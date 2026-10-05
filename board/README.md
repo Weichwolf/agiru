@@ -42,9 +42,15 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   errors, ordinary MilestoneGate passes 13 and the full clean-environment tooling
   replay passes all 233. Keep the failed Make receipt, not a rewritten green run.
   Lint remains red: 55 silent places against the unchanged baseline 13.
-  All compiler input hashes still agree. Full 80/2,314 AL replay is running;
-  source manifest/file hashes match the preceding complete baseline. Receipts:
+  All compiler input and original dependency hashes agree afterward. Full AL
+  replay is terminal: 2,173/2,314 passed, 141 failed, zero incomplete over 80
+  codeunits/six workers/1,432s; runner exits 1, Make 2, no infrastructure errors.
+  Every identity, status, error and source hash matches the preceding complete
+  baseline: zero gains/losses/missing/added/duplicates. Null/unsealed seed remains
+  diagnostic, not causal A/B/G1. Receipts:
   `/tmp/agiru-native-defaults-integration.0S8HWX/{result,interim-verification}.json`.
+  `ut-comparison.json` retains the exact comparison. Next: fixture output isolation,
+  shared effective field length, then complete native profile/live provider.
 
 - Native implicit fields (0013/0044): original logical getters execute twice over
   all 234 tables/2,340 implicit fields, zero refused; raw identity sets and bytes
@@ -59,7 +65,7 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   C++ caller checks fail). 0044 owns the shared primitive; immutable declared length
   stays unchanged. DateFormula 32 is separately authored, not an original native row.
 
-- Current full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
+- Preceding full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.
   Make exits 2, runner 1; no infrastructure errors. Against the preceding
   `/tmp/agiru-native-text-integration.awrO0A`, all identities/source hashes agree:

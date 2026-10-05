@@ -42,17 +42,22 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   lookup fixture still expected the retired omitted-property refusal; it now
   checks the exact missing-original-App-ID refusal, never a fabricated owner.
   All 61 checks remain; `make table-keys` passes 34/166/61 checks, seven compiled
-  and five source controls reject, fixture analysis passes. Full corrected replay
-  is pending; `native-defaults-local.log` and `native-defaults-table-keys{,-lint}.log`.
+  and five source controls reject, fixture analysis passes.
+  `native-defaults-local.log` and `native-defaults-table-keys{,-lint}.log`.
   Later `cd61d73` replay: all C++ gates/qualifiers show zero red; whole Make test
   ends with 146 cases/one red from two tooling output-isolation errors. Parent
   UT_LOG reproduces them; the ordinary thirteen Milestone cases and all 233
   clean-environment tooling cases pass. Preserve the failed original receipt.
-  Lint stays red at 55 silent places/baseline 13; compiler inputs match. Full
-  unchanged 80/2,314 AL replay is live under
-  `/tmp/agiru-native-defaults-integration.0S8HWX/interim-verification.json`.
+  Lint stays red at 55 silent places/baseline 13; compiler inputs/dependencies
+  match afterward. Full AL replay is terminal: 2,173/2,314 passed, 141 failed,
+  zero incomplete; 80 codeunits/six workers/1,432s, runner 1/Make 2, no
+  infrastructure errors. All identities/statuses/errors/source hashes match
+  the preceding full replay: zero gains/losses/missing/added/duplicates.
+  `/tmp/agiru-native-defaults-integration.0S8HWX/{result,ut-comparison}.json`.
+  Null/unsealed seed is diagnostic, not causal A/B/G1. Fix fixture output
+  isolation and shared effective field length before the next integration.
 
-- Current complete UT replay on `2ecc31e` retains 48 Table Metadata provider
+- Complete UT replays through `cd61d73` retain 48 Table Metadata provider
   refusals, unchanged against the preceding full population; 2,173/2,314 pass,
   141 fail, zero incomplete. README retains the source/image/package hashes and
   exact comparison. Step 5 owns the native property/module/implicit-field authority
