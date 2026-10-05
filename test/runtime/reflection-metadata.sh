@@ -6,8 +6,47 @@ CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-reflection-metadata.XXXXXX)
 gate="$B/gate_ReflectionMetadataGate"
 "$gate" > "$proof/current.log" 2>&1
+if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
+  "$gate" "$AGIRU_METADATA_ID_REFERENCE" > "$proof/reference.log" 2>&1
+  sha256sum "$AGIRU_METADATA_ID_REFERENCE" > "$proof/reference.sha256"
+fi
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
+
+if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
+  "$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+    --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -Iinclude -Isrc/rt -Itest/gate test/gate/ReflectionMetadataGate.cpp \
+    src/rt/MetadataSystemId.cpp -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/sanitized"
+  ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 \
+    "$proof/sanitized" "$AGIRU_METADATA_ID_REFERENCE" > "$proof/sanitized.log" 2>&1
+  sha256sum "$proof/sanitized" > "$proof/sanitized.sha256"
+  rm -- "$proof/sanitized"
+fi
+
+for control in guid-byte-order guid-key-order; do
+  awk -v control="$control" '
+    control == "guid-byte-order" && /3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15/ {
+      sub(/3, 2, 1, 0, 5, 4, 7, 6/, "0, 1, 2, 3, 4, 5, 6, 7"); changed++
+    }
+    control == "guid-key-order" && /const std::array parts\{provider.Value\(\), id1, id2, id3\};/ {
+      sub(/id1, id2, id3/, "id1, id3, id2"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' src/rt/MetadataSystemId.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped the stable identity gate\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'FAIL ' "$proof/$control.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
 
 for control in filter-union filter-flowfilter filter-empty; do
   awk -v control="$control" '
@@ -64,7 +103,7 @@ for control in ordinal-cast cds-query default-fallback property-fallback propert
   rg -q 'FAIL ' "$proof/$control.log"
 done
 
-for control in caption-names absent-caption-field null-owner wrong-access wrong-default-classification native-defaults; do
+for control in caption-names absent-caption-field null-owner wrong-access wrong-default-classification native-defaults null-system-id wrong-system-provider; do
   awk -v control="$control" '
     control == "caption-names" && /result \+= std::to_string\(no.Value\(\)\);/ {
       $0 = "    result += Field(source, no)->name;"; changed++
@@ -83,6 +122,12 @@ for control in caption-names absent-caption-field null-owner wrong-access wrong-
     }
     control == "native-defaults" && /return value.empty\(\) && !IsPlatformTable\(source.id\)/ {
       sub(/!IsPlatformTable\(source.id\)/, "source.id.Value() != 0"); changed++
+    }
+    control == "null-system-id" && /result.SystemId = MetadataSystemId/ {
+      $0 = "  result.SystemId = Guid{};"; changed++
+    }
+    control == "wrong-system-provider" && /result.SystemId = MetadataSystemId/ {
+      sub(/platform::TableMetadata_Table::kId/, "source.id"); changed++
     }
     { print }
     END { if (changed != 1) exit 2 }
@@ -111,4 +156,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, compiled filters, AL defaults and temporary rows pass; sixteen controls refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, stable identities, compiled filters, AL defaults and temporary rows pass; twenty controls refuse; %s\n' "$proof"

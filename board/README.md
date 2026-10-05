@@ -26,6 +26,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   diagnostic, not causal A/B/G1. Biggest remaining family: 48 Table Metadata
   provider refusals (0044/0034/0013); no prediction that a provider passes all 48.
 
+- Table Metadata's stable SystemId is implemented from the original keyed-provider
+  path (0044). All 14,101 original constructor observations agree; 204 projection
+  checks/2,917 source checks/twenty controls pass. ASan/UBSan reference replay:
+  14,306 checks/zero red. No own analysis findings; inherited header findings remain.
+  `/tmp/agiru-table-provider-authority.CyvRCA/receipt.json`. Native omitted-property,
+  implicit-field/schema and live read-only-provider gaps remain guarded. This batch
+  has no new full UT result; the complete 2,173/2,314 baseline above is retained.
+
 - Fresh `make census` on BCApps `bb7111877f` retains 36,874 AL files/36,783 objects,
   4,171 test codeunits/113,013 raw methods; fifteen approved exclusions leave
   112,998 required raw methods. Zero unmeasured files; seven conditional assignments

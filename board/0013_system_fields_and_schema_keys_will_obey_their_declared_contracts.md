@@ -14,10 +14,13 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
   NavGuid.Default, while the keyed overload passes its SystemId member.
   IL/hash receipts: `/tmp/agiru-record-order.FQ83WP/native-virtual-system-{fields,population}.il`;
   original extraction provenance: `/tmp/agiru-table-metadata-authority.gCa1Do`.
-  Static creation-path evidence, not original BC execution, Table Metadata's
-  provider call path, native AL omission defaults or cross-version equivalence
+  Static creation-path evidence, not original BC execution,
+  native AL omission defaults or cross-version equivalence
   with System 29.0.55365.0/Runtime 18. Do not apply SQL insertion/audit defaults
   or unconditional zero rowversions to computed providers without qualification.
+  Table Metadata's actual keyed iterator is now traced and its SystemId core
+  measured against the original constructors (0044); audit applicability,
+  timestamp visibility and the complete native field profile remain open.
 - Executed UT recovery (2026-10-03): the Integer sequence provider emitted only
   Number while the cursor selected all declared fields, including system fields.
   `Selection::SeriesColumns` now supplies the complete typed projection with the

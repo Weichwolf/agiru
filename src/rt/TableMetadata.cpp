@@ -8,6 +8,7 @@
 #include "runtime/ErrorValue.h"
 #include "type/Guid.h"
 
+#include "MetadataSystemId.h"
 #include "ReflectionMetadata.h"
 
 #include <optional>
@@ -84,6 +85,7 @@ platform::TableMetadata_Table ProjectTableMetadata(const TableDef &source) {
   result.Scope = Verified(MetadataScope(EffectiveProperty(source, source.scope, "Cloud")));
   result.Access = Verified(MetadataAccess(EffectiveProperty(source, source.access, "Public")));
   result.ALNamespace = source.nameSpace;
+  result.SystemId = MetadataSystemId(platform::TableMetadata_Table::kId, source.id.Value());
   return result;
 }
 

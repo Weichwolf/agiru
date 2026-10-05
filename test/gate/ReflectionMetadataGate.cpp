@@ -16,7 +16,9 @@
 #include "type/Option.h"
 
 #include "Check.h"
+#include "MetadataSystemId.h"
 #include "RecordFilter.h"
+#include "Reference.h"
 #include "ReflectionMetadata.h"
 #include "TableMetadata.h"
 
@@ -25,6 +27,8 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -66,6 +70,50 @@ constexpr agiru::TableDef kSourceTable{.id = agiru::TableId{60074},
                                        .obsoleteReason = "Original reason",
                                        .dataClassification = "AccountData",
                                        .linkedObject = true};
+
+void MetadataIdentities() {
+  using agiru::detail::MetadataSystemId;
+  CHECK_TRUE("metadata identity retains the original mixed-endian GUID layout",
+             MetadataSystemId(agiru::TableId{0x01020304}, 0x01020304, 0x01020304, 0x01020304) ==
+                 *agiru::Guid::FromText("01020304-0304-0102-0403-020104030201"));
+  CHECK_TRUE("metadata identity retains all signed key bits",
+             MetadataSystemId(
+                 agiru::TableId{std::numeric_limits<std::int32_t>::min()}, 65536, 0x01020304, -1) ==
+                 *agiru::Guid::FromText("80000000-0000-0001-0403-0201ffffffff"));
+  CHECK_TRUE("zero metadata keys produce the original empty GUID",
+             MetadataSystemId(agiru::TableId{}, 0).IsNull());
+  const auto original = MetadataSystemId(agiru::platform::TableMetadata::kId, kTemporaryId);
+  for (const auto changed :
+       {MetadataSystemId(agiru::platform::PageMetadata::kId, kTemporaryId),
+        MetadataSystemId(agiru::platform::TableMetadata::kId, kTemporaryId + 1),
+        MetadataSystemId(agiru::platform::TableMetadata::kId, kTemporaryId, 1),
+        MetadataSystemId(agiru::platform::TableMetadata::kId, kTemporaryId, 0, 1)}) {
+    CHECK_TRUE("each metadata key component participates in the stable identity",
+               changed != original);
+  }
+}
+
+void MetadataIdentityReference(const char *path) {
+  constexpr std::size_t kReferenceRows = 14101;
+  std::ifstream input{path};
+  if (!input) { throw agiru::Error("native metadata identity reference cannot be opened"); }
+  std::size_t rows = 0;
+  for (std::string line; std::getline(input, line);) {
+    const auto fields = gate::ReferenceFields<5>(line);
+    const auto expected = agiru::Guid::FromText(fields[4]);
+    if (!expected) { throw agiru::Error("invalid native metadata identity reference GUID"); }
+    const auto actual =
+        agiru::detail::MetadataSystemId(agiru::TableId{std::stoi(std::string(fields[0]))},
+                                        std::stoi(std::string(fields[1])),
+                                        std::stoi(std::string(fields[2])),
+                                        std::stoi(std::string(fields[3])));
+    CHECK_TRUE("original MetadataSystemId construction agrees for all key bits",
+               actual == *expected);
+    ++rows;
+  }
+  CHECK_TRUE("entire original metadata identity reference population retained",
+             rows == kReferenceRows);
+}
 
 void CompiledRecordFilters() {
   using Row = agiru::platform::TableMetadata;
@@ -163,6 +211,15 @@ void TableProjection() {
   CHECK_TRUE("Access retains compile-time visibility", row.Access == TableMetadataAccess::Internal);
   CHECK_TEXT(
       "original AL namespace survives projection", row.ALNamespace.Value(), "Microsoft.Fixture");
+  CHECK_TRUE("Table Metadata SystemId contains the provider and represented table ID",
+             row.SystemId == *agiru::Guid::FromText("77359488-eaaa-0000-0000-000000000000"));
+  auto changed = kSourceTable;
+  changed.id = agiru::TableId{kTemporaryId};
+  const auto other = agiru::detail::ProjectTableMetadata(changed);
+  CHECK_TRUE("Table Metadata SystemId is distinct for a different represented table",
+             other.SystemId != row.SystemId);
+  CHECK_TRUE("Table Metadata SystemId is stable across projection calls",
+             agiru::detail::ProjectTableMetadata(kSourceTable).SystemId == row.SystemId);
   CHECK_TRUE("projection does not allocate per-session catalogue state",
              row.State_Block.Peek() == nullptr);
 }
@@ -467,8 +524,9 @@ template <typename Row> void MissingProviderIsNotAnEmptySnapshot() {
 
 }
 
-int main() {
-  return gate::Run("ReflectionMetadata", [] {
+int main(int argc, char **argv) {
+  return gate::Run("ReflectionMetadata", [&] {
+    MetadataIdentities();
     PageTypes();
     TableTypes();
     TableProperties();
@@ -479,5 +537,6 @@ int main() {
     CompiledRecordFilters();
     MissingProviderIsNotAnEmptySnapshot<agiru::platform::PageMetadata>();
     MissingProviderIsNotAnEmptySnapshot<agiru::platform::TableMetadata>();
+    if (argc > 1) { MetadataIdentityReference(argv[1]); }
   });
 }

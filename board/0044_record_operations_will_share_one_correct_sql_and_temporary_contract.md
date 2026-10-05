@@ -12,6 +12,22 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   and shared read-only provider; do not remove the guard or manufacture defaults.
   Closing this boundary is not a prediction that all 48 business methods pass.
 
+- Table Metadata identity prerequisite: `TableDataProvider` (table 2000000136),
+  iterator `MoveNext` RVA 2efed4, constructs `(provider ID, table ID, 0, 0)` and
+  calls keyed `VirtualDataProvider::CreateVirtualRecordBuffer`. Original Ncl-29
+  `MetadataSystemId` constructors/explicit layout overlay four Int32s at 0/4/8/12
+  with a GUID. Executing the original constructors on CLR 10.0.12 gives 14,101
+  exact, reversible reference rows; private `MetadataSystemId.{h,cpp}` matches all
+  signed bits and GUID byte order without host-endian casts. TableMetadata.cpp
+  now projects that stable identity, not an empty/random/company-specific GUID.
+  `make reflection-metadata`: 204 checks, 2,917 source checks, twenty controls
+  green; reference and ASan/UBSan runs each pass 14,306 checks. Four new mutants
+  reject byte/key order, empty identity and wrong provider. Receipt:
+  `/tmp/agiru-table-provider-authority.CyvRCA/receipt.json`. Targeted analysis
+  reports no own findings; 25/30/30 inherited header findings remain unsuppressed.
+  Guard, native omitted properties, audit/rowversion visibility, schema activation
+  and shared read-only operations remain open; no new full-UT/provider claim.
+
 - Rename cascade read anchor: `src/rt/Rename.cpp::Rewrite` now writes through an
   independent record, leaving its reader on the old key for dynamic Next resumption.
   The preceding implementation skipped remaining old-parent children when their
@@ -425,8 +441,9 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 5. Complete computed platform tables from system symbols and requested ranges, avoiding fixed-date population as the authoritative implementation.
    Qualify each provider's creation path against 0013's original virtual-buffer
    evidence: virtual timestamp 1, conditional audit defaults and supplied versus
-   default SystemId. Do not substitute persisted-row SQL defaults; Table Metadata's
-   actual call path and native omitted-property authority remain unproved.
+   default SystemId. Table Metadata's keyed creation/identity path is qualified
+   above; native omitted properties and implicit-field visibility remain unproved.
+   Do not substitute persisted-row SQL defaults.
    Share Page/Table Metadata, Field and AllObj live projections over immutable installed metadata. Populate every represented source property from qualified declarations/app identity, keep Name separate from Caption, and refuse missing authority rather than default values. Reuse `ReflectionMetadata` mappings; CDS is not Query. Prove typed/reflected filtering, count/navigation, permissions, read-only writes and temporary independence before removing the guards. 0013 owns explicit legacy-snapshot/schema activation.
    Native ownership: start at `Main::WriteNativeObjects`, `NativeSources::app` and
    `TableWriter::{NativeTableAssertions,TableReflectionProperties}`. Emit original
@@ -551,6 +568,14 @@ and `methods-auto/moduleinfo/moduleinfo-data-type.md`; BCApps `bb7111877f`,
 `Business Foundation/App/NoSeries/src/Setup/NoSeries.Table.al`,
 `Layers/W1/BaseApp/Projects/Resources/Pricing/ResourceCost.Table.al`.
 Original verified System `29.0.55365.0`: `src/Virtual Tables/TableMetadata.Table.al`.
+Stable metadata identity: same revisions, `devenv-{virtual-tables,table-system-fields}.md`;
+BCApps `DataClassificationMgtImpl.Codeunit.al::IsSupportedTable`; original Ncl
+`TableDataProvider`/`MetadataSystemId`/`VirtualDataProvider` and retained IL/layout
+receipts above. The 16-byte permutation in MetadataSystemId.cpp converts the original
+little-endian four-Int32 overlay to Guid's canonical byte representation. Keep
+original 29.0.54011.55407, System 29.0.55365.0 and demo 28.4 bounds distinct.
+Predecessor 830 warns of broad metadata activation and vacuous no-op assertions;
+1040/1041 require runtime providers, not silently empty physical copies.
 User docs `0ff62b2266`, `business-central/admin-classifying-data-sensitivity.md`:
 developer classification is not user-maintained sensitivity. Predecessor 1017/1080/1417
 are findings, not schema authority. Local `onprem/classifying-data.md` describes
