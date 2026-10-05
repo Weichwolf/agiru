@@ -5,6 +5,15 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Current production replay `2ecc31e` (source batch `e96f649`) is terminal:
+  2,173/2,314 passed, 141 failed, zero incomplete; all identities/source hashes
+  match the preceding full run. Original OAuth code challenge recovers through
+  HashAlgorithm→Convert; no losses/missing/added/duplicates/changed errors.
+  `/tmp/agiru-convert-carrier-integration.ytBvMq/ut-comparison-native-text.json`;
+  source/image/System hashes agree afterward. Null/unsealed seed is diagnostic,
+  not causal A/B/G1. BigText, keyed hashing, full CLR Array behaviour, numeric
+  conversions, native activation and full-app linking remain open.
+
 - Production regeneration on `9a60a46` activates both ordinary HashAlgorithm and
   Convert calls in the original CryptographyManagementImpl body; generated includes
   name their real headers and neither type remains in absent/Types.h. Make exits 2,
@@ -49,7 +58,7 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   unlinked AL replacement bodies remain gaps, not full-app/G1 proof. Complete
   local tests pass on `c914c68`: 146 cases/zero red, all 233 tooling tests,
   exit 0 in 1,069 seconds; source/image/System hashes agree afterward. Full UT
-  replay remains pending; no business-test pass gain is claimed yet.
+  replay above proves one original code-challenge gain, not ERP/G1 closure.
 
 - Convert byte-array bridge reuses the original-core-qualified Base64 codec.
   Typed formatting ordinals, checked regions and byte cells retain strict CLR
@@ -71,7 +80,8 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   each, zero own findings; both runners pass; generator's three unchanged findings
   remain unsuppressed. Numeric ToInt16/ToInt32/ToUInt16/ToUInt32 still refuse by name;
   complete Array reference/null/byte-type identity and CLR diagnostics remain gaps.
-  Root regeneration/full local/full UT replay are pending, not an OAuth/G1 claim.
+  Production regeneration/full local/full UT replay are completed above; original
+  code challenge recovers, not complete OAuth/ERP/G1 functionality.
   References: developer `ff5939a46e`, `devenv-get-started-call-dotnet-from-al.md`;
   BCApps `bb7111877f`, CryptographyManagementImpl.Codeunit.al ConvertByteHashToBase64String,
   DotNet Aliases/src/dotnet.al and DotNetBinaryWriter.Codeunit.al numeric consumers;
@@ -98,9 +108,8 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   AL runner passes. Generator keeps three pre-existing findings outside edited lines.
   No suppression increases. Keyed/stream/transform APIs, Hash/Initialize state,
   configurable CryptoConfig, complete Array null/type/reference identity, exact
-  diagnostics and WASM remain gaps. Root generation/full UT replay are pending;
-  original hash-output conversion still reaches absent Convert, so do not claim
-  OAuth recovery from the authored fixture.
+  diagnostics and WASM remain gaps. Full production replay proves the original
+  Hash→Convert code challenge; the authored fixture alone was not that proof.
 
 - File/Native-text replay `/tmp/agiru-native-text-integration.awrO0A` is terminal
   on `45f6fd0`: slice/build/local tests pass (142 cases/233 tooling); UT

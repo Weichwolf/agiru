@@ -5,6 +5,13 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Current complete UT replay on `2ecc31e` retains 48 Table Metadata provider
+  refusals, unchanged against the preceding full population; 2,173/2,314 pass,
+  141 fail, zero incomplete. README retains the source/image/package hashes and
+  exact comparison. Step 5 owns the native property/module/implicit-field authority
+  and shared read-only provider; do not remove the guard or manufacture defaults.
+  Closing this boundary is not a prediction that all 48 business methods pass.
+
 - Rename cascade read anchor: `src/rt/Rename.cpp::Rewrite` now writes through an
   independent record, leaving its reader on the old key for dynamic Next resumption.
   The preceding implementation skipped remaining old-parent children when their

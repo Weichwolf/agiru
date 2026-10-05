@@ -15,6 +15,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Current full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
+  2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.
+  Make exits 2, runner 1; no infrastructure errors. Against the preceding
+  `/tmp/agiru-native-text-integration.awrO0A`, all identities/source hashes agree:
+  one gain (`Test OAuth 2.0 UT::GetAuthorizationURLWithCodeChallenge`), zero losses,
+  missing/added/duplicates or changed errors. `/tmp/agiru-convert-carrier-integration.ytBvMq/`
+  retains `receipt.json`, logs and `ut-comparison-native-text.json`; source/image/
+  original System-package hashes agree afterward. Null/unsealed seed remains
+  diagnostic, not causal A/B/G1. Biggest remaining family: 48 Table Metadata
+  provider refusals (0044/0034/0013); no prediction that a provider passes all 48.
+
 - Fresh `make census` on BCApps `bb7111877f` retains 36,874 AL files/36,783 objects,
   4,171 test codeunits/113,013 raw methods; fifteen approved exclusions leave
   112,998 required raw methods. Zero unmeasured files; seven conditional assignments
@@ -49,7 +60,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   bodies remain counted gaps, not full-app/G1 proof. Complete local tests pass on
   `c914c68`: 146 cases/zero red, 233 tooling tests, exit 0 in 1,069s. Compiler/image
   and original System-package hashes agree afterward. `receipt.json` retains the
-  evidence. Full 2,314-method UT replay remains pending; no new pass count claimed.
+  evidence. Full UT replay above proves the original OAuth code-challenge gain;
+  BigText behaviour, full-app linking and remaining native gaps are still open.
 
 - Convert byte-array integration passes: 16,469 C++/14,615 generated-AL checks,
   10,051 original-core and 710 CLR-region reference rows agree; four compiled
@@ -59,7 +71,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-hashing.BKd4NG` (0035). Numeric conversions remain four named
   refusals; Array null/type/reference identity remains unqualified. No own
   source/gate analysis findings; 32 inherited header findings each and three
-  unchanged generator findings remain. Root regeneration/full replay are pending.
+  unchanged generator findings remain. Production regeneration/full replay are
+  completed above; numeric conversions and full CLR Array behaviour remain open.
 
 - Generic byte hashing passes focused verification: five MD5/SHA families,
   1,182 C++ checks, 13 generated-AL checks, three compiled controls rejected by
@@ -67,10 +80,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   1,423 CLR observations agree, one known HMAC factory remains a counted refusal.
   `/tmp/agiru-hashing.iQ1k22`, `/tmp/agiru-hash-reference.82UJ0n` (0035).
   No own source/gate analysis findings; inherited headers and three unchanged
-  generator findings remain unsuppressed. Root generation, complete local gates
-  and the same full UT replay are pending; absent hash-output Convert remains
-  the next reachable bridge. The preceding complete baseline below is not a
-  measurement of this new source/image.
+  generator findings remain unsuppressed. Production regeneration, complete local
+  gates and full UT replay are completed above; the original Hash→Convert path
+  recovers code challenge. Keyed/stream/transform APIs and WASM remain open.
 
 - File/Native-text fixed-tree build passes (compiler inputs `8941708`, documentation
   HEAD `2a75bf1`): six-job resume exits 0 in 1,704 seconds; the preceding two-job

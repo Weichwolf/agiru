@@ -16,7 +16,8 @@ Depends on: 0589 trustworthy execution; 0004 sealed seed for acceptance.
   current measurements and original failure remain in README.
 
 - README owns the latest completed configured UT result and its exact identity/
-  source-hash comparison. The new Hash/Convert production replay remains pending.
+  source-hash comparison. The Hash/Convert replay retains all 80/2,314 identities,
+  with one code-challenge gain and no losses/missing/added/duplicates/changed errors.
   Null/unsealed seeds prove diagnostic repeatability only, not causal A/B or the
   independently larger full AL suite; slice/link success is not full-app/G1 proof.
 - Latest clean reference refresh `6261b1c458`→`bb7111877f`: 36,874 files/36,783 objects/4,171 test codeunits; 113,013 raw methods, fifteen approved exclusions, 112,998 required, zero unmeasured and the same seven conditional refusals (census exit 2). Exact identity comparison retains all 113,005 previous methods and adds eight: PowerBICoreTest.AssistedSetupShowsDeploymentChoiceForNonEvaluationCompany; SubcWIPTransCreateTest.{MultipleWIPReturnsFromOneProductionOrderOpenExactList,ReusedWIPReturnFromAnotherPurchaseOrderAppearsInList,SingleWIPReturnOpensRealTransferOrderCard}; PowerBISynchronizerTests.{TestDeploymentBufferCountsAndRemovesOutcomes,TestDeploymentBufferLoadsSelection}; HttpWebReqMgtTests.TestSetUseDefaultCredentials; TestJobQueueSNAP.RunCleanUpTaskWhenJobQueueRetriedByPlatformTwice. Product classification of mixed cloud/core cases remains 0725, not an implicit exclusion. Configured UT identities remain byte-identical at 80/2,314, no AL execution. `build/number-sequence-{census-before.log,raw-methods-{old,current,added,lost}.tsv,ut-{before,after}.json}`; generated-image refresh/link remains 0038.
