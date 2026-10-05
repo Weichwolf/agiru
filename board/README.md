@@ -46,8 +46,10 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Slice-check: 14,225/zero missing. Six-job build resumes existing objects under
   `/tmp/agiru-convert-carrier-integration.ytBvMq`: build exits 0 in 1,922s;
   all 25,283 compiler input hashes match afterward. 1,383 unlinked replacement
-  bodies remain counted gaps, not full-app/G1 proof. Complete local tests are next;
-  full 2,314-method UT replay remains pending, no new pass count claimed.
+  bodies remain counted gaps, not full-app/G1 proof. Complete local tests pass on
+  `c914c68`: 146 cases/zero red, 233 tooling tests, exit 0 in 1,069s. Compiler/image
+  and original System-package hashes agree afterward. `receipt.json` retains the
+  evidence. Full 2,314-method UT replay remains pending; no new pass count claimed.
 
 - Convert byte-array integration passes: 16,469 C++/14,615 generated-AL checks,
   10,051 original-core and 710 CLR-region reference rows agree; four compiled
