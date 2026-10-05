@@ -3221,7 +3221,7 @@ class DiscoveryGate(unittest.TestCase):
                        'runtime/codeunit-record.sh', 'runtime/page-navigation.sh',
                        'runtime/boolean-expressions.sh', 'transpiler/control-extensions.sh',
                        'transpiler/native-table-ids.sh', 'transpiler/native-codeunits.sh',
-                       'runtime/base64.sh', 'runtime/encoding.sh', 'runtime/record-order.sh',
+                       'runtime/base64.sh', 'runtime/encoding.sh', 'runtime/hashing.sh', 'runtime/record-order.sh',
                        'runtime/streams.sh')
             for name in scripts:
                 script = root / 'test' / name

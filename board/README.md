@@ -15,6 +15,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Generic byte hashing passes focused verification: five MD5/SHA families,
+  1,182 C++ checks, 13 generated-AL checks, three compiled controls rejected by
+  both consumers, primitive/consumer ASan/UBSan green. Private system OpenSSL;
+  1,423 CLR observations agree, one known HMAC factory remains a counted refusal.
+  `/tmp/agiru-hashing.iQ1k22`, `/tmp/agiru-hash-reference.82UJ0n` (0035).
+  No own source/gate analysis findings; inherited headers and three unchanged
+  generator findings remain unsuppressed. Root generation, complete local gates
+  and the same full UT replay are pending; absent hash-output Convert remains
+  the next reachable bridge. The preceding complete baseline below is not a
+  measurement of this new source/image.
+
 - File/Native-text fixed-tree build passes (compiler inputs `8941708`, documentation
   HEAD `2a75bf1`): six-job resume exits 0 in 1,704 seconds; the preceding two-job
   build was intentionally interrupted after AL workers finished, not a compiler

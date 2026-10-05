@@ -154,7 +154,9 @@ prove the narrow header's dependency profile with negative controls.
   Constants need a documented origin where their meaning is not self-evident.
 - Dependencies are allowed when the standard library is insufficient; justify their purpose
   and portability. XML uses libxml2; JSON uses system yyjson behind a private adapter,
-  preserving exact number tokens and stable node ownership. Reporting must preserve BC layout semantics and produce
+  preserving exact number tokens and stable node ownership. Byte hashing uses system OpenSSL
+  Crypto behind a private adapter; no OpenSSL headers in generated/public interfaces.
+  Its WASM backend remains unqualified. Reporting must preserve BC layout semantics and produce
   genuine PDF/workbook output through the layout/Cairo architecture above. Verify native
   Linux performance/resources and browser-only WASM compatibility; no Java/desktop-Office engine.
 - Incremental compiler outputs may use `build/`. Temporary fixtures, probes, source

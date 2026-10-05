@@ -59,6 +59,14 @@ in `XmlReaderGate`; separate-state and raw-input reload mutants must fail. It co
 positioned/ended readers, node ownership, namespaces, DTD retention and whitespace.
 DTD/resolver security, encoding and streaming bounds remain open (0035).
 
+`make hashing JOBS=2` proves named MD5/SHA1/SHA256/SHA384/SHA512 byte-array and
+region hashing, shared disposal and generated AL calls. Three compiled mutants
+must fail both consumers. The primitive and consumers also run under ASan/UBSan;
+OpenSSL and the whole runtime are not instrumented. `AGIRU_HASH_REFERENCE=<TSV>`
+replays the separately measured CLR corpus. Header controls keep OpenSSL/Array
+implementation dependencies private. Keyed/stream/transform hashing, complete
+System.Array identity/type rules and WASM qualification remain open (0035).
+
 `make streams JOBS=2` proves shared cursors, fresh/wrapper-local bindings, escaped
 local BLOB providers and independent BLOB values through C++ and generated AL.
 FileGate and that AL consumer also prove file binary/text modes, declared text

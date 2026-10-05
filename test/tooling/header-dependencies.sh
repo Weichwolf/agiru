@@ -30,6 +30,16 @@ for header in ObjectKind.h RuntimeSurface.h Names.h; do
 done
 compile_header dotnet/Regex.h "$proof/Regex.h.d"
 reject_dependency "$proof/Regex.h.d" regex
+compile_header dotnet/HashAlgorithm.h "$proof/HashAlgorithm.h.d"
+for forbidden in evp.h Regex.h Variant.h vector; do
+  reject_dependency "$proof/HashAlgorithm.h.d" "$forbidden"
+done
+compile_header dotnet/HashAlgorithm.h "$proof/forced-crypto.h.d" -include openssl/evp.h
+if reject_dependency "$proof/forced-crypto.h.d" evp.h \
+  > "$proof/forced-crypto.h.log" 2>&1; then
+  printf 'header-dependencies: private crypto backend escaped the control\n' >&2
+  exit 1
+fi
 compile_header type/JsonHandle.h "$proof/JsonHandle.h.d"
 for forbidden in memory yyjson.h json.hpp; do
   reject_dependency "$proof/JsonHandle.h.d" "$forbidden"
@@ -80,4 +90,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: eight standalone headers; filesystem/regex/JSON/report/module/table controls refused\n'
+printf 'header-dependencies: nine standalone headers; filesystem/regex/crypto/JSON/report/module/table controls refused\n'

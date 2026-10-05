@@ -5,6 +5,28 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Generic HashAlgorithm byte bridge: MD5/SHA1/SHA256/SHA384/SHA512 use private
+  system OpenSSL Crypto 3.5.7, not a business-object workaround. Factories retain
+  built-in aliases/null results; bound copies share provider disposal, rebinding
+  stays wrapper-local. Exact regions and integer byte cells validate before hashing;
+  provider failures refuse. Processing uses a 4 KiB tuning block, not an AL limit.
+  `make hashing`: 1,182 C++ checks and 13 generated-AL checks green; three compiled
+  algorithm/offset/disposal controls reject both. Primitive/consumers pass ASan/UBSan;
+  backend/whole runtime are not instrumented. `/tmp/agiru-hashing.iQ1k22`.
+  CLR 10.0.12 reference: 1,424 rows, 1,423 supported observations agree; one HMAC
+  factory remains explicitly refused, not a parity claim. 0..260/8,193-byte inputs,
+  Unicode-encoded bytes, aliases, ranges and disposal; 52,195 gate checks green.
+  `/tmp/agiru-hash-reference.82UJ0n/reference.tsv`, SHA256
+  `c880a5a3730876620c0a3e9126404efed5ddb31873b21baf882b3696c20e5d7c`.
+  Narrow header excludes OpenSSL/Array/Variant/vector, with forced-backend control.
+  Source/gate analysis: zero own findings, 32 inherited header findings each;
+  AL runner passes. Generator keeps three pre-existing findings outside edited lines.
+  No suppression increases. Keyed/stream/transform APIs, Hash/Initialize state,
+  configurable CryptoConfig, complete Array null/type/reference identity, exact
+  diagnostics and WASM remain gaps. Root generation/full UT replay are pending;
+  original hash-output conversion still reaches absent Convert, so do not claim
+  OAuth recovery from the authored fixture.
+
 - File/Native-text replay `/tmp/agiru-native-text-integration.awrO0A` is terminal
   on `45f6fd0`: slice/build/local tests pass (142 cases/233 tooling); UT
   2,172/2,314, 142 failed, zero incomplete, 80 codeunits/1,231 seconds.
