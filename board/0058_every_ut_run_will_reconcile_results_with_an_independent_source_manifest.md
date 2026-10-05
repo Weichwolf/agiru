@@ -8,6 +8,12 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
+- Latest frozen attempt: `89f0125` / content `1ba53399d1c1`, slice check passed;
+  build, local test and UT Make targets failed. No AL UT ran: all 2,314 methods
+  across eighty codeunits remain unexecuted. The stale generated Table Metadata
+  contract counted new implicit fields as source fields; `make transpile` now
+  regenerates its canonical identity predicate. Record-order mutation anchors also
+  missed the new SQL write helpers. Repairs require a fresh build/test/UT replay.
 - Last completed frozen AL replay: `d3e7671` / content `15e116850819`,
   2,173/2,314 passed, 141 failed, zero incomplete; eighty codeunits,
   BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. Legacy null/unsealed seed:
@@ -19,13 +25,13 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   This replay covers the earlier reflection-name/profile-selection changes,
   not `b9f35e9` materialization/current User lookups, `5a4c3be` source-write refusal
   or subsequent rowversion allocation/SQL integration.
-- Current failure concentrations: 48 Table Metadata provider refusals, thirteen
+- Last measured AL failure concentrations: 48 Table Metadata provider refusals, thirteen
   incoming-document conversion assertions, four Inventory Profile missing-key paths
   and four WorkbookWriter.Create refusals. Fix their shared contracts, not callers.
-- Raw census: 36,874 AL files, 36,783 objects, 4,171 test codeunits,
-  113,013 methods; fifteen approved exclusions leave 112,998 required.
+- Raw census: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
+  113,111 methods; fifteen approved exclusions leave 113,096 required.
   Zero unmeasured files; seven conditional assignments still refuse.
-  Reproduce with `make census` against BCApps `bb7111877f` and the pinned policy.
+  Reproduce with `make census` against BCApps `d99152ee35f0` and the pinned policy.
   This is not the configured 2,314-method executable milestone.
 - Native inventory retains 234 raw tables, 233 selected, eighteen bound and
   215 unbound; 35 selected native codeunits have 67 unimplemented methods.
@@ -34,7 +40,10 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Package/declaration qualifiers are not full-app linking or business execution.
 - BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17` retains byte-identical sources
   for all eighty configured UT codeunits / 2,314 methods versus `bb7111877f`.
-  Existing generated apps have not been regenerated against the newer full tree.
+  `make transpile` has regenerated against this revision and the verified native
+  package; 215 unbound native tables, 67 native methods and 5,683 refused property
+  declarations keep translation nonzero. Generation is not successful full-tree
+  compilation or AL execution.
 - `make lint` is red: 388 unique diagnostics, ninety of 267 units analysed, all
   ninety failed. Newly introduced include/test diagnostics were repaired; focused
   system-profile analysis still fails on common runtime/type headers. Preserve
