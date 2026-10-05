@@ -5,6 +5,20 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Ignore header/closing increment: require whitespace after DOCTYPE and external-ID
+  keywords, a nonempty name token, quoted SYSTEM/PUBLIC literals and the closing
+  `>` after the internal subset. Do not interpret declarations inside that subset.
+  XmlReaderGate retains all 134 checks and adds 86 UTF-8/UTF-16LE reader/Load cases:
+  220 green; preceding actual runtime has 53 failures on the same gate. Seven
+  compiled controls reject; header-bypass control has 79 failures. Fixture-resource
+  tripwire remains qualified. `/tmp/agiru-xml-header.1XX8t9`,
+  `/tmp/agiru-xml-reader.PUZSGA`; final input hashes match. No own analysis findings;
+  36/62 inherited reader/gate header findings remain unsuppressed (lint exits 2).
+  Outside frozen 015114; full replay pending. QName/XML character validation,
+  encoding profiles, whitespace boundaries, error states and Parse/resolver policy
+  remain gaps. Framework `XmlTextReaderImpl::{ParseDoctypeDecl,SkipDtd,SkipUntil}`
+  supplies header boundaries; local developer/BCApps/user revisions below and
+  predecessor 1185 do not define the .NET lexical contract.
 - First DTD-policy increment: Create snapshots its processing mode; the private
   byte scanner stops Prohibit at a non-observable reader boundary and removes
   Ignore declarations before backend entity/default-attribute parsing. Compaction

@@ -31,6 +31,7 @@ namespace agiru::dotnet {
 namespace {
 
 constexpr std::size_t kDeclarationOpen = 5;
+constexpr std::size_t kDoctypeOpen = std::string_view("<!DOCTYPE").size();
 constexpr std::int32_t kXmlDeclaration = 17;
 constexpr std::size_t kFileReadBlock = 4096;
 
@@ -113,10 +114,55 @@ bool XmlSpace(char character) {
   return character == ' ' || character == '\t' || character == '\r' || character == '\n';
 }
 
+void SkipSpace(const MarkupBytes &source, std::size_t &offset) {
+  while (XmlSpace(source.At(offset))) { offset += source.Width(); }
+}
+
+bool SkipQuoted(const MarkupBytes &source, std::size_t &offset, std::size_t size) {
+  const char quote = source.At(offset);
+  if (quote != '\'' && quote != '"') { return false; }
+  offset += source.Width();
+  while (offset < size) {
+    const char character = source.At(offset);
+    offset += source.Width();
+    if (character == quote) { return true; }
+  }
+  return false;
+}
+
+std::size_t DoctypeHeaderEnd(const MarkupBytes &source, std::size_t start, std::size_t size) {
+  std::size_t offset = start + kDoctypeOpen * source.Width();
+  if (!XmlSpace(source.At(offset))) { return start; }
+  SkipSpace(source, offset);
+  const std::size_t name = offset;
+  while (offset < size && !XmlSpace(source.At(offset)) && source.At(offset) != '[' &&
+         source.At(offset) != '>') {
+    offset += source.Width();
+  }
+  if (offset == name) { return start; }
+  SkipSpace(source, offset);
+  if (source.At(offset) == '[' || source.At(offset) == '>') { return offset; }
+  const bool publicId = source.Is(offset, "PUBLIC");
+  if (!publicId && !source.Is(offset, "SYSTEM")) { return start; }
+  offset += std::string_view("SYSTEM").size() * source.Width();
+  if (!XmlSpace(source.At(offset))) { return start; }
+  SkipSpace(source, offset);
+  if (!SkipQuoted(source, offset, size)) { return start; }
+  if (publicId) {
+    if (!XmlSpace(source.At(offset))) { return start; }
+    SkipSpace(source, offset);
+    if (!SkipQuoted(source, offset, size)) { return start; }
+  }
+  SkipSpace(source, offset);
+  return source.At(offset) == '[' || source.At(offset) == '>' ? offset : start;
+}
+
 std::size_t DoctypeEnd(const MarkupBytes &source, std::size_t start, std::size_t size) {
-  std::size_t subset = 0;
+  std::size_t offset = DoctypeHeaderEnd(source, start, size);
+  if (offset == start) { return start; }
+  if (source.At(offset) == '>') { return offset + source.Width(); }
   char quote = '\0';
-  for (std::size_t offset = start; offset < size; offset += source.Width()) {
+  for (offset += source.Width(); offset < size; offset += source.Width()) {
     const char character = source.At(offset);
     if (quote != '\0') {
       if (character == quote) { quote = '\0'; }
@@ -126,13 +172,10 @@ std::size_t DoctypeEnd(const MarkupBytes &source, std::size_t start, std::size_t
       offset = source.After(offset, "?>") - source.Width();
     } else if (character == '\'' || character == '"') {
       quote = character;
-    } else if (character == '[') {
-      ++subset;
     } else if (character == ']') {
-      if (subset == 0) { return start; }
-      --subset;
-    } else if (character == '>' && subset == 0) {
-      return offset + source.Width();
+      offset += source.Width();
+      SkipSpace(source, offset);
+      return source.At(offset) == '>' ? offset + source.Width() : start;
     }
   }
   return start;

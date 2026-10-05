@@ -15,6 +15,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- XML Ignore header/closing fix (0035): 220 checks green; preceding runtime has
+  53 failures on the same expanded gate. Seven compiled controls reject (header
+  bypass: 79 failures); fixture-resource tripwire remains qualified. Input hashes
+  match: `/tmp/agiru-xml-header.1XX8t9`, `/tmp/agiru-xml-reader.PUZSGA`.
+  No own analysis findings, 36/62 inherited header findings remain (lint exits 2).
+  Outside frozen 015114; full replay pending. QName/character validation, other
+  encodings, whitespace/error states and Parse/resolver authority remain open.
 - XML integration is live: `20261005T015114Z-3424473`, frozen HEAD `3f6715e`,
   source `5868281d053a1fc2e797530f440b93f85a8ed23d9afb6c586225de0c19c0e193`;
   `slice-check all test ut`, six jobs. Runner 3426036 is confirmed live; local

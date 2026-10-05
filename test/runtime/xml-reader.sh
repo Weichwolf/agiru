@@ -23,7 +23,7 @@ jq -n --arg directory "$PWD" --arg file "$PWD/$resource_source" \
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
   "${resource_command[@]}" > "$B/fixture-commands/xml-reader-resource.json"
 LD_PRELOAD="$proof/resource-trap.so" "$gate" > "$proof/resource-trap.log" 2>&1
-for control in cursor-local close-local raw-load unfiltered-policy ignore-policy prohibit-boundary; do
+for control in cursor-local close-local raw-load unfiltered-policy ignore-policy prohibit-boundary doctype-header; do
   awk -v control="$control" '
     { print }
     (control == "cursor-local" && $0 == "Boolean XmlReader::Read() {") ||
@@ -38,6 +38,10 @@ for control in cursor-local close-local raw-load unfiltered-policy ignore-policy
     }
     control == "prohibit-boundary" && $0 == "Boolean XmlReader::Read() {" {
       print "  if (state_ != nullptr) { state_->policyFailure.clear(); }"; changed++
+    }
+    control == "doctype-header" && $0 == "std::size_t DoctypeHeaderEnd(const MarkupBytes &source, std::size_t start, std::size_t size) {" {
+      print "  while (start < size && source.At(start) != '\''>'\'') { start += source.Width(); }";
+      print "  return start;"; changed++
     }
     control == "raw-load" && $0 == "void XmlReader::LoadDocument(::agiru::detail::XmlHandle &into, bool preserveWhitespace) const {" {
       print "  if (state_ != nullptr && state_->text != nullptr) {";
@@ -67,6 +71,8 @@ for control in cursor-local close-local raw-load unfiltered-policy ignore-policy
   elif [ "$control" = ignore-policy ]; then
     rg -q 'Ignore never reports a discarded doctype node' "$proof/$control.log"
     rg -q 'Ignore leaves DTD-defined entity references undeclared' "$proof/$control.log"
+  elif [ "$control" = doctype-header ]; then
+    rg -q 'Ignore rejects malformed DOCTYPE header or closing syntax' "$proof/$control.log"
   else
     rg -q 'default Prohibit rejects a DTD before reader or DOM expansion' "$proof/$control.log"
   fi
@@ -83,4 +89,4 @@ done
 rm -- "$proof/resource-trap.so" "$proof/resource-trap.o"
 sha256sum src/net/XmlReader.cpp include/dotnet/XmlReader.h test/gate/XmlReaderGate.cpp \
   "$B/libagiru_net.so" "$gate" > "$proof/inputs.sha256"
-printf 'xml-reader: shared cursor/close/Load and DTD checks pass; six source controls and resource trap reject; %s\n' "$proof"
+printf 'xml-reader: shared cursor/close/Load and DTD checks pass; seven source controls and resource trap reject; %s\n' "$proof"

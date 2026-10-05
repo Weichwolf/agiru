@@ -201,6 +201,56 @@ void TextReaderConstructionAndFactoryHaveDistinctDtdDefaults() {
                  std::string::npos);
 }
 
+void IgnoreStillRequiresDoctypeHeaderAndClosingSyntax() {
+  XmlReaderSettings settings;
+  settings.DtdProcessing(agiru::dotnet::DtdProcessing::Ignore());
+  for (const std::string_view declaration : {"<!DOCTYPEroot>",
+                                             "<!DOCTYPE >",
+                                             "<!DOCTYPE root SYSTEM>",
+                                             "<!DOCTYPE root SYSTEM'outside'>",
+                                             "<!DOCTYPE root SYSTEM outside>",
+                                             "<!DOCTYPE root PUBLIC 'public'>",
+                                             "<!DOCTYPE root PUBLIC'public' 'outside'>",
+                                             "<!DOCTYPE root PUBLIC 'public''outside'>",
+                                             "<!DOCTYPE root PUBLIC 'public' outside>",
+                                             "<!DOCTYPE root UNKNOWN 'outside'>",
+                                             "<!DOCTYPE root SYSTEM 'outside' extra>",
+                                             "<!DOCTYPE root [ignored] extra>",
+                                             "<!DOCTYPE root [ignored [nested]]>"}) {
+    for (const bool utf16 : {false, true}) {
+      for (const bool load : {false, true}) {
+        CHECK_TRUE(
+            "Ignore rejects malformed DOCTYPE header or closing syntax",
+            !ReadFailure(ReaderOverEncoded(std::string(declaration) + "<root/>", utf16, settings),
+                         load)
+                 .empty());
+      }
+    }
+  }
+  for (const std::string_view declaration : {"<!DOCTYPE root>",
+                                             "<!DOCTYPE root []>",
+                                             "<!DOCTYPE root SYSTEM 'outside'>",
+                                             "<!DOCTYPE root PUBLIC 'public' 'outside'>",
+                                             "<!DOCTYPE root[ignored]>",
+                                             "<!DOCTYPE root [<!-- ] --> <?work ]?> 'quoted ]'>] >",
+                                             "<!DOCTYPE root [uninterpreted declaration text]>",
+                                             "<!DOCTYPE root SYSTEM 'quoted > [ ]'>"}) {
+    for (const bool utf16 : {false, true}) {
+      for (const bool load : {false, true}) {
+        CHECK_SILENT(
+            "Ignore retains valid header boundaries without interpreting the subset",
+            ReadFailure(ReaderOverEncoded(std::string(declaration) + "<root/>", utf16, settings),
+                        load));
+      }
+    }
+  }
+  XmlReader reader = ReaderOver("<?before ready?><!DOCTYPEroot><root/>", settings);
+  CHECK_TRUE("Ignore header validation preserves the preceding processing instruction",
+             reader.Read() && reader.NodeType().Equals(XmlNodeType::ProcessingInstruction()));
+  CHECK_TRUE("Ignore header validation throws at the declaration, not at Create",
+             !ReadFailure(reader, false).empty());
+}
+
 void DocumentLoadConsumesTheSharedReader() {
   XmlReader reader = ReaderOver("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
                                 "<!--before--><?work one?><root xmlns:p=\"urn:one\" id=\"7\">"
@@ -448,5 +498,6 @@ int main() {
     IgnoreDiscardsDeclarationsBeforeEntityAndAttributeProcessing();
     ReaderPolicyIsASnapshotAndMarkupLiteralsAreNotDtds();
     TextReaderConstructionAndFactoryHaveDistinctDtdDefaults();
+    IgnoreStillRequiresDoctypeHeaderAndClosingSyntax();
   });
 }
