@@ -114,9 +114,12 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   mutants fail two checks, while existing controls remain. The two new runtime mutants
   reject always-available and Editable-derived flags. This qualifies declared policy,
   not customization editability, implicit-field flags or actual client behavior.
-  Parser/GenTable/source-binding gates pass 142/85/271 checks. Runtime mapper, Field gate
-  and generated fixture pass focused tidy; two Parser complexity, six existing TableWriter
-  complexity/concatenation and one existing AlParserGate function-size findings remain.
+  Parser/GenTable/source-binding gates pass 159/85/271 checks; GenCodeunit passes 49.
+  Runtime mapper, Field gate, generated fixture, Parser.cpp and AlParserGate.cpp pass
+  focused tidy. Separate label reading from variable-block traversal and argument scanning
+  from attribute lookup; retain grouped declarations, quote/comma/empty argument handling
+  and procedure boundaries. The report fixture remains unchanged outside its assertion
+  function. Six existing TableWriter complexity/concatenation findings remain.
   The new pointer-conversion and fixture-number findings were repaired, not suppressed.
   Verified-package regeneration still refuses 5683 properties (exit 1); this is not G1.
   Developer `f928288ee840`: `properties/devenv-allowincustomizations-property.md`;

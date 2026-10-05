@@ -204,8 +204,7 @@ void TheRealFileParses() {
 /// page keeps them, the dataitems and columns land in `dataset` with the same control grammar,
 /// `CurrReport` is spelled `CurrPage` the way `CurrQuery` is spelled `Rec`, and the `labels`
 /// block reads as label declarations (board:0063).
-void AReportParsesAsAPageWithADataset() {
-  constexpr std::string_view kReport = R"(namespace Microsoft.Sales.Reports;
+constexpr std::string_view kReport = R"(namespace Microsoft.Sales.Reports;
 
 report 50000 "Some Statement"
 {
@@ -314,6 +313,8 @@ report 50000 "Some Statement"
     end;
 }
 )";
+
+void AReportParsesAsAPageWithADataset() {
   const PageObject report = ParseReport(kReport);
   CHECK_TRUE("the object is a report", report.report);
   CHECK_TRUE("report 50000", report.id == 50000);
@@ -568,6 +569,79 @@ codeunit 50000 "Something UT"
   CHECK_TRUE("the var block did not become a procedure", unit.procedures.size() == 3);
 }
 
+void GroupedVariablesLabelsAndProcedureBoundariesStayDistinct() {
+  const auto unit = agiru::al::ParseCodeunit(R"(codeunit 60020 "Variable Boundaries"
+{
+    var
+        [InDataSet]
+        First, Second: Integer;
+        CaptionOne, CaptionTwo: Label 'caption', Comment = 'metadata, not a variable';
+        EmptyCaption: Label '';
+        Rows: Record "G/L Entry" temporary;
+        Grid: array[2, 3] of Code[20];
+    [Test]
+    procedure Run()
+    var
+        LocalOne, LocalTwo: Boolean;
+    begin
+    end;
+})");
+  CHECK_TRUE("grouped variables expand without turning labels into variables",
+             unit.variables.size() == 4 && unit.labels.size() == 3);
+  if (unit.variables.size() != 4 || unit.labels.size() != 3) { return; }
+  CHECK_TEXT("the first grouped variable retains its name", unit.variables[0].name, "First");
+  CHECK_TEXT("the second grouped variable retains its name", unit.variables[1].name, "Second");
+  CHECK_TRUE("both grouped variables retain the attribute",
+             unit.variables[0].attributes == std::vector<std::string>{"InDataSet"} &&
+                 unit.variables[1].attributes == unit.variables[0].attributes);
+  CHECK_TEXT("the first grouped label retains its name", unit.labels[0].name, "CaptionOne");
+  CHECK_TEXT("the second grouped label retains its name", unit.labels[1].name, "CaptionTwo");
+  CHECK_TRUE("label values are copied to every declared name",
+             unit.labels[0].text == "caption" && unit.labels[1].text == "caption");
+  CHECK_TRUE("an empty label remains a declaration", unit.labels[2].text.empty());
+  CHECK_TRUE("record declarations retain subtype and temporary state",
+             unit.variables[2].type == "Record" && unit.variables[2].subtype == "G/L Entry" &&
+                 unit.variables[2].temporary);
+  CHECK_TRUE("variable attributes do not leak across labels", unit.variables[2].attributes.empty());
+  CHECK_TRUE("array dimensions and element length survive the same variable block",
+             unit.variables[3].type == "Code" && unit.variables[3].length == 20 &&
+                 unit.variables[3].dimensions == std::vector<int>({2, 3}));
+  CHECK_TRUE("the following procedure retains its own attribute and local declarations",
+             unit.procedures.size() == 1 && agiru::al::HasAttribute(unit.procedures[0], "Test") &&
+                 unit.procedures[0].variables.size() == 2 &&
+                 unit.procedures[0].variables[0].name == "LocalOne" &&
+                 unit.procedures[0].variables[1].name == "LocalTwo");
+}
+
+void AttributeArgumentsPreserveQuotesEmptyValuesAndFirstMatch() {
+  agiru::al::ProcedureDecl declaration;
+  declaration.attributes = {
+      "Scope('Cloud')",
+      "EventSubscriber(ObjectType::Codeunit,Codeunit::\"Name,With,Comma\",'Event','',false,false)",
+      "Test",
+      "Obsolete('','25.0')"};
+  const auto arguments = agiru::al::AttributeArguments(declaration, "eventsubscriber");
+  CHECK_TRUE("attribute arguments retain commas inside either quote style and empty values",
+             arguments == std::vector<std::string>({"ObjectType::Codeunit",
+                                                    "Codeunit::Name,With,Comma",
+                                                    "Event",
+                                                    "",
+                                                    "false",
+                                                    "false"}));
+  CHECK_TRUE("an attribute without parentheses has no arguments",
+             agiru::al::AttributeArguments(declaration, "Test").empty());
+  CHECK_TRUE("an empty quoted argument is not dropped",
+             agiru::al::AttributeArguments(declaration, "Obsolete") ==
+                 std::vector<std::string>({"", "25.0"}));
+  CHECK_TRUE("an absent attribute never borrows another attribute's arguments",
+             agiru::al::AttributeArguments(declaration, "Absent").empty());
+  agiru::al::ProcedureDecl nested;
+  nested.attributes = {"HandlerFunctions('inside)text,after')"};
+  CHECK_TRUE("only the final unquoted parenthesis terminates an argument",
+             agiru::al::AttributeArguments(nested, "HandlerFunctions") ==
+                 std::vector<std::string>{"inside)text,after"});
+}
+
 /// THE AL PRECEDENCE IS PASCAL'S, NOT C'S, and this parser had C's until it was checked against
 /// `c-al-operators.md`, which states the hierarchy outright:
 ///
@@ -770,6 +844,8 @@ int main() {
     AReportParsesAsAPageWithADataset();
     AnXmlPortParsesAsAPageWithASchema();
     AVarBlockDoesNotSwallowTheNextMembersAttribute();
+    GroupedVariablesLabelsAndProcedureBoundariesStayDistinct();
+    AttributeArgumentsPreserveQuotesEmptyValuesAndFirstMatch();
     TheOperatorHierarchyIsTheOneCalDocuments();
     ExclusiveDisjunctionIsAnOperator();
     DatabaseScopeRetainsItsNamespace();

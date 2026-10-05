@@ -8,7 +8,15 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Latest frozen attempt: `9fd1e13` / content `774f78b70460`, slice-check exits 0;
+- Running frozen integration: `00c187c` / content `ef6d7cf62468` has completed compilation;
+  local test exposes Cursor/Filter refusals because the selected Integer provider cannot
+  synthesize SystemRowVersion. PostgreSQL is running; CursorGate's generic database label
+  is misleading. Do not invent a constant or revert the selected profile. Preserve the
+  full configured population and wait for AL execution/final target receipts. This run
+  does not contain the later declaring-owner customization or Parser tidy repairs.
+  Current Parser/AlParserGate focused tidy passes after removing three findings without
+  suppressions; the Parser gate retains previous checks and adds seventeen (159 total).
+- Previous failed frozen attempt: `9fd1e13` / content `774f78b70460`, slice-check exits 0;
   all/test/ut exit 2 after PageTableFieldGate.cpp's legacy five-field static assertion
   disagrees with the selected native Runtime-18 profile. Inputs remain unchanged.
   UT execution never starts: all 2314 configured methods are unexecuted across

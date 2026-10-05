@@ -31,6 +31,35 @@ bool SameName(std::string_view a, std::string_view b) {
   return true;
 }
 
+std::vector<std::string> AttributeValues(std::string_view attribute, std::size_t open) {
+  std::vector<std::string> arguments;
+  std::string current;
+  char quote = 0;
+  for (std::size_t i = open + 1; i < attribute.size(); ++i) {
+    const char c = attribute[i];
+    if (quote != 0) {
+      if (c == quote) {
+        quote = 0;
+      } else {
+        current += c;
+      }
+      continue;
+    }
+    if (c == '\'' || c == '"') {
+      quote = c;
+      continue;
+    }
+    if (c == ',' || (c == ')' && i + 1 == attribute.size())) {
+      arguments.push_back(current);
+      current.clear();
+      continue;
+    }
+    current += c;
+  }
+  if (!current.empty()) { arguments.push_back(current); }
+  return arguments;
+}
+
 class Parser {
 public:
   explicit Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
@@ -982,6 +1011,15 @@ private:
     ParseVarsInto(labels, discarded);
   }
 
+  void ReadVariableLabels(const std::vector<std::string> &names, std::vector<LabelDecl> &labels) {
+    Advance();
+    if (Peek().kind != TokenKind::String) { return; }
+    for (const std::string &name : names) {
+      labels.push_back(LabelDecl{.name = name, .text = Peek().text});
+    }
+    Advance();
+  }
+
   void ParseVarsInto(std::vector<LabelDecl> &labels, std::vector<VarDecl> &variables) {
     std::vector<std::string> pending;
     while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("begin") &&
@@ -999,14 +1037,7 @@ private:
       }
       Expect(":");
       if (AtKeyword("Label")) {
-        Advance();
-        if (Peek().kind == TokenKind::String) {
-          for (const std::string &name : names) {
-            labels.push_back(LabelDecl{.name = name, .text = Peek().text});
-          }
-          Advance();
-        }
-        while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
+        ReadVariableLabels(names, labels);
       } else {
         const VarDecl declared = ReadType();
         for (const std::string &name : names) {
@@ -1375,33 +1406,8 @@ std::vector<std::string> AttributeArguments(const ProcedureDecl &procedure, std:
     if (!SameName(open == std::string::npos ? attribute : attribute.substr(0, open), name)) {
       continue;
     }
-    std::vector<std::string> arguments;
-    if (open == std::string::npos) { return arguments; }
-    std::string current;
-    char quote = 0;
-    for (std::size_t i = open + 1; i < attribute.size(); ++i) {
-      const char c = attribute[i];
-      if (quote != 0) {
-        if (c == quote) {
-          quote = 0;
-        } else {
-          current += c;
-        }
-        continue;
-      }
-      if (c == '\'' || c == '"') {
-        quote = c;
-        continue;
-      }
-      if (c == ',' || (c == ')' && i + 1 == attribute.size())) {
-        arguments.push_back(current);
-        current.clear();
-        continue;
-      }
-      current += c;
-    }
-    if (!current.empty()) { arguments.push_back(current); }
-    return arguments;
+    if (open == std::string::npos) { return {}; }
+    return AttributeValues(attribute, open);
   }
   return {};
 }
