@@ -38,10 +38,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 - Caller-fix integration: `20261004T232014Z-3101267`, frozen HEAD `e9be54d`,
   source `74b27d9d9fe48dbdfdc95a03895d9873db1e29bd87d8b2f430c8170ecd984375`;
   `slice-check all test ut`, six jobs, runner PID 3102678 confirmed live.
-  Slice check passes; build is running. Dependencies match completed 223110.
+  Slice check/build pass; local verification is running. Dependencies match 223110.
   Includes ModifyAll caller preservation, excludes the later Rename cascade fix.
   Compare all 2,314 identities/statuses/errors against 223110 and retain all losses.
   Null/unsealed seed remains diagnostic, not causal A/B or G1.
+  Current-tree local replay is queued behind this run's local phase, with source/
+  binary hash checks; `/tmp/agiru-rename-anchor.7GvVDQ/all-local.log` is its receipt.
+  It may start only after frozen verification enters UT; no shared gate-DB overlap.
 - ModifyAll caller preservation (0044): an independent filtered worker shares temporary
   rows, not caller buffers/cursors/globals. DynamicRecordGate: 7,493 checks green;
   the same fixture against the preceding implementation has 144 failures. SQL and
