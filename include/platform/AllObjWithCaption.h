@@ -2,10 +2,13 @@
 
 #include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/AllObjType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
@@ -66,6 +69,17 @@ public:
   /// \brief AL `AllObjWithCaption.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief AL App Runtime Package ID, field 61.
   Guid AppRuntimePackageID;
   /// \brief AL application identity; distinct from either package identity.
@@ -107,7 +121,10 @@ using AllObjWithCaption = AllObjWithCaption_Table;
 
 /// \brief All ten source fields followed by the common implicit system fields.
 inline constexpr auto kAllObjWithCaptionFields =
-    WithSystemFields<AllObjWithCaption>(std::array<FieldDef, 10>{{
+    WithImplicitFields<AllObjWithCaption,
+                       ::agiru::SystemFieldProfile::Runtime18,
+                       ::agiru::TableType::Normal,
+                       false>(std::array<FieldDef, 10>{{
         Declare<&AllObjWithCaption::ObjectType>(AllObjWithCaption::Field_No::ObjectType,
                                                 "Object Type",
                                                 "Object Type",

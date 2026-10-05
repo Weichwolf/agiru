@@ -3,10 +3,13 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/ReflectionOptions.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/DataClassification.h"
 #include "type/DateTime.h"
@@ -315,6 +318,17 @@ public:
   /// \brief AL `Field.SystemModifiedBy` -- blank.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \note THE SYSTEM FIELDS ARE DECLARED AND NEVER FILLED. A virtual table is not stored
   ///       (`devenv-virtual-tables.md`: "computed at runtime"), so there is no row to carry a
   ///       SystemId or an audit stamp -- but AL reaches them anyway: `Config. Package Management`
@@ -394,7 +408,10 @@ public:
 };
 
 /// \brief The field table of the virtual `Field` table, as static const data.
-inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef, 24>{{
+inline constexpr auto kFieldFields = WithImplicitFields<Field,
+                                                        ::agiru::SystemFieldProfile::Runtime18,
+                                                        ::agiru::TableType::Normal,
+                                                        false>(std::array<FieldDef, 24>{{
     Declare<&Field::TableNo>(
         Field::Field_No::TableNo, "TableNo", "TableNo", offsetof(Field, TableNo)),
     Declare<&Field::No>(Field::Field_No::No, "No.", "No.", offsetof(Field, No)),

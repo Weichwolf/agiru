@@ -3,9 +3,12 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
@@ -87,6 +90,17 @@ public:
   /// \brief AL `FeatureKey.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief The field numbers.
   struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo ID{1};
@@ -109,7 +123,10 @@ public:
 using FeatureKey = FeatureKey_Table;
 
 /// \brief The field table.
-inline constexpr auto kFeatureKeyFields = WithSystemFields<FeatureKey>(std::array<FieldDef, 10>{{
+inline constexpr auto kFeatureKeyFields = WithImplicitFields<FeatureKey,
+                                                             ::agiru::SystemFieldProfile::Runtime18,
+                                                             ::agiru::TableType::Normal,
+                                                             false>(std::array<FieldDef, 10>{{
     Declare<&FeatureKey::ID>(FeatureKey::Field_No::ID, "ID", "ID", offsetof(FeatureKey, ID)),
     Declare<&FeatureKey::Enabled>(
         FeatureKey::Field_No::Enabled, "Enabled", "Enabled", offsetof(FeatureKey, Enabled)),

@@ -3,10 +3,13 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/UserPersonalization.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/DateTime.h"
@@ -72,6 +75,17 @@ public:
   /// \brief AL `AllProfile.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   Boolean Promoted{};
 
   struct Field_No : SystemFieldNumbers {
@@ -113,7 +127,10 @@ inline constexpr Declared kAllProfileObsoleteNotes{
     .obsoleteReason = "Capacity related to System profiles for which support has been removed.",
 };
 
-inline constexpr auto kAllProfileFields = WithSystemFields<AllProfile>(std::array<FieldDef, 17>{{
+inline constexpr auto kAllProfileFields = WithImplicitFields<AllProfile,
+                                                             ::agiru::SystemFieldProfile::Runtime18,
+                                                             ::agiru::TableType::Normal,
+                                                             false>(std::array<FieldDef, 17>{{
     Declare<&AllProfile::Scope>(
         AllProfile::Field_No::Scope, "Scope", "Scope", offsetof(AllProfile, Scope)),
     Declare<&AllProfile::AppID>(

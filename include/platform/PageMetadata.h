@@ -2,10 +2,13 @@
 
 #include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/ReflectionTypes.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
@@ -120,6 +123,17 @@ public:
   /// \brief Implicit AL `SystemModifiedBy`.
   Guid SystemModifiedBy{};
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief Original source field numbers; implicit fields use the canonical platform numbers.
   struct Field_No : SystemFieldNumbers {
     /// \brief Original `ID` number.
@@ -196,8 +210,11 @@ public:
 using PageMetadata = PageMetadata_Table;
 
 /// \brief All source fields plus the canonical implicit system fields.
-inline constexpr auto kPageMetadataFields = WithSystemFields<PageMetadata>(std::array<FieldDef,
-                                                                                      32>{{
+inline constexpr auto kPageMetadataFields = WithImplicitFields<
+    PageMetadata,
+    ::agiru::SystemFieldProfile::Runtime18,
+    ::agiru::TableType::Normal,
+    false>(std::array<FieldDef, 32>{{
     Declare<&PageMetadata::ID>(PageMetadata::Field_No::ID, "ID", "ID", offsetof(PageMetadata, ID)),
     Declare<&PageMetadata::Name>(
         PageMetadata::Field_No::Name, "Name", "Name", offsetof(PageMetadata, Name)),

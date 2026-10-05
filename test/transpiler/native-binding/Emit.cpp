@@ -1,3 +1,5 @@
+#include "meta/SystemFields.h"
+
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "CodeunitWriter.h"
@@ -29,7 +31,8 @@ std::string Read(const char *path) {
 int Emit(const char *path) {
   const auto table = agiru::al::ParseTable(Read(path));
   const std::array declarations{table};
-  const auto bindings = agiru::gen::PlatformTables(declarations);
+  const auto bindings =
+      agiru::gen::PlatformTables(declarations, agiru::SystemFieldProfile::Runtime18);
   const auto binding = bindings.find(agiru::gen::LowerKey(table.name));
   if (binding == bindings.end()) {
     std::cerr << "unbound native table: " << table.id << ' ' << table.name << '\n';
@@ -61,7 +64,8 @@ int EmitPage(const char *tableSource, const char *pageSource, const char *output
   const auto table = agiru::al::ParseTable(Read(tableSource));
   const std::array declarations{table};
   agiru::gen::Objects objects;
-  objects.tables = agiru::gen::PlatformTables(declarations);
+  objects.hostProfile = agiru::SystemFieldProfile::Runtime18;
+  objects.tables = agiru::gen::PlatformTables(declarations, objects.hostProfile);
   objects.fieldEnums = agiru::gen::PlatformFieldEnums(declarations, objects.tables);
   if (objects.tables.empty()) { throw std::runtime_error("native page source table is unbound"); }
   const auto page = agiru::al::ParsePage(Read(pageSource));

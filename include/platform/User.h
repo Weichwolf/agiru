@@ -3,10 +3,13 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/UserLicenseType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/DateTime.h"
@@ -110,6 +113,17 @@ public:
   /// \brief AL `User.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief The field numbers, from the system symbols' declaration.
   struct Field_No : SystemFieldNumbers {
     /// \brief The AL field number of `User Security ID`.
@@ -150,7 +164,10 @@ public:
 using User = User_Table;
 
 /// \brief The field table of the system `User` table.
-inline constexpr auto kUserFields = WithSystemFields<User>(std::array<FieldDef, 12>{{
+inline constexpr auto kUserFields = WithImplicitFields<User,
+                                                       ::agiru::SystemFieldProfile::Runtime18,
+                                                       ::agiru::TableType::Normal,
+                                                       false>(std::array<FieldDef, 12>{{
     Declare<&User::UserSecurityID>(User::Field_No::UserSecurityID,
                                    "User Security ID",
                                    "User Security ID",

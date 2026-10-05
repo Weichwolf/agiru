@@ -2,10 +2,13 @@
 
 #include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/AllObjType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
@@ -62,6 +65,17 @@ public:
   /// \brief AL `AllObj.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief System-source field numbers, not display order.
   struct Field_No : SystemFieldNumbers {
     /// \brief Object Type field number.
@@ -89,7 +103,10 @@ public:
 using AllObj = AllObj_Table;
 
 /// \brief All seven source fields followed by the common implicit system fields.
-inline constexpr auto kAllObjFields = WithSystemFields<AllObj>(std::array<FieldDef, 7>{{
+inline constexpr auto kAllObjFields = WithImplicitFields<AllObj,
+                                                         ::agiru::SystemFieldProfile::Runtime18,
+                                                         ::agiru::TableType::Normal,
+                                                         false>(std::array<FieldDef, 7>{{
     Declare<&AllObj::ObjectType>(
         AllObj::Field_No::ObjectType, "Object Type", "Object Type", offsetof(AllObj, ObjectType)),
     Declare<&AllObj::ObjectID>(

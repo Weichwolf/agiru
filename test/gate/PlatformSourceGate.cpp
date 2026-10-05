@@ -51,12 +51,12 @@ constexpr int kShorterTextLength = 20;
 constexpr int kOriginalToolingPageId = 9630;
 constexpr int kSavedTemporaryField = 8;
 constexpr int kRetiredExternalNameField = 29;
+constexpr std::size_t kRuntime18ImplicitFields = 10;
 
 struct Family {
   std::string_view path;
   const agiru::TableDef *table;
   std::string_view scope;
-  std::size_t implicitFields = agiru::kSystemFieldCount;
 };
 
 constexpr std::array<Family, 13> kFamilies{{
@@ -95,8 +95,7 @@ constexpr std::array<Family, 13> kFamilies{{
      .scope = agiru::platform::PageMetadata::kScope},
     {.path = "Virtual Tables/TableMetadata.Table.al",
      .table = &agiru::platform::kTableMetadataTable,
-     .scope = agiru::platform::TableMetadata::kScope,
-     .implicitFields = 10},
+     .scope = agiru::platform::TableMetadata::kScope},
     {.path = "Virtual Tables/Field.Table.al",
      .table = &agiru::platform::kFieldTable,
      .scope = agiru::platform::Field::kScope},
@@ -190,7 +189,10 @@ void Fields(const agiru::al::TableObject &source, const Family &family, Checks &
   checks.emplace_back("complete original declared field population",
                       declared == source.fields.size());
   checks.emplace_back("complete independently selected effective population",
-                      table.fields.size() == source.fields.size() + family.implicitFields);
+                      table.fields.size() == source.fields.size() + kRuntime18ImplicitFields);
+  checks.emplace_back("original native declaration selects unlinked Normal applicability",
+                      Text(source.properties, "TableType", "Normal") == "Normal" &&
+                          Text(source.properties, "LinkedObject", "false") == "false");
   for (const auto &declared : source.fields) {
     const auto *field = agiru::Field(table, agiru::FieldNo{declared.number});
     checks.emplace_back(declared.name + " field number", field != nullptr);

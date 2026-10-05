@@ -3,8 +3,11 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
@@ -108,6 +111,17 @@ public:
   /// \brief AL `Object Options.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief The field numbers.
   struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo ParameterName{1};
@@ -134,7 +148,10 @@ using ObjectOptions = ObjectOptions_Table;
 
 /// \brief The field table.
 inline constexpr auto kObjectOptionsFields =
-    WithSystemFields<ObjectOptions>(std::array<FieldDef, 9>{{
+    WithImplicitFields<ObjectOptions,
+                       ::agiru::SystemFieldProfile::Runtime18,
+                       ::agiru::TableType::Normal,
+                       false>(std::array<FieldDef, 9>{{
         Declare<&ObjectOptions::ParameterName>(ObjectOptions::Field_No::ParameterName,
                                                "Parameter Name",
                                                "Parameter Name",

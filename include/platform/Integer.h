@@ -2,12 +2,16 @@
 
 #include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/Text.h"
 
 #include <array>
 #include <cstddef>
@@ -61,6 +65,17 @@ public:
   /// \brief AL `Integer.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief The field numbers.
   struct Field_No : SystemFieldNumbers {
     /// \brief The AL field number of `Number`.
@@ -75,7 +90,10 @@ public:
 using Integer = Integer_Table;
 
 /// \brief The field table of the virtual `Integer` table.
-inline constexpr auto kIntegerFields = WithSystemFields<Integer>(std::array<FieldDef, 1>{{
+inline constexpr auto kIntegerFields = WithImplicitFields<Integer,
+                                                          ::agiru::SystemFieldProfile::Runtime18,
+                                                          ::agiru::TableType::Normal,
+                                                          false>(std::array<FieldDef, 1>{{
     Declare<&Integer::Number>(
         Integer::Field_No::Number, "Number", "Number", offsetof(Integer, Number)),
 }});

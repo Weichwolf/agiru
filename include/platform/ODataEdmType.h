@@ -2,8 +2,11 @@
 
 #include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Code.h"
 #include "type/DateTime.h"
@@ -56,6 +59,17 @@ public:
   /// \brief AL `OData Edm Type.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief The field numbers.
   struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo Key{1};
@@ -71,19 +85,23 @@ public:
 using ODataEdmType = ODataEdmType_Table;
 
 /// \brief The field table.
-inline constexpr auto kODataEdmTypeFields = WithSystemFields<ODataEdmType>(std::array<FieldDef, 3>{{
-    Declare<&ODataEdmType::Key>(
-        ODataEdmType::Field_No::Key, "Key", "Key", offsetof(ODataEdmType, Key)),
-    Declare<&ODataEdmType::Description>(ODataEdmType::Field_No::Description,
-                                        "Description",
-                                        "Description",
-                                        offsetof(ODataEdmType, Description)),
-    Declare<&ODataEdmType::EdmXml>(ODataEdmType::Field_No::EdmXml,
-                                   "Edm Xml",
-                                   "Edm Xml",
-                                   offsetof(ODataEdmType, EdmXml),
-                                   {.subtype = "UserDefined"}),
-}});
+inline constexpr auto kODataEdmTypeFields =
+    WithImplicitFields<ODataEdmType,
+                       ::agiru::SystemFieldProfile::Runtime18,
+                       ::agiru::TableType::Normal,
+                       false>(std::array<FieldDef, 3>{{
+        Declare<&ODataEdmType::Key>(
+            ODataEdmType::Field_No::Key, "Key", "Key", offsetof(ODataEdmType, Key)),
+        Declare<&ODataEdmType::Description>(ODataEdmType::Field_No::Description,
+                                            "Description",
+                                            "Description",
+                                            offsetof(ODataEdmType, Description)),
+        Declare<&ODataEdmType::EdmXml>(ODataEdmType::Field_No::EdmXml,
+                                       "Edm Xml",
+                                       "Edm Xml",
+                                       offsetof(ODataEdmType, EdmXml),
+                                       {.subtype = "UserDefined"}),
+    }});
 
 /// \brief The keys.
 inline constexpr std::array<KeyDef, 1> kODataEdmTypeKeys{{

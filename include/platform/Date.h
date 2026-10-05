@@ -2,9 +2,12 @@
 
 #include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
@@ -99,6 +102,17 @@ public:
   /// \brief AL `Date.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief The field numbers, from the system symbols' declaration.
   struct Field_No : SystemFieldNumbers {
     /// \brief The AL field number of `Period Type`.
@@ -124,7 +138,10 @@ public:
 using Date = Date_Table;
 
 /// \brief The field table of the virtual `Date` table.
-inline constexpr auto kDateFields = WithSystemFields<Date>(std::array<FieldDef, 6>{{
+inline constexpr auto kDateFields = WithImplicitFields<Date,
+                                                       ::agiru::SystemFieldProfile::Runtime18,
+                                                       ::agiru::TableType::Normal,
+                                                       false>(std::array<FieldDef, 6>{{
     Declare<&Date::PeriodType_>(
         Date::Field_No::PeriodType, "Period Type", "Period Type", offsetof(Date, PeriodType_)),
     Declare<&Date::PeriodStart>(

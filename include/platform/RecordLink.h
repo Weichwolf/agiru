@@ -3,9 +3,12 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/DateTime.h"
@@ -109,6 +112,17 @@ public:
   /// \brief AL `Record Link.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief The field numbers.
   struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo LinkID{1};
@@ -139,7 +153,10 @@ public:
 using RecordLink = RecordLink_Table;
 
 /// \brief The field table.
-inline constexpr auto kRecordLinkFields = WithSystemFields<RecordLink>(std::array<FieldDef, 14>{{
+inline constexpr auto kRecordLinkFields = WithImplicitFields<RecordLink,
+                                                             ::agiru::SystemFieldProfile::Runtime18,
+                                                             ::agiru::TableType::Normal,
+                                                             false>(std::array<FieldDef, 14>{{
     Declare<&RecordLink::LinkID>(RecordLink::Field_No::LinkID,
                                  "Link ID",
                                  "Link ID",

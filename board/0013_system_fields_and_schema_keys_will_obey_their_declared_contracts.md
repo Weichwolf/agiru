@@ -3,9 +3,9 @@
 Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
-Next: migrate remaining five-field native declarations to their selected host/kind
-profiles; qualify original source consumers and production generation before
-0044's catalogue activation.
+Next: activate the selected host profile in production generation and qualify all
+eight original native page consumers before 0044's catalogue activation. Retain
+the full 2314-case UT population through replay.
 
 ## Implementation
 
@@ -84,12 +84,33 @@ profiles; qualify original source consumers and production generation before
   Fixtures: `test/gate/GenSystemProfileGate.cpp`,
   `test/transpiler/system-profile.sh` and `test/transpiler/system-profile/`.
   External/LinkedObject declarations compile but translation remains nonzero and
-  their business paths are unexecuted; default five-field/native migration is pending.
-- Original-package audit: eighteen bound candidates compile without PCH; original
-  page/source-library and offset/type/number/drop/namespace controls pass. All 215
-  selected unbound tables remain red. Other native/generated records still use the
-  five-field view; host wiring and live providers remain gaps.
-  No AL replay yet covers this materialization. Preserve `4dadfec`/`5a14741`.
+  their business paths are unexecuted; default ordinary-record generation still
+  uses the five-field migration view until production host activation.
+- Every bound native record now materializes the original Runtime-18 Normal,
+  unlinked profile: ten implicit fields, typed offsets/capacities and nonstored
+  User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;
+  `PlatformSourceGate` passes 3060 source/reflection checks. The existing
+  `make reflection-metadata` qualifier retains all 32 rejected mutation controls.
+- `make native-bindings` uses the verified System 29.0.55365.0 / Runtime 18.0
+  package: 234 raw tables, one licensing exclusion, 233 selected; eighteen original
+  contracts and separate-library consumers compile without PCH, 215 unbound remain
+  red. Nine implicit-field mutants plus source-number/page-expression/library-drop/
+  namespace controls reject. Original page binding has six passing checks;
+  original library ownership/reflection has 221. These are declarations, not live
+  providers, complete app compilation or G1. Preserve `4dadfec`/`5a14741`.
+- `make include-cost HEADERS='platform/Integer.h platform/Field.h'` qualifies both
+  headers standalone. Their compiler dependency sets remain 759/760 respectively,
+  unchanged against `9dca232`; no transitive dependency was added. Concurrent-run
+  frontend timings are not a performance-improvement claim.
+- Focused `make lint-one` for PlatformSystemFieldsGate and PlatformSourceGate has
+  no gate or changed-header findings after naming independent source counts; each remains
+  red on 33 diagnostics in unchanged RecordRef/RecordState/Char/Duration/StringValue/
+  Variant headers. Do not suppress them or claim full tidy green. Current full
+  AL replay does not yet cover the eighteen-record migration.
+- The shared qualifier emitter has a passing focused tidy receipt. Both its
+  original-table and original-codeunit compilation paths include public headers;
+  `make native-codeunits` retains source-owned refusal controls and all 61
+  original Base64 checks.
 - `runtime/RowVersionStorage.h`, `src/rt/RowVersionStorage.cpp` and
   `test/gate/RowVersionGate.cpp` qualify the PostgreSQL allocation/fence foundation.
   The SQL record integration in `test/gate/SqlRowVersionGate.cpp` exercises an

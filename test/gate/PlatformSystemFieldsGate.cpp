@@ -73,6 +73,28 @@ constexpr auto kModifiedMilliseconds = 234567890;
 constexpr auto kSampleRowVersion = 123;
 constexpr std::size_t kFirstAuditLookup = kSystemFields.size() + 1;
 
+// Independent source field counts from the original System 29.0.55365.0 declarations.
+struct OriginalSourceFields {
+  static constexpr int AllObj = 7;
+  static constexpr int AllObjWithCaption = 10;
+  static constexpr int AllProfile = 17;
+  static constexpr int Company = 5;
+  static constexpr int Date = 6;
+  static constexpr int FeatureKey = 10;
+  static constexpr int Field = 24;
+  static constexpr int Integer = 1;
+  static constexpr int ODataEdmType = 3;
+  static constexpr int ObjectOptions = 9;
+  static constexpr int PageMetadata = 32;
+  static constexpr int PageTableField = 15;
+  static constexpr int PrivacyNotice = 6;
+  static constexpr int PrivacyNoticeApproval = 4;
+  static constexpr int RecordLink = 14;
+  static constexpr int TableMetadata = 23;
+  static constexpr int User = 12;
+  static constexpr int UserPersonalization = 19;
+};
+
 template <typename Table> constexpr std::array<int, kSystemFields.size()> Numbers() {
   if constexpr (requires {
                   Table::Field_No::SystemId;
@@ -288,11 +310,11 @@ template <bool Linked> void MaterializedKinds() {
   MaterializedHostProfiles<TableType::MicrosoftGraph, Linked>(false);
 }
 
-void NativeTableMetadataHasEveryEffectiveMember() {
-  using Row = agiru::platform::TableMetadata;
+template <typename Row> void NativeHasEveryEffectiveMember(int declaredCount) {
   const auto &table = agiru::TableTraits<Row>::kTable;
-  CHECK_TRUE("original Table Metadata has 23 declared plus ten implicit fields",
-             table.fields.size() == 33);
+  const std::string identity(table.name);
+  CHECK_TRUE(identity + " has its original declarations plus ten implicit fields",
+             table.fields.size() == static_cast<std::size_t>(declaredCount) + 10);
   Row row;
   row.SystemRowVersion = kSampleRowVersion;
   row.SystemCreatedByUserName = "Created User";
@@ -301,8 +323,52 @@ void NativeTableMetadataHasEveryEffectiveMember() {
   row.SystemModifiedByFullName = "Modified full name";
   agiru::RecordRef reference;
   reference.GetTable(row);
-  CHECK_TRUE("native FieldCount still indexes exactly 23 declarations",
-             reference.FieldCount() == 23);
+  CHECK_TRUE(identity + " indexes exactly its original declarations",
+             reference.FieldCount() == declaredCount);
+  constexpr std::array numbers{Row::Field_No::SystemRowVersion.Value(),
+                               Row::Field_No::SystemCreatedByUserName.Value(),
+                               Row::Field_No::SystemCreatedByFullName.Value(),
+                               Row::Field_No::SystemModifiedByUserName.Value(),
+                               Row::Field_No::SystemModifiedByFullName.Value()};
+  constexpr std::array offsets{offsetof(Row, SystemRowVersion),
+                               offsetof(Row, SystemCreatedByUserName),
+                               offsetof(Row, SystemCreatedByFullName),
+                               offsetof(Row, SystemModifiedByUserName),
+                               offsetof(Row, SystemModifiedByFullName)};
+  constexpr std::array sourceNames{"SystemRowVersion",
+                                   "SystemCreatedByUserName",
+                                   "SystemCreatedByFullName",
+                                   "SystemModifiedByUserName",
+                                   "SystemModifiedByFullName"};
+  constexpr std::array calculations{
+      R"(lookup(User."User Name" where("User Security ID" = field(SystemCreatedBy))))",
+      R"(lookup(User."Full Name" where("User Security ID" = field(SystemCreatedBy))))",
+      R"(lookup(User."User Name" where("User Security ID" = field(SystemModifiedBy))))",
+      R"(lookup(User."Full Name" where("User Security ID" = field(SystemModifiedBy))))"};
+  for (std::size_t i = 0; i < numbers.size(); ++i) {
+    const int number = i == 0 ? 0 : 2000000004 + static_cast<int>(i);
+    const auto *field = agiru::Field(table, agiru::FieldNo{number});
+    CHECK_TRUE(identity + " exposes the original effective Field_No", numbers[i] == number);
+    CHECK_TRUE(identity + " exposes every effective member", field != nullptr);
+    if (field == nullptr) { continue; }
+    CHECK_TEXT(identity + " preserves the effective source name", field->name, sourceNames[i]);
+    CHECK_TRUE(identity + " reaches the actual effective member", field->offset == offsets[i]);
+    CHECK_TRUE(identity + " preserves the original effective type",
+               field->type == (i == 0 ? agiru::FieldType::BigInteger : agiru::FieldType::Text));
+    CHECK_TRUE(identity + " keeps effective members read-only", !field->editable);
+    CHECK_TRUE(identity + " aliases only timestamp to SQL rowversion",
+               field->sqlTimestamp == (i == 0));
+    CHECK_TRUE(identity + " keeps user lookups nonstored",
+               field->fieldClass ==
+                   (i == 0 ? agiru::FieldClass::Normal : agiru::FieldClass::FlowField));
+    CHECK_TRUE(identity + " preserves effective capacities",
+               field->length == (i == 0       ? 0
+                                 : i % 2 == 1 ? 50
+                                              : 80));
+    CHECK_TEXT(identity + " preserves original effective calculations",
+               field->calcFormula,
+               i == 0 ? "" : calculations[i - 1]);
+  }
   CHECK_TEXT("timestamp reads the typed BigInteger member", reference.Field(0).ToText(), "123");
   CHECK_TEXT(
       "timestamp retains the original reflection alias", reference.Field(0).Name(), "timestamp");
@@ -312,6 +378,36 @@ void NativeTableMetadataHasEveryEffectiveMember() {
     const auto field = reference.Field(2000000005 + static_cast<int>(i));
     CHECK_TEXT("native lookup reflection reaches its typed buffer", field.ToText(), names[i]);
   }
+}
+
+void NativeProfilesAndIdentityOnlyStorage() {
+  CHECK_TRUE("original Table Metadata has 23 declared plus ten implicit fields",
+             agiru::TableTraits<agiru::platform::TableMetadata>::kTable.fields.size() == 33);
+  NativeHasEveryEffectiveMember<agiru::platform::AllObj>(OriginalSourceFields::AllObj);
+  NativeHasEveryEffectiveMember<agiru::platform::AllObjWithCaption>(
+      OriginalSourceFields::AllObjWithCaption);
+  NativeHasEveryEffectiveMember<agiru::platform::AllProfile>(OriginalSourceFields::AllProfile);
+  NativeHasEveryEffectiveMember<agiru::platform::Company>(OriginalSourceFields::Company);
+  NativeHasEveryEffectiveMember<agiru::platform::Date>(OriginalSourceFields::Date);
+  NativeHasEveryEffectiveMember<agiru::platform::FeatureKey>(OriginalSourceFields::FeatureKey);
+  NativeHasEveryEffectiveMember<agiru::platform::Field>(OriginalSourceFields::Field);
+  NativeHasEveryEffectiveMember<agiru::platform::Integer>(OriginalSourceFields::Integer);
+  NativeHasEveryEffectiveMember<agiru::platform::ODataEdmType>(OriginalSourceFields::ODataEdmType);
+  NativeHasEveryEffectiveMember<agiru::platform::ObjectOptions>(
+      OriginalSourceFields::ObjectOptions);
+  NativeHasEveryEffectiveMember<agiru::platform::PageMetadata>(OriginalSourceFields::PageMetadata);
+  NativeHasEveryEffectiveMember<agiru::platform::PageTableField>(
+      OriginalSourceFields::PageTableField);
+  NativeHasEveryEffectiveMember<agiru::platform::PrivacyNotice>(
+      OriginalSourceFields::PrivacyNotice);
+  NativeHasEveryEffectiveMember<agiru::platform::PrivacyNoticeApproval>(
+      OriginalSourceFields::PrivacyNoticeApproval);
+  NativeHasEveryEffectiveMember<agiru::platform::RecordLink>(OriginalSourceFields::RecordLink);
+  NativeHasEveryEffectiveMember<agiru::platform::TableMetadata>(
+      OriginalSourceFields::TableMetadata);
+  NativeHasEveryEffectiveMember<agiru::platform::User>(OriginalSourceFields::User);
+  NativeHasEveryEffectiveMember<agiru::platform::UserPersonalization>(
+      OriginalSourceFields::UserPersonalization);
 
   struct IdentityOnly {
     agiru::BigInteger SystemRowVersion{};
@@ -381,7 +477,7 @@ int main() {
     CompleteProfilesRespectVersionKindAndLinkedObject();
     MaterializedKinds<false>();
     MaterializedKinds<true>();
-    NativeTableMetadataHasEveryEffectiveMember();
+    NativeProfilesAndIdentityOnlyStorage();
     InvalidImplicitStorageAndDeclarationsRefuse();
     CheckSystemFields<agiru::platform::AllObj>();
     CheckSystemFields<agiru::platform::AllObjWithCaption>();

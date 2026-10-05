@@ -91,11 +91,19 @@ if "$CXX" "${flags[@]}" -fsyntax-only "$proof/wrong-field-number.cpp" \
 fi
 rg -q 'native field declaration mismatch' "$proof/wrong-field-number.compile.log"
 passed_id=$(jq -r 'first(.[] | select(.status == "contract-pass") | .id)' "$proof/tables.json")
-for control in wrong-system-offset wrong-system-type wrong-system-number; do
-  overlay="$proof/$control/include/meta"
+for control in wrong-system-offset wrong-system-type wrong-system-number \
+  wrong-timestamp-offset wrong-lookup-offset wrong-lookup-capacity wrong-lookup-number \
+  wrong-lookup-owner native-profile-downgrade; do
+  case "$control" in
+    wrong-system-number|wrong-lookup-capacity|wrong-lookup-number|wrong-lookup-owner)
+      header=meta/SystemFields.h;;
+    native-profile-downgrade) header=platform/TableMetadata.h;;
+    *) header=meta/Declare.h;;
+  esac
+  candidate="$proof/$passed_id.cpp"
+  if [ "$control" = native-profile-downgrade ]; then candidate="$proof/2000000136.cpp"; fi
+  overlay="$proof/$control/include/$(dirname "$header")"
   mkdir -p "$overlay"
-  header=Declare.h
-  if [ "$control" = wrong-system-number ]; then header=SystemFields.h; fi
   awk -v control="$control" '
     control == "wrong-system-offset" && /offsetof\(T, SystemId\)/ {
       sub(/offsetof\(T, SystemId\)/, "offsetof(T, SystemCreatedBy)"); changed++
@@ -106,15 +114,44 @@ for control in wrong-system-offset wrong-system-type wrong-system-number; do
     control == "wrong-system-number" && /\.no = FieldNo\{2000000000\}/ {
       sub(/FieldNo\{2000000000\}/, "FieldNo{2000000099}"); changed++
     }
+    control == "wrong-timestamp-offset" && /offsetof\(T, SystemRowVersion\)/ {
+      sub(/offsetof\(T, SystemRowVersion\)/, "offsetof(T, SystemId)"); changed++
+    }
+    control == "wrong-lookup-offset" && /offsetof\(T, SystemCreatedByUserName\)/ {
+      sub(/offsetof\(T, SystemCreatedByUserName\)/, "offsetof(T, SystemModifiedByUserName)"); changed++
+    }
+    control == "wrong-lookup-capacity" && /kSystemUserNameLength = 50;/ {
+      sub(/= 50;/, "= 49;"); changed++
+    }
+    control == "wrong-lookup-number" && /\.no = FieldNo\{2000000005\}/ {
+      sub(/FieldNo\{2000000005\}/, "FieldNo{2000000099}"); changed++
+    }
+    control == "wrong-lookup-owner" && !changed && /lookup\(User.*field\(SystemCreatedBy\)/ {
+      sub(/field\(SystemCreatedBy\)/, "field(SystemModifiedBy)"); changed++
+    }
+    control == "native-profile-downgrade" && /SystemFieldProfile::Runtime18/ {
+      sub(/SystemFieldProfile::Runtime18/, "SystemFieldProfile::Runtime17"); changed++
+    }
     { print }
     END { if (changed < 1) exit 2 }
-  ' "include/meta/$header" > "$overlay/$header"
-  if "$CXX" "-I$proof/$control/include" "${flags[@]}" -fsyntax-only "$proof/$passed_id.cpp" \
+  ' "include/$header" > "$proof/$control/include/$header"
+  if "$CXX" "-I$proof/$control/include" "${flags[@]}" -fsyntax-only "$candidate" \
     > "$proof/$control.compile.log" 2>&1; then
     printf 'native-bindings: %s escaped the original source contract\n' "$control" >&2
     exit 1
   fi
-  rg -q 'native (system field offset|field declaration) mismatch' "$proof/$control.compile.log"
+  case "$control" in
+    wrong-system-number)
+      rg -q 'native system field number mismatch: .*\.SystemId' "$proof/$control.compile.log";;
+    wrong-lookup-number)
+      rg -q 'unknown implicit field identity' "$proof/$control.compile.log";;
+    native-profile-downgrade)
+      rg -q 'native effective field count mismatch: Table Metadata' "$proof/$control.compile.log";;
+    wrong-lookup-owner)
+      rg -q 'native system field role mismatch: .*\.SystemCreatedByUserName' "$proof/$control.compile.log";;
+    *)
+      rg -q 'native (system field offset|field declaration) mismatch' "$proof/$control.compile.log";;
+  esac
 done
 jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile tables "$proof/tables.json" \
   --slurpfile package "$package/provenance.json" --arg head "$(git rev-parse HEAD)" \
@@ -128,8 +165,11 @@ jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile tables "$proof/tab
     non_table_objects:($raw[0].summary.objects-($tables[0] | length)),
     unexecuted_native_objects:$raw[0].summary.objects,
     source_field_number_negative_control:"rejected",
-    system_field_negative_controls:{offset:"rejected",type:"rejected",number:"rejected"},
-    contract_surface:["identity","field-count","field-type-length-caption","field-subtype-class","base-system-field-number-type-offset","option-codes-names-captions","keys","company-scope","replication-declaration","table-caption","inherent-permissions-declaration"],
+    system_field_negative_controls:{offset:"rejected",type:"rejected",number:"rejected",
+      timestamp_offset:"rejected",lookup_offset:"rejected",lookup_capacity:"rejected",
+      lookup_number:"rejected",lookup_owner:"rejected",profile_downgrade:"rejected"},
+    host_profile:"Runtime18",
+    contract_surface:["identity","field-count","field-type-length-caption","field-subtype-class","complete-implicit-field-number-type-offset-capacity-calculation","option-codes-names-captions","keys","company-scope","replication-declaration","table-caption","inherent-permissions-declaration"],
     production_native_loader_activated:false,complete_declaration_proof:false,complete_app_proof:false}' \
   > "$proof/result.json"
 base="${AGIRU_BC_SOURCE:-$HOME/Git/BCApps/src}/Layers/W1/BaseApp"
@@ -190,7 +230,8 @@ jq '.product_exclude |= map(select(split(":")[1] | startswith("system-symbols/")
   scope.json > "$proof/qualification-input/scope.json"
 qualification_status=0
 "$B/agirutc" "$proof/qualification-input" "$proof/qualification-input/apps.json" \
-  "$proof/qualified" --system-symbols "$package" > "$proof/qualification-generation.log" 2>&1 \
+  "$proof/qualified" --system-symbols "$package" --host-runtime 18.0 \
+  > "$proof/qualification-generation.log" 2>&1 \
   || qualification_status=$?
 [ "$qualification_status" -eq 0 ] || [ "$qualification_status" -eq 1 ]
 rg -q 'native .* table declarations emitted with original module/namespace ownership' \

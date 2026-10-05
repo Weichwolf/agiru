@@ -3,9 +3,12 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
@@ -217,6 +220,17 @@ public:
   /// \brief Common AL SystemModifiedBy field.
   Guid SystemModifiedBy{};
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   /// \brief Original field numbers.
   struct Field_No : SystemFieldNumbers {
     /// \brief AL Page ID.
@@ -259,7 +273,11 @@ public:
 using PageTableField = PageTableField_Table;
 
 /// \brief All fifteen source fields, original obsolete properties and common system fields.
-inline constexpr auto kPageTableFieldFields = WithSystemFields<PageTableField>([] {
+inline constexpr auto kPageTableFieldFields = WithImplicitFields<
+    PageTableField,
+    ::agiru::SystemFieldProfile::Runtime18,
+    ::agiru::TableType::Normal,
+    false>([] {
   std::array<FieldDef, PageTableField::kFieldCount> fields{{
       Declare<&PageTableField::PageID>(
           PageTableField::Field_No::PageID, "Page ID", "Page ID", offsetof(PageTableField, PageID)),

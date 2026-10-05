@@ -103,7 +103,7 @@ if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then
   original="$AGIRU_SYSTEM_SYMBOLS/src/System Codeunits/Runtime/Base64Convert.Codeunit.al"
   sha256sum "$original" "$AGIRU_SYSTEM_SYMBOLS/NavxManifest.xml" \
     test/transpiler/native-binding/Emit.cpp >> "$proof/inputs.sha256"
-  emitter_flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Isrc/al -Isrc/gen)
+  emitter_flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Isrc/al -Isrc/gen)
   "$CXX" "${emitter_flags[@]}" -c test/transpiler/native-binding/Emit.cpp -o "$proof/emitter.o"
   record_command native-codeunit-emitter "$PWD/test/transpiler/native-binding/Emit.cpp" \
     "$CXX" "${emitter_flags[@]}" -c test/transpiler/native-binding/Emit.cpp -o "$proof/emitter.o"

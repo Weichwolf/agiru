@@ -3,9 +3,12 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/DateTime.h"
@@ -50,6 +53,17 @@ public:
   /// \brief AL `PrivacyNotice.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
+  /// \brief Implicit read-only SQL rowversion buffer; provider ownership is separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
+
   struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo ID{1};
     static constexpr ::agiru::FieldNo IntegrationServiceName{2};
@@ -67,7 +81,10 @@ public:
 using PrivacyNotice = PrivacyNotice_Table;
 
 inline constexpr auto kPrivacyNoticeFields =
-    WithSystemFields<PrivacyNotice>(std::array<FieldDef, 6>{{
+    WithImplicitFields<PrivacyNotice,
+                       ::agiru::SystemFieldProfile::Runtime18,
+                       ::agiru::TableType::Normal,
+                       false>(std::array<FieldDef, 6>{{
         Declare<&PrivacyNotice::ID>(
             PrivacyNotice::Field_No::ID, "ID", "Privacy Notice ID", offsetof(PrivacyNotice, ID)),
         Declare<&PrivacyNotice::IntegrationServiceName>(
