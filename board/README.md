@@ -92,8 +92,10 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Fixture isolation now shares one environment helper with MilestoneGate, stripping
   parent Make flags/B/UT_LOG. The strengthened complete-app case still proves its
   diagnostic-slice negative control; restoring inheritance fails that same case.
-  All 22 CompilerCacheGate/MilestoneGate tests pass; fresh whole-tooling/Make replay
-  remains required. `tooling-output-isolation-{negative,focused}.log` retain proof.
+  All 22 CompilerCacheGate/MilestoneGate tests pass. Fresh whole-tooling replay
+  retains all 233 tests and passes with parent B/Make/UT_LOG overrides (exit 0/
+  96.969s); whole Make replay remains required.
+  `tooling-output-isolation-{negative,focused,full}.log` retain proof.
   The production apps target is unchanged. Lint is terminal/red:
   55 suppression places against unchanged baseline 13. The full AL replay is
   terminal: 2,173/2,314 passed, 141 failed, zero incomplete over eighty codeunits/
