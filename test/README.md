@@ -58,9 +58,13 @@ DTD/resolver security, encoding and streaming bounds remain open (0035).
 
 `make streams JOBS=2` proves shared cursors, fresh/wrapper-local bindings, escaped
 local BLOB providers and independent BLOB values through C++ and generated AL.
+FileGate and that AL consumer also prove file binary/text modes, declared text
+capacity, zero terminators and zero-based positions. The C++ empty-doctype path
+loads a reader, replaces the doctype, saves and reads the file back.
 Both consumers also run with their stream/provider primitives under ASan/UBSan;
-the whole runtime is not instrumented. Four compiled cursor/value/ownership mutants
-must fail both consumers. File/record/codeunit lifetimes, AL assignment/Clear/disposal,
+the whole runtime/File implementation is not instrumented. Nine compiled stream/
+provider/File mutants must fail their C++ and AL consumers. File/record/codeunit
+lifetimes, AL assignment/Clear/disposal,
 encoding, bounds, nonseekable/BigInteger positions and Native activation remain open
 (0035/0034).
 

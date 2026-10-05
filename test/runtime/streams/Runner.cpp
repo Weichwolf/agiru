@@ -1,4 +1,5 @@
 #include "type/Blob.h"
+#include "type/File.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
 #include "type/StringValue.h"
@@ -6,6 +7,8 @@
 
 #include "Check.h"
 #include "fixture/codeunit/StreamAliasConsumer.h"
+
+#include <string_view>
 
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
@@ -49,5 +52,29 @@ int main() {
     CHECK_TEXT("generated BLOB by-value writes preserve the caller's bytes",
                unchanged.ReadBytes(100),
                "abcdef");
+    agiru::File file;
+    static_cast<void>(file.CreateTempFile());
+    const auto name = file.Name();
+    agiru::OutStream fileOutput;
+    file.CreateOutStream(fileOutput);
+    static_cast<void>(fileOutput.WriteBytes("first\r\nsecond"));
+    file.Close();
+    CHECK_TRUE("generated default File.Read does not split lines",
+               consumer.ReadDefaultFile(name, text) == 13);
+    CHECK_TEXT("generated binary file text retains line breaks", text.Value(), "first\r\nsecond");
+    CHECK_TRUE("generated text-mode File.Read excludes line endings",
+               consumer.ReadTextFile(name, text) == 5);
+    CHECK_TEXT("generated text-mode file reads one line", text.Value(), "first");
+    CHECK_TRUE("generated File.Pos begins at zero", consumer.FilePosition(name, 0) == 0);
+    CHECK_TRUE("generated File.Pos matches its Seek offset", consumer.FilePosition(name, 2) == 2);
+    static_cast<void>(file.Create(name));
+    file.CreateOutStream(fileOutput);
+    constexpr char terminated[] = "abc\0tail";
+    static_cast<void>(fileOutput.WriteBytes(std::string_view(terminated, sizeof(terminated) - 1)));
+    file.Close();
+    CHECK_TRUE("generated binary File.Read preserves its declared capacity",
+               consumer.ReadBoundedFile(name, text) == 4);
+    CHECK_TEXT("generated binary file strips its terminator", text.Value(), "abc");
+    static_cast<void>(agiru::File::Erase(name));
   });
 }

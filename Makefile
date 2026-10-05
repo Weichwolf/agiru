@@ -169,8 +169,8 @@ base64: comments db ## prove byte codec, bounded output, aliases and compiled ne
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_Base64Gate
 	@B="$(B)" bash "$(SELF)/test/runtime/base64.sh"
 
-streams: comments db tc ## prove stream cursor aliases, generated AL and compiled controls
-	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_StreamGate
+streams: comments db tc ## prove stream providers/cursors and file reads through generated AL
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_StreamGate gate_FileGate
 	@B="$(B)" bash "$(SELF)/test/runtime/streams.sh"
 
 encoding: comments db ## prove declared encodings, factories and compiled negative controls

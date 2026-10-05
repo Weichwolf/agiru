@@ -1,26 +1,30 @@
 #include "runtime/ErrorValue.h"
 #include "type/Blob.h"
-#include "type/Date.h"
+#include "type/Boolean.h"
 #include "type/File.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
-#include "type/Text.h"
-#include "type/Time.h"
+#include "type/TextEncoding.h"
 #include "type/Variant.h"
 
-#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <iterator>
 #include <random>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace agiru {
 
 namespace {
+
+constexpr int kTemporaryNameAttemptLimit = 64;
 
 std::vector<std::uint8_t> BytesOf(const std::filesystem::path &path) {
   std::ifstream file{path, std::ios::binary};
@@ -39,7 +43,7 @@ void WriteBytes(const std::filesystem::path &path, const std::vector<std::uint8_
 std::string TemporaryName() {
   static std::mt19937_64 turns{std::random_device{}()};
   const std::filesystem::path where = std::filesystem::temp_directory_path();
-  for (int tries = 0; tries < 64; ++tries) {
+  for (int tries = 0; tries < kTemporaryNameAttemptLimit; ++tries) {
     const std::filesystem::path made = where / ("agiru_" + std::to_string(turns()) + ".tmp");
     if (!std::filesystem::exists(made)) { return made.string(); }
   }
@@ -99,7 +103,7 @@ Integer File::Len() {
 }
 
 Integer File::Pos() const {
-  return static_cast<Integer>(position_) + 1;
+  return static_cast<Integer>(position_);
 }
 
 void File::Seek(Integer Position) {
@@ -120,19 +124,40 @@ void File::WriteLine(std::string_view text) {
 }
 
 Integer File::Read(Variant &Read) {
-  const std::vector<std::uint8_t> &bytes = held_.Bytes();
-  if (position_ >= bytes.size()) {
-    Read = Variant{std::string{}};
-    return 0;
+  std::string text;
+  const Integer read = ReadText(text, 0);
+  Read = Variant{text};
+  return read;
+}
+
+Integer File::ReadText(std::string &text, std::size_t maximum) {
+  if (maximum > kMaximumDeclaredReadText) {
+    throw Error("File.Read: the declared text length exceeds the supported stream text length");
   }
-  std::size_t end = position_;
-  while (end < bytes.size() && bytes[end] != static_cast<std::uint8_t>('\n')) { ++end; }
-  std::string line(bytes.begin() + static_cast<std::ptrdiff_t>(position_),
-                   bytes.begin() + static_cast<std::ptrdiff_t>(end));
-  if (!line.empty() && line.back() == '\r') { line.pop_back(); }
-  const std::size_t consumed = (end < bytes.size() ? end + 1 : end) - position_;
+  if (!open_) { throw Error("File.Read: the file is not open"); }
+  const std::vector<std::uint8_t> &bytes = held_.Bytes();
+  text.clear();
+  if (position_ >= bytes.size()) { return 0; }
+  if (textMode_) {
+    while (position_ < bytes.size()) {
+      const auto byte = bytes[position_++];
+      if (byte == 0 || byte == static_cast<std::uint8_t>('\n')) { break; }
+      if (byte != static_cast<std::uint8_t>('\r')) { text += static_cast<char>(byte); }
+    }
+    return static_cast<Integer>(text.size());
+  }
+  const std::size_t available = bytes.size() - position_;
+  const std::size_t requested = maximum == 0 ? available : maximum + 1;
+  const std::size_t consumed = requested < available ? requested : available;
+  const std::size_t start = position_;
   position_ += consumed;
-  Read = Variant{line};
+  if (maximum != 0 && consumed > maximum && bytes[position_ - 1] != 0) {
+    throw Error("File.Read: invalid stream data beyond the declared text capacity");
+  }
+  std::size_t end = start;
+  while (end < position_ && bytes[end] != 0) { ++end; }
+  text.assign(bytes.begin() + static_cast<std::ptrdiff_t>(start),
+              bytes.begin() + static_cast<std::ptrdiff_t>(end));
   return static_cast<Integer>(consumed);
 }
 

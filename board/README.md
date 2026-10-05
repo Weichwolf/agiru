@@ -15,10 +15,21 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- File mode/capacity/position fix (0035): 44 C++ and 25 generated AL checks green;
+  all preceding 17/17 retained. Default binary reads preserve newlines, typed
+  capacity and zero-byte accounting; text mode returns content length; File.Pos
+  is zero-based. Nine compiled controls reject both consumers. Stream 89,
+  Base64 79, XML 79/reader 220 and Encoding 87 remain green; all gates rebuild.
+  `/tmp/agiru-streams.5Y5ARv`, hashes match; `/tmp/agiru-file-mode.uH1HcI`.
+  Runner analysis passes; source/gate retain 33/66 inherited header findings,
+  zero own findings, lint exits 2. Empty-doctype reader/replacement/Save/File.Read
+  path passes locally. Outside frozen 024625; full UT gain remains unproven.
+  Encoding, configured bounds, non-text reads, diagnostics and File lifecycle/
+  access remain open; nonempty XML subsets are still discarded (0035/0074).
 - Stream/XML replay is running: `20261005T024625Z-3504499`, runner 3504975,
   frozen HEAD `9c3291e`, source
   `12f5e315a376d585ea8c20dbc95ce8dccfb068598fd88d1f82cdac33e648e588`.
-  Six jobs, `slice-check all test ut`; runner process confirmed live during build.
+  Six jobs, `slice-check all test ut`; runner process confirmed live during local tests.
   Includes Ignore-header, shared-cursor and owned-provider fixes; no new UT result yet.
   Compare every one of the 2,314 milestone identities/source hashes with terminal
   015114; retain raw/full-tree gaps separately. Dependencies match 015114.

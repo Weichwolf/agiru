@@ -62,4 +62,52 @@ codeunit 50261 "Stream Alias Consumer"
         Output.WriteText('copy');
         exit(Source.Length());
     end;
+
+    procedure ReadDefaultFile(Name: Text; var Value: Text): Integer
+    var
+        Source: File;
+        Count: Integer;
+    begin
+        Source.Open(Name);
+        Count := Source.Read(Value);
+        Source.Close();
+        exit(Count);
+    end;
+
+    procedure ReadTextFile(Name: Text; var Value: Text): Integer
+    var
+        Source: File;
+        Count: Integer;
+    begin
+        Source.TextMode(true);
+        Source.Open(Name);
+        Count := Source.Read(Value);
+        Source.Close();
+        exit(Count);
+    end;
+
+    procedure ReadBoundedFile(Name: Text; var Value: Text): Integer
+    var
+        Source: File;
+        Bounded: Text[3];
+        Count: Integer;
+    begin
+        Source.Open(Name);
+        Count := Source.Read(Bounded);
+        Value := Bounded;
+        Source.Close();
+        exit(Count);
+    end;
+
+    procedure FilePosition(Name: Text; Offset: Integer): Integer
+    var
+        Source: File;
+        Position: Integer;
+    begin
+        Source.Open(Name);
+        Source.Seek(Offset);
+        Position := Source.Pos();
+        Source.Close();
+        exit(Position);
+    end;
 }

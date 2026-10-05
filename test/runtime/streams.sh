@@ -4,7 +4,8 @@ cd "$(dirname "$0")/../.."
 B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-streams.XXXXXX)
-mkdir -p "$proof/source"
+mkdir -p "$proof/source" "$proof/files"
+export TMPDIR="$proof/files"
 cp test/runtime/streams/Fixture.Codeunit.al "$proof/source/Fixture.Codeunit.al"
 cp test/transpiler/native-enums/source/app.json "$proof/source/app.json"
 printf '%s\n' '{"apps":[{"name":"fixture","source":"source"}]}' > "$proof/apps.json"
@@ -14,6 +15,7 @@ flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Ite
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 "$B/gate_StreamGate" > "$proof/current.log" 2>&1
+"$B/gate_FileGate" > "$proof/file-current.log" 2>&1
 "$B/agirutc" "$proof" "$proof/apps.json" "$proof/generated" > "$proof/generation.log" 2>&1
 rg -q '^absent    0 .NET type\(s\) with 0 member\(s\), 0 AL object\(s\) with 0$' "$proof/generation.log"
 mapfile -t sources < <(rg --files --no-ignore "$proof/generated" -g '*.cpp' | LC_ALL=C sort)
@@ -107,7 +109,69 @@ for fixture in "$B/gate_StreamGate" "$proof/runner"; do
   rg -q 'BLOB value copies do not share mutations|BLOB by-value writes preserve the caller' \
     "$proof/shared-value-$name.log"
 done
-sha256sum src/net/Stream.cpp src/net/Blob.cpp include/type/Stream.h include/type/Blob.h test/gate/StreamGate.cpp \
+for control in file-lines-only file-count-endings file-one-based; do
+  awk -v control="$control" '
+    control == "file-one-based" && /^  return static_cast<Integer>\(position_\);$/ {
+      print "  return static_cast<Integer>(position_) + 1;"; changed++; next
+    }
+    /^Integer File::ReadText\(/ {
+      reading = 1; print
+      if (control == "file-count-endings") { print "  const std::size_t initial = position_;"; changed++ }
+      next
+    }
+    reading && control == "file-lines-only" && /^  if \(textMode_\) \{$/ {
+      print "  if (true) {"; changed++; next
+    }
+    reading && control == "file-count-endings" && /return static_cast<Integer>\(text.size\(\)\);/ {
+      print "    return static_cast<Integer>(position_ - initial);"; changed++; next
+    }
+    { print }
+    END { if (changed != (control == "file-count-endings" ? 2 : 1)) exit 2 }
+  ' src/net/AlFile.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" -fPIC -shared "$proof/$control.cpp" "${links[@]}" -o "$proof/$control.so"
+  for fixture in "$B/gate_FileGate" "$proof/runner"; do
+    name=$(basename "$fixture")
+    if LD_PRELOAD="$proof/$control.so" "$fixture" > "$proof/$control-$name.log" 2>&1; then
+      printf 'streams: %s escaped %s\n' "$control" "$name" >&2
+      exit 1
+    fi
+    rg -q 'binary Read retains XML|default File.Read does not split|text mode excludes|text-mode File.Read excludes|file pointer starts at zero|File.Pos begins at zero' \
+      "$proof/$control-$name.log"
+  done
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
+for control in file-default-text file-capacity-erased; do
+  mkdir -p "$proof/$control/type"
+  awk -v control="$control" '
+    control == "file-default-text" && /^  bool textMode_ = false;$/ {
+      print "  bool textMode_ = true;"; changed++; next
+    }
+    control == "file-capacity-erased" && /maximum = Read.Max\(\);/ {
+      sub(/maximum = Read.Max\(\);/, "maximum = 0;"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' include/type/File.h > "$proof/$control/type/File.h"
+  "$CXX" "-I$proof/$control" "${flags[@]}" test/gate/FileGate.cpp "${links[@]}" \
+    -o "$proof/$control-gate"
+  "$CXX" "-I$proof/$control" "${flags[@]}" "$runner_source" "${sources[@]}" "${links[@]}" \
+    -o "$proof/$control-runner"
+  for fixture in gate runner; do
+    if "$proof/$control-$fixture" > "$proof/$control-$fixture.log" 2>&1; then
+      printf 'streams: %s escaped %s\n' "$control" "$fixture" >&2
+      exit 1
+    fi
+    rg -q 'defaults to binary|default File.Read does not split|binary capacity allows|declared capacity' \
+      "$proof/$control-$fixture.log"
+  done
+  sha256sum "$proof/$control/type/File.h" "$proof/$control-gate" "$proof/$control-runner" \
+    >> "$proof/controls.sha256"
+  rm -- "$proof/$control/type/File.h" "$proof/$control-gate" "$proof/$control-runner"
+  rmdir -- "$proof/$control/type" "$proof/$control"
+done
+sha256sum Makefile test/runtime/streams.sh src/net/Stream.cpp src/net/Blob.cpp include/type/Stream.h include/type/Blob.h test/gate/StreamGate.cpp \
+  src/net/AlFile.cpp include/type/File.h test/gate/FileGate.cpp "$B/gate_FileGate" \
   test/runtime/streams/Fixture.Codeunit.al "$runner_source" "$B/agirutc" \
   "$B/libagiru_net.so" "$B/libagiru_rt.so" "$B/gate_StreamGate" > "$proof/inputs.sha256"
 sha256sum "$proof/unowned-provider.cpp" "$proof/unowned-provider.so" \
@@ -115,4 +179,7 @@ sha256sum "$proof/unowned-provider.cpp" "$proof/unowned-provider.so" \
 rm -- "$proof/runner.o" "$proof/runner" "$proof/sanitized-gate" "$proof/sanitized-runner" \
   "$proof/sanitized.so" "$proof/unowned-provider.cpp" "$proof/unowned-provider.so" \
   "$proof/shared-value.cpp" "$proof/shared-value.so"
-printf 'streams: C++ and generated AL preserve cursor/provider/value contracts under ASan/UBSan; four compiled controls reject both; %s\n' "$proof"
+mapfile -t temporary_files < <(rg --files --hidden --no-ignore "$proof/files")
+if [ "${#temporary_files[@]}" -gt 0 ]; then rm -- "${temporary_files[@]}"; fi
+rmdir -- "$proof/files"
+printf 'streams: cursor/provider/value contracts preserve ASan/UBSan; file modes/capacities/positions preserve generated AL; nine compiled controls reject both; %s\n' "$proof"

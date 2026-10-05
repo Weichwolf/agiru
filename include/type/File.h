@@ -200,27 +200,30 @@ public:
 
   /// \brief AL `File.Pos()`. Gets the current position of the file pointer in an ASCII or binary
   /// file.
-  /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \return The zero-based byte offset, as documented by `file-pos-method.md`.
   [[nodiscard]] ::agiru::Integer Pos() const;
 
-  /// \brief AL `File.Read(Any)`. Reads from an MS-DOS encoded file or binary file.
-  /// \param Read The AL `Any`.
-  /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief Reads file text into an unbounded Variant text value.
+  /// \param Read Receives the text; typed Variant reads remain unqualified.
+  /// \return Binary bytes consumed, or text-mode content length without line endings.
+  /// \throws Error When the file is not open.
+  /// \note File encoding and configured stream limits remain gaps (0035/0074).
   ::agiru::Integer Read(::agiru::Variant &Read);
 
-  /// \brief AL `File.Read(var Text)` -- a line in text mode.
+  /// \brief AL `File.Read(var Text)` -- a line in text mode, bytes in binary mode.
   /// \tparam T The text's type, which must assign from a `std::string_view`.
-  /// \param Read Receives the line.
-  /// \return How many bytes were read, the line break counted.
+  /// \param Read Receives text with its declared capacity preserved.
+  /// \return Binary bytes consumed, including a terminator; text-mode content length.
+  /// \throws Error For invalid binary data or a closed file; length errors remain visible.
   template <typename T>
     requires requires(T &into) { into = std::string_view{}; } &&
              (!std::is_same_v<std::remove_cvref_t<T>, ::agiru::Variant>)::agiru::Integer
   Read(T &Read) {
-    ::agiru::Variant held;
-    const ::agiru::Integer read = this->Read(held);
-    Read = std::string_view(held.Get<Text<0>>());
+    std::size_t maximum = 0;
+    if constexpr (requires { Read.Max(); }) { maximum = Read.Max(); }
+    std::string text;
+    const ::agiru::Integer read = ReadText(text, maximum);
+    Read = std::string_view(text);
     return read;
   }
 
@@ -380,6 +383,12 @@ public:
   ::agiru::Boolean WriteMode(::agiru::Boolean Mode);
 
 private:
+  /// \brief ALStream.ALRead's bound on declared Text lengths (Ncl 29.0.54011.55407,
+  ///        method RVA 0x54b3c); unbounded Text is exempt.
+  static constexpr std::size_t kMaximumDeclaredReadText = 2048;
+
+  ::agiru::Integer ReadText(std::string &text, std::size_t maximum);
+
   void Bind(std::string_view name, bool truncate);
 
   void WriteLine(std::string_view text);
@@ -390,7 +399,7 @@ private:
   std::string name_;
   std::size_t position_ = 0;
   bool open_ = false;
-  bool textMode_ = true;
+  bool textMode_ = false;
   bool writeMode_ = true;
 };
 

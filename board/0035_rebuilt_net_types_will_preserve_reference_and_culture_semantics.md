@@ -5,15 +5,31 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
-- Remaining XML doctype UT crosses `File.Open/Read` after XmlDocument.Save
-  (`XMLDOMManagementUT.Codeunit.al::CheckDoctypeElementWithEmptyInternalSubset`).
-  `AlFile.cpp::Read` always splits at LF; File.h defaults TextMode to true.
-  Original NavFile constructor leaves its CLR Boolean false; FileGate's line test
-  currently relies on the opposite default. `/tmp/agiru-file-mode.uH1HcI` retains
-  original IL/hashes (Ncl version below). Developer `file-{read,textmode}-method.md`
-  and predecessor 1351 distinguish text/binary modes. Qualify the native File.Read
-  dispatcher, typed capacity, terminators and encoding before changing this path;
-  this is a consumer hypothesis, not an XML fix or recovered UT.
+- File text increment: default binary mode preserves newlines; text mode ignores
+  CR, stops on LF/zero and returns content length. Binary reads preserve declared
+  capacity plus a possible zero terminator; conversion stops at the first zero
+  without discarding consumed-byte accounting. File.Pos is zero-based, unlike
+  InStream.Position. FileGate: 44 green, original 17 retained with explicit text
+  mode in the line fixture; original read reproduction 14/35 red, pre-position
+  correction 6/44 red. Generated AL: 25 green, all preceding 17 retained.
+  Nine compiled controls reject both consumers (five File, four stream/provider).
+  StreamGate 89, Base64 79, XML 79/reader 220 and Encoding 87 remain green; all
+  gate consumers rebuild. Stream primitives/consumers retain ASan/UBSan proof,
+  not whole-runtime/File instrumentation. `/tmp/agiru-streams.5Y5ARv`, hashes match.
+  `/tmp/agiru-file-mode.uH1HcI` retains authority, red runs and analysis: runner
+  passes; source/gate have zero own findings, 33/66 inherited header findings remain
+  unsuppressed (lint exits 2). Unused includes removed; no runtime header widening.
+  Authority: developer `ff5939a46e`, `file-{read,textmode,pos,seek,open}-method.md`;
+  BCApps `bb7111877f`, XMLDOMManagementUT/Management empty-doctype consumer and
+  LibraryPlainTextFile; predecessor 1351. Original Ncl 29.0.54011.55407 NavFile
+  Mode/constructor, ALStream.ALRead(NavText)/ReadLine/ReadBytes and ByteToText
+  establish the ASCII mode/capacity/zero contracts; static IL, not native execution.
+  Preserve the System 29.0.55365.0 distinction. Reader/doctype replacement/Save →
+  File.Read retains the empty doctype in the authored C++ path. Full UT recovery
+  is unproven; outside frozen 024625. Encoding/OEM/session settings, configured
+  stream limits, typed non-text/Variant reads, diagnostics, large-file bounds and
+  File ownership/access/disposal remain gaps (0074). InternalSubset/CreateDocumentType
+  still discard nonempty subsets; empty-doctype proof does not close XML semantics.
 - Owned BLOB provider: streams retain bytes after a local wrapper ends or moves;
   BLOB value copies remain independent, while Set updates the retained provider.
   Default BLOBs allocate nothing. StreamGate: 89 green (all preceding 73 retained);
