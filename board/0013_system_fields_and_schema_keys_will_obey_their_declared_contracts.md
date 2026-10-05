@@ -3,9 +3,9 @@
 Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
-Next: activate the selected host profile in production generation and qualify all
-eight original native page consumers before 0044's catalogue activation. Retain
-the full 2314-case UT population through replay.
+Next: restore Integer series navigation with qualified implicit-field values;
+finish all eight original native page consumers before 0044's catalogue activation.
+Retain the full 2314-case UT population through replay.
 
 ## Implementation
 
@@ -76,7 +76,8 @@ the full 2314-case UT population through replay.
   `GenSourceBindingGate` and the compiled writable-role mutant qualify this boundary;
   borrowed-var writes and source Validate/Clear paths remain separate gaps.
 - `make system-profiles`: 954 generator checks, 28 compiled host/kind/LinkedObject
-  consumers and eleven generated-AL/SQL checks on each host pass. Host 17/18 is
+  consumers and two production-wrapper consumers pass, with eleven generated-AL/SQL
+  checks for each direct host and each wrapper path. Host 17/18 is
   explicit (`agirutc --host-runtime`, Make `AGIRU_HOST_RUNTIME`), independent of
   fixture app version 99 and minimum runtime 12. Binding/output mismatches,
   wrong audit/lookup presence/count and unsupported/duplicate host options refuse.
@@ -84,8 +85,19 @@ the full 2314-case UT population through replay.
   Fixtures: `test/gate/GenSystemProfileGate.cpp`,
   `test/transpiler/system-profile.sh` and `test/transpiler/system-profile/`.
   External/LinkedObject declarations compile but translation remains nonzero and
-  their business paths are unexecuted; default ordinary-record generation still
-  uses the five-field migration view until production host activation.
+  their business paths are unexecuted. `make transpile` now selects Runtime 18 by
+  default, with explicit `AGIRU_HOST_RUNTIME=17.0` override; an explicitly empty
+  host refuses before output. Nineteen SymbolsPackageGate tooling tests pass.
+  Direct generator fixture APIs still allow the unselected migration view.
+- Production regeneration from BCApps `d99152ee35f0` and the verified System
+  package emits ordinary/native Runtime-18 declarations. Translation remains
+  exit 1: 5683 refused properties and 215 selected unbound native tables; no full
+  compilation, provider or G1 claim follows from generated files.
+- `make gate GATE=FilterGate JOBS=2` reproduces a native Integer regression:
+  `sequence provider cannot synthesize field SystemRowVersion`. The series builder
+  still recognizes only five legacy audit/identity fields. Qualify computed rowversion
+  and identity before changing it; do not invent zero/one stamps to obtain green.
+  Local `devenv-integer-virtual-table.md` specifies Number/range, not these values.
 - Every bound native record now materializes the original Runtime-18 Normal,
   unlinked profile: ten implicit fields, typed offsets/capacities and nonstored
   User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;

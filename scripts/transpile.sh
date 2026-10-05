@@ -8,8 +8,7 @@ fi
 B=$(realpath "${B:-build}")
 proof=$(mktemp -d /tmp/agiru-transpile.XXXXXX)
 printf '%s\n' "$proof" > "$B/transpile.latest"
-arguments=("$1" "$2" "$3")
-if [ -n "${AGIRU_HOST_RUNTIME:-}" ]; then arguments+=(--host-runtime "$AGIRU_HOST_RUNTIME"); fi
+arguments=("$1" "$2" "$3" --host-runtime "${AGIRU_HOST_RUNTIME-18.0}")
 sha256sum "$B/agirutc" "$2" "$(dirname "$2")/scope.json" > "$proof/inputs.sha256"
 git rev-parse HEAD > "$proof/head.txt"
 if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then

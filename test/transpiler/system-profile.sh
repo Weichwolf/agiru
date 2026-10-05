@@ -67,6 +67,38 @@ for runtime in 17.0 18.0; do
   done
 done
 
+cp "$input/al/fixture/ProfileRow.Table.al" "$proof/source/fixture/ProfileRow.Table.al"
+for host in default 17.0; do
+  output="$proof/wrapper-$host"
+  environment=(env -u AGIRU_SYSTEM_SYMBOLS -u AGIRU_HOST_RUNTIME B="$B")
+  count=12
+  lookup=1
+  if [ "$host" = 17.0 ]; then environment+=(AGIRU_HOST_RUNTIME=17.0); count=8; lookup=0; fi
+  "${environment[@]}" bash scripts/transpile.sh "$proof/source" "$proof/apps.json" "$output" \
+    > "$proof/wrapper-$host-generation.log" 2>&1
+  flags=("${base_flags[@]}" "-I$output/fixture" "-I$output/shared" "-I$output/absent"
+    "-DAGIRU_TEST_DSN=\"$dsn\"" "-DAGIRU_PROFILE_FIELDS=$count"
+    -DAGIRU_PROFILE_AUDIT=1 "-DAGIRU_PROFILE_LOOKUP=$lookup")
+  "$CXX" "${flags[@]}" -c "$input/Consumer.cpp" -o "$proof/wrapper-$host.o"
+  mapfile -t sources < <(rg --files --no-ignore "$output" -g '*.cpp' | LC_ALL=C sort)
+  [ "${#sources[@]}" -gt 0 ]
+  "$CXX" "${flags[@]}" "$proof/wrapper-$host.o" "${sources[@]}" "${links[@]}" \
+    -o "$proof/runner-wrapper-$host"
+  jq -n --arg directory "$PWD" --arg file "$input/Consumer.cpp" \
+    --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
+    "$CXX" "${flags[@]}" -c "$input/Consumer.cpp" -o "$proof/wrapper-$host.o" \
+    > "$B/fixture-commands/system-profile-wrapper-$host.json"
+  "$proof/runner-wrapper-$host" > "$proof/wrapper-$host-execution.log" 2>&1
+  cat "$proof/wrapper-$host-execution.log"
+done
+status=0
+env -u AGIRU_SYSTEM_SYMBOLS B="$B" AGIRU_HOST_RUNTIME= bash scripts/transpile.sh \
+  "$proof/source" "$proof/apps.json" "$proof/wrapper-empty" \
+  > "$proof/wrapper-empty.log" 2>&1 || status=$?
+[ "$status" -eq 1 ]
+rg -q 'unsupported host runtime' "$proof/wrapper-empty.log"
+[ ! -e "$proof/wrapper-empty" ]
+
 output="$proof/18.0-Normal-false"
 flags=("${base_flags[@]}" "-I$output/fixture" "-I$output/shared" "-I$output/absent"
   "-DAGIRU_TEST_DSN=\"$dsn\"" -DAGIRU_PROFILE_FIELDS=12
@@ -109,4 +141,4 @@ status=0
 [ "$status" -eq 1 ]
 rg -q 'duplicate --host-runtime' "$proof/duplicate.log"
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'system-profile: 28 host/kind/linked declarations qualify; generated AL executes both hosts; presence/profile/options controls refuse; %s\n' "$proof"
+printf 'system-profile: 28 host/kind/linked declarations and two production-wrapper profiles qualify; generated AL executes both hosts; presence/profile/options/empty-host controls refuse; %s\n' "$proof"
