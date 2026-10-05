@@ -31,7 +31,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Exact BigText caller adapter retains the named ToText refusal; no workflow claim.
   Generator names Base64's complete Array dependency without relying on PCH;
   GenReceiver's 13 checks pass. No new own analysis findings; inherited header
-  and three unchanged generator findings remain. Root regeneration/build/UT follow.
+  and three unchanged generator findings remain. `e96f649` is pushed; production
+  regeneration retains the same native gaps/package bytes. Both original
+  SignatureKeyImpl and ImportExportWorkflow now compile without PCH (exit 0).
+  Slice-check: 14,225/zero missing. Six-job build resumes existing objects under
+  `/tmp/agiru-convert-carrier-integration.ytBvMq`; 25,283 input hashes retained,
+  compiler inputs held unchanged. Full local/UT replay waits for successful linking.
 
 - Convert byte-array integration passes: 16,469 C++/14,615 generated-AL checks,
   10,051 original-core and 710 CLR-region reference rows agree; four compiled

@@ -25,8 +25,10 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   refuses by name; original workflow execution remains a runtime gap.
   Generated Base64 callers explicitly include the complete Array definition,
   instead of relying on PCH/unity. Original SignatureKeyImpl reproduced the
-  incomplete-return-type failure without PCH before the fix; production replay
-  follows regeneration. Numeric-only/unrelated names keep narrow dependencies.
+  incomplete-return-type failure without PCH before the fix. After production
+  regeneration both original SignatureKeyImpl and ImportExportWorkflow compile
+  without PCH, with declared app includes and strict Clang 19 flags (exit 0 each).
+  Numeric-only/unrelated names keep narrow dependencies.
   `/tmp/agiru-conversion.nF0D8G`: 16,470 C++/14,617 generated AL checks green,
   720,028 reference checks; four runtime mutants reject both consumers, removed
   return-type include refuses the implicit-array AL consumer without PCH.
@@ -38,6 +40,12 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   Original consumer: W1/BaseApp/System/Workflow/ImportExportWorkflow.XmlPort.al,
   developer BigText type/interop docs; predecessor 1354 rejects unknown-type no-ops.
   Compilation repairs do not establish BigText or ERP workflow functionality.
+  Production source batch `e96f649`: `/tmp/agiru-transpile.pN3Qx7` retains the
+  same native gaps and byte-identical package. Slice-check: 14,225/zero missing.
+  Six-job `make all` resumes existing objects, inputs held unchanged;
+  `/tmp/agiru-convert-carrier-integration.ytBvMq`, 25,283 input hashes, manifest
+  SHA256 `4f1ebd4770631eb5b53134cbe864948da0665d3a760880bb6003c3e7db5bbfb7`.
+  Build is running; complete local tests and all 2,314 UT await successful linking.
 
 - Convert byte-array bridge reuses the original-core-qualified Base64 codec.
   Typed formatting ordinals, checked regions and byte cells retain strict CLR
