@@ -539,8 +539,16 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    LinkedObject pair through Types creation: fourteen cases/replay match; ignored
    LinkedObject/universal audit controls fail two/twelve. Keep timestamp/SystemId
    for every kind; audit families require unlinked Normal/Temporary. Original
-   compiler CDS and native Query both have ordinal 5 but are different contracts;
-   qualify emitter conversion before replacing the existing CDS refusal.
+   compiler CDS and native Query both have ordinal 5 but are different contracts.
+   `table-kind-emitter-contract.json` now qualifies CDS→CRM: original compiler
+   PropertyKind.TableType=37 and emitter local Nullable<TableTypeKind> execute
+   through CLR reflection; exact emitter IL RVA 22f11c remaps CDS 5 to CRM 1
+   before writing XML. The source-bound emit path is static authority, not a new
+   AL business run. Replace `ReflectionMetadata.cpp::MetadataTableType`'s CDS
+   refusal with explicit CRM; preserve source kind/external/company semantics.
+   Retain all gate cases, replace three retired refusal expectations, extend
+   projection variants, and reject restored-refusal/CDS-to-Query controls.
+   No cloud admission follows from representing this source property.
    Ordinary NCL creation remains unexecuted after a dependency/finalizer refusal;
    do not promote the Types declaration matrix to live business proof.
    Validate table Scope eligibility at source admission: the reference compiler

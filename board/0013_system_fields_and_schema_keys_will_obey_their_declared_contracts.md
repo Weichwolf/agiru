@@ -27,8 +27,9 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
   match twice. Timestamp/SystemId are always present; both audit families require
   `!IsLinked && (Normal || Temporary)`. Ignoring LinkedObject fails two cases;
   universally appending audit fields fails twelve. Original CLR enums prove
-  compiler CDS=5 versus native Query=5: numeric casts are invalid; actual emitter
-  conversion remains open. `implicit-profile-boundaries.json` retains all hashes
+  compiler CDS=5 versus native Query=5: numeric casts are invalid. Exact emitter
+  IL now qualifies CDS→CRM (0044); the C++ refusal still needs replacement.
+  `implicit-profile-boundaries.json` retains all hashes
   and failed attempts. Ordinary NCL creation still refuses without NavEnvironment;
   no ordinary business, SQL lookup or Runtime-17 equivalence is claimed.
 

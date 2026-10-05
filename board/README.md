@@ -88,8 +88,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Follow-up `implicit-profile-boundaries.json`: fourteen authored original Types
   cases/replay qualify all internal kinds × LinkedObject. Only unlinked
   Normal/Temporary carry both audit families; controls fail two/twelve cases.
-  Original CLR enums prove source CDS=5 and native Query=5 are distinct; emitter
-  conversion stays open. Original ordinary NCL creation remains refused; no
+  Original CLR enums prove source CDS=5 and native Query=5 are distinct.
+  `table-kind-emitter-contract.json` now qualifies original CDS→CRM XML conversion:
+  PropertyKind/local-type reflection executes; emitter IL RVA 22f11c remaps 5 to 1.
+  The existing C++ refusal still needs replacement and negative controls; no
+  source-bound AL emit/cloud integration is claimed. Original ordinary NCL creation remains refused; no
   business/SQL lookup/Runtime-17 equivalence or new AL UT gain is claimed.
 
 - Preceding full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
