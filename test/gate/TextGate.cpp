@@ -8,7 +8,9 @@
 
 #include "Check.h"
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -23,6 +25,42 @@ namespace {
 
 constexpr std::size_t kPositionCapacity = 20;
 constexpr agiru::Integer kEuroPosition = 5;
+
+void Utf8FramingPreservesCharacterBoundaries() {
+  struct Character {
+    std::int32_t code;
+    std::string_view encoded;
+  };
+
+  constexpr std::array cases{Character{.code = 0x7F, .encoded = "\x7F"},
+                             Character{.code = 0x80, .encoded = "\xC2\x80"},
+                             Character{.code = 0x7FF, .encoded = "\xDF\xBF"},
+                             Character{.code = 0x800, .encoded = "\xE0\xA0\x80"},
+                             Character{.code = 0xFFFF, .encoded = "\xEF\xBF\xBF"}};
+  for (const auto &one : cases) {
+    CHECK_TRUE("Char decodes each UTF-8 width boundary", agiru::Char{one.encoded} == one.code);
+    CHECK_TEXT("Char encodes each UTF-8 width boundary",
+               agiru::Encoded(agiru::Char{one.code}),
+               one.encoded);
+    const Text<1> text{one.encoded};
+    auto at = text.begin();
+    CHECK_TRUE("foreach decodes the same boundary character", *at == one.code);
+    ++at;
+    CHECK_TRUE("foreach consumes exactly the boundary sequence", !(at != text.end()));
+  }
+  const Text<2> supplementary{"💡"};
+  auto at = supplementary.begin();
+  CHECK_TRUE("foreach still decodes four-byte framing", *at == agiru::Char{"💡"});
+  ++at;
+  CHECK_TRUE("foreach consumes the complete four-byte sequence", !(at != supplementary.end()));
+  for (const std::string_view invalid : {"\x80", "\xC2", "\xC2\x41", "\xE0\xA0", "AB"}) {
+    bool refused = false;
+    try {
+      static_cast<void>(agiru::Char{invalid});
+    } catch (const agiru::Error &) { refused = true; }
+    CHECK_TRUE("invalid sequence framing still refuses", refused);
+  }
+}
 
 std::string V(const auto &s) {
   return std::string(s.Value());
@@ -222,6 +260,7 @@ void GeneratedPositionWritesRejectInvalidCharacters() {
 
 int main() {
   return gate::Run("Text", [] {
+    Utf8FramingPreservesCharacterBoundaries();
     CodeNormalisesPerTheDocumentation();
     LengthIsCheckedAfterTrimming();
     TheMessageIsTheBcMessage();

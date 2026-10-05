@@ -285,7 +285,8 @@ public:
       width_ = 0;
       if (at_ >= text_.size()) { return; }
       const auto lead = static_cast<unsigned char>(text_[at_]);
-      width_ = lead < 0x80U ? 1 : (lead & 0xE0U) == 0xC0U ? 2 : (lead & 0xF0U) == 0xE0U ? 3 : 4;
+      width_ = detail::Utf8SequenceWidth(lead);
+      if (width_ == 0) { width_ = 4; }
       if (at_ + width_ > text_.size()) { width_ = text_.size() - at_; }
       current_ = Char{text_.substr(at_, width_)};
     }

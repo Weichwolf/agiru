@@ -14,6 +14,7 @@ flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Ite
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 sha256sum test/runtime/text-positions/Fixture.Codeunit.al test/runtime/text-positions/Runner.cpp \
+  test/runtime/text-positions.sh test/gate/TextGate.cpp include/type/Char.h \
   include/type/AlArray.h include/type/StringValue.h src/net/StringValue.cpp "$B/agirutc" \
   "$B/libagiru_net.so" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 "$B/agirutc" "$proof" "$proof/apps.json" "$proof/generated" > "$proof/generation.log" 2>&1
@@ -46,5 +47,27 @@ if "$proof/mutant" > "$proof/mutant-execution.log" 2>&1; then
   exit 1
 fi
 rg -q 'generated AL copies values between same-type text proxies' "$proof/mutant-execution.log"
-rm -f "$proof/runner.o" "$proof/runner" "$proof/mutant"
-printf 'text-positions: generated reads/writes/copies/bounds execute; source-index control fails; %s\n' "$proof"
+for control in lead-payload continuation-payload; do
+  mkdir -p "$proof/$control/type"
+  anchor='kTwoBytePayloadMask = 0x1FU'
+  replacement='kTwoBytePayloadMask = 0x0FU'
+  if [ "$control" = continuation-payload ]; then
+    anchor='kPayloadMask = 0x3FU'
+    replacement='kPayloadMask = 0x1FU'
+  fi
+  awk -v anchor="$anchor" -v replacement="$replacement" '
+    index($0, anchor) {sub(anchor, replacement); changed++}
+    {print} END {if (changed != 1) exit 1}' \
+    include/type/Char.h > "$proof/$control/type/Char.h"
+  "$CXX" -O2 "-I$proof/$control" "${flags[@]}" test/gate/TextGate.cpp "${links[@]}" \
+    -o "$proof/$control-gate"
+  if "$proof/$control-gate" > "$proof/$control-execution.log" 2>&1; then
+    printf 'text-positions: %s escaped character boundary checks\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'Char decodes each UTF-8 width boundary' "$proof/$control-execution.log"
+done
+sha256sum --check --status "$proof/inputs.sha256"
+find "$proof" -maxdepth 1 -type f \
+  \( -name runner.o -o -name runner -o -name mutant -o -name '*-gate' \) -delete
+printf 'text-positions: generated reads/writes/copies/bounds execute; source-index and two UTF-8 payload controls fail; %s\n' "$proof"

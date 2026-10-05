@@ -122,11 +122,14 @@ Retain the full 2314-case UT population through replay.
   headers standalone. Their compiler dependency sets remain 759/760 respectively,
   unchanged against `9dca232`; no transitive dependency was added. Concurrent-run
   frontend timings are not a performance-improvement claim.
-- Focused `make lint-one` for PlatformSystemFieldsGate and PlatformSourceGate has
-  no gate or changed-header findings after naming independent source counts; each remains
-  red on 33 diagnostics in unchanged RecordRef/RecordState/Char/Duration/StringValue/
-  Variant headers. Do not suppress them or claim full tidy green. Current full
-  AL replay does not yet cover the eighteen-record migration.
+- Shared Char decoding and Text iteration now use constexpr UTF-8 framing constants
+  and one width primitive. `TextGate` passes 91 checks, `TextBuiltinGate` 43 and
+  `make text-positions` ten generated AL checks. Source-index and two payload-mask
+  mutants fail execution; malformed framing still refuses. `make lint-one
+  UNIT=test/gate/TextGate.cpp` passes. PlatformSource retains 3060 passing checks;
+  its focused tidy findings fall from 33 to eight unchanged diagnostics in
+  RecordRef/RecordState/Duration/Variant headers. No suppression or baseline rises.
+  Full tidy remains red; full AL replay does not yet cover the native migration.
 - The shared qualifier emitter has a passing focused tidy receipt. Both its
   original-table and original-codeunit compilation paths include public headers;
   `make native-codeunits` retains source-owned refusal controls and all 61

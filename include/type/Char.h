@@ -4,6 +4,7 @@
 #include "type/Integer.h"
 
 #include <compare>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -12,6 +13,41 @@
 /// \brief AL `Char` -- one character.
 
 namespace agiru {
+
+namespace detail {
+
+/// \brief UTF-8 byte framing from Unicode Table 3-6; no scalar-value validation.
+struct Utf8Framing {
+  static constexpr std::uint32_t kAsciiLimit = 0x80U;         ///< First non-ASCII code point.
+  static constexpr std::uint32_t kTwoByteLimit = 0x800U;      ///< First three-byte code point.
+  static constexpr std::uint32_t kTwoBytePrefix = 0xC0U;      ///< Two-byte leading tag.
+  static constexpr std::uint32_t kThreeBytePrefix = 0xE0U;    ///< Three-byte leading tag.
+  static constexpr std::uint32_t kFourBytePrefix = 0xF0U;     ///< Four-byte leading tag.
+  static constexpr std::uint32_t kTwoByteLeadMask = 0xE0U;    ///< Bits selecting a two-byte lead.
+  static constexpr std::uint32_t kThreeByteLeadMask = 0xF0U;  ///< Bits selecting a three-byte lead.
+  static constexpr std::uint32_t kFourByteLeadMask = 0xF8U;   ///< Bits selecting a four-byte lead.
+  static constexpr std::uint32_t kTwoBytePayloadMask = 0x1FU; ///< Five leading payload bits.
+  static constexpr std::uint32_t kThreeBytePayloadMask = 0x0FU; ///< Four leading payload bits.
+  static constexpr std::uint32_t kFourBytePayloadMask = 0x07U;  ///< Three leading payload bits.
+  static constexpr std::uint32_t kContinuationMask = 0xC0U;     ///< Continuation tag mask.
+  static constexpr std::uint32_t kContinuationPrefix = 0x80U;   ///< Continuation byte tag.
+  static constexpr std::uint32_t kPayloadMask = 0x3FU;          ///< Six continuation payload bits.
+  static constexpr unsigned kPayloadBits = 6; ///< Payload bits contributed by each continuation.
+};
+
+/// \brief Declared UTF-8 sequence width, or zero for a non-leading byte.
+/// \param lead The leading byte; the caller remains responsible for validating the sequence.
+/// \return One through four bytes, or zero.
+[[nodiscard]] constexpr std::size_t Utf8SequenceWidth(unsigned char lead) {
+  using Bits = Utf8Framing;
+  return lead < Bits::kAsciiLimit                                      ? 1
+         : (lead & Bits::kTwoByteLeadMask) == Bits::kTwoBytePrefix     ? 2
+         : (lead & Bits::kThreeByteLeadMask) == Bits::kThreeBytePrefix ? 3
+         : (lead & Bits::kFourByteLeadMask) == Bits::kFourBytePrefix   ? 4
+                                                                       : 0;
+}
+
+}
 
 /// \brief AL `Char`.
 ///
@@ -183,22 +219,19 @@ private:
   ///       cases, 2026-09-11); the text form of a `Char` is `Encoded` below, and this is its
   ///       inverse.
   static constexpr std::int32_t Decoded(std::string_view text) {
+    using Bits = detail::Utf8Framing;
     if (text.empty()) { return -1; }
     const auto lead = static_cast<unsigned char>(text[0]);
-    const std::size_t length = lead < 0x80U              ? 1
-                               : (lead & 0xE0U) == 0xC0U ? 2
-                               : (lead & 0xF0U) == 0xE0U ? 3
-                               : (lead & 0xF8U) == 0xF0U ? 4
-                                                         : 0;
+    const std::size_t length = detail::Utf8SequenceWidth(lead);
     if (length == 0 || text.size() != length) { return -1; }
     std::uint32_t code = length == 1   ? lead
-                         : length == 2 ? (lead & 0x1FU)
-                         : length == 3 ? (lead & 0x0FU)
-                                       : (lead & 0x07U);
+                         : length == 2 ? (lead & Bits::kTwoBytePayloadMask)
+                         : length == 3 ? (lead & Bits::kThreeBytePayloadMask)
+                                       : (lead & Bits::kFourBytePayloadMask);
     for (std::size_t i = 1; i < length; ++i) {
       const auto unit = static_cast<unsigned char>(text[i]);
-      if ((unit & 0xC0U) != 0x80U) { return -1; }
-      code = (code << 6U) | (unit & 0x3FU);
+      if ((unit & Bits::kContinuationMask) != Bits::kContinuationPrefix) { return -1; }
+      code = (code << Bits::kPayloadBits) | (unit & Bits::kPayloadMask);
     }
     return static_cast<std::int32_t>(code);
   }
@@ -222,17 +255,19 @@ private:
 ///       (`Data Exch. Exp. Latin Char UT`, 2026-09-09); AL's `Char` is a UTF-16 code unit and its
 ///       text form is that code point encoded, never its low byte.
 [[nodiscard]] inline std::string Encoded(Char character) {
+  using Bits = detail::Utf8Framing;
   const auto code = static_cast<std::uint32_t>(static_cast<std::int32_t>(character));
   std::string out;
-  if (code < 0x80U) {
+  if (code < Bits::kAsciiLimit) {
     out += static_cast<char>(code);
-  } else if (code < 0x800U) {
-    out += static_cast<char>(0xC0U | (code >> 6U));
-    out += static_cast<char>(0x80U | (code & 0x3FU));
+  } else if (code < Bits::kTwoByteLimit) {
+    out += static_cast<char>(Bits::kTwoBytePrefix | (code >> Bits::kPayloadBits));
+    out += static_cast<char>(Bits::kContinuationPrefix | (code & Bits::kPayloadMask));
   } else {
-    out += static_cast<char>(0xE0U | (code >> 12U));
-    out += static_cast<char>(0x80U | ((code >> 6U) & 0x3FU));
-    out += static_cast<char>(0x80U | (code & 0x3FU));
+    out += static_cast<char>(Bits::kThreeBytePrefix | (code >> (2 * Bits::kPayloadBits)));
+    out += static_cast<char>(Bits::kContinuationPrefix |
+                             ((code >> Bits::kPayloadBits) & Bits::kPayloadMask));
+    out += static_cast<char>(Bits::kContinuationPrefix | (code & Bits::kPayloadMask));
   }
   return out;
 }
