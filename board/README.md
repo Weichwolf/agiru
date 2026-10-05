@@ -37,6 +37,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   reject, and fixture analysis passes. Full corrected local/AL replay is pending.
   `native-defaults-table-keys{,-lint}.log` in the same receipt directory.
 
+- Native implicit fields (0013/0044): original logical getters execute twice over
+  all 234 tables/2,340 implicit fields, zero refused; raw identity sets and bytes
+  agree. Original AL FieldCount subtracts the ten implicit fields: Table Metadata
+  remains 23, not internal 33. Runtime-18's four read-only text fields use current
+  User lookups; SQL identifiers/current lookup execution and agiru's complete profile
+  remain open. `native-implicit-fields.json` in the same receipt directory records
+  field-number/type/class/length authority, API distinctions and failed probes.
+
 - Current full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.
   Make exits 2, runner 1; no infrastructure errors. Against the preceding

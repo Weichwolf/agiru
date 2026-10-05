@@ -1,6 +1,6 @@
 # 0013 — System fields and schema keys will obey their declared contracts
 
-Status: open | Priority: P1 | Stage: UT → Clients | Reviewed: 2026-10-04
+Status: open | Priority: P1 | Stage: UT → Clients | Reviewed: 2026-10-05
 Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-population proof.
 
 ## Evidence
@@ -11,6 +11,17 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
   NCL assignment confirms virtual kind and audit applicability. agiru has 28,
   so timestamp/FlowField implementation and row values remain open, not an absent
   authority blocker. `/tmp/agiru-table-provider-authority.CyvRCA/native-profile.json`.
+  Original logical field getters now execute twice for all 234 tables/2,340
+  implicit fields, zero refused, identical bytes and exact independently inventoried
+  IDs. `native-implicit-fields.json` retains hashes and bounds. Original
+  `NavRecord.get_ALFieldCount` RVA 47562 subtracts all ten implicit fields: Table
+  Metadata's AL count is 23, not its internal 33. Preserve primary-first declared
+  indexing; `RecordRef.cpp::IndexedFields` must exclude timestamp 0 when added.
+  Original Types XML binds the four read-only Text[50]/Text[80] FlowFields to
+  User 2000000120 fields 2/3, filtered on User field 1 by audit GUID 2000000002/4.
+  User lookup execution and SQL identifier resolution remain unproved; failed
+  NavEnvironment probes are retained, not counted as passes. Raw `$systemId`,
+  native byte lengths and classification getters are distinct from AL API contracts.
 
 - Native virtual-buffer authority: original BC 29.0.54011.55407 Ncl SHA256
   `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`:
@@ -58,6 +69,10 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
 1. Use one database-wide sequence for rowversion; include the returned version in RecordState and expose it to 0012 without widening every generated field wrapper.
 2. Audit SystemId uniqueness, supplied-ID Insert overloads, created/modified stamps and database-wide monotonic SystemRowVersion. Assign versions in PostgreSQL so independent tiers cannot collide.
    Implement Runtime-18's read-only SystemCreatedBy/SystemModifiedBy user-name/full-name FlowFields for Normal/Temporary tables from the verified declaration profile. Preserve reserved IDs 2000000005–2000000008, Text[50]/Text[80], current User lookup and nonstored/read-only semantics; do not add them to Runtime-17 or infer virtual-table applicability from an absent TableType property.
+   Retain one immutable runtime-version field profile, standard-layout member offsets
+   and shared typed/reflected calculation primitives. Keep timestamp/implicit fields
+   out of declared FieldCount/index loops. Verify actual FieldName → virtual Field
+   lookup → FieldRef.Value callers, not expected-name literals (predecessor 1114).
 3. Activate the shared default/key projection only with 0034/0058 proof. Complete unsupported default eligibility from platform evidence; never select a later field silently. Implement SqlIndex as separate SQL fields, not SetCurrentKey fields; keep its refusal until supported. Enforce Unique, MaintainSqlIndex, IncludedFields, Enabled, AutoIncrement and SqlTimestamp restrictions. No SQL Server physical-clustering promise for PostgreSQL.
 4. Return platform-owned fields from writes and preserve identity on Rename. Coordinate version checks with 0012 and company-qualified sequences with its company work.
 5. Use typed generated metadata for constraints and migration comparisons; never infer a field number from display order.
@@ -81,6 +96,11 @@ this repair leaves those bounds unchanged. Receipts:
 Code: `src/rt/Storage.cpp`, `src/gen/TableWriter.cpp`, `include/meta/TableDef.h`.
 
 Base field declarations: `include/meta/Declare.h::SystemFieldNumbers`, `test/gate/PlatformSystemFieldsGate.cpp`, `test/transpiler/native-bindings.sh`; developer `ff5939a46e`, `devenv-table-system-fields.md` separates the five base fields from Runtime-18's additional Normal/Temporary FlowFields. Typed-member/metadata availability does not prove SQL audit generation or provider contents.
+
+Implicit profile: developer `ff5939a46e`, `methods-auto/recordref/recordref-{fieldcount,fieldindex}-method.md`;
+BCApps `bb7111877f`, `Layers/W1/BaseApp/Modules/System/ApplicationArea/ApplicationAreaMgmt.Codeunit.al`
+and `Apps/W1/{HybridSL/app/src/Migration/History/SLPopulateHistTables.Codeunit.al,ExpenseAgent/test/src/ActivityLog/ExpenseActivityLogTest.Codeunit.al}`.
+Original creation/getter and declaration IL receipts: `native-implicit-fields.json` above.
 
 Default keys: `src/gen/{TableKeys,TableWriter,TableDefinitions,NativeKeyAssertions}.cpp`, `src/tc/Main.cpp::IndexTables`, `test/gate/{GenKeyGate,GenNativeBindingGate}.cpp`, `test/transpiler/table-keys.sh`, `test/transpiler/table-keys/`. Platform: `analyzers/appsourcecop-as{0010,0118,0123}.md`, `diagnostics/diagnostic-al{256,450,464,527}.md`, `methods-auto/recordref/recordref-keyindex-method.md`. BCApps current main: UserSettings, CreatePickParameters, WordTemplatesTestTable4; pinned System TableMetadata. AL0325's explanatory whitelist contradicts actual Code primary keys; do not adopt it. Focused predecessor search found no default-primary finding; 980/1244's emitted-contract guidance applies.
 
