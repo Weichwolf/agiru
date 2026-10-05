@@ -8,7 +8,6 @@
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
-#include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/StringValue.h"
@@ -161,15 +160,19 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
   row.IsPartOfPrimaryKey = InPrimaryKey(table, def.no);
 }
 
-Boolean platform::Field::Get(::agiru::Integer TableNo, ::agiru::Integer No) {
+detail::Found platform::Field::Get(::agiru::Integer TableNo, ::agiru::Integer No) {
   if (IsTemporary()) { return Table<Field>::Get(TableNo, No); }
+  AssignPrimaryKey(TableNo, No);
   const TableEntry *entry = FindTable(TableId{TableNo});
-  if (entry == nullptr) { return false; }
-  const auto wanted = std::ranges::find_if(
-      entry->table->fields, [No](const FieldDef &def) { return def.no.Value() == No; });
-  if (wanted == entry->table->fields.end()) { return false; }
-  detail::LoadFieldMetadata(*this, *entry->table, *wanted);
-  return true;
+  if (entry != nullptr) {
+    const auto wanted = std::ranges::find_if(
+        entry->table->fields, [No](const FieldDef &def) { return def.no.Value() == No; });
+    if (wanted != entry->table->fields.end()) {
+      detail::LoadFieldMetadata(*this, *entry->table, *wanted);
+      return {true, kName};
+    }
+  }
+  return {false, kName, PrimaryKeyText()};
 }
 
 }

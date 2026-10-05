@@ -59,6 +59,47 @@ for control in public-owner assignment-state; do
   find "$proof/$control" -depth -delete
 done
 
+control=moved-get-key
+mkdir -p "$proof/$control/runtime"
+awk '
+  /^[[:space:]]*key_\(std::move\(other.key_\)\),[[:space:]]*$/ { changed++; next }
+  { print }
+  END { if (changed != 1) exit 2 }
+' include/runtime/Table.h > "$proof/$control/runtime/Table.h"
+"$CXX" -O2 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+  --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+  "-I$proof/$control" -Iinclude -Itest/gate -Itest/transpiler/golden -Isrc/rt \
+  test/gate/PlatformFieldGate.cpp "${image_objects[@]}" \
+  "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db \
+  -o "$proof/$control/gate" > "$proof/$control.compile.log" 2>&1
+if "$proof/$control/gate" > "$proof/$control.log" 2>&1; then
+  printf 'reflection-metadata: dropped read key escaped the move contract\n' >&2
+  exit 1
+fi
+rg -q 'FAIL .*moved read failure retains exact key text' "$proof/$control.log"
+sha256sum "$proof/$control/runtime/Table.h" "$proof/$control/gate" > "$proof/read-controls.sha256"
+find "$proof/$control" -depth -delete
+
+control=field-value-context
+awk '
+  /return \{false, kName, PrimaryKeyText\(\)\};/ {
+    print "  detail::Found missing{false, kName, PrimaryKeyText()};";
+    print "  static_cast<void>(static_cast<bool>(missing));";
+    print "  return missing;"; changed++; next
+  }
+  { print }
+  END { if (changed != 1) exit 2 }
+' src/rt/written/PlatformField.cpp > "$proof/$control.cpp"
+"$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+  -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+if LD_PRELOAD="$proof/$control.so" "$field_gate" > "$proof/$control.log" 2>&1; then
+  printf 'reflection-metadata: silently consumed missing Field.Get escaped its contract\n' >&2
+  exit 1
+fi
+rg -q 'FAIL .*a discarded native missing-field Get carries its searched key' "$proof/$control.log"
+sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/read-controls.sha256"
+rm -- "$proof/$control.cpp" "$proof/$control.so"
+
 has_typed_dependencies() {
   rg -q '/(type|runtime)/|/c\+\+/v1/(vector|map|unordered_map|memory|format)([[:space:]]|$)' "$1"
 }
@@ -393,4 +434,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-four compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-six compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

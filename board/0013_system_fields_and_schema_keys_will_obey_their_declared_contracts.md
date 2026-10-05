@@ -58,7 +58,7 @@ Retain the full 2314-case UT population through replay.
   ExpenseActivityLogTest; `src/gen/{TableKeys,TableWriter}.cpp`,
   `src/rt/{FieldMetadata,RecordRef,Storage}.cpp`.
 - `make reflection-metadata` passes the source, reflection, RecordRef, Field and
-  system-profile gates plus 34 mutation controls. The canonical profile selects
+  system-profile gates plus 36 mutation controls. The canonical profile selects
   kind/LinkedObject/host presence; all three reflection callers share original names.
   A real Record.FieldName → Field lookup → FieldRef.Value caller detects source-name
   substitution. The narrow identity header's typed-dependency control also passes.
@@ -110,7 +110,7 @@ Retain the full 2314-case UT population through replay.
   unlinked profile: ten implicit fields, typed offsets/capacities and nonstored
   User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;
   `PlatformSourceGate` passes 3060 source/reflection checks. The existing
-  `make reflection-metadata` qualifier retains all original 32 rejected mutation controls.
+  `make reflection-metadata` qualifier retains all prior controls; 36 mutants reject.
 - `make native-bindings` uses the verified System 29.0.55365.0 / Runtime 18.0
   package: 234 raw tables, one licensing exclusion, 233 selected; eighteen original
   contracts and separate-library consumers compile without PCH, 215 unbound remain

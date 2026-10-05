@@ -95,7 +95,11 @@ public:
 
   /// \brief Moves, and the moved-from copy stops being an assertion.
   /// \param other The one being moved.
-  Found(Found &&other) noexcept : found_(other.found_), table_(other.table_), read_(other.read_) {
+  Found(Found &&other) noexcept
+      : found_(other.found_),
+        table_(other.table_),
+        key_(std::move(other.key_)),
+        read_(other.read_) {
     other.read_ = true;
   }
 
@@ -107,7 +111,8 @@ public:
   }
 
   /// \brief Raises when nobody read it and nothing was found.
-  /// \throws Error `DB:NothingInsideFilter` -- "There is no <Table> within the filter."
+  /// \throws Error `DB:RecordNotFound` for a missing key, or `DB:NothingInsideFilter`
+  ///         for an empty search result; consumed results never raise here.
   ~Found() noexcept(false);
 
 private:

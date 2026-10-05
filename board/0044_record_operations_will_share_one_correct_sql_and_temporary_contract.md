@@ -3,8 +3,7 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: qualify Field.Get consumed/discarded missing-row behavior; then complete
-installed Field Find/Next/Count and the
+Next: complete installed Field Find/Next/Count and the
 actual FieldName → catalogue → FieldRef caller before retiring seed snapshots.
 
 ## Implementation
@@ -79,6 +78,16 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
 
 ## Acceptance
 
+- Native/temporary `Field.Get` preserves optional-result semantics, searched keys,
+  unchanged filters and zero-default omitted trailing keys. Non-missing projection
+  errors still throw when the result is consumed. Moving `detail::Found` retains
+  owned key text. `PlatformFieldGate`: 336 checks; implementation and gate focused
+  tidy pass. `make reflection-metadata JOBS=2`: all 36 compiled controls plus the
+  header-dependency control pass, including dropped-key and silent-miss mutants.
+  Developer `f928288ee840`: `methods-auto/record/record-get-method.md`;
+  BCApps `d99152ee35f0`: `System/RapidStart/ConfigPackageField.Table.al`
+  uses both contexts. Predecessor 1136 warns against weakening strict reads to
+  hide upstream faults. Live navigation, full projection and full AL replay remain open.
 - Temporary record arrays now share one row store across dimensions, not their
   field buffers or filters; distinct arrays and ordinary/scalar elements stay
   independent. `TemporaryGate` passes 95 checks and `AlArrayGate` seventeen.

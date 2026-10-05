@@ -391,9 +391,11 @@ public:
 
   /// \brief AL `Field.Get(TableNo, No)` -- the field of a table, by number.
   ///
-  /// \param TableNo The table.
-  /// \param No      The field within it.
-  /// \return True when this installation carries that field.
+  /// \param TableNo The table, defaulting to zero when omitted.
+  /// \param No      The field within it, defaulting to zero when omitted.
+  /// \return True when this installation carries that field. Consumed missing reads
+  ///         return false; discarded missing reads raise `DB:RecordNotFound`.
+  /// \throws Error if a discarded read misses or a declaration cannot be projected.
   ///
   /// \note IT READS THE CATALOGUE AND NOT THE DATABASE, which is what makes `Field` VIRTUAL.
   ///       There is no `Field` table in PostgreSQL and there must not be: every row it could hold
@@ -403,8 +405,8 @@ public:
   ///
   /// \warning IT HIDES `Table<Field>::Get` RATHER THAN OVERRIDING IT, because `Table` is CRTP and
   ///          has no virtuals -- that is the point of it. A `Field` reached through a `RecordRef`
-  ///          therefore still goes to SQL, and that is board:0052.
-  Boolean Get(::agiru::Integer TableNo, ::agiru::Integer No);
+  ///          therefore retains the live-provider guard until common navigation is qualified.
+  detail::Found Get(::agiru::Integer TableNo = 0, ::agiru::Integer No = 0);
 };
 
 /// \brief The field table of the virtual `Field` table, as static const data.

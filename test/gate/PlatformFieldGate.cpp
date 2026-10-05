@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 
 using agiru::FieldType;
 using agiru::RecordRef;
@@ -48,6 +49,104 @@ constexpr agiru::Integer kTypeNameField = 9;
 constexpr FieldType kUnsupportedType = static_cast<FieldType>(250);
 constexpr agiru::Integer kNativeCodeOrdinal = 31489;
 constexpr agiru::Integer kNativeFieldRefCodeOrdinal = 31490;
+constexpr agiru::Integer kMissingMetadataField = 99;
+constexpr agiru::Integer kMissingMetadataTable = 50155;
+
+struct ReadFailure {
+  std::string message;
+  std::string code;
+};
+
+ReadFailure CaptureReadFailure(auto &&read) {
+  try {
+    read();
+  } catch (const agiru::Error &error) {
+    return {.message = error.what(), .code = std::string(error.Code())};
+  }
+  return {};
+}
+
+void MetadataGetPreservesOptionalFailureContext() {
+  Field row;
+  row.SetRange(row.No, 2);
+  row.Get(kMetadataFixtureId.Value(), 1);
+  CHECK_TRUE("native Get ignores filters when finding its primary key", row.No == 1);
+  CHECK_TEXT("native Get does not reset filters", row.GetFilter(row.No), "2");
+  const bool found = row.Get(kMetadataFixtureId.Value(), kMissingMetadataField);
+  CHECK_TRUE("a consumed native missing-field Get answers false", !found);
+  CHECK_TRUE("a consumed native missing-table Get answers false",
+             !row.Get(kMissingMetadataTable, 1));
+  const ReadFailure missingField =
+      CaptureReadFailure([&] { row.Get(kMetadataFixtureId.Value(), kMissingMetadataField); });
+  CHECK_TEXT("a discarded native missing-field Get carries its searched key",
+             missingField.message,
+             "The Field does not exist. Identification fields and values: 50151, 99");
+  CHECK_TEXT("a discarded native missing-field Get carries the record error code",
+             missingField.code,
+             "DB:RecordNotFound");
+  const ReadFailure missingTable = CaptureReadFailure([&] { row.Get(kMissingMetadataTable, 1); });
+  CHECK_TEXT("a discarded native missing-table Get carries its searched key",
+             missingTable.message,
+             "The Field does not exist. Identification fields and values: 50155, 1");
+  CHECK_TEXT("a discarded native missing-table Get carries the record error code",
+             missingTable.code,
+             "DB:RecordNotFound");
+}
+
+void MovedReadFailuresPreserveOwnedKeyText() {
+  const ReadFailure missing = CaptureReadFailure([] {
+    agiru::detail::Found source{false, "Field", "50151, 99"};
+    const agiru::detail::Found moved{std::move(source)};
+  });
+  CHECK_TEXT("moved read failure retains exact key text",
+             missing.message,
+             "The Field does not exist. Identification fields and values: 50151, 99");
+  CHECK_TEXT("moved read failure retains the record error code", missing.code, "DB:RecordNotFound");
+  const ReadFailure consumed = CaptureReadFailure([] {
+    agiru::detail::Found source{false, "Field", "50151, 99"};
+    agiru::detail::Found moved{std::move(source)};
+    CHECK_TRUE("a moved consumed failure remains false", !static_cast<bool>(moved));
+  });
+  CHECK_SILENT("moving a consumed read result does not duplicate its assertion", consumed.message);
+}
+
+void MetadataGetDefaultsAndTemporaryReadsShareTheContract() {
+  Field native;
+  CHECK_TRUE("native Get defaults an omitted field number to zero",
+             native.Get(agiru::platform::Company::kId.Value()));
+  CHECK_TRUE("the omitted native key selects timestamp rather than the previous key",
+             native.No == 0);
+  CHECK_TEXT("the omitted native key reads the original timestamp spelling",
+             native.FieldName.Value(),
+             "timestamp");
+  CHECK_TRUE("native Get defaults all omitted keys to zero", !native.Get());
+  const ReadFailure empty = CaptureReadFailure([&] { native.Get(); });
+  CHECK_TEXT("a discarded native default-key read names zero keys",
+             empty.message,
+             "The Field does not exist. Identification fields and values: 0, 0");
+
+  Temporary<Field> rows;
+  rows.TableNo = kMetadataFixtureId.Value();
+  rows.No = 0;
+  rows.FieldName = "Stored zero key";
+  rows.Insert();
+  rows.No = kMissingMetadataField;
+  CHECK_TRUE("temporary Get defaults an omitted trailing key",
+             rows.Get(kMetadataFixtureId.Value()));
+  CHECK_TEXT("temporary Get reads its own rows, not installed metadata",
+             rows.FieldName.Value(),
+             "Stored zero key");
+  CHECK_TRUE("a consumed temporary missing-field Get answers false",
+             !rows.Get(kMetadataFixtureId.Value(), kMissingMetadataField));
+  const ReadFailure missing =
+      CaptureReadFailure([&] { rows.Get(kMetadataFixtureId.Value(), kMissingMetadataField); });
+  CHECK_TEXT("a discarded temporary missing-field Get carries the searched key",
+             missing.message,
+             "The Field does not exist. Identification fields and values: 50151, 99");
+  CHECK_TEXT("a discarded temporary missing-field Get carries the record error code",
+             missing.code,
+             "DB:RecordNotFound");
+}
 
 struct TypeNameCase {
   FieldType type;
@@ -238,6 +337,13 @@ void MetadataTypeNamesMatchTheNativePrimitiveContract() {
   CHECK_TEXT("the shared length primitive refuses an unknown type",
              said,
              "Field metadata: unsupported length");
+  const ReadFailure invalidType = CaptureReadFailure([&] {
+    const bool readable = row.Get(kTypeMetadataId.Value(), kUnknownTypeField);
+    static_cast<void>(readable);
+  });
+  CHECK_TEXT("metadata projection errors are not converted to missing-row answers",
+             invalidType.message,
+             "Field metadata: unsupported type name");
 }
 
 void MetadataKeepsDeclaredValuesAndRecordState() {
@@ -466,6 +572,9 @@ int main() {
     agiru::RegisterTableEntry(&kTargetEntry);
     agiru::RegisterTableEntry(&kLongMetadataEntry);
     agiru::RegisterTableEntry(&kTypeMetadataEntry);
+    MetadataGetPreservesOptionalFailureContext();
+    MovedReadFailuresPreserveOwnedKeyText();
+    MetadataGetDefaultsAndTemporaryReadsShareTheContract();
     ATemporaryFieldIsAContainerAndNeedsNoPlatform();
     ItIsTheTableTheBaseAppReadsFrom();
     TheCompatibilityTypeKeepsItsExistingOptionVocabulary();
