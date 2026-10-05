@@ -36,24 +36,27 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   path passes locally. Outside frozen 024625; full UT gain remains unproven.
   Encoding, configured bounds, non-text reads, diagnostics and File lifecycle/
   access remain open; nonempty XML subsets are still discarded (0035/0074).
-- Stream/XML replay is running: `20261005T024625Z-3504499`, runner 3504975,
-  frozen HEAD `9c3291e`, source
+- Stream/XML replay is terminal: `20261005T024625Z-3504499`, frozen HEAD
+  `9c3291e`, source
   `12f5e315a376d585ea8c20dbc95ce8dccfb068598fd88d1f82cdac33e648e588`.
-  Six jobs, `slice-check all test ut`; runner and AL worker processes confirmed live.
-  Slice/build pass; local population is 142 cases with one tooling failure: DiscoveryGate
+  Finished 04:06:14 UTC; runner gone. Slice/build pass; local population is
+  142 cases with one tooling failure: DiscoveryGate
   omitted the stream qualifier from its isolated fixture. Fix `079158d` passes its
   missing-binary/per-script removal controls locally; it is outside this snapshot.
-  Includes Ignore-header, shared-cursor and owned-provider fixes; UT is executing,
-  no terminal UT result yet.
-  Compare every one of the 2,314 milestone identities/source hashes with terminal
-  015114; retain raw/full-tree gaps separately. Dependencies match 015114.
+  UT exits 2: 2,170/2,314 passed, 144 failed, zero incomplete; 80 codeunits,
+  six workers/1,571 seconds. All identities/source manifest/file hashes match
+  015114: no gains/losses/changed errors/missing/added/duplicates
+  (`artifacts/ut-comparison-015114.json`). Dependencies and frozen source/System/
+  original-notice pre/post hashes match. Includes Ignore-header, shared-cursor
+  and owned-provider fixes; excludes later File and Native Base64 bindings.
+  Null/unsealed seed remains diagnostic repeatability, not causal A/B or G1.
 - Owned BLOB providers (0035): 89 C++/17 generated AL checks green, including
   ASan/UBSan; all preceding 73/12 checks retained. Four compiled controls fail
   both consumers, including heap-use-after-free for an unowned provider.
   `/tmp/agiru-streams.D7G8B1`, hashes match; `/tmp/agiru-stream-owner.L3GzVu`.
   All gate consumers rebuilt; Base64 79/XML 220/File 17 remain green.
   Blob/AL runner lint passes; Stream/gate retain 25/47 inherited header findings,
-  no own findings, lint exits 2. Outside frozen 015114; full replay pending.
+  no own findings, lint exits 2. Terminal 024625 retains all prior statuses/errors.
   File/record/codeunit ownership, AL assignment/Clear/disposal, encoding, bounds,
   nonseekable/BigInteger positions and Native activation remain open.
 - Shared InStream cursor (0035): 73 C++ checks green, preceding runtime 16 red;
@@ -62,14 +65,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   reader 220 remain green. `/tmp/agiru-stream-alias.hjKWK3`,
   `/tmp/agiru-streams.QdtX0X`, hashes match. No own analysis findings; 25/47 inherited
   source/gate header findings remain (lint exits 2); AL runner lint passes.
-  Outside frozen 015114; full replay pending. Broader provider lifetimes, positions,
+  Terminal 024625 retains all prior statuses/errors. Broader provider lifetimes, positions,
   encoding/line handling and Native stream activation remain open.
 - XML Ignore header/closing fix (0035): 220 checks green; preceding runtime has
   53 failures on the same expanded gate. Seven compiled controls reject (header
   bypass: 79 failures); fixture-resource tripwire remains qualified. Input hashes
   match: `/tmp/agiru-xml-header.1XX8t9`, `/tmp/agiru-xml-reader.PUZSGA`.
   No own analysis findings, 36/62 inherited header findings remain (lint exits 2).
-  Outside frozen 015114; full replay pending. QName/character validation, other
+  Terminal 024625 retains all prior statuses/errors. QName/character validation, other
   encodings, whitespace/error states and Parse/resolver authority remain open.
 - XML integration is terminal: `20261005T015114Z-3424473`, frozen HEAD `3f6715e`,
   source `5868281d053a1fc2e797530f440b93f85a8ed23d9afb6c586225de0c19c0e193`;

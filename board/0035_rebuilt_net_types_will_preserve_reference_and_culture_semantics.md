@@ -5,6 +5,14 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Full XML/stream replay `20261005T024625Z-3504499` is terminal on frozen
+  `9c3291e`: slice/build pass; UT 2,170/2,314, 144 failed, zero incomplete,
+  80 codeunits/1,571 seconds. All identities/source hashes and errors agree
+  with 015114 (`artifacts/ut-comparison-015114.json`); dependency and frozen
+  source/System/notice hashes match. Local tests retain one DiscoveryGate
+  fixture failure, fixed separately in `079158d`. Includes Ignore-header,
+  shared-cursor and owned-provider increments; excludes later File and
+  Native Base64 text fixes. Null/unsealed seed: diagnostic, not causal A/B/G1.
 - File text increment: default binary mode preserves newlines; text mode ignores
   CR, stops on LF/zero and returns content length. Binary reads preserve declared
   capacity plus a possible zero terminator; conversion stops at the first zero
@@ -41,7 +49,8 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   retain 25/47 inherited header findings, no own findings (lint exits 2).
   All gate consumers rebuild; Base64 79, XML reader 220 and File 17 remain green.
   Three no-PCH header rounds: Blob 904→1,270 ms, Stream 983→1,579 ms under different
-  concurrent loads, not a comparable speed measurement. Full local/AL replay pending.
+  concurrent loads, not a comparable speed measurement. Full AL replay above
+  retains every prior status/error; later File/Native replay remains required.
   Authority: developer `ff5939a46e`, `methods-auto/blob/blob-create{in,out}stream-method.md`;
   BCApps `bb7111877f`, `BLOB Storage/src/TempBlobImpl.Codeunit.al`, TempBlobTest;
   predecessor 1045/1658. Original Ncl 29.0.54011.55407 retains the provider/host
@@ -60,7 +69,7 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   findings; 25/47 inherited header findings remain (lint exits 2), AL runner lint
   passes. Stream.h standalone frontend cost: before 1,124 ms, after 1,118 ms, three
   no-PCH rounds each under concurrent UT load; no build-speed or scale claim.
-  Outside frozen 015114; full local/AL replay pending. Broader provider lifetimes,
+  Full AL replay above retains every prior status/error. Broader provider lifetimes,
   nonseekable/BigInteger positions, encoding/line handling and Native activation
   remain open. Authority: native stream-copy receipt below; developer
   `methods-auto/instream/{instream-position,instream-resetposition}-method.md`;
@@ -74,7 +83,7 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   tripwire remains qualified. `/tmp/agiru-xml-header.1XX8t9`,
   `/tmp/agiru-xml-reader.PUZSGA`; final input hashes match. No own analysis findings;
   36/62 inherited reader/gate header findings remain unsuppressed (lint exits 2).
-  Outside frozen 015114; full replay pending. QName/XML character validation,
+  Full AL replay above retains every prior status/error. QName/XML character validation,
   encoding profiles, whitespace boundaries, error states and Parse/resolver policy
   remain gaps. Framework `XmlTextReaderImpl::{ParseDoctypeDecl,SkipDtd,SkipUntil}`
   supplies header boundaries; local developer/BCApps/user revisions below and
@@ -90,7 +99,7 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   `/tmp/agiru-xml-reader.3UuLuu`, hashes match after execution. Resource probe
   analysis passes using its actual compiler command; reader/gate add no own
   findings, 36/62 inherited header findings remain unsuppressed (lint exits 2).
-  Full local/AL replay is pending. This qualifies authored UTF-8/UTF-16LE cases,
+  Full AL replay above retains every prior status/error. This qualifies authored UTF-8/UTF-16LE cases,
   not complete XML security/conformance: Parse/resolver authority, other encoding
   profiles, full Ignore grammar/whitespace boundaries, native error states/messages,
   encoded declarations and streaming limits remain open. No blanket safety claim.
