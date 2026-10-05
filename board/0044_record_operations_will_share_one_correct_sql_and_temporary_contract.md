@@ -3,14 +3,15 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: complete installed Field Find/Next/Count and the
+Next: complete Field classification, SQLDataType, package provenance and customization
+projection, then installed Field Find/Next/Count and the
 actual FieldName → catalogue → FieldRef caller before retiring seed snapshots.
 
 ## Implementation
 
 1. Project AllObj/Field/Table Metadata/Page Metadata from one immutable installed
-   registry in `src/rt/{ReflectionMetadata,FieldMetadata,Storage,Selection,Navigate}.cpp`
-   and `written/PlatformField.cpp`. Share typed/RecordRef predicates for filters,
+   registry in `src/rt/{ReflectionMetadata,Storage,Selection,Navigate}.cpp`,
+   `FieldMetadata.h` and `written/PlatformField.cpp`. Share typed/RecordRef predicates for filters,
    order/count/navigation; keep only cursor indices per handle. Missing metadata
    refuses; no guessed values, copied session catalogue or competing registry.
 2. Preserve source app/version/extension property ownership, Name versus Caption,
@@ -18,6 +19,9 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
    and permissions. Source CDS → native CRM; provider kind differs from TableType.
    Remove legacy SQL Field copies only on disposable schema-qualified databases,
    after proving persisted-name migration/read behavior. Keep guards until qualified.
+   Field customization defaults belong to the declaring table/extension: an extension's
+   AllowInCustomizations affects its new fields, not base fields; field overrides win.
+   Retain this origin rather than applying the merged table default to every field.
 3. Preserve SQL/temporary Record and RecordRef parity: Init/Clear, assignment/Copy/
    ShareTable, Get/filter/marks and trigger-aware ModifyAll/DeleteAll. Keep alias
    ownership and temporary storage distinct from filter/cursor/record state.
@@ -81,13 +85,23 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
 - Native/temporary `Field.Get` preserves optional-result semantics, searched keys,
   unchanged filters and zero-default omitted trailing keys. Non-missing projection
   errors still throw when the result is consumed. Moving `detail::Found` retains
-  owned key text. `PlatformFieldGate`: 336 checks; implementation and gate focused
-  tidy pass. `make reflection-metadata JOBS=2`: all 36 compiled controls plus the
-  header-dependency control pass, including dropped-key and silent-miss mutants.
+  owned key text. Search flags and all four compile-time Access members preserve
+  declarations, default Public and case-insensitive spelling; unknown Access refuses.
+  One private ordinal decoder serves Field and Table Metadata without adding public
+  dependencies or a second mapper. `PlatformFieldGate`: 354 checks; PlatformField.cpp
+  and gate focused tidy pass. ReflectionMetadata.cpp retains four existing
+  std::expected include-cleaner diagnostics; no suppression or baseline increase.
+  `make reflection-metadata JOBS=2`: all 38 compiled controls plus the header control
+  pass, including dropped-key, silent-miss, forced-Public and false-search mutants.
+  The shared fallback mutant also fails the unknown-Field-access check.
   Developer `f928288ee840`: `methods-auto/record/record-get-method.md`;
   BCApps `d99152ee35f0`: `System/RapidStart/ConfigPackageField.Table.al`
   uses both contexts. Predecessor 1136 warns against weakening strict reads to
-  hide upstream faults. Live navigation, full projection and full AL replay remain open.
+  hide upstream faults. Properties `devenv-{access,optimizefortextsearch,allowincustomizations}-property.md`
+  establish field defaults and declaring-extension customization inheritance.
+  BCApps Item.Table.al declares optimized No./Description; TableWriter.cpp and
+  meta/Declare.h already retain these flags. This is not an implemented text-search
+  index, authorization, live navigation, complete projection or full AL replay.
 - Temporary record arrays now share one row store across dimensions, not their
   field buffers or filters; distinct arrays and ordinary/scalar elements stay
   independent. `TemporaryGate` passes 95 checks and `AlArrayGate` seventeen.

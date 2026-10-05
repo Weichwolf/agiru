@@ -13,6 +13,7 @@
 #include "type/StringValue.h"
 
 #include "FieldMetadata.h"
+#include "ReflectionMetadata.h"
 
 #include <algorithm>
 #include <array>
@@ -140,6 +141,11 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
   const auto obsoleteState = ObsoleteStateOf(def);
   const auto nativeType = NativeFieldTypeOf(def);
   const std::string typeName = TypeNameOf(def, nativeType);
+  const auto access = MetadataPropertyOrdinal(OptionTraits<platform::FieldAccess>::kValues,
+                                              def.access.empty() ? "Public" : def.access,
+                                              "Access",
+                                              "Field");
+  if (!access) { throw Error(access.error()); }
   row.TableNo = table.id.Value();
   row.No = def.no.Value();
   row.TableName = FittedFieldText(table.name, platform::Field::kNameLength);
@@ -158,6 +164,8 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
                                      platform::Field::kCaptionLength);
   row.Enabled = def.enabled;
   row.IsPartOfPrimaryKey = InPrimaryKey(table, def.no);
+  row.OptimizeForTextSearch = def.optimizeForTextSearch;
+  row.Access = Option<platform::FieldAccess>{*access};
 }
 
 detail::Found platform::Field::Get(::agiru::Integer TableNo, ::agiru::Integer No) {

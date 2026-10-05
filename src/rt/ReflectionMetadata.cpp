@@ -1,5 +1,6 @@
 #include "ReflectionMetadata.h"
 
+#include "meta/EnumDef.h"
 #include "meta/PageDef.h"
 #include "meta/TableType.h"
 #include "platform/ReflectionOptions.h"
@@ -9,7 +10,9 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <expected>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -32,13 +35,23 @@ bool SameProperty(std::string_view left, std::string_view right) {
 template <typename Native>
 std::expected<Native, std::string> MetadataProperty(std::string_view name,
                                                     std::string_view property) {
-  for (const auto &value : OptionTraits<Native>::kValues) {
-    if (SameProperty(name, value.name)) { return static_cast<Native>(value.ordinal); }
-  }
-  return std::unexpected("Table Metadata." + std::string(property) + " has no verified member '" +
-                         std::string(name) + "'");
+  const auto value = MetadataPropertyOrdinal(OptionTraits<Native>::kValues, name, property);
+  if (!value) { return std::unexpected(value.error()); }
+  return static_cast<Native>(*value);
 }
 
+}
+
+std::expected<std::int32_t, std::string>
+MetadataPropertyOrdinal(std::span<const EnumValueDef> values,
+                        std::string_view name,
+                        std::string_view property,
+                        std::string_view owner) {
+  for (const auto &value : values) {
+    if (SameProperty(name, value.name)) { return value.ordinal; }
+  }
+  return std::unexpected(std::string(owner) + "." + std::string(property) +
+                         " has no verified member '" + std::string(name) + "'");
 }
 
 std::expected<platform::TableMetadataObsoleteState, std::string>

@@ -100,6 +100,31 @@ rg -q 'FAIL .*a discarded native missing-field Get carries its searched key' "$p
 sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/read-controls.sha256"
 rm -- "$proof/$control.cpp" "$proof/$control.so"
 
+for control in field-access-default field-search-default; do
+  awk -v control="$control" '
+    control == "field-access-default" && /row.Access = Option<platform::FieldAccess>/ {
+      print "  row.Access = platform::FieldAccess::Public;"; changed++; next
+    }
+    control == "field-search-default" && /row.OptimizeForTextSearch = def.optimizeForTextSearch;/ {
+      print "  row.OptimizeForTextSearch = false;"; changed++; next
+    }
+    { print } END { if (changed != 1) exit 2 }
+  ' src/rt/written/PlatformField.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$field_gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped declared field policies\n' "$control" >&2
+    exit 1
+  fi
+  case "$control" in
+    field-access-default) claim='metadata access retains the declared native member';;
+    field-search-default) claim='metadata text search retains the declared flag';;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/policy-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
+
 has_typed_dependencies() {
   rg -q '/(type|runtime)/|/c\+\+/v1/(vector|map|unordered_map|memory|format)([[:space:]]|$)' "$1"
 }
@@ -357,11 +382,12 @@ for control in ordinal-cast cds-query cds-refusal default-fallback property-fall
     control == "default-fallback" && /return std::unexpected\("unknown TableType/ {
       $0 = "  return Native::Normal;"; changed++
     }
-    control == "property-fallback" && /return std::unexpected\("Table Metadata\."/ {
-      print "  static_cast<void>(property); return static_cast<Native>(0);"; changed++; skipping=1; next
+    control == "property-fallback" && /return std::unexpected\(std::string\(owner\) \+/ {
+      print "  static_cast<void>(property); static_cast<void>(owner); return 0;";
+      changed++; skipping=1; next
     }
-    control == "property-ordinal" && /static_cast<Native>\(value.ordinal\)/ {
-      sub(/static_cast<Native>\(value.ordinal\)/, "static_cast<Native>(value.ordinal + 1)"); changed++
+    control == "property-ordinal" && /return value.ordinal;/ {
+      sub(/return value.ordinal;/, "return value.ordinal + 1;"); changed++
     }
     control == "scope-aliases" && /SameProperty\(name, alias\)/ {
       $0 = "    static_cast<void>(alias); static_cast<void>(value);"; changed++
@@ -375,6 +401,13 @@ for control in ordinal-cast cds-query cds-refusal default-fallback property-fall
     exit 1
   fi
   rg -q 'FAIL ' "$proof/$control.log"
+  if [ "$control" = property-fallback ]; then
+    if LD_PRELOAD="$proof/$control.so" "$field_gate" > "$proof/field-access-refusal.log" 2>&1; then
+      printf 'reflection-metadata: unknown field access escaped the shared decoder\n' >&2
+      exit 1
+    fi
+    rg -q 'FAIL .*unknown field access refuses rather than granting Public' "$proof/field-access-refusal.log"
+  fi
 done
 
 for control in caption-names absent-caption-field null-owner wrong-access wrong-default-classification native-defaults declaration-company-scope null-system-id wrong-system-provider; do
@@ -434,4 +467,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-six compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-eight compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

@@ -45,6 +45,7 @@ constexpr agiru::TableId kMetadataFixtureId{50151};
 constexpr agiru::TableId kMetadataTargetId{50152};
 constexpr agiru::TableId kLongMetadataId{50153};
 constexpr agiru::TableId kTypeMetadataId{50154};
+constexpr agiru::TableId kPolicyMetadataId{50156};
 constexpr agiru::Integer kTypeNameField = 9;
 constexpr FieldType kUnsupportedType = static_cast<FieldType>(250);
 constexpr agiru::Integer kNativeCodeOrdinal = 31489;
@@ -195,6 +196,39 @@ constexpr auto kTypeMetadataFields = [] {
 
 constexpr agiru::TableDef kTypeMetadataTable{
     .id = kTypeMetadataId, .name = "Fixture Primitive Types", .fields = kTypeMetadataFields};
+
+struct FieldPolicyCase {
+  std::string_view access;
+  agiru::platform::FieldAccess native;
+  bool textSearch;
+};
+
+constexpr auto kFieldPolicies = std::to_array<FieldPolicyCase>({
+    {.access = "", .native = agiru::platform::FieldAccess::Public, .textSearch = false},
+    {.access = "Public", .native = agiru::platform::FieldAccess::Public, .textSearch = true},
+    {.access = "iNtErNaL", .native = agiru::platform::FieldAccess::Internal, .textSearch = false},
+    {.access = "Protected", .native = agiru::platform::FieldAccess::Protected, .textSearch = true},
+    {.access = "Local", .native = agiru::platform::FieldAccess::Local, .textSearch = true},
+});
+constexpr agiru::Integer kUnknownPolicyField =
+    static_cast<agiru::Integer>(kFieldPolicies.size() + 1);
+constexpr auto kPolicyMetadataFields = [] {
+  std::array<agiru::FieldDef, kFieldPolicies.size() + 1> fields{};
+  for (std::size_t i = 0; i < kFieldPolicies.size(); ++i) {
+    fields[i] = {.name = "Policy value",
+                 .access = kFieldPolicies[i].access,
+                 .no = agiru::FieldNo{static_cast<agiru::Integer>(i + 1)},
+                 .type = FieldType::Text,
+                 .optimizeForTextSearch = kFieldPolicies[i].textSearch};
+  }
+  fields[kFieldPolicies.size()] = {.name = "Unsupported access",
+                                   .access = "Undocumented",
+                                   .no = agiru::FieldNo{kUnknownPolicyField},
+                                   .type = FieldType::Text};
+  return fields;
+}();
+constexpr agiru::TableDef kPolicyMetadataTable{
+    .id = kPolicyMetadataId, .name = "Fixture Field Policies", .fields = kPolicyMetadataFields};
 constexpr std::string_view kLongName = "012345678901234567890123456789😀tail";
 constexpr std::string_view kLongFieldName = "äääääääääääääääääääääääääääääätail";
 constexpr std::array<agiru::EnumValueDef, 6> kBlankOptions{{
@@ -289,6 +323,7 @@ constexpr agiru::TableEntry kMetadataEntry = MetadataEntry(kMetadataTable);
 constexpr agiru::TableEntry kTargetEntry = MetadataEntry(kMetadataTarget);
 constexpr agiru::TableEntry kLongMetadataEntry = MetadataEntry(kLongMetadataTable);
 constexpr agiru::TableEntry kTypeMetadataEntry = MetadataEntry(kTypeMetadataTable);
+constexpr agiru::TableEntry kPolicyMetadataEntry = MetadataEntry(kPolicyMetadataTable);
 
 std::string ReadTypeName(Field &row) {
   RecordRef ref;
@@ -302,6 +337,25 @@ std::string ReadMetadata(Field &row, agiru::Integer no, agiru::TableId table = k
   try {
     return row.Get(table.Value(), no) ? "" : "missing field";
   } catch (const agiru::Error &error) { return error.what(); }
+}
+
+void MetadataSearchAndAccessRetainDeclaredProperties() {
+  Field row;
+  for (std::size_t i = 0; i < kFieldPolicies.size(); ++i) {
+    CHECK_TRUE("a declared field policy is readable",
+               row.Get(kPolicyMetadataId.Value(), static_cast<agiru::Integer>(i + 1)));
+    CHECK_TRUE("metadata access retains the declared native member",
+               row.Access == kFieldPolicies[i].native);
+    CHECK_TRUE("metadata text search retains the declared flag",
+               row.OptimizeForTextSearch == kFieldPolicies[i].textSearch);
+  }
+  CHECK_TEXT("unknown field access refuses rather than granting Public",
+             ReadMetadata(row, kUnknownPolicyField, kPolicyMetadataId),
+             "Field.Access has no verified member 'Undocumented'");
+  CHECK_TRUE("a refused policy does not replace the preceding access",
+             row.Access == agiru::platform::FieldAccess::Local);
+  CHECK_TRUE("a refused policy does not replace the preceding search flag",
+             row.OptimizeForTextSearch);
 }
 
 void MetadataTypeNamesMatchTheNativePrimitiveContract() {
@@ -572,6 +626,8 @@ int main() {
     agiru::RegisterTableEntry(&kTargetEntry);
     agiru::RegisterTableEntry(&kLongMetadataEntry);
     agiru::RegisterTableEntry(&kTypeMetadataEntry);
+    agiru::RegisterTableEntry(&kPolicyMetadataEntry);
+    MetadataSearchAndAccessRetainDeclaredProperties();
     MetadataGetPreservesOptionalFailureContext();
     MovedReadFailuresPreserveOwnedKeyText();
     MetadataGetDefaultsAndTemporaryReadsShareTheContract();
