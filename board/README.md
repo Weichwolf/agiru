@@ -28,6 +28,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   pass 14,329 checks each. Native source omissions stay unchanged; no own
   analysis findings, inherited headers remain red. `native-defaults.json` in
   the same receipt directory. Live activation and full AL replay remain open.
+  Pushed `417954e` passes slice-check (14,225/zero missing) and full six-job
+  build (exit 0/8s); all 25,285 compiler input hashes agree. Complete local
+  regression is running on this fixed source batch; no pending test is a pass.
 
 - Current full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.

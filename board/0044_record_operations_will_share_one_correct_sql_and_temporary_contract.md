@@ -36,6 +36,9 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   retains `native-source-comparison.json` and `native-defaults.json`.
   Complete implicit profile, schema activation and shared live read-only provider
   remain open/guarded. No new full UT result or business activation claim.
+  `417954e` is pushed; slice-check has 14,225 sources/zero missing, full build
+  exits 0/8s, all 25,285 compiler inputs match afterward. Complete local replay
+  is pending on this unchanged batch (`native-defaults-local.log`).
 
 - Current complete UT replay on `2ecc31e` retains 48 Table Metadata provider
   refusals, unchanged against the preceding full population; 2,173/2,314 pass,
