@@ -12,6 +12,13 @@ dotnet
 
 codeunit 50265 "Byte Conversion Consumer"
 {
+    procedure DecodeBigText(Input: BigText): DotNet Array
+    var
+        Convert: DotNet Convert;
+    begin
+        exit(Convert.FromBase64String(Input));
+    end;
+
     procedure Encode(Input: DotNet Array): Text
     var
         Convert: DotNet Convert;

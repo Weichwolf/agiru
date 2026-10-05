@@ -19,10 +19,19 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   bodies; package bytes agree pre/post. Translation remains red: 67 Native methods,
   215 native tables and 90 other native sources unactivated, 5,683 unacted properties;
   numeric Convert keeps four separate runtime refusals (0035). Slice-check retains
-  14,225 sources/zero missing. Direct six-job integration build is running under
+  14,225 sources/zero missing. Direct six-job integration build failed after 138s under
   `/tmp/agiru-hash-convert-integration.Qzx26W`; 25,282 compiler input hashes retained,
-  development inputs held unchanged. Local/full UT replay follows a successful build;
-  no new UT result yet. Previous complete 2,172/2,314 measurement remains below.
+  development inputs held unchanged and checked afterward. ImportExportWorkflow's
+  BigText→Convert call blocked compilation; full local tests/all 2,314 UT were
+  unexecuted on this image. Previous complete 2,172/2,314 measurement remains below.
+
+- Follow-up conversion checks pass: 16,470 C++/14,617 generated AL checks,
+  720,028 reference checks; four runtime controls and a removed Array-include
+  compile control reject. `/tmp/agiru-conversion.nF0D8G` (0035).
+  Exact BigText caller adapter retains the named ToText refusal; no workflow claim.
+  Generator names Base64's complete Array dependency without relying on PCH;
+  GenReceiver's 13 checks pass. No new own analysis findings; inherited header
+  and three unchanged generator findings remain. Root regeneration/build/UT follow.
 
 - Convert byte-array integration passes: 16,469 C++/14,615 generated-AL checks,
   10,051 original-core and 710 CLR-region reference rows agree; four compiled

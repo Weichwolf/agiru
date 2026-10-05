@@ -2,9 +2,9 @@
 #include "BodyWriter.h"
 #include "Check.h"
 #include "CodeunitWriter.h"
+#include "ObjectKind.h"
 #include "Parser.h"
 #include "RuntimeSurface.h"
-#include "Scope.h"
 #include "TableWriter.h"
 
 #include <string>
@@ -71,11 +71,28 @@ void HeadersAreNotInsertedTwice() {
           .contains("#include \"dotnet/Generic.h\""));
 }
 
+void ConversionResultNamesItsArrayDependency() {
+  const auto complete =
+      agiru::gen::RuntimeIncludes("dotnet::Convert Converter; Converter.FromBase64String(Text);",
+                                  agiru::gen::ObjectKind::Codeunit);
+  CHECK_TRUE("Convert return-value consumers name the complete Array dependency",
+             complete.contains("#include \"dotnet/Regex.h\""));
+  const auto numeric = agiru::gen::RuntimeIncludes(
+      "dotnet::Convert Converter; Converter.ToInt32(1);", agiru::gen::ObjectKind::Codeunit);
+  CHECK_TRUE("numeric refusals do not widen to the Array implementation",
+             !numeric.contains("#include \"dotnet/Regex.h\""));
+  const auto unrelated = agiru::gen::RuntimeIncludes("Local.FromBase64String(Text);",
+                                                     agiru::gen::ObjectKind::Codeunit);
+  CHECK_TRUE("an unrelated procedure name does not add a CLR Array dependency",
+             !unrelated.contains("#include \"dotnet/Regex.h\""));
+}
+
 }
 
 int main() {
   return gate::Run("GenReceiver", [] {
     DeclarationsTakePrecedenceOverGetterNames();
     HeadersAreNotInsertedTwice();
+    ConversionResultNamesItsArrayDependency();
   });
 }

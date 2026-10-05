@@ -14,10 +14,30 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   remain separate explicit gaps, not hidden by that generated absent-type census.
   `/tmp/agiru-transpile.puKdvp`; original System package pre/post bytes agree.
   Slice-check retains 14,225 identities/zero missing. Six-job direct `make all`
-  is running on frozen compiler inputs (editable tree held unchanged):
+  failed after 138 seconds at ImportExportWorkflow's BigText→Convert call:
   `/tmp/agiru-hash-convert-integration.Qzx26W`, 25,282 input hashes, manifest SHA256
   `50de38cdfff45409f9820771610993fdb13428d5e2fc301f4c3e6edafe515aec`.
-  Build/local/full UT terminal results remain pending; this is not G1 or a UT gain.
+  All compiler hashes agree afterward. Full local tests and all 2,314 UT remain
+  unexecuted on this image; the preceding 2,172 result is not a current pass count.
+
+- Follow-up: Convert accepts exactly AL BigText through caller-side ToText;
+  no net→rt dependency or arbitrary text-object coercion. BigText.ToText still
+  refuses by name; original workflow execution remains a runtime gap.
+  Generated Base64 callers explicitly include the complete Array definition,
+  instead of relying on PCH/unity. Original SignatureKeyImpl reproduced the
+  incomplete-return-type failure without PCH before the fix; production replay
+  follows regeneration. Numeric-only/unrelated names keep narrow dependencies.
+  `/tmp/agiru-conversion.nF0D8G`: 16,470 C++/14,617 generated AL checks green,
+  720,028 reference checks; four runtime mutants reject both consumers, removed
+  return-type include refuses the implicit-array AL consumer without PCH.
+  Primitive/consumer ASan/UBSan pass. Input manifest SHA256
+  `3e42a8045e44fbb2c55162f33febef76dfe47bf4ec3587c76df5110fc40c27a2`.
+  GenReceiver: 13 green. Targeted analysis: no new own findings; Convert gate's
+  32 inherited header findings, receiver's one inherited BodyWriter finding and
+  generator's three unchanged findings remain unsuppressed; AL runner passes.
+  Original consumer: W1/BaseApp/System/Workflow/ImportExportWorkflow.XmlPort.al,
+  developer BigText type/interop docs; predecessor 1354 rejects unknown-type no-ops.
+  Compilation repairs do not establish BigText or ERP workflow functionality.
 
 - Convert byte-array bridge reuses the original-core-qualified Base64 codec.
   Typed formatting ordinals, checked regions and byte cells retain strict CLR

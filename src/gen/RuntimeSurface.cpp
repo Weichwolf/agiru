@@ -518,6 +518,10 @@ std::string RuntimeIncludes(std::string_view text, ObjectKind kind) {
   for (const auto &[name, header] : kElsewhere) {
     if (Mentions(text, name)) { headers.insert(std::string(header)); }
   }
+  if (Mentions(text, "dotnet::Convert") &&
+      (Mentions(text, "FromBase64String") || Mentions(text, "ToBase64String"))) {
+    headers.insert("dotnet/Regex.h");
+  }
   for (const auto &[name, header] : TestRuntimeHeaders()) {
     if (Mentions(text, name)) { headers.insert(header); }
   }

@@ -6,6 +6,7 @@ CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-conversion.XXXXXX)
 mkdir -p "$proof/source"
 cp test/runtime/conversion/Fixture.Codeunit.al "$proof/source/Fixture.Codeunit.al"
+cp test/runtime/conversion/Implicit.Codeunit.al "$proof/source/Implicit.Codeunit.al"
 cp test/transpiler/native-enums/source/app.json "$proof/source/app.json"
 printf '%s\n' '{"apps":[{"name":"fixture","source":"source"}]}' > "$proof/apps.json"
 printf '%s\n' '{"include":["Microsoft"],"exclude":[],"product_exclude":[]}' > "$proof/scope.json"
@@ -39,7 +40,27 @@ command=("$CXX" "${flags[@]}" -c "$runner_source" -o "$proof/runner.o")
 mkdir -p "$B/fixture-commands"
 jq -n --arg directory "$PWD" --arg file "$PWD/$runner_source" \
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
-  "${command[@]}" > "$B/fixture-commands/conversion.json"
+"${command[@]}" > "$B/fixture-commands/conversion.json"
+awk '
+  /^    headers.insert\("dotnet\/Regex.h"\);$/ { $0 = ""; changed++ }
+  { print }
+  END { if (changed != 1) exit 2 }
+' src/gen/RuntimeSurface.cpp > "$proof/missing-array.cpp"
+"$CXX" "${flags[@]}" -Isrc/gen -Isrc/al -DAGIRU_SOURCE_DIR=\""$PWD"\" -fPIC -shared \
+  "$proof/missing-array.cpp" "${links[@]}" -lagiru_gen -lagiru_al -o "$proof/missing-array.so"
+LD_PRELOAD="$proof/missing-array.so" "$B/agirutc" "$proof" "$proof/apps.json" \
+  "$proof/missing-array/generated" > "$proof/missing-array-generation.log" 2>&1
+missing_flags=("-I$proof/missing-array/generated/fixture"
+  "-I$proof/missing-array/generated/shared" "-I$proof/missing-array/generated/absent")
+if "$CXX" "${missing_flags[@]}" "${flags[@]}" -fsyntax-only \
+  "$proof/missing-array/generated/fixture/fixture/codeunit/ImplicitByteArrayConsumer.cpp" \
+  > "$proof/missing-array-compile.log" 2>&1; then
+  printf 'conversion: removed return-type dependency escaped the no-PCH consumer\n' >&2
+  exit 1
+fi
+rg -q "incomplete return type 'Array'|incomplete type.*Array" "$proof/missing-array-compile.log"
+sha256sum "$proof/missing-array.cpp" "$proof/missing-array.so" >> "$proof/controls.sha256"
+rm -- "$proof/missing-array.cpp" "$proof/missing-array.so"
 for control in wrong-offset no-block-seam ignore-formatting; do
   awk -v control="$control" '
     control == "wrong-offset" && /detail::ReadByteBlock\(bytes, offset \+ consumed,/ {
@@ -102,7 +123,7 @@ sha256sum "$proof/sanitized-gate" "$proof/sanitized-runner" "$proof/sanitized.so
 rm -- "$proof/sanitized-gate" "$proof/sanitized-runner" "$proof/sanitized.so"
 sha256sum src/net/Convert.cpp src/net/ByteArray.cpp src/net/ByteArray.h \
   include/dotnet/Convert.h include/dotnet/Base64FormattingOptions.h test/gate/ConvertGate.cpp \
-  "$runner_source" test/runtime/conversion/Fixture.Codeunit.al src/gen/RuntimeSurface.cpp \
+  "$runner_source" test/runtime/conversion/Fixture.Codeunit.al test/runtime/conversion/Implicit.Codeunit.al src/gen/RuntimeSurface.cpp \
   "$B/libagiru_net.so" "$B/agirutc" "$gate" "$proof/runner" > "$proof/inputs.sha256"
 rm -- "$proof/runner.o" "$proof/runner"
-printf 'conversion: byte arrays and generated AL pass; four compiled controls reject both; %s\n' "$proof"
+printf 'conversion: byte arrays and generated AL pass; four runtime controls reject both; return-dependency control refuses without PCH; %s\n' "$proof"

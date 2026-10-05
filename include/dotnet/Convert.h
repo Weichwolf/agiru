@@ -4,8 +4,13 @@
 #include "dotnet/Refused.h"
 #include "type/Integer.h"
 
+#include <concepts>
 #include <string>
 #include <string_view>
+
+namespace agiru {
+class BigText;
+}
 
 namespace agiru::dotnet {
 
@@ -39,6 +44,17 @@ public:
   /// \return Independently owned Integer byte cells, including zero and high bytes.
   /// \throws Error for invalid alphabet/padding; never returns partial decoded data.
   [[nodiscard]] static Array FromBase64String(std::string_view text);
+
+  /// \brief AL BigText input is materialized through its owned ToText adapter at the call site.
+  /// \tparam Carrier Exactly AL BigText, not an arbitrary text-convertible object.
+  /// \param text The AL value. \return Owned decoded byte cells.
+  /// \throws Error when BigText.ToText remains unimplemented or Base64 is invalid.
+  /// \note Caller-side instantiation preserves the net→rt dependency boundary.
+  template <typename Carrier>
+    requires std::same_as<Carrier, ::agiru::BigText>
+  [[nodiscard]] static auto FromBase64String(const Carrier &text) {
+    return FromBase64String(text.ToText());
+  }
 
   /// \brief Unsupported numeric methods keep their original type/member refusal identities.
   static constexpr Refused ToInt16{{.type = "Convert", .member = "ToInt16"}};

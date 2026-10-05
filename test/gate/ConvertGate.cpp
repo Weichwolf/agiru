@@ -2,6 +2,7 @@
 #include "dotnet/Convert.h"
 #include "dotnet/Regex.h"
 #include "runtime/ErrorValue.h"
+#include "type/BigText.h"
 #include "type/Integer.h"
 #include "type/StringValue.h"
 #include "type/Variant.h"
@@ -123,6 +124,8 @@ void Formatting() {
 }
 
 void Refusals() {
+  CHECK_TRUE("BigText uses its named adapter refusal rather than an empty substitute",
+             Fails([] { (void)Convert::FromBase64String(agiru::BigText{}); }));
   for (const auto *const text :
        {"TQ", "TQ=", "T===", "TQ===", "TQ==TQ==", "TQ==\v", "TQ==\f", "TQ==\xc2\xa0", "!!!!"}) {
     CHECK_TRUE("invalid decoder input refuses without returning partial bytes",
