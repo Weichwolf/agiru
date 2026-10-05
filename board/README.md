@@ -79,6 +79,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   initializes scalar members and removes existing include/const/optional findings;
   runtime loses two auto findings. Full generated rebuild/local/AL replay remain
   pending; complete profile/provider remains guarded. No new UT gain/G1 claim.
+  Pushed `a59e992` now has one direct six-job integration running under
+  `/tmp/agiru-field-length-integration.Xo5JqS/result.json`: slice-check passes
+  14,225/zero missing; build is live, then complete test/lint/80-codeunit UT are
+  queued. All 25,285 compiler inputs are frozen (manifest SHA256
+  `05b5e649890236d1b260f03f1373b2d0ecae3812d19d4d2fa67c27da3b3ded6e`).
+  UT_LOG is passed only to UT; its runner log and outer Make log are distinct.
 
 - Preceding full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.
