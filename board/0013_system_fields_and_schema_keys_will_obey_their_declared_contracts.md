@@ -28,7 +28,7 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
   `!IsLinked && (Normal || Temporary)`. Ignoring LinkedObject fails two cases;
   universally appending audit fields fails twelve. Original CLR enums prove
   compiler CDS=5 versus native Query=5: numeric casts are invalid. Exact emitter
-  IL now qualifies CDS→CRM (0044); the C++ refusal still needs replacement.
+  IL qualifies CDS→CRM; the shared C++ mapping and controls now pass (0044/README).
   `implicit-profile-boundaries.json` retains all hashes
   and failed attempts. Ordinary NCL creation still refuses without NavEnvironment;
   no ordinary business, SQL lookup or Runtime-17 equivalence is claimed.
@@ -138,7 +138,7 @@ BCApps `bb7111877f`, `Layers/W1/BaseApp/Modules/System/ApplicationArea/Applicati
 and `Apps/W1/{HybridSL/app/src/Migration/History/SLPopulateHistTables.Codeunit.al,ExpenseAgent/test/src/ActivityLog/ExpenseActivityLogTest.Codeunit.al}`.
 Original creation/getter and declaration IL receipts: `native-implicit-fields.json` above.
 
-Default keys: `src/gen/{TableKeys,TableWriter,TableDefinitions,NativeKeyAssertions}.cpp`, `src/tc/Main.cpp::IndexTables`, `test/gate/{GenKeyGate,GenNativeBindingGate}.cpp`, `test/transpiler/table-keys.sh`, `test/transpiler/table-keys/`. Platform: `analyzers/appsourcecop-as{0010,0118,0123}.md`, `diagnostics/diagnostic-al{256,450,464,527}.md`, `methods-auto/recordref/recordref-keyindex-method.md`. BCApps current main: UserSettings, CreatePickParameters, WordTemplatesTestTable4; pinned System TableMetadata. AL0325's explanatory whitelist contradicts actual Code primary keys; do not adopt it. Focused predecessor search found no default-primary finding; 980/1244's emitted-contract guidance applies.
+Default keys: `src/gen/TableKeys.cpp::CompletePrimaryKey`, `src/gen/TableWriter.cpp::{NativeKeyAssertions,NativeFieldAssertion}`, `src/tc/Main.cpp::IndexTables`, `test/gate/{GenKeyGate,GenNativeBindingGate}.cpp`, `test/transpiler/table-keys.sh`, `test/transpiler/table-keys/`. Platform: `analyzers/appsourcecop-as{0010,0118,0123}.md`, `diagnostics/diagnostic-al{256,450,464,527}.md`, `methods-auto/recordref/recordref-keyindex-method.md`. BCApps current main: UserSettings, CreatePickParameters, WordTemplatesTestTable4; pinned System TableMetadata. AL0325's explanatory whitelist contradicts actual Code primary keys; do not adopt it. Focused predecessor search found no default-primary finding; 980/1244's emitted-contract guidance applies.
 
 Platform: `devenv-table-keys.md`, `properties/devenv-{clustered,enabled,maintainsiftindex,maintainsqlindex,unique,sumindexfields,includedfields,sqlindex,obsoletestate}-property.md`, system-field/Insert guarantees and `analyzers/appsourcecop-as{0002,0016}.md`. AL: BCApps main `a9ea4d84534cebba852c44bf0f841c2ea149de4e`, `Layers/W1/BaseApp/Finance/GeneralLedger/{Journal/PostedGenJournalLine,Ledger/GLEntry}.Table.al`, ResourceCost and CopilotSettings; pinned UserPersonalization/FeatureKey. User intent: `business-central/database-missing-indexes.md`. Predecessor 980/1244 show property loss and unreliable name-only audits; their correctness-neutral clustering label is not a metadata contract. Fixtures: `test/gate/{GenKeyGate,UserPersonalizationGate}.cpp`; preserved `artifacts/{old-generator-control-final.log,wrong-key-clang.log,wrong-key-gcc.log,transpile-first-control.log,transpile.log}`. Earlier obsolete-column control remains `build/user-personalization-proof/stored-negative-runtime.log`; Moved/merge identity is 0033.
 

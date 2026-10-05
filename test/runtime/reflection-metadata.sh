@@ -71,13 +71,15 @@ for control in filter-union filter-flowfilter filter-empty; do
   rg -q 'FAIL ' "$proof/$control.log"
 done
 
-for control in ordinal-cast cds-query default-fallback property-fallback property-ordinal scope-aliases; do
+for control in ordinal-cast cds-query cds-refusal default-fallback property-fallback property-ordinal scope-aliases; do
   awk -v control="$control" '
     control == "ordinal-cast" && /case PageType::HeadlinePart: return Native::HeadlinePart;/ {
       sub(/return Native::HeadlinePart;/, "return static_cast<Native>(type);"); changed++
     }
-    control == "cds-query" && /case TableType::CDS:/ {
-      print "    case TableType::CDS: return Native::Query;"; changed++; skipping=1; next
+    (control == "cds-query" || control == "cds-refusal") && /case TableType::CDS: return Native::CRM;/ {
+      if (control == "cds-query") print "    case TableType::CDS: return Native::Query;"
+      else print "    case TableType::CDS: return std::unexpected(\"CDS refused\");"
+      changed++; next
     }
     skipping { if (/;$/) skipping=0; next }
     control == "default-fallback" && /return std::unexpected\("unknown TableType/ {
@@ -160,4 +162,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, stable identities, compiled filters, qualified defaults/company scope and temporary rows pass; twenty-one controls refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, stable identities, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; twenty-two controls refuse; %s\n' "$proof"

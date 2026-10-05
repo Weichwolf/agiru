@@ -231,6 +231,7 @@ void TableProjectionVariants() {
        {std::tuple{Property::Temporary, Native::Temporary, false},
         std::tuple{Property::ExternalSQL, Native::ExternalSQL, true},
         std::tuple{Property::CRM, Native::CRM, true},
+        std::tuple{Property::CDS, Native::CRM, true},
         std::tuple{Property::Exchange, Native::Exchange, true},
         std::tuple{Property::MicrosoftGraph, Native::MicrosoftGraph, true}}) {
     auto source = kSourceTable;
@@ -347,7 +348,11 @@ void TableProjectionRefusals() {
   }
   source = kSourceTable;
   source.tableType = agiru::TableType::CDS;
-  CHECK_TRUE("CDS never becomes the native Query member", refused(source, "CDS"));
+  const auto cds = agiru::detail::ProjectTableMetadata(source);
+  CHECK_TRUE("CDS emits CRM metadata without changing its source kind or becoming Query",
+             cds.TableType == agiru::platform::TableMetadataTableType::CRM &&
+                 cds.TableType != agiru::platform::TableMetadataTableType::Query &&
+                 source.tableType == agiru::TableType::CDS);
   constexpr std::array missingField{agiru::FieldNo{8}};
   source = kSourceTable;
   source.dataCaptionFields = missingField;
@@ -417,9 +422,8 @@ void TableTypes() {
                result && *result == native);
   }
   const auto cds = agiru::detail::MetadataTableType(Property::CDS);
-  CHECK_TRUE("CDS cannot be reinterpreted as Query", !cds && cds.error().contains("CDS"));
-  CHECK_TRUE("the refusal retains the distinct Query vocabulary",
-             !cds && cds.error().contains("Query"));
+  CHECK_TRUE("CDS reflects the original compiler-emitted CRM identity", cds && *cds == Native::CRM);
+  CHECK_TRUE("CDS cannot be reinterpreted as native Query", cds && *cds != Native::Query);
   const auto invalid = agiru::detail::MetadataTableType(std::bit_cast<Property>(kInvalidType));
   CHECK_TRUE("unknown table kinds never become Normal",
              !invalid && invalid.error().contains("unknown"));

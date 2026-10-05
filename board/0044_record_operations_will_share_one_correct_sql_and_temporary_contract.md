@@ -544,10 +544,10 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    PropertyKind.TableType=37 and emitter local Nullable<TableTypeKind> execute
    through CLR reflection; exact emitter IL RVA 22f11c remaps CDS 5 to CRM 1
    before writing XML. The source-bound emit path is static authority, not a new
-   AL business run. Replace `ReflectionMetadata.cpp::MetadataTableType`'s CDS
-   refusal with explicit CRM; preserve source kind/external/company semantics.
-   Retain all gate cases, replace three retired refusal expectations, extend
-   projection variants, and reject restored-refusal/CDS-to-Query controls.
+   AL business run. `ReflectionMetadata.cpp::MetadataTableType` now emits CRM;
+   source kind/external/company semantics remain unchanged. All prior gate cases
+   are retained (229 checks); restored-refusal/CDS-to-Query controls reject.
+   Complete local/AL replay of the source batch remains required (README).
    No cloud admission follows from representing this source property.
    Ordinary NCL creation remains unexecuted after a dependency/finalizer refusal;
    do not promote the Types declaration matrix to live business proof.

@@ -113,9 +113,7 @@ MetadataTableType(TableType type) {
     case TableType::Exchange: return Native::Exchange;
     case TableType::MicrosoftGraph: return Native::MicrosoftGraph;
     case TableType::Temporary: return Native::Temporary;
-    case TableType::CDS:
-      return std::unexpected(
-          "Table Metadata.TableType has no verified CDS member; Query is distinct");
+    case TableType::CDS: return Native::CRM;
   }
   return std::unexpected("unknown TableType cannot become Table Metadata.Normal");
 }

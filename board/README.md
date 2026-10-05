@@ -113,8 +113,18 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Original CLR enums prove source CDS=5 and native Query=5 are distinct.
   `table-kind-emitter-contract.json` now qualifies original CDS→CRM XML conversion:
   PropertyKind/local-type reflection executes; emitter IL RVA 22f11c remaps 5 to 1.
-  The existing C++ refusal still needs replacement and negative controls; no
-  source-bound AL emit/cloud integration is claimed. Original ordinary NCL creation remains refused; no
+  The shared C++ mapping now emits CRM, preserving source CDS, external-data and
+  company semantics. ReflectionMetadataGate retains every previous case and passes
+  229 checks; original source checks pass 2,917. All twenty-two controls reject,
+  including restored CDS refusal and CDS→Query (four red/229 checks). Integration
+  build passes (exit 0/11s); 1,383 unlinked replacement bodies remain gaps.
+  The four mapping-module expected-header analysis findings exactly match the
+  predecessor at the same compiler/analyzer budget; the gate retains thirty
+  inherited header findings. No new suppression/baseline increase. Receipts:
+  `cds-crm-{gate,controls,integration-build}.log` in the authority directory and
+  `/tmp/agiru-reflection-metadata.oKkIyk/`. Full local/AL replay of this source
+  batch remains required; no source-bound AL emit/cloud integration is claimed.
+  Original ordinary NCL creation remains refused; no
   business/SQL lookup/Runtime-17 equivalence or new AL UT gain is claimed.
 
 - Preceding full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
