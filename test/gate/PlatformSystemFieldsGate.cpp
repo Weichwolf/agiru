@@ -1,3 +1,4 @@
+#include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/SystemFields.h"
 #include "meta/TableDef.h"
@@ -20,8 +21,10 @@
 #include "platform/TableMetadata.h"
 #include "platform/User.h"
 #include "platform/UserPersonalization.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/DateTime.h"
 #include "type/FieldClass.h"
 #include "type/Guid.h"
@@ -67,6 +70,7 @@ constexpr std::array<SystemSpec, 5> kSystemFields{{
 }};
 constexpr auto kCreatedMilliseconds = 123456789;
 constexpr auto kModifiedMilliseconds = 234567890;
+constexpr auto kSampleRowVersion = 123;
 constexpr std::size_t kFirstAuditLookup = kSystemFields.size() + 1;
 
 template <typename Table> constexpr std::array<int, kSystemFields.size()> Numbers() {
@@ -210,11 +214,175 @@ void CompleteProfilesRespectVersionKindAndLinkedObject() {
                field.userField.Value() == (i % 2 == 0 ? 2 : 3));
   }
 }
+
+template <agiru::SystemFieldProfile Profile, agiru::TableType Type, bool Linked>
+void MaterializedProfile(bool audit) {
+  using Row = agiru::platform::TableMetadata;
+  constexpr auto fields =
+      agiru::WithImplicitFields<Row, Profile, Type, Linked>(std::array<agiru::FieldDef, 0>{});
+  const std::size_t expected = !audit                                            ? 2
+                               : Profile == agiru::SystemFieldProfile::Runtime18 ? 10
+                                                                                 : 6;
+  CHECK_TRUE("materialization retains the complete selected denominator",
+             fields.size() == expected);
+  constexpr std::array offsets{offsetof(Row, SystemRowVersion),
+                               offsetof(Row, SystemId),
+                               offsetof(Row, SystemCreatedAt),
+                               offsetof(Row, SystemCreatedBy),
+                               offsetof(Row, SystemModifiedAt),
+                               offsetof(Row, SystemModifiedBy),
+                               offsetof(Row, SystemCreatedByUserName),
+                               offsetof(Row, SystemCreatedByFullName),
+                               offsetof(Row, SystemModifiedByUserName),
+                               offsetof(Row, SystemModifiedByFullName)};
+  constexpr std::array types{agiru::FieldType::BigInteger,
+                             agiru::FieldType::Guid,
+                             agiru::FieldType::DateTime,
+                             agiru::FieldType::Guid,
+                             agiru::FieldType::DateTime,
+                             agiru::FieldType::Guid};
+  constexpr std::array calculations{
+      R"(lookup(User."User Name" where("User Security ID" = field(SystemCreatedBy))))",
+      R"(lookup(User."Full Name" where("User Security ID" = field(SystemCreatedBy))))",
+      R"(lookup(User."User Name" where("User Security ID" = field(SystemModifiedBy))))",
+      R"(lookup(User."Full Name" where("User Security ID" = field(SystemModifiedBy))))"};
+  for (std::size_t i = 0; i < fields.size(); ++i) {
+    const auto &field = fields[i];
+    CHECK_TRUE("materialized offsets reach the actual selected members",
+               field.offset == offsets[i]);
+    CHECK_TRUE("timestamp precedes sorted reserved identities",
+               i == 0 ? field.no.Value() == 0
+                      : field.no.Value() == 2000000000 + static_cast<int>(i - 1));
+    CHECK_TRUE("only timestamp aliases SQL rowversion", field.sqlTimestamp == (i == 0));
+    CHECK_TRUE("materialized timestamp, identity and audit types match the original profile",
+               i >= types.size() || field.type == types[i]);
+    CHECK_TRUE("lookups are nonstored FlowFields",
+               field.fieldClass == (i >= kFirstAuditLookup ? agiru::FieldClass::FlowField
+                                                           : agiru::FieldClass::Normal));
+    CHECK_TRUE("only timestamp and lookup buffers are declared read-only",
+               field.editable == (i != 0 && i < kFirstAuditLookup));
+    if (i >= kFirstAuditLookup) {
+      CHECK_TRUE("lookup text has its independently specified capacity",
+                 field.type == agiru::FieldType::Text && field.length == (i % 2 == 0 ? 50 : 80));
+      CHECK_TRUE("every materialized lookup retains a calculation", !field.calcFormula.empty());
+      CHECK_TEXT("lookup calculations retain the original SID owner and User field",
+                 field.calcFormula,
+                 calculations[i - kFirstAuditLookup]);
+    }
+  }
+}
+
+template <agiru::TableType Type, bool Linked> void MaterializedHostProfiles(bool audit) {
+  MaterializedProfile<agiru::SystemFieldProfile::Runtime17, Type, Linked>(audit);
+  MaterializedProfile<agiru::SystemFieldProfile::Runtime18, Type, Linked>(audit);
+}
+
+template <bool Linked> void MaterializedKinds() {
+  using agiru::TableType;
+  MaterializedHostProfiles<TableType::Normal, Linked>(!Linked);
+  MaterializedHostProfiles<TableType::Temporary, Linked>(!Linked);
+  MaterializedHostProfiles<TableType::CRM, Linked>(false);
+  MaterializedHostProfiles<TableType::CDS, Linked>(false);
+  MaterializedHostProfiles<TableType::ExternalSQL, Linked>(false);
+  MaterializedHostProfiles<TableType::Exchange, Linked>(false);
+  MaterializedHostProfiles<TableType::MicrosoftGraph, Linked>(false);
+}
+
+void NativeTableMetadataHasEveryEffectiveMember() {
+  using Row = agiru::platform::TableMetadata;
+  const auto &table = agiru::TableTraits<Row>::kTable;
+  CHECK_TRUE("original Table Metadata has 23 declared plus ten implicit fields",
+             table.fields.size() == 33);
+  Row row;
+  row.SystemRowVersion = kSampleRowVersion;
+  row.SystemCreatedByUserName = "Created User";
+  row.SystemCreatedByFullName = "Created full name";
+  row.SystemModifiedByUserName = "Modified User";
+  row.SystemModifiedByFullName = "Modified full name";
+  agiru::RecordRef reference;
+  reference.GetTable(row);
+  CHECK_TRUE("native FieldCount still indexes exactly 23 declarations",
+             reference.FieldCount() == 23);
+  CHECK_TEXT("timestamp reads the typed BigInteger member", reference.Field(0).ToText(), "123");
+  CHECK_TEXT(
+      "timestamp retains the original reflection alias", reference.Field(0).Name(), "timestamp");
+  constexpr std::array names{
+      "Created User", "Created full name", "Modified User", "Modified full name"};
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    const auto field = reference.Field(2000000005 + static_cast<int>(i));
+    CHECK_TEXT("native lookup reflection reaches its typed buffer", field.ToText(), names[i]);
+  }
+
+  struct IdentityOnly {
+    agiru::BigInteger SystemRowVersion{};
+    agiru::Guid SystemId;
+  };
+
+  constexpr auto linked = agiru::WithImplicitFields<IdentityOnly,
+                                                    agiru::SystemFieldProfile::Runtime18,
+                                                    agiru::TableType::Normal,
+                                                    true>(std::array<agiru::FieldDef, 0>{});
+  CHECK_TRUE("linked materialization requires no audit or lookup storage", linked.size() == 2);
+}
+
+void InvalidImplicitStorageAndDeclarationsRefuse() {
+  using Row = agiru::platform::TableMetadata;
+  const auto refuses = [](auto operation, std::string_view reason) {
+    bool refused = false;
+    try {
+      operation();
+    } catch (const agiru::Error &error) {
+      refused = std::string_view(error.what()).contains(reason);
+    }
+    CHECK_TRUE("invalid implicit storage/source declarations refuse explicitly", refused);
+  };
+
+  struct WrongIdentity {
+    agiru::BigInteger SystemRowVersion{};
+    agiru::DateTime SystemId;
+  };
+
+  refuses(
+      [] {
+        static_cast<void>(agiru::WithImplicitFields<WrongIdentity,
+                                                    agiru::SystemFieldProfile::Runtime18,
+                                                    agiru::TableType::Normal,
+                                                    true>(std::array<agiru::FieldDef, 0>{}));
+      },
+      "original type or capacity");
+  for (const auto number : {0, -1, 2000000000}) {
+    refuses(
+        [&] {
+          const std::array declared{agiru::FieldDef{.no = agiru::FieldNo{number}}};
+          static_cast<void>(agiru::WithImplicitFields<Row,
+                                                      agiru::SystemFieldProfile::Runtime18,
+                                                      agiru::TableType::Normal,
+                                                      false>(declared));
+        },
+        "nonreserved source fields");
+  }
+  for (const auto second : {1, 2}) {
+    refuses(
+        [&] {
+          const std::array declared{agiru::FieldDef{.no = agiru::FieldNo{2}},
+                                    agiru::FieldDef{.no = agiru::FieldNo{second}}};
+          static_cast<void>(agiru::WithImplicitFields<Row,
+                                                      agiru::SystemFieldProfile::Runtime18,
+                                                      agiru::TableType::Normal,
+                                                      false>(declared));
+        },
+        "sorted, distinct");
+  }
+}
 }
 
 int main() {
   return gate::Run("PlatformSystemFields", [] {
     CompleteProfilesRespectVersionKindAndLinkedObject();
+    MaterializedKinds<false>();
+    MaterializedKinds<true>();
+    NativeTableMetadataHasEveryEffectiveMember();
+    InvalidImplicitStorageAndDeclarationsRefuse();
     CheckSystemFields<agiru::platform::AllObj>();
     CheckSystemFields<agiru::platform::AllObjWithCaption>();
     CheckSystemFields<agiru::platform::AllProfile>();

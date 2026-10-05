@@ -64,20 +64,100 @@ for control in linked-audit old-profile-lookups; do
     { print }
     END { if (changed != 1) exit 2 }
   ' include/meta/SystemFields.h > "$proof/$control/meta/SystemFields.h"
+  compile_status=0
   "$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
     --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
     -I"$proof/$control" -Iinclude -Itest/gate test/gate/PlatformSystemFieldsGate.cpp \
-    -L"$B" -Wl,-rpath,"$B" -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control/gate"
-  if "$proof/$control/gate" > "$proof/$control.log" 2>&1; then
-    printf 'reflection-metadata: %s escaped the complete profile gate\n' "$control" >&2
+    -L"$B" -Wl,-rpath,"$B" -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control/gate" \
+    > "$proof/$control.compile.log" 2>&1 || compile_status=$?
+  if [ "$compile_status" -eq 0 ]; then
+    if "$proof/$control/gate" > "$proof/$control.log" 2>&1; then
+      printf 'reflection-metadata: %s escaped the complete profile gate\n' "$control" >&2
+      exit 1
+    fi
+    rg -q 'FAIL .*complete selected identity population agrees' "$proof/$control.log"
+    sha256sum "$proof/$control/gate" >> "$proof/profile-controls.sha256"
+    rm -- "$proof/$control/gate"
+  elif [ "$compile_status" -eq 1 ]; then
+    case "$control" in
+      linked-audit)
+        rg -q "no member named 'SystemCreatedAt' in 'IdentityOnly'" "$proof/$control.compile.log";;
+      old-profile-lookups)
+        rg -q 'one-past-the-end|outside its lifetime' "$proof/$control.compile.log";;
+    esac
+  else
+    printf 'reflection-metadata: unexpected mutant compiler status %s\n' "$compile_status" >&2
     exit 1
   fi
-  rg -q 'FAIL .*complete selected identity population agrees' "$proof/$control.log"
-  sha256sum "$proof/$control/meta/SystemFields.h" "$proof/$control/gate" \
-    >> "$proof/profile-controls.sha256"
-  rm -- "$proof/$control/meta/SystemFields.h" "$proof/$control/gate"
+  sha256sum "$proof/$control/meta/SystemFields.h" >> "$proof/profile-controls.sha256"
+  rm -- "$proof/$control/meta/SystemFields.h"
   rmdir "$proof/$control/meta" "$proof/$control"
 done
+
+for control in timestamp-offset stored-lookups creator-lookup-owner native-profile-downgrade; do
+  case "$control" in
+    timestamp-offset|stored-lookups) header=meta/Declare.h;;
+    creator-lookup-owner) header=meta/SystemFields.h;;
+    native-profile-downgrade) header=platform/TableMetadata.h;;
+  esac
+  mkdir -p "$proof/$control/$(dirname "$header")"
+  awk -v control="$control" '
+    control == "timestamp-offset" && /offsetof\(T, SystemRowVersion\)/ {
+      sub(/offsetof\(T, SystemRowVersion\)/, "offsetof(T, SystemId)"); changed++
+    }
+    control == "stored-lookups" && /\.fieldClass = field.role == SystemFieldRole::AuditLookup/ {
+      sub(/field.role == SystemFieldRole::AuditLookup/, "false"); changed++
+    }
+    control == "creator-lookup-owner" && !changed && /lookup\(User.*field\(SystemCreatedBy\)/ {
+      sub(/field\(SystemCreatedBy\)/, "field(SystemModifiedBy)"); changed++
+    }
+    control == "native-profile-downgrade" && /SystemFieldProfile::Runtime18/ {
+      sub(/SystemFieldProfile::Runtime18/, "SystemFieldProfile::Runtime17"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' "include/$header" > "$proof/$control/$header"
+  "$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+    --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+    -I"$proof/$control" -Iinclude -Itest/gate test/gate/PlatformSystemFieldsGate.cpp \
+    -L"$B" -Wl,-rpath,"$B" -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control/gate" \
+    > "$proof/$control.compile.log" 2>&1
+  if "$proof/$control/gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped materialized field qualification\n' "$control" >&2
+    exit 1
+  fi
+  case "$control" in
+    timestamp-offset) claim='materialized offsets reach the actual selected members';;
+    stored-lookups) claim='lookups are nonstored FlowFields';;
+    creator-lookup-owner) claim='lookup calculations retain the original SID owner and User field';;
+    native-profile-downgrade) claim='original Table Metadata has 23 declared plus ten implicit fields';;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+  sha256sum "$proof/$control/$header" "$proof/$control/gate" >> "$proof/materialization-controls.sha256"
+  rm -- "$proof/$control/$header" "$proof/$control/gate"
+  rmdir "$proof/$control/$(dirname "$header")" "$proof/$control"
+done
+
+awk '
+  /^void RecordRef::Open\(Integer tableNo\) \{$/ {
+    print "void RecordRef::Open(Integer) { Close(); }"; skipping=1; changed++; next
+  }
+  skipping { if (/^}$/) skipping=0; next }
+  { print }
+  END { if (changed != 1 || skipping) exit 2 }
+' src/rt/RecordRef.cpp > "$proof/unopened-buffer.cpp"
+"$CXX" "${flags[@]}" "$proof/unopened-buffer.cpp" -L"$B" -Wl,-rpath,"$B" \
+  -lagiru_rt -lagiru_net -lagiru_db -o "$proof/unopened-buffer.so"
+buffer_status=0
+LD_PRELOAD="$proof/unopened-buffer.so" "$B/gate_PlatformSystemFieldsGate" \
+  > "$proof/unopened-buffer.log" 2>&1 || buffer_status=$?
+if [ "$buffer_status" -ne 1 ]; then
+  printf 'reflection-metadata: an unopened buffer was accepted or crashed (status %s)\n' "$buffer_status" >&2
+  exit 1
+fi
+rg -q 'RecordRef.GetTable: the opened table has no record buffer' "$proof/unopened-buffer.log"
+sha256sum "$proof/unopened-buffer.cpp" "$proof/unopened-buffer.so" > "$proof/buffer-control.sha256"
+rm -- "$proof/unopened-buffer.cpp" "$proof/unopened-buffer.so"
 
 awk '
   /if \(IsImplicitSystemField\(def.no\)\) \{ continue; \}/ {
@@ -246,4 +326,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, original field names, complete profile selection, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; twenty-six compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-one compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

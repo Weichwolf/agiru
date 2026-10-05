@@ -4,6 +4,7 @@
 #include "meta/Ids.h"
 #include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "runtime/ErrorValue.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
@@ -14,6 +15,7 @@
 #include "type/Decimal.h"
 #include "type/Duration.h"
 #include "type/Enum.h"
+#include "type/FieldClass.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Media.h"
@@ -385,6 +387,94 @@ WithSystemFields(const std::array<FieldDef, N> &declared) {
                                              kSystemFields[4].name,
                                              kSystemFields[4].name,
                                              offsetof(T, SystemModifiedBy));
+  return all;
+}
+
+namespace detail {
+
+/// \brief Original storage type of a known implicit declaration; unknown types refuse.
+/// \param field Canonical source-owned declaration. \return Its runtime type tag.
+constexpr FieldType ImplicitFieldType(const SystemFieldDecl &field) {
+  if (field.alType == "Guid") { return FieldType::Guid; }
+  if (field.alType == "DateTime") { return FieldType::DateTime; }
+  if (field.alType == "BigInteger") { return FieldType::BigInteger; }
+  if (field.alType == "Text") { return FieldType::Text; }
+  throw Error("unknown implicit field type");
+}
+
+/// \brief Binds one canonical declaration to actual typed storage; mismatches refuse.
+/// \tparam Member Typed record member. \param no Original field number.
+/// \param offset Actual standard-layout offset. \return Validated immutable metadata.
+template <auto Member> constexpr FieldDef ImplicitField(FieldNo no, std::size_t offset) {
+  for (const auto &field : kImplicitSystemFields) {
+    if (field.no != no) { continue; }
+    const auto declaration = Declare<Member>(
+        no,
+        field.name,
+        field.name,
+        offset,
+        Declared{.fieldClass = field.role == SystemFieldRole::AuditLookup ? FieldClass::FlowField
+                                                                          : FieldClass::Normal,
+                 .calcFormula = field.calcFormula,
+                 .editable = field.role != SystemFieldRole::Timestamp &&
+                             field.role != SystemFieldRole::AuditLookup,
+                 .sqlTimestamp = field.role == SystemFieldRole::Timestamp});
+    if (declaration.type != ImplicitFieldType(field) || declaration.length != field.length) {
+      throw Error("implicit field storage violates the original type or capacity");
+    }
+    return declaration;
+  }
+  throw Error("unknown implicit field identity");
+}
+
+}
+
+/// \brief Materializes a complete host-selected profile using actual record member offsets.
+/// \tparam T Standard-layout record with storage for every selected implicit member.
+/// \tparam Profile Explicit host capability, not an app's version/minimum runtime.
+/// \tparam Type AL source table kind.
+/// \tparam Linked Original LinkedObject property.
+/// \tparam N Source-declared field count.
+/// \param declared Sorted positive source field numbers, below the reserved range.
+/// \return Timestamp, source declarations and selected reserved fields, sorted by number.
+/// \note User-name fields are nonstored FlowFields over the shared lookup evaluator.
+///       Metadata allocation does not provide durable rowversion/audit or a live catalogue.
+template <typename T, SystemFieldProfile Profile, TableType Type, bool Linked, std::size_t N>
+[[nodiscard]] constexpr auto WithImplicitFields(const std::array<FieldDef, N> &declared) {
+  static_assert(std::is_standard_layout_v<T>);
+  for (std::size_t i = 0; i < N; ++i) {
+    if (declared[i].no.Value() <= 0 || IsReservedSystemField(declared[i].no) ||
+        (i > 0 && declared[i - 1].no.Value() >= declared[i].no.Value())) {
+      throw Error("implicit profile requires sorted, distinct, nonreserved source fields");
+    }
+  }
+  std::array<FieldDef, N + ImplicitFieldCount(Profile, Type, Linked)> all{};
+  all[0] = detail::ImplicitField<&T::SystemRowVersion>(SystemFieldNumbers::SystemRowVersion,
+                                                       offsetof(T, SystemRowVersion));
+  for (std::size_t i = 0; i < N; ++i) { all[i + 1] = declared[i]; }
+  std::size_t next = N + 1;
+  all[next++] =
+      detail::ImplicitField<&T::SystemId>(SystemFieldNumbers::SystemId, offsetof(T, SystemId));
+  if constexpr (CarriesAuditFields(Type, Linked)) {
+    all[next++] = detail::ImplicitField<&T::SystemCreatedAt>(SystemFieldNumbers::SystemCreatedAt,
+                                                             offsetof(T, SystemCreatedAt));
+    all[next++] = detail::ImplicitField<&T::SystemCreatedBy>(SystemFieldNumbers::SystemCreatedBy,
+                                                             offsetof(T, SystemCreatedBy));
+    all[next++] = detail::ImplicitField<&T::SystemModifiedAt>(SystemFieldNumbers::SystemModifiedAt,
+                                                              offsetof(T, SystemModifiedAt));
+    all[next++] = detail::ImplicitField<&T::SystemModifiedBy>(SystemFieldNumbers::SystemModifiedBy,
+                                                              offsetof(T, SystemModifiedBy));
+    if constexpr (Profile == SystemFieldProfile::Runtime18) {
+      all[next++] = detail::ImplicitField<&T::SystemCreatedByUserName>(
+          SystemFieldNumbers::SystemCreatedByUserName, offsetof(T, SystemCreatedByUserName));
+      all[next++] = detail::ImplicitField<&T::SystemCreatedByFullName>(
+          SystemFieldNumbers::SystemCreatedByFullName, offsetof(T, SystemCreatedByFullName));
+      all[next++] = detail::ImplicitField<&T::SystemModifiedByUserName>(
+          SystemFieldNumbers::SystemModifiedByUserName, offsetof(T, SystemModifiedByUserName));
+      all[next++] = detail::ImplicitField<&T::SystemModifiedByFullName>(
+          SystemFieldNumbers::SystemModifiedByFullName, offsetof(T, SystemModifiedByFullName));
+    }
+  }
   return all;
 }
 

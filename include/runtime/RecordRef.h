@@ -661,12 +661,17 @@ public:
   /// \brief AL `RecordRef.GetTable(Record)` -- copies fields and state into an owned buffer.
   /// \tparam T The generated table class.
   /// \param rec The record.
+  /// \throws Error if the installed table cannot provide an owned record buffer.
   template <typename T>
     requires requires { T::kId; }
   void GetTable(T &rec) {
     Open(TableTraits<T>::kTable.id.Value());
-    static_cast<std::remove_cvref_t<T> *>(State().record)->Copy(rec);
-    if (detail::RuntimeIsTemporary(&rec)) { detail::RuntimeAdoptTemporary(State().record, &rec); }
+    void *record = State().record;
+    if (record == nullptr) {
+      throw Error("RecordRef.GetTable: the opened table has no record buffer");
+    }
+    static_cast<std::remove_cvref_t<T> *>(record)->Copy(rec);
+    if (detail::RuntimeIsTemporary(&rec)) { detail::RuntimeAdoptTemporary(record, &rec); }
   }
 
   /// \brief AL `RecordRef.GetTable(Record)` on a record global held by handle, which is how a

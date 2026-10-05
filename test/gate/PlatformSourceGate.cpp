@@ -56,6 +56,7 @@ struct Family {
   std::string_view path;
   const agiru::TableDef *table;
   std::string_view scope;
+  std::size_t implicitFields = agiru::kSystemFieldCount;
 };
 
 constexpr std::array<Family, 13> kFamilies{{
@@ -94,7 +95,8 @@ constexpr std::array<Family, 13> kFamilies{{
      .scope = agiru::platform::PageMetadata::kScope},
     {.path = "Virtual Tables/TableMetadata.Table.al",
      .table = &agiru::platform::kTableMetadataTable,
-     .scope = agiru::platform::TableMetadata::kScope},
+     .scope = agiru::platform::TableMetadata::kScope,
+     .implicitFields = 10},
     {.path = "Virtual Tables/Field.Table.al",
      .table = &agiru::platform::kFieldTable,
      .scope = agiru::platform::Field::kScope},
@@ -179,9 +181,16 @@ void Options(const agiru::al::FieldDecl &source, const agiru::FieldDef &field, C
   }
 }
 
-void Fields(const agiru::al::TableObject &source, const agiru::TableDef &table, Checks &checks) {
-  checks.emplace_back("complete field population including system fields",
-                      table.fields.size() == source.fields.size() + agiru::kSystemFieldCount);
+void Fields(const agiru::al::TableObject &source, const Family &family, Checks &checks) {
+  const auto &table = *family.table;
+  std::size_t declared = 0;
+  for (const auto &field : table.fields) {
+    declared += agiru::IsImplicitSystemField(field.no) ? 0 : 1;
+  }
+  checks.emplace_back("complete original declared field population",
+                      declared == source.fields.size());
+  checks.emplace_back("complete independently selected effective population",
+                      table.fields.size() == source.fields.size() + family.implicitFields);
   for (const auto &declared : source.fields) {
     const auto *field = agiru::Field(table, agiru::FieldNo{declared.number});
     checks.emplace_back(declared.name + " field number", field != nullptr);
@@ -260,7 +269,7 @@ Checks Compare(const agiru::al::TableObject &source, const Family &family) {
   checks.emplace_back("extension availability", family.scope == Text(source.properties, "Scope"));
   checks.emplace_back("inherent permissions declaration",
                       table.inherentPermissions == Text(source.properties, "InherentPermissions"));
-  Fields(source, table, checks);
+  Fields(source, family, checks);
   Keys(source, table, checks);
   return checks;
 }
@@ -473,7 +482,9 @@ template <typename Row> void Reflection() {
   const auto &table = agiru::TableTraits<Row>::kTable;
   CHECK_TRUE("FieldCount indexes declared fields, not implicit system fields",
              reference.FieldCount() ==
-                 static_cast<int>(table.fields.size() - agiru::kSystemFieldCount));
+                 static_cast<int>(std::ranges::count_if(table.fields, [](const auto &field) {
+                   return !agiru::IsImplicitSystemField(field.no);
+                 })));
   for (const auto &field : table.fields) {
     CHECK_TRUE("all source and system fields reflect by number",
                reference.FieldExist(field.no.Value()));

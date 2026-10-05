@@ -27,6 +27,11 @@ enum class SystemFieldRole : std::uint8_t {
   AuditLookup, ///< Runtime-18 current User lookup, not a stored column.
 };
 
+/// \brief Runtime-18 User Name capacity from devenv-table-system-fields.md (UTF-16 units).
+inline constexpr std::uint16_t kSystemUserNameLength = 50;
+/// \brief Runtime-18 Full Name capacity from devenv-table-system-fields.md (UTF-16 units).
+inline constexpr std::uint16_t kSystemFullNameLength = 80;
+
 /// \brief One implicit declaration from the system-field docs and original Types-29 getters.
 struct SystemFieldDecl {
   FieldNo no;                      ///< Timestamp 0 or a reserved field number.
@@ -37,6 +42,7 @@ struct SystemFieldDecl {
   std::uint16_t length{};          ///< Declared Text capacity, zero for nontext types.
   FieldNo auditOwner{};            ///< Audit GUID used by an AuditLookup.
   FieldNo userField{};             ///< User 2000000120 field 2/3 used by an AuditLookup.
+  std::string_view calcFormula{};  ///< Current User lookup using the original source names.
 };
 
 /// \brief Complete known implicit declarations, in field-number order.
@@ -78,33 +84,41 @@ inline constexpr std::array<SystemFieldDecl, 10> kImplicitSystemFields{{
      .alType = "Text",
      .reflectionName = "SystemCreatedByUserName",
      .role = SystemFieldRole::AuditLookup,
-     .length = 50,
+     .length = kSystemUserNameLength,
      .auditOwner = FieldNo{2000000002},
-     .userField = FieldNo{2}},
+     .userField = FieldNo{2},
+     .calcFormula =
+         R"(lookup(User."User Name" where("User Security ID" = field(SystemCreatedBy))))"},
     {.no = FieldNo{2000000006},
      .name = "SystemCreatedByFullName",
      .alType = "Text",
      .reflectionName = "SystemCreatedByFullName",
      .role = SystemFieldRole::AuditLookup,
-     .length = 80,
+     .length = kSystemFullNameLength,
      .auditOwner = FieldNo{2000000002},
-     .userField = FieldNo{3}},
+     .userField = FieldNo{3},
+     .calcFormula =
+         R"(lookup(User."Full Name" where("User Security ID" = field(SystemCreatedBy))))"},
     {.no = FieldNo{2000000007},
      .name = "SystemModifiedByUserName",
      .alType = "Text",
      .reflectionName = "SystemModifiedByUserName",
      .role = SystemFieldRole::AuditLookup,
-     .length = 50,
+     .length = kSystemUserNameLength,
      .auditOwner = FieldNo{2000000004},
-     .userField = FieldNo{2}},
+     .userField = FieldNo{2},
+     .calcFormula =
+         R"(lookup(User."User Name" where("User Security ID" = field(SystemModifiedBy))))"},
     {.no = FieldNo{2000000008},
      .name = "SystemModifiedByFullName",
      .alType = "Text",
      .reflectionName = "SystemModifiedByFullName",
      .role = SystemFieldRole::AuditLookup,
-     .length = 80,
+     .length = kSystemFullNameLength,
      .auditOwner = FieldNo{2000000004},
-     .userField = FieldNo{3}},
+     .userField = FieldNo{3},
+     .calcFormula =
+         R"(lookup(User."Full Name" where("User Security ID" = field(SystemModifiedBy))))"},
 }};
 
 /// \brief Base compatibility view used by declarations not yet materializing the full profile.
@@ -145,6 +159,20 @@ inline constexpr std::int32_t kSystemFieldFloor = 2000000000;
          (field.role == SystemFieldRole::Audit || profile == SystemFieldProfile::Runtime18);
 }
 
+/// \brief Count of the complete selected implicit population, including timestamp.
+/// \param profile Explicit host capability selection.
+/// \param type AL source table kind.
+/// \param linked Original LinkedObject value.
+/// \return Two, six or ten fields; never the declared AL field count.
+[[nodiscard]] constexpr std::size_t
+ImplicitFieldCount(SystemFieldProfile profile, TableType type, bool linked) {
+  std::size_t count = 0;
+  for (const auto &field : kImplicitSystemFields) {
+    count += IncludesSystemField(field, profile, type, linked) ? 1 : 0;
+  }
+  return count;
+}
+
 /// \brief Whether a field number belongs to the reserved system-field range.
 /// \param no The field number; zero is not in this range.
 /// \return True at and above the documented reserved lower bound.
@@ -159,14 +187,19 @@ inline constexpr std::int32_t kSystemFieldFloor = 2000000000;
   return no.Value() == 0 || IsReservedSystemField(no);
 }
 
-/// \brief Base field numbers inherited by generated `Field_No` declarations.
+/// \brief Implicit field numbers inherited by generated `Field_No` declarations.
 /// \note Static identities add no record storage and preserve standard layout.
 struct SystemFieldNumbers {
+  static constexpr FieldNo SystemRowVersion{0};                    ///< Platform rowversion.
   static constexpr FieldNo SystemId = kSystemFields[0].no;         ///< Immutable row identity.
   static constexpr FieldNo SystemCreatedAt = kSystemFields[1].no;  ///< Creation instant.
   static constexpr FieldNo SystemCreatedBy = kSystemFields[2].no;  ///< Creating user's SID.
   static constexpr FieldNo SystemModifiedAt = kSystemFields[3].no; ///< Last modification instant.
   static constexpr FieldNo SystemModifiedBy = kSystemFields[4].no; ///< Modifying user's SID.
+  static constexpr FieldNo SystemCreatedByUserName{2000000005};    ///< Creator's current User name.
+  static constexpr FieldNo SystemCreatedByFullName{2000000006};    ///< Creator's current full name.
+  static constexpr FieldNo SystemModifiedByUserName{2000000007}; ///< Modifier's current User name.
+  static constexpr FieldNo SystemModifiedByFullName{2000000008}; ///< Modifier's current full name.
 };
 
 }

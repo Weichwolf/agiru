@@ -94,19 +94,21 @@ passed_id=$(jq -r 'first(.[] | select(.status == "contract-pass") | .id)' "$proo
 for control in wrong-system-offset wrong-system-type wrong-system-number; do
   overlay="$proof/$control/include/meta"
   mkdir -p "$overlay"
+  header=Declare.h
+  if [ "$control" = wrong-system-number ]; then header=SystemFields.h; fi
   awk -v control="$control" '
     control == "wrong-system-offset" && /offsetof\(T, SystemId\)/ {
       sub(/offsetof\(T, SystemId\)/, "offsetof(T, SystemCreatedBy)"); changed++
     }
-    control == "wrong-system-type" && /Declare<&T::SystemId>/ {
-      sub(/Declare<&T::SystemId>/, "Declare<\\&T::SystemCreatedAt>"); changed++
+    control == "wrong-system-type" && /<&T::SystemId>/ {
+      sub(/SystemId>/, "SystemCreatedAt>"); changed++
     }
     control == "wrong-system-number" && /\.no = FieldNo\{2000000000\}/ {
       sub(/FieldNo\{2000000000\}/, "FieldNo{2000000099}"); changed++
     }
     { print }
-    END { if (changed != 1) exit 2 }
-  ' include/meta/Declare.h > "$overlay/Declare.h"
+    END { if (changed < 1) exit 2 }
+  ' "include/meta/$header" > "$overlay/$header"
   if "$CXX" "-I$proof/$control/include" "${flags[@]}" -fsyntax-only "$proof/$passed_id.cpp" \
     > "$proof/$control.compile.log" 2>&1; then
     printf 'native-bindings: %s escaped the original source contract\n' "$control" >&2

@@ -7,10 +7,15 @@
 #include "platform/ReflectionOptions.h"
 #include "platform/ReflectionTypes.h"
 #include "platform/TableMetadata.h"
+#include "platform/User.h"
+#include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/RecordRef.h"
 #include "runtime/RecordState.h"
+#include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
+#include "runtime/Transaction.h"
 #include "type/FieldClass.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
@@ -30,6 +35,7 @@
 #include <cstdint>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -40,6 +46,10 @@ namespace {
 
 constexpr std::uint8_t kInvalidType = 255;
 constexpr agiru::Integer kTemporaryId = 50175;
+// Original Table Metadata declares fields 1–23; 24 is neither declared nor implicit.
+constexpr agiru::FieldNo kAbsentMetadataField{24};
+constexpr auto kInsideTimestampInterval = 123;
+constexpr auto kOutsideTimestampInterval = 99;
 
 constexpr agiru::ModuleDef kSourceModule{.id = "118874ab-44bc-4ccb-9daf-59763539ab16",
                                          .name = "Source App",
@@ -164,12 +174,19 @@ void CompiledRecordFilters() {
              RecordFilter(flow, flowTable).Matches(&row));
   bool refused = false;
   try {
-    const std::array missing{Filter{.field = agiru::FieldNo{0}, .group = 0, .text = "1"}};
+    const std::array missing{Filter{.field = kAbsentMetadataField, .group = 0, .text = "1"}};
     static_cast<void>(RecordFilter(missing, table));
   } catch (const agiru::Error &error) {
-    refused = std::string_view(error.what()).contains("no field 0");
+    refused = std::string_view(error.what()).contains("no field 24");
   }
   CHECK_TRUE("an undeclared filter field refuses before a computed scan", refused);
+  row.SystemRowVersion = kInsideTimestampInterval;
+  const std::array timestamp{Filter{.field = agiru::FieldNo{0}, .group = 0, .text = "100..200"}};
+  CHECK_TRUE("timestamp filters read its actual BigInteger buffer",
+             RecordFilter(timestamp, table).Matches(&row));
+  row.SystemRowVersion = kOutsideTimestampInterval;
+  CHECK_TRUE("timestamp filters reject versions outside the interval",
+             !RecordFilter(timestamp, table).Matches(&row));
 }
 
 void TableProjection() {
@@ -223,6 +240,84 @@ void TableProjection() {
              agiru::detail::ProjectTableMetadata(kSourceTable).SystemId == row.SystemId);
   CHECK_TRUE("projection does not allocate per-session catalogue state",
              row.State_Block.Peek() == nullptr);
+}
+
+void ImplicitUserLookupsReadCurrentDatabaseValues() {
+  const agiru::Session session(AGIRU_TEST_DSN);
+  const agiru::detail::Scope boundary;
+  session.Database().Run("CREATE TEMP TABLE \"agiru_implicit_profile_anchor\" (id integer)");
+  session.Database().Run("SET LOCAL search_path = pg_temp");
+  const auto &userTable = agiru::TableTraits<agiru::platform::User>::kTable;
+  agiru::DropTable(session.Database(), userTable);
+  agiru::CreateTable(session.Database(), userTable);
+  const auto namespaceCheck =
+      session.Database().Execute("SELECT count(*) FROM pg_class WHERE relnamespace = "
+                                 "pg_my_temp_schema() AND relname = 'User'");
+  CHECK_TRUE("lookup fixture owns a connection-private PostgreSQL User table",
+             namespaceCheck.Value(0, 0) == std::optional<std::string_view>{"1"});
+  agiru::platform::User creator;
+  creator.UserSecurityID = agiru::Guid("11111111-2222-3333-4444-555555555555");
+  creator.UserName = "Creator";
+  creator.FullName = "Creator current name";
+  creator.Insert();
+  agiru::platform::User modifier;
+  modifier.UserSecurityID = agiru::Guid("66666666-7777-8888-9999-aaaaaaaaaaaa");
+  modifier.UserName = "Modifier";
+  modifier.FullName = "Modifier current name";
+  modifier.Insert();
+  agiru::Temporary<agiru::platform::TableMetadata> row;
+  row.ID = kTemporaryId;
+  row.SystemCreatedBy = creator.UserSecurityID;
+  row.SystemModifiedBy = modifier.UserSecurityID;
+  row.Insert();
+  row.Get(kTemporaryId);
+  CHECK_TRUE("implicit lookup buffers are initially uncalculated",
+             row.SystemCreatedByUserName.Value().empty() &&
+                 row.SystemCreatedByFullName.Value().empty() &&
+                 row.SystemModifiedByUserName.Value().empty() &&
+                 row.SystemModifiedByFullName.Value().empty());
+  row.CalcFields(row.SystemCreatedByUserName,
+                 row.SystemCreatedByFullName,
+                 row.SystemModifiedByUserName,
+                 row.SystemModifiedByFullName);
+  CHECK_TEXT("creator name is selected by the creator SID",
+             row.SystemCreatedByUserName.Value(),
+             "CREATOR");
+  CHECK_TEXT("creator full name is selected by the creator SID",
+             row.SystemCreatedByFullName.Value(),
+             "Creator current name");
+  CHECK_TEXT("modifier name is selected by the modifier SID",
+             row.SystemModifiedByUserName.Value(),
+             "MODIFIER");
+  CHECK_TEXT("modifier full name is selected by the modifier SID",
+             row.SystemModifiedByFullName.Value(),
+             "Modifier current name");
+  creator.UserName = "Renamed Creator";
+  creator.FullName = "Creator changed name";
+  creator.Modify();
+  agiru::RecordRef reference;
+  reference.GetTable(row);
+  reference.Field(agiru::platform::TableMetadata::Field_No::SystemCreatedByUserName.Value())
+      .CalcField();
+  reference.Field(agiru::platform::TableMetadata::Field_No::SystemCreatedByFullName.Value())
+      .CalcField();
+  reference.SetTable(row);
+  CHECK_TEXT("FieldRef lookup reads the current name, not an insert-time snapshot",
+             row.SystemCreatedByUserName.Value(),
+             "RENAMED CREATOR");
+  CHECK_TEXT("FieldRef lookup reads the current full name",
+             row.SystemCreatedByFullName.Value(),
+             "Creator changed name");
+  row.Modify();
+  row.Get(kTemporaryId);
+  CHECK_TRUE("temporary operations preserve the creator/modifier GUIDs",
+             row.SystemCreatedBy == creator.UserSecurityID &&
+                 row.SystemModifiedBy == modifier.UserSecurityID);
+  row.SystemModifiedBy = agiru::Guid("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
+  row.CalcFields(row.SystemModifiedByUserName, row.SystemModifiedByFullName);
+  CHECK_TRUE("an absent User yields blank lookups, not the current session's identity",
+             row.SystemModifiedByUserName.Value().empty() &&
+                 row.SystemModifiedByFullName.Value().empty());
 }
 
 void TableProjectionVariants() {
@@ -569,6 +664,7 @@ int main(int argc, char **argv) {
     TableTypes();
     TableProperties();
     TableProjection();
+    ImplicitUserLookupsReadCurrentDatabaseValues();
     TableProjectionVariants();
     TableProjectionDefaults();
     NativeTableProjectionDefaults();

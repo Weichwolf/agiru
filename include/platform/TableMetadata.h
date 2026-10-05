@@ -2,11 +2,14 @@
 
 #include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/ReflectionOptions.h"
 #include "platform/ReflectionTypes.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
@@ -102,6 +105,16 @@ public:
   DateTime SystemModifiedAt{};
   /// \brief Implicit AL `SystemModifiedBy`.
   Guid SystemModifiedBy{};
+  /// \brief Implicit rowversion buffer; live-provider version ownership remains separate.
+  BigInteger SystemRowVersion{};
+  /// \brief Current creator User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemCreatedByUserName{};
+  /// \brief Current creator full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemCreatedByFullName{};
+  /// \brief Current modifier User name; nonstored Runtime-18 FlowField.
+  Text<kSystemUserNameLength> SystemModifiedByUserName{};
+  /// \brief Current modifier full name; nonstored Runtime-18 FlowField.
+  Text<kSystemFullNameLength> SystemModifiedByFullName{};
 
   /// \brief Original source field numbers; implicit fields use the canonical platform numbers.
   struct Field_No : SystemFieldNumbers {
@@ -161,8 +174,10 @@ public:
 using TableMetadata = TableMetadata_Table;
 
 /// \brief All source fields plus the canonical implicit system fields.
-inline constexpr auto kTableMetadataFields = WithSystemFields<TableMetadata>(std::array<FieldDef,
-                                                                                        23>{{
+inline constexpr auto kTableMetadataFields = WithImplicitFields<TableMetadata,
+                                                                SystemFieldProfile::Runtime18,
+                                                                TableType::Normal,
+                                                                false>(std::array<FieldDef, 23>{{
     Declare<&TableMetadata::ID>(
         TableMetadata::Field_No::ID, "ID", "ID", offsetof(TableMetadata, ID)),
     Declare<&TableMetadata::Name>(

@@ -3,8 +3,8 @@
 Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
-Next: materialize the selected implicit profile in generated and handwritten records;
-qualify computed user lookups without renaming SQL columns.
+Next: wire explicit host selection into generated/native records, migrate remaining
+five-field declarations, and qualify PostgreSQL rowversion before catalogue activation.
 
 ## Implementation
 
@@ -57,13 +57,22 @@ qualify computed user lookups without renaming SQL columns.
   ExpenseActivityLogTest; `src/gen/{TableKeys,TableWriter}.cpp`,
   `src/rt/{FieldMetadata,RecordRef,Storage}.cpp`.
 - `make reflection-metadata` passes the source, reflection, RecordRef, Field and
-  system-profile gates plus 26 mutation controls. The canonical profile selects
+  system-profile gates plus 31 mutation controls. The canonical profile selects
   kind/LinkedObject/host presence; all three reflection callers share original names.
   A real Record.FieldName → Field lookup → FieldRef.Value caller detects source-name
   substitution. The narrow identity header's typed-dependency control also passes.
-- Actual record materialization still uses the five-field compatibility view.
-  Timestamp/user lookups, host wiring and live providers are not activated by these
-  declaration tests. Full AL replay is pending; preserve `4dadfec`/`5a14741`.
+- `WithImplicitFields` materializes every selected profile with sorted IDs, actual
+  offsets, checked storage types/capacities and nonstored lookup formulas. Native
+  Table Metadata now has 23 + 10 fields; timestamp/lookup reflection is qualified.
+  Typed CalcFields and FieldRef.CalcField read current creator/modifier names from
+  PostgreSQL User rows, including renamed and absent users. The fixture owns a
+  connection-private PostgreSQL schema and rolls back; it never drops a shared User.
+  Typed GetTable rejects an absent buffer instead of dereferencing null.
+- Original-package audit: eighteen bound candidates compile without PCH; original
+  page/source-library and offset/type/number/drop/namespace controls pass. All 215
+  selected unbound tables remain red. Other native/generated records still use the
+  five-field view; host wiring, durable timestamp and live providers remain gaps.
+  No AL replay yet covers this materialization. Preserve `4dadfec`/`5a14741`.
 
 Absorbs prior 0080/0353/0371/0511. Previous detail and mappings:
 Git `356dadda4a4aa435899bc8aa9e9c4f24a8c0fa21:board/`.

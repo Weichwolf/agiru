@@ -907,14 +907,14 @@ std::string NativeTableAssertions(const al::TableObject &table, const TableRef &
   const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
   std::string out = "#include \"" + binding.header + "\"\n";
   out += "#include \"meta/Declare.h\"\n#include \"meta/Ids.h\"\n";
+  out += "#include \"meta/SystemFields.h\"\n";
   out += "#include \"meta/TableDef.h\"\n#include \"type/FieldClass.h\"\n#include <cstddef>\n\n";
   out += "static_assert(" + metadata + ".id == ::agiru::TableId{" + std::to_string(table.id) +
          "} && " + metadata + ".name == " + Literal(table.name) + ", " +
          Literal("native table identity mismatch: " + table.name) + ");\n";
   out += "static_assert([] {\n  std::size_t declared = 0;\n  for (const auto &field : " + metadata +
          ".fields) {\n    bool system = false;\n";
-  out += "    for (const auto &implicit : ::agiru::kSystemFields) {\n";
-  out += "      system = system || field.no == implicit.no;\n    }\n";
+  out += "    system = ::agiru::IsImplicitSystemField(field.no);\n";
   out += "    if (!system) { ++declared; }\n  }\n  return declared == " +
          std::to_string(table.fields.size()) + ";\n}(), " +
          Literal("native field count mismatch: " + table.name) + ");\n";
