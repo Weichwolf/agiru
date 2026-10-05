@@ -170,9 +170,10 @@ void CheckInstalledLookup() {
   try {
     static_cast<void>(agiru::detail::InstalledTableMetadata(agiru::platform::TableMetadata::kId));
   } catch (const agiru::Error &error) {
-    refused = std::string_view(error.what()).contains("Table Metadata.ObsoleteState");
+    refused = std::string_view(error.what()) ==
+              "Table Metadata.App ID has no original module: Table Metadata";
   }
-  CHECK_TRUE("unqualified native defaults cannot become a fabricated metadata row", refused);
+  CHECK_TRUE("an unqualified native declaration cannot fabricate its original app owner", refused);
   const auto after = agiru::InstalledTables();
   CHECK_TRUE("metadata reads reuse the one frozen catalogue without changing it",
              catalogue.data() == after.data() && catalogue.size() == after.size());

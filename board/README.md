@@ -30,7 +30,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   the same receipt directory. Live activation and full AL replay remain open.
   Pushed `417954e` passes slice-check (14,225/zero missing) and full six-job
   build (exit 0/8s); all 25,285 compiler input hashes agree. Complete local
-  regression is running on this fixed source batch; no pending test is a pass.
+  regression is terminal: 146 cases/one red, 233 tooling tests pass. The one
+  authored fixture expected the retired native-property refusal instead of
+  missing original App ID. Its corrected exact refusal preserves all 61 checks;
+  `make table-keys` passes 34/166/61 checks, seven compiled/five source controls
+  reject, and fixture analysis passes. Full corrected local/AL replay is pending.
+  `native-defaults-table-keys{,-lint}.log` in the same receipt directory.
 
 - Current full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.
