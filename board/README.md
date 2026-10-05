@@ -20,8 +20,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   build was intentionally interrupted after AL workers finished, not a compiler
   failure. Slice-check: 14,225 sources/zero missing; 1,383 unlinked replacement
   bodies remain gaps, not full-app/G1 proof. 25,267 input hashes agree after building.
-  `/tmp/agiru-native-text-integration.awrO0A`; local Make tests run with verified
-  original System package/notice. Full 2,314 UT replay is next; no pass gain yet.
+  `/tmp/agiru-native-text-integration.awrO0A`; local Make tests pass: 142 cases/
+  zero red, 233 tooling tests. Original Native declaration checks retain 61 green;
+  twenty-three record and nine stream/File controls reject. Source/image hashes
+  remain unchanged; verified System package pre/post matches, original notice retained.
+  Full 2,314 UT replay is next; no pass gain yet.
 - Native Base64 transform authority (0034): original `ConvertBuffer` executes
   on CLR 10.0.12, 2,699 calls/2,696 distinct case identities. Whole-buffer Convert
   differs at 104 decode cases, zero encode cases; padded groups, unused bits,
