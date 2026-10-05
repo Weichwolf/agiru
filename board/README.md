@@ -15,6 +15,16 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Native Base64 text bindings (0034): five signatures execute through the common
+  emitter; four InStream signatures remain counted refusals. 166 generator and 61
+  original-declaration checks green; encoding/terminated-output controls fail 6/2.
+  Loader census proves five bound/four unbound and wrong-identity refusal.
+  `/tmp/agiru-native-codeunits.h58edG`, hashes match. New binding/refusal/consumer
+  analysis passes; 33/1 inherited primitive/gate findings and older compiler findings
+  remain unsuppressed. Locale defaults, transform output above the original 10 MiB
+  character threshold, original AL suite and full UT replay remain open. Root generation
+  `/tmp/agiru-transpile.woncg0` retains 35 selected native codeunits, reduces unbound
+  methods 72→67 and exits 1 on remaining gaps; package pre/post hashes match. Outside 024625.
 - File mode/capacity/position fix (0035): 44 C++ and 25 generated AL checks green;
   all preceding 17/17 retained. Default binary reads preserve newlines, typed
   capacity and zero-byte accounting; text mode returns content length; File.Pos
@@ -29,8 +39,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 - Stream/XML replay is running: `20261005T024625Z-3504499`, runner 3504975,
   frozen HEAD `9c3291e`, source
   `12f5e315a376d585ea8c20dbc95ce8dccfb068598fd88d1f82cdac33e648e588`.
-  Six jobs, `slice-check all test ut`; runner process confirmed live during local tests.
-  Includes Ignore-header, shared-cursor and owned-provider fixes; no new UT result yet.
+  Six jobs, `slice-check all test ut`; runner and AL worker processes confirmed live.
+  Slice/build pass; local population is 142 cases with one tooling failure: DiscoveryGate
+  omitted the stream qualifier from its isolated fixture. Fix `079158d` passes its
+  missing-binary/per-script removal controls locally; it is outside this snapshot.
+  Includes Ignore-header, shared-cursor and owned-provider fixes; UT is executing,
+  no terminal UT result yet.
   Compare every one of the 2,314 milestone identities/source hashes with terminal
   015114; retain raw/full-tree gaps separately. Dependencies match 015114.
 - Owned BLOB providers (0035): 89 C++/17 generated AL checks green, including

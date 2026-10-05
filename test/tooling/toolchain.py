@@ -392,6 +392,36 @@ class NativeSourceCompilerGate(unittest.TestCase):
         self.assertNotIn('native-method-unbound', excluded.stdout)
         self.assertFalse(header.exists())
 
+    def test_native_base64_binding_census_preserves_unbound_signatures(self):
+        self.native_table_manifest()
+        declared = self.package / 'src/conversion.aL'
+        declared.write_text('''namespace System.Runtime;
+codeunit 2000000024 Base64Convert {
+ [Native] procedure ToBase64(S: Text; L: Boolean; E: TextEncoding; P: Integer): Text begin end;
+ [Native] procedure ToBase64(S: Text; L: Boolean; E: TextEncoding; P: Integer; O: OutStream) begin end;
+ [Native] procedure FromBase64(S: Text; E: TextEncoding; P: Integer): Text begin end;
+ [Native] procedure FromBase64(S: Text; E: TextEncoding; P: Integer; O: OutStream) begin end;
+ [Native] procedure FromBase64(S: Text; O: OutStream) begin end;
+ [Native] procedure ToBase64(S: InStream; L: Boolean): Text begin end;
+ [Native] procedure ToBase64(S: InStream; L: Boolean; O: OutStream) begin end;
+ [Native] procedure FromBase64(S: InStream): Text begin end;
+ [Native] procedure FromBase64(S: InStream; O: OutStream) begin end;
+}''')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.count('native-method-bound codeunit'), 5)
+        self.assertEqual(result.stdout.count('native-method-unbound codeunit'), 4)
+        self.assertIn('1 codeunit declarations selected; 4 native methods unbound', result.stdout)
+        body = self.generated / 'platform/system/runtime/codeunit/Base64Convert.cpp'
+        self.assertEqual(body.read_text().count('has no native implementation'), 4)
+        self.assertEqual(body.read_text().count('::agiru::NativeToBase64('), 2)
+        self.assertEqual(body.read_text().count('::agiru::NativeFromBase64('), 3)
+        declared.write_text(declared.read_text().replace('namespace System.Runtime;', 'namespace Other;'))
+        wrong_identity = self.run_compiler()
+        self.assertEqual(wrong_identity.returncode, 1, wrong_identity.stdout + wrong_identity.stderr)
+        self.assertNotIn('native-method-bound codeunit', wrong_identity.stdout)
+        self.assertEqual(wrong_identity.stdout.count('native-method-unbound codeunit'), 9)
+
     def test_unbound_native_methods_refuse_in_analysis_with_and_without_a_system_package(self):
         self.native_table_manifest()
         declaration = ('namespace System.Fixture; codeunit 50200 NativeUnit { '

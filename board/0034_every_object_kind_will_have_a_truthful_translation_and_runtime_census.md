@@ -5,6 +5,35 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
 
 ## Evidence
 
+- Native Base64 text increment: `src/gen/NativeMethods.{h,cpp}` binds five original
+  text-input signatures through the shared emitter/refusal/census paths. Match ID,
+  namespace/name, Native attribute, scalar types, lengths, argument modes and return;
+  drift refuses. `runtime/NativeBase64.h`, `src/net/NativeBase64.cpp` reuse the byte
+  codec/Encoding; raw output preserves prefixes, binary zeros, no BOM/terminator.
+  Empty output still checks its binding. UTF-8/UTF-16 ignore codepage; explicit
+  supported Windows/MSDos pages use it. Decode's unknown-option UTF-8 fallback
+  follows original IL; invalid encode options refuse. Locale page zero and output
+  beyond the original 10,485,760 UTF-16-character threshold refuse, not guessed
+  defaults or unqualified whole-buffer transform semantics.
+  GenNativeBinding 166, GenCodeunit 49, original declaration consumer 61 green;
+  wrong-encoding/terminated-output controls have 6/2 failures. Existing fixture
+  refusals/source ownership retain 19/8 checks. `/tmp/agiru-native-codeunits.h58edG`,
+  input hashes match. Loader census control proves five bound/four unbound, wrong
+  namespace restores all nine refusals (`/tmp/agiru-native-text-census.log`).
+  NativeMethods/Refused/consumer analysis passes; primitive/gate retain 33/1 inherited
+  findings. CodeunitWriter/Main retain existing findings, none in changed regions;
+  no suppression raised. Original System 29.0.55365.0 and BC29 DLL 29.0.54011.55407
+  remain distinct. Authority: developer `ff5939a46e`, Native attribute/TextEncoding/
+  file-encoding docs; BCApps `bb7111877f`, Base64ConvertImpl/Test; user `0ff62b2266`,
+  data-exchange definitions; predecessor 1511; native core/state-machine receipts
+  below. Verified-package root regeneration: `/tmp/agiru-transpile.woncg0`, 35
+  selected codeunits retained; five methods bound, 67 unbound (previously 72),
+  four of those in Base64Convert. Exit 1 retains other translation gaps; original
+  package pre/post verification matches. Four InStream overloads, transform-block
+  output, locale defaults and exact
+  native diagnostics remain gaps. Thirteen original AL tests/full 2,314-case replay
+  remain required; this increment is outside frozen 024625 and proves no UT gain.
+
 - Native codeunit declarations: `src/tc/Main.cpp` indexes original IDs, bare and
   qualified names and typed procedures; one emitter serves app/native bodies.
   Duplicate native/app IDs/names and unresolved bare-name ambiguity refuse.
@@ -285,10 +314,10 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
    Native methods: bind through the common production codeunit index/output,
    admitted source ASTs and original module ownership; retain collision controls.
    Keep all unbound methods counted/refusing; Native attribute alone grants no binding.
-   Base64Convert needs all nine source overloads over one byte codec,
-   existing Encoding and bounded stream I/O. First qualify generic shared stream
-   cursor/owner semantics (0035): native ALByValue retains SharedNavStream,
-   while current C++ copies its position scalar. Preserve declared argument modes.
+   Complete Base64Convert's remaining four InStream overloads and above-threshold
+   text-output transform branches over the byte codec/Encoding and bounded I/O.
+   Preserve the qualified shared cursor/provider semantics (0035), declared argument
+   modes and small/large native branch distinctions; implement locale-default authority.
    Qualify native core/error/line-break
    contracts, execute the thirteen original tests, retain every other native gap
    and compare all 2,314 UT after activation. Do not patch OAuth or base64 AL bodies.

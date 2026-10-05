@@ -2,6 +2,7 @@
 
 #include "Ast.h"
 #include "EnumWriter.h"
+#include "NativeMethods.h"
 
 #include <algorithm>
 #include <array>
@@ -171,7 +172,9 @@ std::vector<RefusedProperty> Refused(const al::CodeunitObject &codeunit) {
   std::vector<RefusedProperty> found;
   CollectRefused(codeunit.properties, "codeunit " + codeunit.name, found);
   for (const auto &procedure : codeunit.procedures) {
-    if (!al::HasAttribute(procedure, "Native")) { continue; }
+    if (!al::HasAttribute(procedure, "Native") || BindNativeMethod(codeunit, procedure)) {
+      continue;
+    }
     found.push_back({.property = "Native", .where = NativeMethodIdentity(codeunit, procedure)});
   }
   return found;

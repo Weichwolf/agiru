@@ -47,9 +47,12 @@ the source-bound fixture uses production `--system-symbols` loading, indexes bar
 qualified and numeric identities, links cross-codeunit AL calls and checks registry
 metadata and original module ownership. Wrong source IDs and missing definitions
 must fail compilation/linking. Unbound Native calls remain named refusals.
-An explicit verified `AGIRU_SYSTEM_SYMBOLS` also compiles and calls all nine original
-Base64 overloads, retaining named refusals. Neither proves implemented native
-behaviour or authenticates authored fixtures as System packages.
+An explicit verified `AGIRU_SYSTEM_SYMBOLS` compiles all nine original Base64
+overloads: five text-input bindings execute; four InStream overloads retain named
+refusals. Wrong-encoding and terminated-output controls must fail. The text-output
+profile includes the original 10 MiB character boundary; larger transform branches
+and locale-default codepages refuse explicitly. This is not all thirteen original
+AL tests, complete native behaviour or authentication of authored System fixtures.
 
 `runtime/xml-reader.sh` proves shared cursor/close and consuming DOM-load contracts
 in `XmlReaderGate`; separate-state and raw-input reload mutants must fail. It covers

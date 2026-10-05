@@ -9,7 +9,8 @@ printf 'native-codeunits: receipts %s\n' "$proof"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate)
 links=(--rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
-sha256sum src/gen/{CodeunitWriter,NativeSource,Refused}.{cpp,h} src/tc/Main.cpp \
+sha256sum src/gen/{CodeunitWriter,NativeSource,NativeMethods,Refused}.{cpp,h} src/tc/Main.cpp \
+  include/runtime/NativeBase64.h src/net/NativeBase64.cpp \
   "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" > "$proof/inputs.sha256"
 find "$input" -type f -exec sha256sum {} + >> "$proof/inputs.sha256"
@@ -113,9 +114,29 @@ if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then
     "$CXX" "${flags[@]}" "-I$proof/original-generated" -c "$input/OriginalRunner.cpp" -o "$proof/original-runner.o"
   link_generated "$proof/original-generated" "$proof/original-runner.o" "$proof/original-runner"
   "$proof/original-runner" | tee "$proof/original-execution.log"
+  for control in wrong-encoding terminated-output; do
+    cp src/net/NativeBase64.cpp "$proof/$control.cpp"
+    case "$control" in
+      wrong-encoding)
+        sed -i 's/case TextEncoding::UTF16: return dotnet::Encoding::Unicode();/case TextEncoding::UTF16: return dotnet::Encoding::UTF8();/' "$proof/$control.cpp"
+        ;;
+      terminated-output)
+        sed -i 's/DecodeBase64(text, output);/output.Write(DecodeBase64(text));/' "$proof/$control.cpp"
+        ;;
+    esac
+    ! cmp -s src/net/NativeBase64.cpp "$proof/$control.cpp"
+    "$CXX" "${flags[@]}" -fPIC -shared "$proof/$control.cpp" "${links[@]}" -o "$proof/$control.so"
+    if LD_PRELOAD="$proof/$control.so" "$proof/original-runner" > "$proof/$control.log" 2>&1; then
+      printf 'native-codeunits: native text control escaped: %s\n' "$control" >&2
+      exit 1
+    fi
+    rg -q '^FAIL ' "$proof/$control.log"
+    sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
+    rm -f "$proof/$control.cpp" "$proof/$control.so"
+  done
   sha256sum --check --status "$proof/inputs.sha256"
   rm -f "$proof/emitter.o" "$proof/emitter" "$proof/original-runner.o" "$proof/original-runner"
 fi
 rm -f "$proof/runner.o" "$proof/runner" "$proof/non-native/runner" \
   "$proof/source-runner.o" "$proof/source-runner"
-printf 'native-codeunits: unbound declarations refuse before effects; missing-attribute control fails; %s\n' "$proof"
+printf 'native-codeunits: source-bound declarations and unbound refusals proved; original Base64 text bindings qualified when supplied; %s\n' "$proof"

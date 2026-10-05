@@ -3,6 +3,7 @@
 #include "Check.h"
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
+#include "NativeMethods.h"
 #include "PageWriter.h"
 #include "Parser.h"
 #include "TableWriter.h"
@@ -471,6 +472,50 @@ void NativePropertyRefusals() {
                  agiru::gen::BindTable(table, "::agiru::platform::Field", "fixture/Field.h")));
 }
 
+void NativeMethodSignatures() {
+  auto unit = agiru::al::ParseCodeunit(R"(namespace System.Runtime;
+    codeunit 2000000024 Base64Convert {
+      [Native] procedure ToBase64(Source: Text; Lines: Boolean; Kind: TextEncoding; Page: Integer): Text begin end;
+      [Native] procedure FromBase64(Source: Text; Output: OutStream) begin end;
+      [Native] procedure FromBase64(Source: InStream): Text begin end;
+    })");
+  CHECK_TRUE("verified native text signatures bind",
+             agiru::gen::BindNativeMethod(unit, unit.procedures[0]).has_value());
+  CHECK_TRUE("verified native raw output signatures bind",
+             agiru::gen::BindNativeMethod(unit, unit.procedures[1]).has_value());
+  CHECK_TRUE("unqualified native stream signatures remain explicit gaps",
+             !agiru::gen::BindNativeMethod(unit, unit.procedures[2]));
+  const auto text = agiru::gen::WriteCodeunitSource(unit, "original.al", {});
+  CHECK_TRUE("binding uses declared argument names, not canonical spellings",
+             text.contains("NativeToBase64(Source, Lines, Kind, Page)"));
+  CHECK_TRUE("native consumer explicitly includes its narrow primitive contract",
+             text.contains("#include \"runtime/NativeBase64.h\""));
+  auto procedure = unit.procedures[0];
+  procedure.parameters[0].byReference = true;
+  CHECK_TRUE("different native argument modes do not bind",
+             !agiru::gen::BindNativeMethod(unit, procedure));
+  procedure = unit.procedures[0];
+  procedure.parameters[0].length = 10;
+  CHECK_TRUE("different native bounded text signatures do not bind",
+             !agiru::gen::BindNativeMethod(unit, procedure));
+  procedure = unit.procedures[0];
+  procedure.returnType = "Integer";
+  CHECK_TRUE("different native returns do not bind",
+             !agiru::gen::BindNativeMethod(unit, procedure));
+  procedure = unit.procedures[0];
+  procedure.attributes.clear();
+  CHECK_TRUE("missing Native attribute never grants a binding",
+             !agiru::gen::BindNativeMethod(unit, procedure));
+  for (const auto *part : {"id", "namespace", "name"}) {
+    auto altered = unit;
+    if (std::string_view(part) == "id") { altered.id = kWrongIntrinsicId; }
+    if (std::string_view(part) == "namespace") { altered.nameSpace = "Other"; }
+    if (std::string_view(part) == "name") { altered.name = "Other"; }
+    CHECK_TRUE("native identity drift never grants a binding",
+               !agiru::gen::BindNativeMethod(altered, altered.procedures[0]));
+  }
+}
+
 }
 
 int main() {
@@ -482,5 +527,6 @@ int main() {
     SharedTableProperties();
     RefusalsAndCodedOrdinals();
     NativePropertyRefusals();
+    NativeMethodSignatures();
   });
 }

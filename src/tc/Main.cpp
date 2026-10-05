@@ -4,6 +4,7 @@
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
 #include "Names.h"
+#include "NativeMethods.h"
 #include "NativeSource.h"
 #include "ObjectKind.h"
 #include "PageWriter.h"
@@ -1489,6 +1490,12 @@ std::size_t ReportNativeSources(const agiru::gen::NativeSources &sources,
                  sources.codeunitPaths[at]);
     for (const auto &procedure : unit.procedures) {
       if (!agiru::al::HasAttribute(procedure, "Native")) { continue; }
+      if (agiru::gen::BindNativeMethod(unit, procedure)) {
+        std::println("native-method-bound {}: {}",
+                     agiru::gen::NativeMethodIdentity(unit, procedure),
+                     sources.codeunitPaths[at]);
+        continue;
+      }
       ++unboundMethods;
       std::println("native-method-unbound {}: {}",
                    agiru::gen::NativeMethodIdentity(unit, procedure),
@@ -3076,7 +3083,7 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
                native.interfaces.size(),
                interfacesWritten);
   std::println("native {} codeunit sources indexed; {} codeunit objects written into the platform "
-               "app; native methods remain explicit refusals",
+               "app; unbound native methods remain explicit refusals",
                native.codeunits.size(),
                run.written - beforeCodeunits);
   std::size_t interfaceGaps = 0;

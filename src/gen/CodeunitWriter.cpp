@@ -5,6 +5,7 @@
 #include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
+#include "NativeMethods.h"
 #include "ObjectKind.h"
 #include "Refused.h"
 #include "RuntimeSurface.h"
@@ -1877,12 +1878,16 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "namespace {\nnamespace " + identifier + "_unit {\nconst RegisterCodeunit<" + unitClass +
          "> kInCodeunitCatalogue;\n} // namespace " + identifier + "_unit\n} // namespace\n\n";
   const std::size_t bodyAt = out.size();
+  std::set<std::string> nativeHeaders;
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
     const ProcedureNames names(unit, procedure, objects);
+    const auto native = BindNativeMethod(unit, procedure);
+    if (native) { nativeHeaders.insert(native->header); }
     const std::string body =
-        al::HasAttribute(procedure, "Native")
+        native ? native->body
+        : al::HasAttribute(procedure, "Native")
             ? "  throw ::agiru::Error(" +
                   Literal(NativeMethodIdentity(unit, procedure) +
                           " has no native implementation (board:0034)") +
@@ -1923,6 +1928,9 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out.insert(includeAt,
              SourceIncludes(unit.variables, unit.procedures, objects, TableNoOf(unit)) +
                  BodyIncludes(out.substr(bodyAt), objects));
+  for (const auto &header : nativeHeaders) {
+    out.insert(includeAt, "#include \"" + header + "\"\n");
+  }
   return WithRuntimeIncludes(out, ObjectKind::Codeunit);
 }
 
