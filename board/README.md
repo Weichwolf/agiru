@@ -15,6 +15,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Stream/XML replay is running: `20261005T024625Z-3504499`, runner 3504975,
+  frozen HEAD `9c3291e`, source
+  `12f5e315a376d585ea8c20dbc95ce8dccfb068598fd88d1f82cdac33e648e588`.
+  Six jobs, `slice-check all test ut`; runner process confirmed live during build.
+  Includes Ignore-header, shared-cursor and owned-provider fixes; no new UT result yet.
+  Compare every one of the 2,314 milestone identities/source hashes with terminal
+  015114; retain raw/full-tree gaps separately. Dependencies match 015114.
 - Owned BLOB providers (0035): 89 C++/17 generated AL checks green, including
   ASan/UBSan; all preceding 73/12 checks retained. Four compiled controls fail
   both consumers, including heap-use-after-free for an unowned provider.
