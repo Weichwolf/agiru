@@ -124,6 +124,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `cds-crm-{gate,controls,integration-build}.log` in the authority directory and
   `/tmp/agiru-reflection-metadata.oKkIyk/`. Full local/AL replay of this source
   batch remains required; no source-bound AL emit/cloud integration is claimed.
+  Frozen replay of pushed `ae71f8d` is now live (six jobs, slice-check/all/test/UT):
+  `/tmp/agiru-verify/b3fb41b94d2994ba/20261005T131257Z-298717/`;
+  runner PID 300689, source SHA256
+  `7e60e3057a71be09a24efd541643811e224c215f9f998f842ce40681f325805a`.
+  Its snapshot/lane inputs remain immutable; development may resume in the main tree.
   Original ordinary NCL creation remains refused; no
   business/SQL lookup/Runtime-17 equivalence or new AL UT gain is claimed.
 
