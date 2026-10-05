@@ -1,6 +1,7 @@
 #include "meta/Ids.h"
 #include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/User.h"
 #include "platform/UserPersonalization.h"
 #include "runtime/Database.h"
@@ -88,8 +89,11 @@ constexpr int kBreakOnErrorField = 18;
 
 void TheCompleteDeclarationRetainsItsProperties() {
   const auto &table = Declaration();
-  CHECK_TRUE("all declared fields and five platform system fields",
-             table.fields.size() == kFields.size() + agiru::kSystemFieldCount);
+  CHECK_TRUE("all declared fields and the selected Runtime-18 system fields",
+             table.fields.size() ==
+                 kFields.size() + agiru::ImplicitFieldCount(agiru::SystemFieldProfile::Runtime18,
+                                                            agiru::TableType::Normal,
+                                                            false));
   CHECK_TRUE("personalization is tenant-wide", !table.dataPerCompany);
   CHECK_TRUE("personalization is not replicated", !table.replicateData);
   for (const auto &expected : kFields) {
@@ -191,8 +195,10 @@ void MetadataDrivesSQLAndLookups() {
       "SELECT column_name FROM information_schema.columns WHERE table_schema = "
       "'agiru_gate_user_personalization' AND table_name = 'User Personalization'");
   constexpr std::size_t kStoredDeclaredFields = 13;
-  CHECK_TRUE("thirteen stored declared fields plus five system fields",
-             columns.Rows() == kStoredDeclaredFields + agiru::kSystemFieldCount);
+  // System-field documentation: timestamp + SystemId + four audits, excluding user lookups.
+  constexpr std::size_t kStoredSystemFields = 6;
+  CHECK_TRUE("thirteen stored declared fields plus six stored system fields",
+             columns.Rows() == kStoredDeclaredFields + kStoredSystemFields);
   for (const auto &expected : kFields) {
     bool found = false;
     for (std::size_t row = 0; row < columns.Rows(); ++row) {

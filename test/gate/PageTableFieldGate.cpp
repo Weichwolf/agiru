@@ -1,6 +1,7 @@
 #include "meta/Ids.h"
 #include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/PageTableField.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
@@ -53,7 +54,10 @@ constexpr std::array<int, 21> kTypeCodes{4912,  4988,  11519, 11775, 11776, 1179
                                          34559, 35071, 35583, 36095, 36863, 37119, 37375};
 
 static_assert(Row::kId.Value() == kExpectedSourceId);
-static_assert(kTable.fields.size() == kNames.size() + agiru::kSystemFieldCount);
+static_assert(kTable.fields.size() ==
+              kNames.size() + agiru::ImplicitFieldCount(agiru::SystemFieldProfile::Runtime18,
+                                                        agiru::TableType::Normal,
+                                                        false));
 
 void DeclarationAndReflection() {
   CHECK_TEXT("original table name", kTable.name, "Page Table Field");

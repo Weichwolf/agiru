@@ -1,6 +1,7 @@
 #include "meta/Ids.h"
 #include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/FeatureKey.h"
 #include "runtime/RecordRef.h"
 #include "type/FieldClass.h"
@@ -62,7 +63,10 @@ constexpr std::array<FieldSpec, 10> kFields{{
 void TheDeclarationMatchesTheSystemSource() {
   const auto &table = agiru::TableTraits<agiru::platform::FeatureKey>::kTable;
   CHECK_TRUE("all ten declared fields and the common system fields",
-             table.fields.size() == kFields.size() + agiru::kSystemFieldCount);
+             table.fields.size() ==
+                 kFields.size() + agiru::ImplicitFieldCount(agiru::SystemFieldProfile::Runtime18,
+                                                            agiru::TableType::Normal,
+                                                            false));
   CHECK_TRUE("System table number", table.id.Value() == 2000000211);
   CHECK_TEXT("System table name", table.name, "Feature Key");
   CHECK_TEXT("System table caption", table.caption, "Feature Key");

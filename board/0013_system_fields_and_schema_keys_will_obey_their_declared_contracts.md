@@ -111,6 +111,13 @@ Retain the full 2314-case UT population through replay.
   User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;
   `PlatformSourceGate` passes 3060 source/reflection checks. The existing
   `make reflection-metadata` qualifier retains all prior controls; 38 mutants reject.
+- Native fixture assertions now select Runtime 18 explicitly, rather than counting
+  the five legacy declarations. PageTableField/ObjectCatalogue/FeatureKey/
+  UserPersonalization gates pass 312/345/93/320 checks; all four pass focused tidy.
+  User Personalization independently expects six stored implicit columns, excluding
+  four user lookups, as documented in `devenv-table-system-fields.md` at `f928288ee840`.
+  All original source fields, reflection, refusals and SQL checks remain; no provider
+  downgrade or test-population reduction. Full integration/replay remains required.
 - `make native-bindings` uses the verified System 29.0.55365.0 / Runtime 18.0
   package: 234 raw tables, one licensing exclusion, 233 selected; eighteen original
   contracts and separate-library consumers compile without PCH, 215 unbound remain

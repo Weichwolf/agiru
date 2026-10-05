@@ -12,8 +12,9 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   all/test/ut exit 2 after PageTableFieldGate.cpp's legacy five-field static assertion
   disagrees with the selected native Runtime-18 profile. Inputs remain unchanged.
   UT execution never starts: all 2314 configured methods are unexecuted across
-  eighty incomplete codeunits. Repair native fixture assertions, not production
-  profiles or test totals, before repeating `make verify-start JOBS=6
+  eighty incomplete codeunits. The current native fixture assertions are repaired:
+  1070 checks and all four focused tidy runs pass, without production-profile or
+  test-total changes. Repeat `make verify-start JOBS=6
   VERIFY_TARGETS='slice-check all test ut'`. Field.Get/property repairs landed later
   and are not covered by this snapshot.
 - Latest completed frozen replay: `9dca232` / content `fde18ee95496`, slice check

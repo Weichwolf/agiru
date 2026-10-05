@@ -1,6 +1,7 @@
 #include "meta/Ids.h"
 #include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/AllObj.h"
 #include "platform/AllObjWithCaption.h"
 #include "runtime/RecordRef.h"
@@ -95,7 +96,10 @@ void DeclarationMatchesSource(int id,
   CHECK_TRUE("System table ID", table.id.Value() == id);
   CHECK_TEXT("original AL table name", table.name, name);
   CHECK_TRUE("complete source and implicit field population",
-             table.fields.size() == fields.size() + agiru::kSystemFieldCount);
+             table.fields.size() ==
+                 fields.size() + agiru::ImplicitFieldCount(agiru::SystemFieldProfile::Runtime18,
+                                                           agiru::TableType::Normal,
+                                                           false));
   CHECK_TRUE("shared company scope", !table.dataPerCompany);
   CHECK_TEXT("source inherent permissions", table.inherentPermissions, "rX");
   CHECK_TRUE("only the source key", table.keys.size() == 1);
