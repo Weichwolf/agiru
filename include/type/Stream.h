@@ -29,9 +29,8 @@ concept TextAssignable = requires(T &target, std::string_view text) { target = t
 
 /// \brief AL `OutStream` -- what a BLOB is written through.
 ///
-/// \note IT DOES NOT OWN THE BLOB. `Blob.CreateOutStream(Out)` points a stream at a BLOB that
-///       already exists, and everything written goes into that BLOB. A stream that owned a copy
-///       would leave the caller's BLOB empty and every test of it green for the wrong reason.
+/// \note Owns the same byte provider as its BLOB, not a value copy. Writes remain visible
+///       to that value and its streams; destruction of the BLOB wrapper is safe.
 class OutStream {
 public:
   /// \brief A stream bound to nothing yet.
@@ -45,7 +44,7 @@ public:
 
   /// \brief A stream that writes into a BLOB.
   /// \param into The BLOB.
-  explicit OutStream(Blob &into) : blob_(&into) {}
+  explicit OutStream(Blob &into);
 
   /// \brief AL `OutStream.WriteText(Text)`.
   /// \param text The text to write.
@@ -149,17 +148,17 @@ private:
 
   Integer WriteTerminated(std::string_view text, Integer length);
 
-  [[nodiscard]] Blob &Bound() const;
+  [[nodiscard]] Blob::Storage &Bound() const;
 
   [[noreturn]] static void RefuseTyped();
 
-  Blob *blob_ = nullptr;
+  std::shared_ptr<Blob::Storage> bytes_;
 };
 
 /// \brief AL `InStream` -- what a BLOB is read through.
 /// \note Copies and by-value calls share a cursor. CreateInStream binds a fresh cursor;
 ///       rebinding one wrapper leaves existing aliases on their original target.
-/// \warning The BLOB must still outlive its streams; provider ownership remains unqualified.
+/// \note Retains its byte provider even after the BLOB wrapper ends or moves.
 class InStream {
 public:
   /// \brief A stream bound to nothing yet.
@@ -251,7 +250,7 @@ public:
 private:
   Integer ReadTerminated(std::string &into, Integer length);
 
-  [[nodiscard]] const Blob &Bound() const;
+  [[nodiscard]] const Blob::Storage &Bound() const;
 
   [[noreturn]] static void RefuseTyped();
 

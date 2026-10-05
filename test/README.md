@@ -56,10 +56,13 @@ in `XmlReaderGate`; separate-state and raw-input reload mutants must fail. It co
 positioned/ended readers, node ownership, namespaces, DTD retention and whitespace.
 DTD/resolver security, encoding and streaming bounds remain open (0035).
 
-`make streams JOBS=2` proves shared InStream cursors through C++ and generated AL:
-copy/by-value reads, reset, fresh bindings and wrapper-local rebinding. Separate
-read/reset cursor mutants must fail both consumers. BLOB/provider lifetime,
-nonseekable/BigInteger positions and Native activation remain open (0035/0034).
+`make streams JOBS=2` proves shared cursors, fresh/wrapper-local bindings, escaped
+local BLOB providers and independent BLOB values through C++ and generated AL.
+Both consumers also run with their stream/provider primitives under ASan/UBSan;
+the whole runtime is not instrumented. Four compiled cursor/value/ownership mutants
+must fail both consumers. File/record/codeunit lifetimes, AL assignment/Clear/disposal,
+encoding, bounds, nonseekable/BigInteger positions and Native activation remain open
+(0035/0034).
 
 `runtime/codeunit-record.sh` executes generated typed/static/dynamic `Codeunit.Run`
 forms. Table-global saves survive SQL rollback through scoped var-Record identity;

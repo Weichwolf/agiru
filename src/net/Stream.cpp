@@ -25,26 +25,29 @@ constexpr std::string_view kLineBreak = "\r\n";
 }
 
 struct InStream::State {
-  const Blob *blob;
+  std::shared_ptr<Blob::Storage> bytes;
   std::size_t position = 0;
 };
 
-InStream::InStream(const Blob &from) : state_(std::make_shared<State>(State{.blob = &from})) {}
+InStream::InStream(const Blob &from)
+    : state_(std::make_shared<State>(State{.bytes = from.Pin()})) {}
 
-Blob &OutStream::Bound() const {
-  if (blob_ == nullptr) {
+OutStream::OutStream(Blob &into) : bytes_(into.Pin()) {}
+
+Blob::Storage &OutStream::Bound() const {
+  if (bytes_ == nullptr) {
     throw Error("this OutStream was never given a source: AL declares the variable and "
                 "`CreateOutStream` binds it");
   }
-  return *blob_;
+  return *bytes_;
 }
 
-const Blob &InStream::Bound() const {
-  if (state_ == nullptr || state_->blob == nullptr) {
+const Blob::Storage &InStream::Bound() const {
+  if (state_ == nullptr || state_->bytes == nullptr) {
     throw Error("this InStream was never given a source: AL declares the variable and "
                 "`CreateInStream` binds it");
   }
-  return *state_->blob;
+  return *state_->bytes;
 }
 
 Integer InStream::Position() const {
@@ -67,7 +70,7 @@ void InStream::RefuseTyped() {
 }
 
 Integer OutStream::Append(std::string_view text, bool terminated) {
-  auto &bytes = Bound().bytes_;
+  auto &bytes = Bound();
   const std::size_t maximum = bytes.max_size();
   const std::size_t terminator = terminated ? 1 : 0;
   if (terminator > maximum - bytes.size() || text.size() > maximum - bytes.size() - terminator) {
@@ -92,7 +95,7 @@ Integer OutStream::Append(std::string_view text, bool terminated) {
 
 bool OutStream::Borrows(std::string_view bytes) const {
   if (bytes.empty()) { return false; }
-  const auto &storage = Bound().Bytes();
+  const auto &storage = Bound();
   if (storage.empty()) { return false; }
   const auto *first = reinterpret_cast<const char *>(storage.data());
   const std::less<> before;
@@ -113,7 +116,7 @@ Integer OutStream::WriteBytes(std::string_view bytes) {
 }
 
 std::string InStream::ReadBytes(Integer count) {
-  const std::vector<std::uint8_t> &bytes = Bound().Bytes();
+  const std::vector<std::uint8_t> &bytes = Bound();
   auto &position = state_->position;
   const std::size_t want = count < 0 ? 0 : static_cast<std::size_t>(count);
   const std::size_t end = position + want < bytes.size() ? position + want : bytes.size();
@@ -128,16 +131,16 @@ Integer OutStream::WriteText() {
 }
 
 Boolean InStream::EOS() const {
-  const std::size_t length = Bound().Length();
+  const std::size_t length = Bound().size();
   return state_->position >= length;
 }
 
 Integer InStream::Length() const {
-  return static_cast<Integer>(Bound().Length());
+  return static_cast<Integer>(Bound().size());
 }
 
 Integer InStream::ReadTerminated(std::string &into, Integer length) {
-  const std::vector<std::uint8_t> &bytes = Bound().Bytes();
+  const std::vector<std::uint8_t> &bytes = Bound();
   auto &position = state_->position;
   const std::size_t end = bytes.size();
   const std::size_t want = length < 0 ? end : static_cast<std::size_t>(length);
@@ -157,7 +160,7 @@ Integer InStream::ReadTerminated(std::string &into, Integer length) {
 }
 
 Integer InStream::ReadText(::agiru::Text<0> &text, Integer length) {
-  const auto &bytes = Bound().Bytes();
+  const auto &bytes = Bound();
   auto &position = state_->position;
   const std::size_t left = bytes.size() - (position < bytes.size() ? position : bytes.size());
   const std::size_t want = length < 0 ? 0 : static_cast<std::size_t>(length);
@@ -168,7 +171,7 @@ Integer InStream::ReadText(::agiru::Text<0> &text, Integer length) {
 }
 
 Integer InStream::ReadText(::agiru::Text<0> &text) {
-  const std::size_t length = Bound().Length();
+  const std::size_t length = Bound().size();
   return ReadText(text, static_cast<Integer>(length - state_->position));
 }
 

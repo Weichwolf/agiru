@@ -4,9 +4,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 /// \file
@@ -20,30 +20,43 @@ namespace agiru {
 /// variables in that BLOBs have a variable length. The maximum size of a BLOB (binary large object)
 /// is 2 GB."
 ///
-/// \note Streams borrow this BLOB; writes append to its owned byte storage. Client file
-///       import/export still refuse. Stream text-encoding selection remains unimplemented.
+/// \note Streams retain this value's byte provider after the wrapper ends. BLOB copies
+///       have independent bytes. Client import/export and stream encoding remain gaps.
 class Blob {
 public:
   /// \brief An empty BLOB, which is what a field holds until something writes to it.
   Blob() = default;
+
+  /// \brief Copies the byte value into an independent provider. \param other The source value.
+  Blob(const Blob &other);
+
+  /// \brief Copies bytes without aliasing the source provider. \param other The source value.
+  /// \return This value; self-assignment retains its provider.
+  Blob &operator=(const Blob &other);
+
+  /// \brief Transfers the provider; existing streams keep it alive. \param other The source.
+  Blob(Blob &&other) noexcept = default;
+
+  /// \brief Transfers the provider. \param other The source. \return This value.
+  Blob &operator=(Blob &&other) noexcept = default;
 
   /// \brief The largest BLOB AL accepts, from `blob-data-type.md`.
   static constexpr std::size_t kMaximumSize = 2UL * 1024 * 1024 * 1024;
 
   /// \brief AL `Blob.HasValue()`.
   /// \return True when the BLOB holds at least one byte.
-  [[nodiscard]] bool HasValue() const { return !bytes_.empty(); }
+  [[nodiscard]] bool HasValue() const { return Length() != 0; }
 
   /// \brief AL `Blob.Length()`.
   /// \return The number of bytes.
-  [[nodiscard]] std::size_t Length() const { return bytes_.size(); }
+  [[nodiscard]] std::size_t Length() const;
 
   /// \return The bytes.
-  [[nodiscard]] const std::vector<std::uint8_t> &Bytes() const { return bytes_; }
+  [[nodiscard]] const std::vector<std::uint8_t> &Bytes() const;
 
   /// \brief Replaces the bytes.
   /// \param bytes The new content.
-  void Set(std::vector<std::uint8_t> bytes) { bytes_ = std::move(bytes); }
+  void Set(std::vector<std::uint8_t> bytes);
 
   /// \brief AL `Blob.CreateOutStream(OutStream)` -- points a stream at this BLOB to write into.
   /// \return The stream.
@@ -83,11 +96,14 @@ public:
   /// \brief Compares two BLOBs.
   /// \param o The other BLOB.
   /// \return True when they hold the same bytes.
-  [[nodiscard]] bool operator==(const Blob &o) const = default;
+  [[nodiscard]] bool operator==(const Blob &o) const;
 
 private:
   friend class OutStream;
-  std::vector<std::uint8_t> bytes_;
+  friend class InStream;
+  using Storage = std::vector<std::uint8_t>;
+  [[nodiscard]] std::shared_ptr<Storage> Pin() const;
+  mutable std::shared_ptr<Storage> bytes_;
 };
 
 }

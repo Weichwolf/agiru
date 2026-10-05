@@ -1,4 +1,5 @@
 #include "type/Blob.h"
+#include "type/Integer.h"
 #include "type/Stream.h"
 #include "type/StringValue.h"
 #include "type/Text.h"
@@ -35,5 +36,18 @@ int main() {
     CHECK_TEXT("generated var rebinding selects a fresh target", input.ReadBytes(1), "x");
     auto old = alias;
     CHECK_TEXT("generated var rebinding preserves existing aliases", old.ReadBytes(1), "b");
+    auto escaped = consumer.InputFromLocalBlob();
+    CHECK_TEXT("generated local BLOB input retains its provider", escaped.ReadBytes(100), "local");
+    agiru::InStream linked;
+    auto output = consumer.OutputFromLocalBlob(linked);
+    CHECK_TRUE("generated local BLOB output retains its provider", output.WriteBytes("alive") > 0);
+    CHECK_TEXT(
+        "generated escaped streams share their retained provider", linked.ReadBytes(100), "alive");
+    CHECK_TRUE("generated BLOB by-value writes mutate an independent value",
+               consumer.WriteBlobByValue(blob) > static_cast<agiru::Integer>(blob.Length()));
+    auto unchanged = blob.CreateInStream();
+    CHECK_TEXT("generated BLOB by-value writes preserve the caller's bytes",
+               unchanged.ReadBytes(100),
+               "abcdef");
   });
 }

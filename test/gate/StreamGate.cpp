@@ -233,6 +233,55 @@ void InputAliasesShareOneCursorButNewBindingsAreIndependent() {
   CHECK_TRUE("assigned wrappers advance the existing target", input.Position() == 3);
 }
 
+InStream InputWithLocalBlob() {
+  Blob local;
+  static_cast<void>(local.CreateOutStream().WriteBytes("owned"));
+  return local.CreateInStream();
+}
+
+std::pair<InStream, OutStream> StreamsWithLocalBlob() {
+  Blob local;
+  return {local.CreateInStream(), local.CreateOutStream()};
+}
+
+void StreamsRetainTheirProviderAfterItsWrapperEnds() {
+  auto input = InputWithLocalBlob();
+  CHECK_TEXT("input retains a destroyed local BLOB provider", input.ReadBytes(2), "ow");
+  auto alias = input;
+  CHECK_TEXT("an escaped input alias retains the same data and cursor", alias.ReadBytes(3), "ned");
+  CHECK_TRUE("escaped aliases share EOF", input.EOS());
+  auto [emptyInput, output] = StreamsWithLocalBlob();
+  CHECK_TRUE("an escaped empty provider remains readable", emptyInput.EOS());
+  CHECK_TRUE("output retains a destroyed local BLOB provider", output.WriteBytes("live") == 4);
+  CHECK_TEXT("escaped input sees writes to its retained provider", emptyInput.ReadBytes(4), "live");
+  Blob original;
+  static_cast<void>(original.CreateOutStream().WriteBytes("one"));
+  auto originalInput = original.CreateInStream();
+  auto originalOutput = original.CreateOutStream();
+  Blob copied = original;
+  CHECK_TRUE("BLOB copies initially compare by bytes", copied == original);
+  static_cast<void>(copied.CreateOutStream().WriteBytes("copy"));
+  CHECK_TEXT("BLOB value copies do not share mutations", originalInput.ReadBytes(100), "one");
+  CHECK_TRUE("BLOB equality compares content rather than provider identity", copied != original);
+  Blob moved = std::move(original);
+  CHECK_TRUE("moving a BLOB retains its byte value", moved.Length() == 3);
+  original = Blob{};
+  CHECK_TRUE("the moved-from BLOB wrapper can be reused", !original.HasValue());
+  CHECK_TRUE("streams survive moving their BLOB wrapper", originalOutput.WriteBytes("two") == 3);
+  CHECK_TEXT("input survives moving its BLOB wrapper", originalInput.ReadBytes(100), "two");
+  CHECK_TRUE("moved BLOB sees its provider's writes", moved.Length() == 6);
+  moved.Set({'r', 'e', 'p', 'l', 'a', 'c', 'e', 'd'});
+  originalInput.ResetPosition();
+  CHECK_TEXT("replacing bytes updates the same retained provider",
+             originalInput.ReadBytes(100),
+             "replaced");
+  Blob assigned;
+  assigned = moved;
+  static_cast<void>(assigned.CreateOutStream().WriteBytes("copy"));
+  originalInput.ResetPosition();
+  CHECK_TEXT("assigned BLOB values remain independent", originalInput.ReadBytes(100), "replaced");
+}
+
 /// A NOTE ON A RECORD LINK IS A .NET STRING: `BinaryWriter.Write(string)` puts a 7-bit length
 /// prefix before the UTF-8 bytes and `BinaryReader.ReadString` takes it off again, which is how
 /// `Record Link Management` writes and reads a note (board:0645). The constructor is spelled the
@@ -286,6 +335,7 @@ int main() {
     SmallWritesGrowAmortizedStorage();
     WritesPreserveBorrowedSelfInput();
     InputAliasesShareOneCursorButNewBindingsAreIndependent();
+    StreamsRetainTheirProviderAfterItsWrapperEnds();
     ABinaryWriterAndReaderRoundTripANote();
   });
 }

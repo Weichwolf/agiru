@@ -31,4 +31,35 @@ codeunit 50261 "Stream Alias Consumer"
         Replacement.CreateInStream(Source);
         Source.Read(Value, 1);
     end;
+
+    procedure InputFromLocalBlob(): InStream
+    var
+        LocalBlob: Blob;
+        Output: OutStream;
+        Input: InStream;
+    begin
+        LocalBlob.CreateOutStream(Output);
+        Output.WriteText('local');
+        LocalBlob.CreateInStream(Input);
+        exit(Input);
+    end;
+
+    procedure OutputFromLocalBlob(var Input: InStream): OutStream
+    var
+        LocalBlob: Blob;
+        Output: OutStream;
+    begin
+        LocalBlob.CreateInStream(Input);
+        LocalBlob.CreateOutStream(Output);
+        exit(Output);
+    end;
+
+    procedure WriteBlobByValue(Source: Blob): Integer
+    var
+        Output: OutStream;
+    begin
+        Source.CreateOutStream(Output);
+        Output.WriteText('copy');
+        exit(Source.Length());
+    end;
 }

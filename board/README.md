@@ -15,13 +15,22 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Owned BLOB providers (0035): 89 C++/17 generated AL checks green, including
+  ASan/UBSan; all preceding 73/12 checks retained. Four compiled controls fail
+  both consumers, including heap-use-after-free for an unowned provider.
+  `/tmp/agiru-streams.D7G8B1`, hashes match; `/tmp/agiru-stream-owner.L3GzVu`.
+  All gate consumers rebuilt; Base64 79/XML 220/File 17 remain green.
+  Blob/AL runner lint passes; Stream/gate retain 25/47 inherited header findings,
+  no own findings, lint exits 2. Outside frozen 015114; full replay pending.
+  File/record/codeunit ownership, AL assignment/Clear/disposal, encoding, bounds,
+  nonseekable/BigInteger positions and Native activation remain open.
 - Shared InStream cursor (0035): 73 C++ checks green, preceding runtime 16 red;
   12 production-generated AL checks green. Read/reset cursor controls fail both
   consumers (C++ 16/6 red; AL 5/3). All gate consumers rebuilt; Base64 79 and XML
   reader 220 remain green. `/tmp/agiru-stream-alias.hjKWK3`,
   `/tmp/agiru-streams.QdtX0X`, hashes match. No own analysis findings; 25/47 inherited
   source/gate header findings remain (lint exits 2); AL runner lint passes.
-  Outside frozen 015114; full replay pending. BLOB/provider ownership, positions,
+  Outside frozen 015114; full replay pending. Broader provider lifetimes, positions,
   encoding/line handling and Native stream activation remain open.
 - XML Ignore header/closing fix (0035): 220 checks green; preceding runtime has
   53 failures on the same expanded gate. Seven compiled controls reject (header
