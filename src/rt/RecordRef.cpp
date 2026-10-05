@@ -80,6 +80,10 @@ FieldRef::~FieldRef() {
   Release_();
 }
 
+Integer FieldRef::Length() const {
+  return detail::EffectiveFieldLength(Def_());
+}
+
 void FieldRef::Release_() noexcept {
   if (state_ != nullptr && --state_->uses == 0) { delete state_; }
   state_ = nullptr;
@@ -722,7 +726,7 @@ void RecordRef::SetTable(Variant &Rec) {
     throw Error("RecordRef.SetTable: the RecordRef is not open");
   }
   if (!Rec.IsRecord()) { throw Error("RecordRef.SetTable(Variant): the Variant holds no record"); }
-  const RecordInVariant &record = Rec.Get<RecordInVariant>();
+  const auto &record = Rec.Get<RecordInVariant>();
   if (record.table != State().table->id) {
     throw Error("RecordRef.SetTable: the RecordRef refers to " + std::string(State().table->name) +
                 " and the Variant holds a record of table " + std::to_string(record.table.Value()));
@@ -817,7 +821,7 @@ void RecordRefFromVariant(RecordRef &into, const Variant &held) {
   if (!held.IsRecord()) {
     throw Error("RecordRef.GetTable(Variant): the Variant holds neither a record nor a RecordRef");
   }
-  const RecordInVariant &record = held.Get<RecordInVariant>();
+  const auto &record = held.Get<RecordInVariant>();
   const TableEntry *entry = FindTable(record.table);
   if (entry == nullptr) {
     throw Error("RecordRef.GetTable: the record's table " + std::to_string(record.table.Value()) +

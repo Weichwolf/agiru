@@ -5,18 +5,22 @@
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Date.h"
 #include "type/Decimal.h"
 #include "type/Enum.h"
 #include "type/FieldClass.h"
 #include "type/Integer.h"
+#include "type/KeyRef.h"
 #include "type/Option.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include "Check.h"
 #include "ResourceCost.h"
 #include "Selection.h"
+#include "options/Types.h"
 
 #include <array>
 #include <cstddef>
@@ -70,6 +74,12 @@ void OneThatIsNotOpenRefusesRatherThanAnsweringZero() {
   } catch (const Error &e) { said = e.what(); }
   CHECK_TRUE("and so does FieldCount", !said.empty());
   CHECK_TRUE("while FieldExist simply answers false", !ref.FieldExist(1));
+  const FieldRef empty;
+  said.clear();
+  try {
+    (void)empty.Length();
+  } catch (const Error &e) { said = e.what(); }
+  CHECK_TRUE("an unassigned FieldRef refuses Length rather than reporting zero", !said.empty());
 }
 
 /// A RECORDREF IS A REFERENCE TYPE, so a copy is a second handle on the same object: the BaseApp
@@ -77,7 +87,7 @@ void OneThatIsNotOpenRefusesRatherThanAnsweringZero() {
 /// (`FindRecordManagement.GetRecRefAndFieldsNoByType`, 11 UT cases on 2026-09-09).
 void ACopyIsASecondHandleOnTheSameObject() {
   ResourceCost rec;
-  RecordRef ref;
+  const RecordRef ref;
   RecordRef copy = ref;
   CHECK_TRUE("both start closed", !ref.IsOpen() && !copy.IsOpen());
   copy.GetTable(rec);
@@ -119,7 +129,7 @@ void AVariantRetainsTheRecordRefBeyondItsSourceVariable() {
   auto copy = held;
   CHECK_TRUE("a copied Variant retains reference identity", copy == held);
   auto replacement = held;
-  RecordRef closed;
+  const RecordRef closed;
   static_cast<RecordRef &>(replacement) = closed;
   CHECK_TRUE("assigning another boxed handle does not overwrite the original box",
              !static_cast<const RecordRef &>(replacement).IsOpen() && retained.IsOpen());
@@ -138,6 +148,12 @@ void AFieldIsReachedByNumberAndByPosition() {
   CHECK_TRUE("a field found by number carries it", code.Number() == 2);
   CHECK_TEXT("and its AL name", std::string(code.Name()), "Code");
   CHECK_TRUE("and its declared length", code.Length() == 20);
+  CHECK_TRUE("a Decimal has the platform size rather than its host wrapper size",
+             ref.Field(ResourceCost::Field_No::UnitCost.Value()).Length() == 12);
+  CHECK_TRUE("a system GUID has its fixed size",
+             ref.Field(agiru::SystemFieldNumbers::SystemId.Value()).Length() == 16);
+  CHECK_TRUE("an audit timestamp has its fixed size",
+             ref.Field(agiru::SystemFieldNumbers::SystemCreatedAt.Value()).Length() == 8);
 
   const FieldRef first = ref.FieldIndex(1);
   CHECK_TRUE("FieldIndex counts from ONE", first.Number() == 1);
@@ -174,8 +190,8 @@ void FieldAndKeyReferencesKeepTheirRecordAlive() {
   CHECK_TEXT("FieldRef.Record keeps the same row alive", fromField.Field(2).ToText(), "KEPT");
   const RecordRef fromKey = key.Record();
   CHECK_TEXT("KeyRef.Record keeps the same row alive", fromKey.Field(2).ToText(), "KEPT");
-  FieldRef copied = field;
-  agiru::KeyRef moved = std::move(key);
+  const FieldRef copied = field;
+  const agiru::KeyRef moved = std::move(key);
   CHECK_TEXT("a copied FieldRef shares the live row", copied.ToText(), "KEPT");
   CHECK_TEXT("a moved KeyRef keeps the live row", moved.Record().Field(2).ToText(), "KEPT");
   fromField.Field(2).Value("CHANGED");
@@ -183,6 +199,7 @@ void FieldAndKeyReferencesKeepTheirRecordAlive() {
   CHECK_TEXT(
       "KeyRef.Record observes the same changed row", moved.Record().Field(2).ToText(), "CHANGED");
   copied.Record().Close();
+  CHECK_TRUE("the retained declaration survives closing the record", field.Length() == 20);
   std::string said;
   try {
     (void)field.ToText();
@@ -311,8 +328,8 @@ struct Painted : agiru::Table<Painted> {
 
   agiru::Enum<::Kind> Kind;
   agiru::Option<::Shade> Shade;
-  agiru::Integer Painted_Count;
-  agiru::Date Painted_On;
+  agiru::Integer Painted_Count{};
+  agiru::Date Painted_On{};
 
   struct Field_No {
     static constexpr agiru::FieldNo Kind{1};
@@ -384,6 +401,8 @@ void AnEnumFieldReportsOption() {
 
   CHECK_TRUE("an enum field reports Option", declared.Type() == agiru::FieldType::Option);
   CHECK_TRUE("and so does an option field", option.Type() == agiru::FieldType::Option);
+  CHECK_TRUE("an enum has the original Option byte size", declared.Length() == 4);
+  CHECK_TRUE("and an ordinary option has the same byte size", option.Length() == 4);
 
   // THE NEGATIVE CONTROL: they are still two different things, and IsEnum is the one place BC puts
   // that difference. A Type() that answered Option for both while IsEnum() also answered the same
@@ -405,6 +424,8 @@ void AFieldAnswersTheClassItsTableDeclared() {
 
   CHECK_TRUE("a FlowField says so", ref.Field(3).Class() == agiru::FieldClass::FlowField);
   CHECK_TRUE("a FlowFilter says so", ref.Field(4).Class() == agiru::FieldClass::FlowFilter);
+  CHECK_TRUE("a calculated Integer has the fixed size", ref.Field(3).Length() == 4);
+  CHECK_TRUE("a date filter has the fixed size", ref.Field(4).Length() == 4);
 
   // THE NEGATIVE CONTROL IS THE ORDINARY FIELD. `devenv-fieldclass-property.md` makes Normal the
   // default, so a Class() that returned a hardcoded Normal passes on field 1 and fails on the two
@@ -428,7 +449,7 @@ void AFormulaTermOverAFlowFieldIsASubquery() {
       agiru::FieldDef{.offset = 32,
                       .name = "Unpainted",
                       .caption = "Unpainted",
-                      .calcFormula = "count(\"Painted\" where(\"Painted Count\" = const(0)))",
+                      .calcFormula = R"(count("Painted" where("Painted Count" = const(0))))",
                       .no = agiru::FieldNo{2},
                       .fieldClass = agiru::FieldClass::FlowField,
                       .type = agiru::FieldType::Integer},
@@ -452,8 +473,7 @@ void AFormulaTermOverAFlowFieldIsASubquery() {
   CHECK_TRUE("and never the FlowField's name as a column",
              made.where.find("\"Painted Count\" =") == std::string::npos);
   CHECK_TRUE("the constant is bound after the subquery",
-             made.binds.size() == 2 && made.binds[0].has_value() && *made.binds[0] == "0" &&
-                 made.binds[1].has_value() && *made.binds[1] == "1");
+             made.binds.size() == 2 && made.binds[0] == "0" && made.binds[1] == "1");
 }
 
 /// THE FIELD TYPE'S NUMBERS ARE THE PLATFORM'S OWN AND NOT A COUNTER. AL compares the result of

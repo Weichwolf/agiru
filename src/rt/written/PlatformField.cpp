@@ -17,10 +17,43 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
 namespace agiru {
+
+std::uint16_t detail::EffectiveFieldLength(const FieldDef &def) {
+  constexpr std::uint16_t kIntegerLength = 4;
+  constexpr std::uint16_t kBigIntegerLength = 8;
+  constexpr std::uint16_t kDecimalLength = 12;
+  constexpr std::uint16_t kGuidLength = 16;
+  constexpr std::uint16_t kDateFormulaLength = 32;
+  constexpr std::uint16_t kRecordIdLength = 448;
+  constexpr std::uint16_t kTableFilterLength = 504;
+  switch (def.type) {
+    case FieldType::Text:
+    case FieldType::Code: return def.length;
+    case FieldType::Boolean:
+    case FieldType::Integer:
+    case FieldType::Option:
+    case FieldType::Enum:
+    case FieldType::Date:
+    case FieldType::Time: return kIntegerLength;
+    case FieldType::BigInteger:
+    case FieldType::Duration:
+    case FieldType::DateTime:
+    case FieldType::Blob: return kBigIntegerLength;
+    case FieldType::Decimal: return kDecimalLength;
+    case FieldType::Guid:
+    case FieldType::Media:
+    case FieldType::MediaSet: return kGuidLength;
+    case FieldType::DateFormula: return kDateFormulaLength;
+    case FieldType::RecordId: return kRecordIdLength;
+    case FieldType::TableFilter: return kTableFilterLength;
+    default: throw Error("Field metadata: unsupported length");
+  }
+}
 
 std::string detail::FieldOptionMembers(const FieldDef &def) {
   std::string out;
@@ -104,7 +137,7 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
   row.TableName = FittedFieldText(table.name, platform::Field::kNameLength);
   row.FieldName = FittedFieldText(def.name, platform::Field::kNameLength);
   row.Type = nativeType;
-  row.Len = static_cast<::agiru::Integer>(def.length);
+  row.Len = EffectiveFieldLength(def);
   row.Class = def.fieldClass;
   row.TypeName = typeName;
   row.OptionString = FieldOptionMembers(def);

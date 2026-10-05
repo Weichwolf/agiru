@@ -25,13 +25,16 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
 
 - Field length authority now covers every original native field: 234 tables/4,477
   fields, zero refused. Original FieldRef.Length and virtual Field.Len both use
-  NCL FieldDefinedLength, not raw declared capacity. agiru returns 0 instead of
-  Integer/Boolean 4 and GUID 16; a real C++ caller reproduces three differences
-  across four cases. Decimal is 12, BLOB 8, RecordID 448 and TableFilter 504,
+  NCL FieldDefinedLength, not raw declared capacity. The shared agiru primitive
+  now reports Integer/Boolean 4 and GUID 16; all four real C++ caller cases match.
+  Decimal is 12, BLOB 8, RecordID 448 and TableFilter 504,
   never `sizeof` host wrappers. Original native sources contain no DateFormula;
   a separately authored original-creation probe confirms 32. Receipt:
   `/tmp/agiru-table-provider-authority.CyvRCA/native-field-length-contract.json`.
-  The fix remains open (0044); source `FieldDef.length` must stay declared-only.
+  `field-length-implementation.json`: 98/305 gate checks pass, restored zero
+  lengths fail 7/19; all 4,477 original lengths match, old zero control differs
+  2,754 times. Source `FieldDef.length` stays declared-only. Full generated/local/AL
+  replay and native profile/provider remain open (0044); lint remains red.
 
 - Native virtual-buffer authority: original BC 29.0.54011.55407 Ncl SHA256
   `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`:

@@ -198,8 +198,9 @@ public:
   [[nodiscard]] std::string_view Caption() const { return Def_().caption; }
 
   /// \brief AL `FieldRef.Length()`.
-  /// \return The declared length for Code and Text, 0 otherwise.
-  [[nodiscard]] Integer Length() const { return Def_().length; }
+  /// \return The declared UTF-16 capacity for Code/Text or the fixed BC byte size otherwise.
+  /// \throws Error when no field is assigned or its type is unsupported.
+  [[nodiscard]] Integer Length() const;
 
   /// \brief AL `FieldRef.Type()`.
   ///

@@ -67,9 +67,18 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   field-number/type/class/length authority, API distinctions and failed probes.
   Follow-up `native-field-length-contract.json`: original getters cover all 4,477
   native fields; public FieldRef.Length and virtual Field.Len share that effective
-  value. Current agiru incorrectly returns zero for fixed-size types (three of four
-  C++ caller checks fail). 0044 owns the shared primitive; immutable declared length
-  stays unchanged. DateFormula 32 is separately authored, not an original native row.
+  value. Their shared allocation-free primitive is now implemented; declared length
+  stays unchanged. RecordRefGate/PlatformFieldGate pass 98/305 checks, with every
+  previous case retained. Restored zero lengths fail 7/19 checks; all 4,477 original
+  field lengths match the primitive/Field.Len projection (old zero control differs
+  2,754 times). The original four C++ caller cases now match. DateFormula 32 is
+  separately authored, not an original native row. `field-length-implementation.json`
+  in the same receipt directory retains original/compiler/control hashes and bounds.
+  No new length analysis findings; one existing RecordRef.Get value-copy finding
+  and 37/33/36/33 inherited header findings remain unsuppressed. Fixture cleanup
+  initializes scalar members and removes existing include/const/optional findings;
+  runtime loses two auto findings. Full generated rebuild/local/AL replay remain
+  pending; complete profile/provider remains guarded. No new UT gain/G1 claim.
 
 - Preceding full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.

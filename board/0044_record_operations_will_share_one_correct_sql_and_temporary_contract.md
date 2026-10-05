@@ -498,13 +498,15 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 2. Write a small operation matrix over typed Record, RecordRef and temporary records: Init versus Clear, assignment versus Copy, Copy(ShareTable), Get versus filters, Find directions, marks and ModifyAll/DeleteAll triggers.
    Extend the retained FilterGroupGate matrix to SQL and full sealed-seed UT A/B. Verify consumed setter return against the platform rather than assuming the example proves it; prove group -1 FlowField refusal. Keep independent per-group filters, same-field intersection, cross-column OR and every former item-tracking identity.
 3. Centralize primitives below the typed wrappers while retaining typed field access. Preserve table variables and temporary ownership according to operation, not a general C++ copy rule.
-   Fix `FieldRef.Length` and virtual `Field.Len` with one effective-length primitive
-   in `src/rt/{RecordRef.cpp,FieldMetadata.h,written/PlatformField.cpp}` and the
-   public contract in `include/runtime/RecordRef.h`. Preserve declared-only
-   `FieldDef.length`, Text/Code UTF-16 capacity and native source assertions.
-   Use original sizes, not host `sizeof`; unknown types refuse. Keep all existing
-   `RecordRefGate`/`PlatformFieldGate` cases; add numeric/system-field/empty-handle
-   callers and a restored-zero-length control. Qualified original 4,477-field,
+   Shared `FieldRef.Length`/`Field.Len` primitive is implemented in
+   `src/rt/{RecordRef.cpp,FieldMetadata.h,written/PlatformField.cpp}`; public
+   contract: `include/runtime/RecordRef.h`. Declared-only `FieldDef.length`,
+   UTF-16 capacity and source assertions remain unchanged; unknown types refuse.
+   Retained/expanded gates pass 98/305 checks; restored-zero control fails 7/19.
+   All 4,477 original lengths match the projection (zero control: 2,754 differences).
+   `field-length-implementation.json` in the native authority receipt retains
+   hashes and remaining lint findings. Rebuild all generated consumers and compare
+   unchanged full local/AL populations; no new UT result yet. Qualified original 4,477-field,
    separately authored DateFormula and current three-error receipts:
    `/tmp/agiru-table-provider-authority.CyvRCA/native-field-length-contract.json`;
    developer `ff5939a46e`, `methods-auto/fieldref/fieldref-length-method.md`, BCApps

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace agiru {
@@ -12,6 +13,8 @@ class Field;
 }
 
 namespace detail {
+
+std::uint16_t EffectiveFieldLength(const FieldDef &def);
 
 std::string FieldOptionMembers(const FieldDef &def);
 

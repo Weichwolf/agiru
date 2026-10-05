@@ -14,6 +14,7 @@
 #include "type/Variant.h"
 
 #include "Check.h"
+#include "FieldMetadata.h"
 
 #include <array>
 #include <cstddef>
@@ -50,30 +51,31 @@ struct TypeNameCase {
   FieldType type;
   std::uint16_t length;
   std::string_view name;
+  agiru::Integer effectiveLength;
 };
 
 constexpr std::array<TypeNameCase, 21> kTypeNames{{
-    {.type = FieldType::Boolean, .length = 0, .name = "Boolean"},
-    {.type = FieldType::Integer, .length = 0, .name = "Integer"},
-    {.type = FieldType::BigInteger, .length = 0, .name = "BigInteger"},
-    {.type = FieldType::Decimal, .length = 0, .name = "Decimal"},
-    {.type = FieldType::Option, .length = 0, .name = "Option"},
-    {.type = FieldType::Enum, .length = 0, .name = "Option"},
-    {.type = FieldType::Duration, .length = 0, .name = "Duration"},
-    {.type = FieldType::Code, .length = 20, .name = "Code20"},
-    {.type = FieldType::Text, .length = 100, .name = "Text100"},
-    {.type = FieldType::Code, .length = 0, .name = "Code0"},
-    {.type = FieldType::Text, .length = 2048, .name = "Text2048"},
-    {.type = FieldType::Date, .length = 0, .name = "Date"},
-    {.type = FieldType::Time, .length = 0, .name = "Time"},
-    {.type = FieldType::DateTime, .length = 0, .name = "DateTime"},
-    {.type = FieldType::Guid, .length = 0, .name = "GUID"},
-    {.type = FieldType::RecordId, .length = 0, .name = "RecordID"},
-    {.type = FieldType::DateFormula, .length = 0, .name = "DateFormula"},
-    {.type = FieldType::Blob, .length = 0, .name = "BLOB"},
-    {.type = FieldType::TableFilter, .length = 0, .name = "TableFilter"},
-    {.type = FieldType::MediaSet, .length = 0, .name = "MediaSet"},
-    {.type = FieldType::Media, .length = 0, .name = "Media"},
+    {.type = FieldType::Boolean, .length = 0, .name = "Boolean", .effectiveLength = 4},
+    {.type = FieldType::Integer, .length = 0, .name = "Integer", .effectiveLength = 4},
+    {.type = FieldType::BigInteger, .length = 0, .name = "BigInteger", .effectiveLength = 8},
+    {.type = FieldType::Decimal, .length = 0, .name = "Decimal", .effectiveLength = 12},
+    {.type = FieldType::Option, .length = 0, .name = "Option", .effectiveLength = 4},
+    {.type = FieldType::Enum, .length = 0, .name = "Option", .effectiveLength = 4},
+    {.type = FieldType::Duration, .length = 0, .name = "Duration", .effectiveLength = 8},
+    {.type = FieldType::Code, .length = 20, .name = "Code20", .effectiveLength = 20},
+    {.type = FieldType::Text, .length = 100, .name = "Text100", .effectiveLength = 100},
+    {.type = FieldType::Code, .length = 0, .name = "Code0", .effectiveLength = 0},
+    {.type = FieldType::Text, .length = 2048, .name = "Text2048", .effectiveLength = 2048},
+    {.type = FieldType::Date, .length = 0, .name = "Date", .effectiveLength = 4},
+    {.type = FieldType::Time, .length = 0, .name = "Time", .effectiveLength = 4},
+    {.type = FieldType::DateTime, .length = 0, .name = "DateTime", .effectiveLength = 8},
+    {.type = FieldType::Guid, .length = 0, .name = "GUID", .effectiveLength = 16},
+    {.type = FieldType::RecordId, .length = 0, .name = "RecordID", .effectiveLength = 448},
+    {.type = FieldType::DateFormula, .length = 0, .name = "DateFormula", .effectiveLength = 32},
+    {.type = FieldType::Blob, .length = 0, .name = "BLOB", .effectiveLength = 8},
+    {.type = FieldType::TableFilter, .length = 0, .name = "TableFilter", .effectiveLength = 504},
+    {.type = FieldType::MediaSet, .length = 0, .name = "MediaSet", .effectiveLength = 16},
+    {.type = FieldType::Media, .length = 0, .name = "Media", .effectiveLength = 16},
 }};
 constexpr agiru::Integer kUnknownTypeField = static_cast<agiru::Integer>(kTypeNames.size() + 1);
 
@@ -210,6 +212,10 @@ void MetadataTypeNamesMatchTheNativePrimitiveContract() {
                ReadTypeName(row),
                kTypeNames[i].name);
     CHECK_TRUE("every primitive maps to a declared native code", row.Type.IsDeclared());
+    CHECK_TRUE("Len uses the original effective size, not the host wrapper or declared zero",
+               row.Len == kTypeNames[i].effectiveLength);
+    CHECK_TRUE("the shared primitive agrees with the native row",
+               agiru::detail::EffectiveFieldLength(kTypeMetadataFields[i]) == row.Len);
     CHECK_TRUE("an internal metadata tag cannot escape the Type boundary",
                row.Type.AsInteger() != static_cast<int>(kTypeNames[i].type));
     if (kTypeNames[i].type == FieldType::Code) {
@@ -221,6 +227,15 @@ void MetadataTypeNamesMatchTheNativePrimitiveContract() {
              ReadMetadata(row, kUnknownTypeField, kTypeMetadataId),
              "Field metadata: unsupported type name");
   CHECK_TEXT("a refused declaration preserves the previous row", ReadTypeName(row), "Media");
+  CHECK_TRUE("a refused declaration preserves the previous length",
+             row.Len == kTypeNames.back().effectiveLength);
+  std::string said;
+  try {
+    (void)agiru::detail::EffectiveFieldLength(kTypeMetadataFields.back());
+  } catch (const agiru::Error &error) { said = error.what(); }
+  CHECK_TEXT("the shared length primitive refuses an unknown type",
+             said,
+             "Field metadata: unsupported length");
 }
 
 void MetadataKeepsDeclaredValuesAndRecordState() {
