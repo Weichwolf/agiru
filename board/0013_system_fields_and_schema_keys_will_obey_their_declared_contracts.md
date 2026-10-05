@@ -100,6 +100,11 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
    `NativeManifest.cpp`, `AppManifest.cpp` and `meta/ModuleDef.h` currently discard it.
    Derive generator system-name recognition (`BodyWriter.cpp::IsSystemFieldName`)
    from the same profile instead of its separate six-name list.
+   Keep that profile independent of typed declaration helpers: three no-PCH rounds
+   currently measure `meta/Declare.h` 849.8 ms, `meta/TableDef.h` 243.9 ms and
+   `platform/ReflectionTypes.h` 368.1 ms. `make include-cost` receipt:
+   `/tmp/agiru-include-cost.2NI3iZ/results.tsv`. Concurrent-host baseline, not a
+   speedup claim; compare the same consumers after separating the profile.
    Guard AL assignment and `FieldRef::SetValue`, not the common `SetFieldText`:
    `Table.cpp::Store`/`CalcField` and SQL navigation also use that internal writer.
    Reuse the existing Lookup formula for current User names; prove changed/missing
