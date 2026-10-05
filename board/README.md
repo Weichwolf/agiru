@@ -44,6 +44,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   User lookups; SQL identifiers/current lookup execution and agiru's complete profile
   remain open. `native-implicit-fields.json` in the same receipt directory records
   field-number/type/class/length authority, API distinctions and failed probes.
+  Follow-up `native-field-length-contract.json`: original getters cover all 4,477
+  native fields; public FieldRef.Length and virtual Field.Len share that effective
+  value. Current agiru incorrectly returns zero for fixed-size types (three of four
+  C++ caller checks fail). 0044 owns the shared primitive; immutable declared length
+  stays unchanged. DateFormula 32 is separately authored, not an original native row.
 
 - Current full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.

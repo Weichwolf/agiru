@@ -23,6 +23,16 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
   NavEnvironment probes are retained, not counted as passes. Raw `$systemId`,
   native byte lengths and classification getters are distinct from AL API contracts.
 
+- Field length authority now covers every original native field: 234 tables/4,477
+  fields, zero refused. Original FieldRef.Length and virtual Field.Len both use
+  NCL FieldDefinedLength, not raw declared capacity. agiru returns 0 instead of
+  Integer/Boolean 4 and GUID 16; a real C++ caller reproduces three differences
+  across four cases. Decimal is 12, BLOB 8, RecordID 448 and TableFilter 504,
+  never `sizeof` host wrappers. Original native sources contain no DateFormula;
+  a separately authored original-creation probe confirms 32. Receipt:
+  `/tmp/agiru-table-provider-authority.CyvRCA/native-field-length-contract.json`.
+  The fix remains open (0044); source `FieldDef.length` must stay declared-only.
+
 - Native virtual-buffer authority: original BC 29.0.54011.55407 Ncl SHA256
   `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`:
   `VirtualDataProvider::.cctor` RVA addf3 sets VirtualTimeStamp to 1, not 0.
