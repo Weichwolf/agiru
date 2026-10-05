@@ -33,6 +33,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-table-provider-authority.CyvRCA/receipt.json`. Native omitted-property,
   implicit-field/schema and live read-only-provider gaps remain guarded. This batch
   has no new full UT result; the complete 2,173/2,314 baseline above is retained.
+  Full integration on `976e479` is terminal: build exit 0/12s, local tests
+  146 cases/zero red and 233 tooling tests/exit 0. All 25,285 compiler input
+  hashes agree afterward; `integration.json` in the same receipt directory.
 
 - Fresh `make census` on BCApps `bb7111877f` retains 36,874 AL files/36,783 objects,
   4,171 test codeunits/113,013 raw methods; fifteen approved exclusions leave

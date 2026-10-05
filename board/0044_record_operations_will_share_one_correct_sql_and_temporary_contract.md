@@ -28,6 +28,12 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   Guard, native omitted properties, audit/rowversion visibility, schema activation
   and shared read-only operations remain open; no new full-UT/provider claim.
 
+  Full integration of this identity prerequisite on `976e479` passes:
+  `make all JOBS=6` exit 0/12s; `make test JOBS=2` exit 0,
+  146 cases/zero red and 233 tooling tests. All 25,285 compiler inputs match
+  afterward. `/tmp/agiru-table-provider-authority.CyvRCA/integration.json`
+  retains commands, HEAD, input digest and exits; no new AL UT execution.
+
 - Rename cascade read anchor: `src/rt/Rename.cpp::Rewrite` now writes through an
   independent record, leaving its reader on the old key for dynamic Next resumption.
   The preceding implementation skipped remaining old-parent children when their
