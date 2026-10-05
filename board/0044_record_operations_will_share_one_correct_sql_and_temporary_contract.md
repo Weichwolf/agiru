@@ -78,6 +78,14 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
 
 ## Acceptance
 
+- Record boxes expose borrowing accessors, not writable ownership/table/identity slots.
+  `RecordRefGate` qualifies independent snapshots, typed writes, SetTable and clearing
+  one copied slot, plus state self-assignment versus explicit Copy; 147 checks pass.
+  `reflection-metadata.sh` rejects public-owner and assignment-state mutants.
+  This is ownership/API evidence, not live link-storage or complete business proof.
+  Developer `f928288ee840`: recordref gettable/settable/copylinks/haslinks and
+  duration-data-type; BCApps `d99152ee35f0`: System/Workflow/WorkflowRecordManagement.
+  Predecessor 1095/1241: preserve independent Variant boxes and complete typed snapshots.
 - Same fixture yields keys/values/filters/events through typed SQL, RecordRef and
   temporary paths; include absent/duplicate keys, malformed values and negative Next.
 - Live catalogue exact lookup/name/count/order/permission/write controls fail mutants;

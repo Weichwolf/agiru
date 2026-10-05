@@ -146,7 +146,7 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
   if (Value.Is<DateFormula>()) { return Value.Get<DateFormula>().ToText(); }
   if (Value.Is<OrdinalInVariant>()) { return OrdinalText(Value.Get<OrdinalInVariant>(), format); }
   if (const ::agiru::RecordInVariant *held = Value.HeldRecord(); held != nullptr) {
-    return held->id.ToText();
+    return held->Identity().ToText();
   }
   if (Value.Is<Blob>()) { return {}; }
   if (const ::agiru::JsonInVariant *held = Value.JsonHeld(); held != nullptr) {

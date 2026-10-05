@@ -714,9 +714,9 @@ template <typename... Arguments>
           writable = true;
         }
       } else if (const RecordInVariant *held = argument.HeldRecord(); held != nullptr) {
-        const TableEntry *entry = FindTable(held->table);
+        const TableEntry *entry = FindTable(held->TableNumber());
         if (entry != nullptr) {
-          record = held->record;
+          record = held->RecordPointer();
           table = entry->table;
           writable = true;
         }

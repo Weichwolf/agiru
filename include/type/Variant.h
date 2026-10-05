@@ -107,6 +107,7 @@ namespace detail {
 
 }
 
+/// \brief Owns a typed record snapshot; callers borrow its buffer without replacing ownership.
 class RecordInVariant {
 public:
   /// \brief Takes a copy of the record.
@@ -114,20 +115,28 @@ public:
   /// \param from The record.
   template <typename R>
   explicit RecordInVariant(const R &from)
-      : record(new R(from)),
-        table(R::kId),
-        id(from.RecordId()),
+      : record_(new R(from)),
+        table_(R::kId),
+        id_(from.RecordId()),
         clone_([](const void *held) -> void * { return new R(*static_cast<const R *>(held)); }),
         free_([](void *held) { delete static_cast<R *>(held); }) {}
 
   /// \brief A second copy.
   RecordInVariant(const RecordInVariant &o)
-      : record(o.clone_(o.record)), table(o.table), id(o.id), clone_(o.clone_), free_(o.free_) {}
+      : record_(o.clone_(o.record_)),
+        table_(o.table_),
+        id_(o.id_),
+        clone_(o.clone_),
+        free_(o.free_) {}
 
   /// \brief Takes over the copy.
   RecordInVariant(RecordInVariant &&o) noexcept
-      : record(o.record), table(o.table), id(std::move(o.id)), clone_(o.clone_), free_(o.free_) {
-    o.record = nullptr;
+      : record_(o.record_),
+        table_(o.table_),
+        id_(std::move(o.id_)),
+        clone_(o.clone_),
+        free_(o.free_) {
+    o.record_ = nullptr;
   }
 
   /// \brief Replaces this copy with a copy of the other's.
@@ -143,12 +152,12 @@ public:
   RecordInVariant &operator=(RecordInVariant &&o) noexcept {
     if (this != &o) {
       Free_();
-      record = o.record;
-      table = o.table;
-      id = std::move(o.id);
+      record_ = o.record_;
+      table_ = o.table_;
+      id_ = std::move(o.id_);
       clone_ = o.clone_;
       free_ = o.free_;
-      o.record = nullptr;
+      o.record_ = nullptr;
     }
     return *this;
   }
@@ -156,19 +165,29 @@ public:
   /// \brief Frees the copy.
   ~RecordInVariant() { Free_(); }
 
-  void *record;  ///< The copy, owned here -- `RecordRef.SetTable(Variant)` writes into it.
-  TableId table; ///< Which table it is, so a reader can refuse the wrong one.
+  /// \brief Borrows the owned buffer, writable by `RecordRef.SetTable(Variant)`.
+  /// \return The buffer, or null after moving ownership away.
+  /// \warning Assignment, moving or destruction ends the borrow; ownership stays in this box.
+  [[nodiscard]] void *RecordPointer() const { return record_; }
+
+  /// \brief The declared table of the owned snapshot.
+  /// \return Its immutable table identity.
+  [[nodiscard]] TableId TableNumber() const { return table_; }
 
   /// \brief What the record was when the Variant was built: its table, caption and primary key,
   ///        which is what `Format` reads (board:0624).
-  ::agiru::RecordId id;
+  /// \return The captured identity, not a writable alias into the current record buffer.
+  [[nodiscard]] const ::agiru::RecordId &Identity() const { return id_; }
 
 private:
   void Free_() {
-    if (record != nullptr) { free_(record); }
-    record = nullptr;
+    if (record_ != nullptr) { free_(record_); }
+    record_ = nullptr;
   }
 
+  void *record_;
+  TableId table_;
+  ::agiru::RecordId id_;
   void *(*clone_)(const void *);
   void (*free_)(void *);
 };
@@ -251,11 +270,11 @@ private:
   const Ops *ops_;
 };
 
-/// \note FREE AND NOT A MEMBER, so `RecordInVariant` stays an aggregate. A member `operator==`
-///       makes it a class with behaviour, and its two data members then have to be private -- which
-///       would buy accessors for a pair that IS the value.
+/// \brief Compares the identity of owned buffers and their declared tables.
+/// \param a The first box. \param b The second box.
+/// \return Whether both boxes borrow the same buffer of the same table.
 [[nodiscard]] inline bool operator==(const RecordInVariant &a, const RecordInVariant &b) {
-  return a.record == b.record && a.table.Value() == b.table.Value();
+  return a.RecordPointer() == b.RecordPointer() && a.TableNumber() == b.TableNumber();
 }
 
 /// \brief What a Variant holding an OPTION or an ENUM holds.
@@ -636,11 +655,11 @@ public:
   template <typename R> [[nodiscard]] const R &AsRecord() const {
     const auto *held = std::get_if<RecordInVariant>(&held_);
     if (held == nullptr) { throw Error("this Variant holds no record"); }
-    if (held->table.Value() != R::kId.Value()) {
-      throw Error("this Variant holds table " + std::to_string(held->table.Value()) +
+    if (held->TableNumber() != R::kId) {
+      throw Error("this Variant holds table " + std::to_string(held->TableNumber().Value()) +
                   " and table " + std::to_string(R::kId.Value()) + " was asked for");
     }
-    return *static_cast<const R *>(held->record);
+    return *static_cast<const R *>(held->RecordPointer());
   }
 
   /// \brief Holds anything that reads as text.

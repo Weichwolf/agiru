@@ -64,7 +64,7 @@ public:
 
   /// \brief AL `DecimalVar := Duration`: the milliseconds as a Decimal, which AL converts on
   ///        assignment and a procedure argument (`TelemetryLogMetrics.LogMeasure`).
-  explicit(false) operator Decimal() const { return Decimal(milliseconds_); }
+  explicit(false) operator Decimal() const { return {milliseconds_}; }
 
   /// \return The count of milliseconds, which is what the page says a Duration IS.
   [[nodiscard]] constexpr std::int64_t Milliseconds() const { return milliseconds_; }

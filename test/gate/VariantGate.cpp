@@ -14,6 +14,8 @@
 #include "Check.h"
 
 #include <cstdint>
+#include <initializer_list>
+#include <limits>
 #include <string>
 
 using agiru::Date;
@@ -113,6 +115,22 @@ void TheDurationAlgebraIsTheDocumentedOne() {
   CHECK_TRUE("DateTime - Duration lands back on the earlier one", end - between == start);
   CHECK_TRUE("a duration the other way round is negative", (start - end).Milliseconds() < 0);
   CHECK_TRUE("and adding it moves backwards", end + (start - end) == start);
+}
+
+void DurationConvertsToDecimalWithoutLosingMilliseconds() {
+  constexpr std::int64_t kBeyondBinaryFloatPrecision = 9007199254740993;
+  constexpr std::int64_t kMinimum = std::numeric_limits<std::int64_t>::min();
+  constexpr std::int64_t kMaximum = std::numeric_limits<std::int64_t>::max();
+  for (const auto milliseconds : {kMinimum,
+                                  -kBeyondBinaryFloatPrecision,
+                                  std::int64_t{0},
+                                  kBeyondBinaryFloatPrecision,
+                                  kMaximum}) {
+    const agiru::Decimal exact = agiru::Duration{milliseconds};
+    CHECK_TEXT("Duration conversion preserves exact signed 64-bit milliseconds",
+               exact.ToInvariantString(),
+               std::to_string(milliseconds));
+  }
 }
 
 bool Raises(const auto &what) {
@@ -258,6 +276,7 @@ int main() {
     TwoVariantsCompareByTypeAndValue();
     ADurationIsNotABigInteger();
     TheDurationAlgebraIsTheDocumentedOne();
+    DurationConvertsToDecimalWithoutLosingMilliseconds();
     ALessGeneralNumberReadsAsAMoreGeneralOne();
   });
 }

@@ -51,7 +51,7 @@ bool RuntimeHasLinks(const RecordId &of) {
 }
 
 RecordId RecordIdInVariant(const Variant &held) {
-  if (held.IsRecord()) { return held.Get<RecordInVariant>().id; }
+  if (held.IsRecord()) { return held.Get<RecordInVariant>().Identity(); }
   if (held.IsRecordRef()) { return static_cast<const RecordRef &>(held).RecordId(); }
   if (held.IsRecordId()) { return held.Get<RecordId>(); }
   throw Error("CopyLinks needs a record, a RecordRef or a RecordId, and this Variant holds none");

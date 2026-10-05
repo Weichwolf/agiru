@@ -42,6 +42,73 @@ using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
 
+template <typename T>
+concept PublicRecordBoxAuthority = requires(T &box) { box.record_ = nullptr; } || requires(T &box) {
+  box.table_ = agiru::TableId{};
+} || requires(T &box) { box.id_ = agiru::RecordId{}; };
+
+static_assert(!PublicRecordBoxAuthority<agiru::RecordInVariant>);
+
+static_assert(requires(const RecordRef &ref, const RecordRef &from, const agiru::Variant &record) {
+  ref.HasLinks();
+  ref.CopyLinks(from);
+  ref.CopyLinks(record);
+});
+
+void ARecordVariantOwnsAnIndependentWritableSnapshot() {
+  ResourceCost source;
+  source.Code = "SOURCE";
+  const auto identity = source.RecordId();
+  agiru::Variant held(source);
+  const auto *snapshot = held.HeldRecord();
+  CHECK_TRUE("the box owns a distinct typed buffer", snapshot->RecordPointer() != &source);
+  CHECK_TRUE("the declared table stays immutable", snapshot->TableNumber() == ResourceCost::kId);
+  CHECK_TRUE("the original record identity survives boxing", snapshot->Identity() == identity);
+  source.Code = "OUTSIDE";
+  CHECK_TEXT("editing the source leaves its snapshot unchanged",
+             std::string_view(held.AsRecord<ResourceCost>().Code),
+             "SOURCE");
+  auto copy = held;
+  CHECK_TRUE("copying a Variant clones its owned record",
+             copy.HeldRecord()->RecordPointer() != snapshot->RecordPointer());
+  ResourceCost &writable = copy;
+  writable.Code = "COPY";
+  CHECK_TEXT("typed writes reach only the second box",
+             std::string_view(held.AsRecord<ResourceCost>().Code),
+             "SOURCE");
+  RecordRef ref;
+  ref.GetTable(copy);
+  ref.Field(2).Value("WRITTEN");
+  ref.SetTable(copy);
+  CHECK_TEXT("SetTable writes into the owned Variant buffer",
+             std::string_view(copy.AsRecord<ResourceCost>().Code),
+             "WRITTEN");
+  CHECK_TEXT("SetTable does not alias the source box",
+             std::string_view(held.AsRecord<ResourceCost>().Code),
+             "SOURCE");
+  held = agiru::Variant{};
+  CHECK_TEXT("clearing one slot does not clear its copied snapshot",
+             std::string_view(copy.AsRecord<ResourceCost>().Code),
+             "WRITTEN");
+}
+
+void RecordAssignmentPreservesTheExistingState() {
+  agiru::detail::StateHandle target;
+  target.Ensure().group = 1;
+  const auto *original = target.Peek();
+  const auto &same = target;
+  target = same;
+  CHECK_TRUE("self-assignment retains the same state owner", target.Peek() == original);
+  CHECK_TRUE("self-assignment leaves filters in their existing group", target.Peek()->group == 1);
+  agiru::detail::StateHandle other;
+  other.Ensure().group = 2;
+  target = other;
+  CHECK_TRUE("record field assignment does not replace the destination state",
+             target.Peek() == original && target.Peek()->group == 1);
+  target.CopyStateFrom(other);
+  CHECK_TRUE("explicit Copy still transfers the source state", target.Peek()->group == 2);
+}
+
 /// A RecordRef REACHES A RECORD BY NUMBER RATHER THAN BY NAME, which is the same address the field
 /// table already gives -- arrived at from the other side.
 void ItReachesTheTableWithoutNamingIt() {
@@ -85,6 +152,16 @@ void OneThatIsNotOpenRefusesRatherThanAnsweringZero() {
     (void)empty.Length();
   } catch (const Error &e) { said = e.what(); }
   CHECK_TRUE("an unassigned FieldRef refuses Length rather than reporting zero", !said.empty());
+  bool refused = false;
+  try {
+    static_cast<void>(ref.HasLinks());
+  } catch (const Error &) { refused = true; }
+  CHECK_TRUE("a closed const reference refuses HasLinks before reading storage", refused);
+  refused = false;
+  try {
+    ref.CopyLinks(ref);
+  } catch (const Error &) { refused = true; }
+  CHECK_TRUE("closed CopyLinks references refuse before writing storage", refused);
 }
 
 /// A RECORDREF IS A REFERENCE TYPE, so a copy is a second handle on the same object: the BaseApp
@@ -629,6 +706,8 @@ void TheFieldTypeCarriesThePlatformsOwnNumbers() {
 
 int main() {
   return gate::Run("RecordRef", [] {
+    ARecordVariantOwnsAnIndependentWritableSnapshot();
+    RecordAssignmentPreservesTheExistingState();
     ACopyIsASecondHandleOnTheSameObject();
     AVariantRetainsTheRecordRefBeyondItsSourceVariable();
     ItReachesTheTableWithoutNamingIt();

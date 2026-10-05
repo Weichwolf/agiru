@@ -18,6 +18,46 @@ if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
 fi
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
+mapfile -t image_objects < <(find "$B/CMakeFiles/gate_image.dir/test/transpiler/golden" \
+  -maxdepth 1 -type f -name '*.o' -print | LC_ALL=C sort)
+[ "${#image_objects[@]}" -gt 0 ]
+
+for control in public-owner assignment-state; do
+  header=type/Variant.h
+  if [ "$control" = assignment-state ]; then header=runtime/RecordState.h; fi
+  mkdir -p "$proof/$control/$(dirname "$header")"
+  awk -v control="$control" '
+    /^class RecordInVariant \{/ {inside=1}
+    control == "public-owner" && inside && /^private:/ {$0 = "public:"; changed++}
+    inside && /^};/ {inside=0}
+    control == "assignment-state" && /^  StateHandle &operator=\(const StateHandle &o\)/ {
+      assigning=1
+    }
+    assigning && /if \(this == &o\) \{ return \*this; \}/ {
+      $0 = "    CopyStateFrom(o);"; changed++; assigning=0
+    }
+    {print} END {if (changed != 1 || assigning) exit 2}' \
+    "include/$header" > "$proof/$control/$header"
+  status=0
+  "$CXX" -O2 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+    --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+    "-I$proof/$control" -Iinclude -Itest/gate -Itest/transpiler/golden -Isrc/rt \
+    test/gate/RecordRefGate.cpp "${image_objects[@]}" \
+    "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db \
+    -o "$proof/$control/gate" > "$proof/$control.compile.log" 2>&1 || status=$?
+  if [ "$control" = public-owner ]; then
+    [ "$status" -eq 1 ]
+    rg -q 'static assertion failed.*PublicRecordBoxAuthority' "$proof/$control.compile.log"
+  else
+    [ "$status" -eq 0 ]
+    status=0
+    "$proof/$control/gate" > "$proof/$control.log" 2>&1 || status=$?
+    [ "$status" -eq 1 ]
+    rg -q 'FAIL .*record field assignment does not replace the destination state' "$proof/$control.log"
+  fi
+  sha256sum "$proof/$control/$header" >> "$proof/ownership-controls.sha256"
+  find "$proof/$control" -depth -delete
+done
 
 has_typed_dependencies() {
   rg -q '/(type|runtime)/|/c\+\+/v1/(vector|map|unordered_map|memory|format)([[:space:]]|$)' "$1"
@@ -353,4 +393,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-two compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-four compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

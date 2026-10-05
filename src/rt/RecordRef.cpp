@@ -731,16 +731,17 @@ void RecordRef::SetTable(Variant &Rec) {
   }
   if (!Rec.IsRecord()) { throw Error("RecordRef.SetTable(Variant): the Variant holds no record"); }
   const auto &record = Rec.Get<RecordInVariant>();
-  if (record.table != State().table->id) {
+  if (record.TableNumber() != State().table->id) {
     throw Error("RecordRef.SetTable: the RecordRef refers to " + std::string(State().table->name) +
-                " and the Variant holds a record of table " + std::to_string(record.table.Value()));
+                " and the Variant holds a record of table " +
+                std::to_string(record.TableNumber().Value()));
   }
-  const TableEntry *entry = FindTable(record.table);
+  const TableEntry *entry = FindTable(record.TableNumber());
   if (entry == nullptr) {
-    throw Error("RecordRef.SetTable: the record's table " + std::to_string(record.table.Value()) +
-                " is not translated in this build");
+    throw Error("RecordRef.SetTable: the record's table " +
+                std::to_string(record.TableNumber().Value()) + " is not translated in this build");
   }
-  entry->copy(record.record, State().record);
+  entry->copy(record.RecordPointer(), State().record);
 }
 
 KeyRef RecordRef::KeyIndex(Integer Index) const {
@@ -826,15 +827,15 @@ void RecordRefFromVariant(RecordRef &into, const Variant &held) {
     throw Error("RecordRef.GetTable(Variant): the Variant holds neither a record nor a RecordRef");
   }
   const auto &record = held.Get<RecordInVariant>();
-  const TableEntry *entry = FindTable(record.table);
+  const TableEntry *entry = FindTable(record.TableNumber());
   if (entry == nullptr) {
-    throw Error("RecordRef.GetTable: the record's table " + std::to_string(record.table.Value()) +
-                " is not translated in this build");
+    throw Error("RecordRef.GetTable: the record's table " +
+                std::to_string(record.TableNumber().Value()) + " is not translated in this build");
   }
-  into.Open(record.table.Value());
-  entry->copy(into.State().record, record.record);
-  if (RuntimeIsTemporary(record.record)) {
-    RuntimeAdoptTemporary(into.State().record, record.record);
+  into.Open(record.TableNumber().Value());
+  entry->copy(into.State().record, record.RecordPointer());
+  if (RuntimeIsTemporary(record.RecordPointer())) {
+    RuntimeAdoptTemporary(into.State().record, record.RecordPointer());
   }
 }
 

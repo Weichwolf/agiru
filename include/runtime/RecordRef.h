@@ -895,13 +895,13 @@ public:
 
   /// \brief AL `RecordRef.CopyLinks(RecordRef)`. Copies all the links from a particular record.
   /// \param FromRecord The AL `RecordRef`.
-  void CopyLinks(const ::agiru::RecordRef &FromRecord) {
+  void CopyLinks(const ::agiru::RecordRef &FromRecord) const {
     detail::RuntimeCopyLinks(FromRecord.RecordId(), RecordId());
   }
 
   /// \brief AL `RecordRef.CopyLinks(Variant)`. Copies all the links from a particular record.
   /// \param FromRecordOrRecordRef The AL `Variant`.
-  void CopyLinks(const ::agiru::Variant &FromRecordOrRecordRef) {
+  void CopyLinks(const ::agiru::Variant &FromRecordOrRecordRef) const {
     detail::RuntimeCopyLinks(detail::RecordIdInVariant(FromRecordOrRecordRef), RecordId());
   }
 
@@ -1096,8 +1096,8 @@ public:
 
   /// \brief AL `RecordRef.HasLinks()`. Determines whether a record contains any links.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean HasLinks() { return detail::RuntimeHasLinks(RecordId()); }
+  /// \throws Error when this reference is closed or link storage cannot be read.
+  ::agiru::Boolean HasLinks() const { return detail::RuntimeHasLinks(RecordId()); }
 
   /// \brief AL `RecordRef.Init()` -- every field to its default, the way `Record.Init` does it
   ///        (`recordref-init-method.md`: the table's InitValue, else the type's zero).

@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
 Next: restore Integer series navigation with qualified implicit-field values;
-resolve shared-header tidy findings before 0044's catalogue activation.
+qualify catalogue activation under 0044 after the unchanged-population UT replay.
 Retain the full 2314-case UT population through replay.
 
 ## Implementation
@@ -58,7 +58,7 @@ Retain the full 2314-case UT population through replay.
   ExpenseActivityLogTest; `src/gen/{TableKeys,TableWriter}.cpp`,
   `src/rt/{FieldMetadata,RecordRef,Storage}.cpp`.
 - `make reflection-metadata` passes the source, reflection, RecordRef, Field and
-  system-profile gates plus 32 mutation controls. The canonical profile selects
+  system-profile gates plus 34 mutation controls. The canonical profile selects
   kind/LinkedObject/host presence; all three reflection callers share original names.
   A real Record.FieldName → Field lookup → FieldRef.Value caller detects source-name
   substitution. The narrow identity header's typed-dependency control also passes.
@@ -110,7 +110,7 @@ Retain the full 2314-case UT population through replay.
   unlinked profile: ten implicit fields, typed offsets/capacities and nonstored
   User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;
   `PlatformSourceGate` passes 3060 source/reflection checks. The existing
-  `make reflection-metadata` qualifier retains all 32 rejected mutation controls.
+  `make reflection-metadata` qualifier retains all original 32 rejected mutation controls.
 - `make native-bindings` uses the verified System 29.0.55365.0 / Runtime 18.0
   package: 234 raw tables, one licensing exclusion, 233 selected; eighteen original
   contracts and separate-library consumers compile without PCH, 215 unbound remain
@@ -127,9 +127,14 @@ Retain the full 2314-case UT population through replay.
   `make text-positions` ten generated AL checks. Source-index and two payload-mask
   mutants fail execution; malformed framing still refuses. `make lint-one
   UNIT=test/gate/TextGate.cpp` passes. PlatformSource retains 3060 passing checks;
-  its focused tidy findings fall from 33 to eight unchanged diagnostics in
-  RecordRef/RecordState/Duration/Variant headers. No suppression or baseline rises.
-  Full tidy remains red; full AL replay does not yet cover the native migration.
+  its focused tidy now passes after clearing all 33 shared-header diagnostics.
+  Record snapshots keep private ownership/table/identity state with explicit borrows;
+  RecordRef passes 147 checks, Variant 58, including exact Duration-to-Decimal
+  conversion across signed 64-bit bounds. Public-owner and assignment-state mutants
+  reject, bringing reflection-metadata to 34 controls. New/changed gate code has no
+  tidy findings; RecordRefGate remains red on two unchanged Table.h diagnostics,
+  VariantGate on nineteen existing diagnostics outside the changed code. No
+  suppression or baseline rises. Full tidy and the native-migration AL replay remain open.
 - The shared qualifier emitter has a passing focused tidy receipt. Both its
   original-table and original-codeunit compilation paths include public headers;
   `make native-codeunits` retains source-owned refusal controls and all 61

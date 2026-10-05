@@ -436,7 +436,7 @@ public:
   /// \param o The other, which is left alone.
   /// \return This handle, unchanged.
   StateHandle &operator=(const StateHandle &o) {
-    static_cast<void>(o);
+    if (this == &o) { return *this; }
     return *this;
   }
 
