@@ -35,6 +35,10 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
 7. PostgreSQL owns database-wide rowversion and returned identity/audit values.
    Preserve supplied SystemId uniqueness/Rename, observed-version DML and LockTable
    wait/version policies. Commit durability differs from test isolation/virtual buffers.
+   Use `runtime/RowVersionStorage.h` / `src/rt/RowVersionStorage.cpp` for provisioning;
+   wire its allocator into Insert/Modify/Rename and return stored versions to buffers.
+   Map SqlTimestamp aliases to the same physical column, never writable duplicate columns.
+   Activate LastUsed/MinimumActive only after every production DML path is qualified.
 
 ## Useful implementation details
 
@@ -61,6 +65,13 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   complete totals; no second SQL builder.
 - Predecessor 1897 is an open partial-posting/lock-timeout report, not proven BC
   transaction authority. Inspect original AL Commit boundaries before claiming rollback.
+- `runtime/builtins/_system.py::_row_version` uses XID/xmin and returns zero on errors;
+  reject this approach: transaction IDs are not distinct row-write versions.
+- Rowversion foundation: one logged bigint sequence, CACHE 1 / NO CYCLE / OWNED BY NONE.
+  Negative bigint advisory keys retain the first allocation of each active transaction;
+  an ASCII AGRV two-integer gate serializes initial publication and minimum reads.
+  Transaction-local fence state rolls back with savepoints; later row allocations reuse
+  the fence without per-row locks or pg_locks scans. This is not complete ERP DML coverage.
 
 ## Acceptance
 
@@ -70,11 +81,22 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   temporary catalogues alone do not prove production virtual-table navigation.
 - Two connections prove distinct database-wide versions, stale-write conflict,
   durable Commit/restart and boundary rollback. Never mutate seed/master templates.
+- `make rowversions` uses owned empty databases: 114 checks, 384 concurrent SQL writes,
+  savepoints/errors/disconnect, incompatible storage, 32/64-bit bounds and eight
+  compiled controls for missing/per-row fences, unsafe minimum/cache, cross-database
+  locks, publication races and cancellation leaks. Provider and gate pass focused
+  clang-tidy. Reconnect is covered; PostgreSQL server restart/WASM are not.
 - Run `make gate GATE=RecordRefGate`, `PlatformFieldGate`,
   `ReflectionMetadataGate`, cursor/filter/transaction gates and
   `test/runtime/reflection-metadata.sh`; replay all UT under 0058.
   Local docs: record/recordref methods, dynamic results, read-isolation/tri-state locking.
   References: developer `ff5939a46e`, BCApps `bb7111877f`; predecessor 0889/1114/1868.
+- Rowversion contract: developer `f928288ee840`:
+  `devenv-table-system-fields.md`, `methods-auto/database/database-{lastusedrowversion,minimumactiverowversion}-method.md`.
+  PostgreSQL 17: [sequences](https://www.postgresql.org/docs/17/sql-createsequence.html),
+  [advisory-key layout and database scope](https://www.postgresql.org/docs/17/view-pg-locks.html),
+  [savepoint lock release](https://www.postgresql.org/docs/17/explicit-locking.html),
+  [disjoint advisory key spaces](https://www.postgresql.org/docs/17/functions-admin.html).
 
 Absorbs 0018, 0019, 0045 and their former absorbed IDs. Detailed matrices/mappings:
 Git `356dadda4a4aa435899bc8aa9e9c4f24a8c0fa21:board/`.

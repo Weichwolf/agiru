@@ -4,7 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
 Next: wire explicit host selection into generated/native records, migrate remaining
-five-field declarations, and qualify PostgreSQL rowversion before catalogue activation.
+five-field declarations and integrate the qualified rowversion primitive with SQL DML
+under 0044 before catalogue activation.
 
 ## Implementation
 
@@ -79,6 +80,11 @@ five-field declarations, and qualify PostgreSQL rowversion before catalogue acti
   selected unbound tables remain red. Other native/generated records still use the
   five-field view; host wiring, durable timestamp and live providers remain gaps.
   No AL replay yet covers this materialization. Preserve `4dadfec`/`5a14741`.
+- `runtime/RowVersionStorage.h`, `src/rt/RowVersionStorage.cpp` and
+  `test/gate/RowVersionGate.cpp` qualify the PostgreSQL allocation/fence foundation.
+  `make rowversions` passes 114 checks, concurrent SQL writes and eight compiled
+  negative controls. Existing AL methods still refuse: ordinary/native DML,
+  SqlTimestamp aliases, observed-version checks and server-restart proof remain 0044.
 
 Absorbs prior 0080/0353/0371/0511. Previous detail and mappings:
 Git `356dadda4a4aa435899bc8aa9e9c4f24a8c0fa21:board/`.
