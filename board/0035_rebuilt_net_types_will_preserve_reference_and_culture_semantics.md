@@ -5,6 +5,13 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- File/Native-text replay `/tmp/agiru-native-text-integration.awrO0A` is terminal
+  on `45f6fd0`: slice/build/local tests pass (142 cases/233 tooling); UT
+  2,172/2,314, 142 failed, zero incomplete, 80 codeunits/1,231 seconds.
+  Against 024625: two gains, no losses/missing/added/duplicates; source hashes
+  match. Empty-doctype XML and OAuth nonce recover; OAuth code challenge reaches
+  `HashAlgorithm.Create` instead of Native Base64 refusal. Source/image/System
+  hashes match pre/post. Null/unsealed seed: diagnostic, not causal A/B/G1.
 - Full XML/stream replay `20261005T024625Z-3504499` is terminal on frozen
   `9c3291e`: slice/build pass; UT 2,170/2,314, 144 failed, zero incomplete,
   80 codeunits/1,571 seconds. All identities/source hashes and errors agree
@@ -33,8 +40,8 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   Mode/constructor, ALStream.ALRead(NavText)/ReadLine/ReadBytes and ByteToText
   establish the ASCII mode/capacity/zero contracts; static IL, not native execution.
   Preserve the System 29.0.55365.0 distinction. Reader/doctype replacement/Save →
-  File.Read retains the empty doctype in the authored C++ path. Full UT recovery
-  is unproven; outside frozen 024625. Encoding/OEM/session settings, configured
+  File.Read retains the empty doctype in the authored C++ path. Full replay above
+  recovers the original AL empty-doctype test. Encoding/OEM/session settings, configured
   stream limits, typed non-text/Variant reads, diagnostics, large-file bounds and
   File ownership/access/disposal remain gaps (0074). InternalSubset/CreateDocumentType
   still discard nonempty subsets; empty-doctype proof does not close XML semantics.
@@ -50,7 +57,7 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   All gate consumers rebuild; Base64 79, XML reader 220 and File 17 remain green.
   Three no-PCH header rounds: Blob 904→1,270 ms, Stream 983→1,579 ms under different
   concurrent loads, not a comparable speed measurement. Full AL replay above
-  retains every prior status/error; later File/Native replay remains required.
+  retains every prior status/error; later File/Native replay is terminal above.
   Authority: developer `ff5939a46e`, `methods-auto/blob/blob-create{in,out}stream-method.md`;
   BCApps `bb7111877f`, `BLOB Storage/src/TempBlobImpl.Codeunit.al`, TempBlobTest;
   predecessor 1045/1658. Original Ncl 29.0.54011.55407 retains the provider/host

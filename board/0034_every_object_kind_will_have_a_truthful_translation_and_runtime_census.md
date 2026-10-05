@@ -42,8 +42,12 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   four of those in Base64Convert. Exit 1 retains other translation gaps; original
   package pre/post verification matches. Four InStream overloads, transform-block
   output, locale defaults and exact
-  native diagnostics remain gaps. Thirteen original AL tests/full 2,314-case replay
-  remain required; this increment is outside frozen 024625 and proves no UT gain.
+  native diagnostics remain gaps. All thirteen original AL tests remain required.
+  Full 2,314-case replay `/tmp/agiru-native-text-integration.awrO0A` on `45f6fd0`
+  reaches 2,172 passed: OAuth nonce and empty-doctype XML recover, no losses or
+  population/source-hash changes. Code challenge reaches HashAlgorithm.Create;
+  0035 owns that bridge gap. Source/image/System hashes match pre/post; null/unsealed
+  seed remains diagnostic, not causal A/B/G1. Four stream overloads remain refused.
 
 - Native codeunit declarations: `src/tc/Main.cpp` indexes original IDs, bare and
   qualified names and typed procedures; one emitter serves app/native bodies.

@@ -24,7 +24,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   zero red, 233 tooling tests. Original Native declaration checks retain 61 green;
   twenty-three record and nine stream/File controls reject. Source/image hashes
   remain unchanged; verified System package pre/post matches, original notice retained.
-  Full 2,314 UT replay is next; no pass gain yet.
+  Full UT is terminal on `45f6fd0`: 2,172/2,314 pass, 142 fail, zero incomplete,
+  80 codeunits/six workers/1,231 seconds; Make exits 2, runner status 1. Against
+  024625, all identities/source hashes agree: two gains, no losses/missing/added/
+  duplicates. Empty-doctype XML and OAuth nonce tests recover; code challenge
+  advances from Native Base64 refusal to `HashAlgorithm.Create` (0035).
+  `ut-comparison-024625.json`; source/image/System hashes match after execution.
+  Null/unsealed seed remains diagnostic, not causal A/B/G1.
 - Native Base64 transform authority (0034): original `ConvertBuffer` executes
   on CLR 10.0.12, 2,699 calls/2,696 distinct case identities. Whole-buffer Convert
   differs at 104 decode cases, zero encode cases; padded groups, unused bits,
@@ -38,7 +44,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-native-codeunits.h58edG`, hashes match. New binding/refusal/consumer
   analysis passes; 33/1 inherited primitive/gate findings and older compiler findings
   remain unsuppressed. Locale defaults, transform output above the original 10 MiB
-  character threshold, original AL suite and full UT replay remain open. Root generation
+  character threshold and original thirteen-test AL suite remain open. Full UT
+  replay above recovers OAuth nonce; code challenge reaches HashAlgorithm.Create.
+  Root generation
   `/tmp/agiru-transpile.woncg0` retains 35 selected native codeunits, reduces unbound
   methods 72→67 and exits 1 on remaining gaps; package pre/post hashes match. Outside 024625.
 - File mode/capacity/position fix (0035): 44 C++ and 25 generated AL checks green;
@@ -49,7 +57,7 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-streams.5Y5ARv`, hashes match; `/tmp/agiru-file-mode.uH1HcI`.
   Runner analysis passes; source/gate retain 33/66 inherited header findings,
   zero own findings, lint exits 2. Empty-doctype reader/replacement/Save/File.Read
-  path passes locally. Outside frozen 024625; full UT gain remains unproven.
+  path passes locally. Full UT replay above recovers the original empty-doctype test.
   Encoding, configured bounds, non-text reads, diagnostics and File lifecycle/
   access remain open; nonempty XML subsets are still discarded (0035/0074).
 - Stream/XML replay is terminal: `20261005T024625Z-3504499`, frozen HEAD
