@@ -242,8 +242,8 @@ Keep only current build recipes in the working tree; Git preserves superseded in
 
 ## Commits and pushes
 
-After every verified coherent increment (code, tests or documentation), commit and push
-immediately, before starting the next increment. This is standing user authorization;
-do not wait for a separate request or accumulate completed increments locally.
-Split commits by outcome; leave unrelated unfinished changes out.
-Keep pending checks and known failures explicit; a pushed commit is not an ERP milestone.
+- Commit and push after every verified coherent increment (code, tests or documentation),
+  before starting the next increment. No separate request is required.
+- Split commits by outcome; leave unrelated unfinished changes out.
+- Report failed pushes, pending checks and known failures explicitly; never force-push.
+  A pushed commit is not an ERP milestone.
