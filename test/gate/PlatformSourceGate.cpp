@@ -1,5 +1,5 @@
-#include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "platform/AllProfile.h"
 #include "platform/Company.h"

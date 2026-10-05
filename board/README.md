@@ -15,6 +15,18 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- System-field index prerequisite (0013/0044): base identities now live in narrow
+  `meta/SystemFields.h`; consumers no longer include typed declaration helpers
+  merely for numbers/names. Timestamp 0 stays out of RecordRef's AL index.
+  Focused/source/index gates pass 229/2,917/132 checks, retaining previous cases;
+  restored timestamp indexing fails four checks. All 23 compiled controls and
+  the typed-header dependency control reject; GenTableGate passes 78 checks.
+  `/tmp/agiru-implicit-field-index.xIGT1A/` and
+  `/tmp/agiru-reflection-metadata.rrYA7W/` retain results. New gate code has no
+  own analysis findings; 36 header findings remain, no suppression added.
+  Complete production implicit profile/live provider and full replay of this
+  increment remain open; it is outside the live frozen CDS replay below.
+
 - Native property authority (0044/0013): original embedded System 29.0.55365.0
   matches all 398 verified AL sources; all 234 original compiled tables execute
   both XML creation and production NCL assignment with zero refused/static overrides.

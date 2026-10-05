@@ -1,20 +1,25 @@
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
 #include "type/Date.h"
+#include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Enum.h"
 #include "type/FieldClass.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/KeyRef.h"
 #include "type/Option.h"
 #include "type/StringValue.h"
+#include "type/Text.h"
 #include "type/Variant.h"
 
 #include "Check.h"
@@ -321,6 +326,18 @@ template <> struct agiru::OptionTraits<Shade> {
 
 namespace {
 
+// Runtime-18 system FlowField declarations: devenv-table-system-fields.md.
+constexpr std::size_t kAuditUserNameLength = 50;
+constexpr std::size_t kAuditFullNameLength = 80;
+constexpr std::size_t kPaintedDeclaredCount = 4;
+constexpr std::size_t kRuntime18ImplicitCount = 10;
+constexpr std::array<agiru::FieldNo, 4> kAuditNameNumbers{{
+    agiru::FieldNo{2000000005},
+    agiru::FieldNo{2000000006},
+    agiru::FieldNo{2000000007},
+    agiru::FieldNo{2000000008},
+}};
+
 struct Painted : agiru::Table<Painted> {
   agiru::detail::StateHandle State_Block;
   static constexpr agiru::TableId kId{50000};
@@ -331,6 +348,17 @@ struct Painted : agiru::Table<Painted> {
   agiru::Integer Painted_Count{};
   agiru::Date Painted_On{};
 
+  agiru::BigInteger SystemRowVersion{};
+  agiru::Guid SystemId;
+  agiru::DateTime SystemCreatedAt;
+  agiru::Guid SystemCreatedBy;
+  agiru::DateTime SystemModifiedAt;
+  agiru::Guid SystemModifiedBy;
+  agiru::Text<kAuditUserNameLength> SystemCreatedByUserName;
+  agiru::Text<kAuditFullNameLength> SystemCreatedByFullName;
+  agiru::Text<kAuditUserNameLength> SystemModifiedByUserName;
+  agiru::Text<kAuditFullNameLength> SystemModifiedByFullName;
+
   struct Field_No {
     static constexpr agiru::FieldNo Kind{1};
     static constexpr agiru::FieldNo Shade{2};
@@ -338,7 +366,7 @@ struct Painted : agiru::Table<Painted> {
     static constexpr agiru::FieldNo Painted_On{4};
   };
 
-  static constexpr std::array<agiru::FieldNo, 1> kKey1{{Field_No::Kind}};
+  static constexpr std::array<agiru::FieldNo, 2> kKey1{{Field_No::Shade, Field_No::Kind}};
 };
 
 inline constexpr std::array<agiru::FieldDef, 4> kPaintedFields{{
@@ -365,10 +393,46 @@ inline constexpr std::array<agiru::KeyDef, 1> kPaintedKeys{{
     agiru::KeyDef{.name = "Key1", .fields = Painted::kKey1, .clustered = true},
 }};
 
+constexpr auto PaintedImplicitProfile() {
+  const auto base = agiru::WithSystemFields<Painted>(kPaintedFields);
+  std::array<agiru::FieldDef, kPaintedDeclaredCount + kRuntime18ImplicitCount> fields{};
+  fields[0] = agiru::Declare<&Painted::SystemRowVersion>(
+      agiru::FieldNo{0}, "timestamp", "timestamp", offsetof(Painted, SystemRowVersion));
+  for (std::size_t i = 0; i < base.size(); ++i) { fields[i + 1] = base[i]; }
+  std::size_t output = base.size() + 1;
+  fields[output++] = agiru::Declare<&Painted::SystemCreatedByUserName>(
+      kAuditNameNumbers[0],
+      "SystemCreatedByUserName",
+      "SystemCreatedByUserName",
+      offsetof(Painted, SystemCreatedByUserName),
+      agiru::Declared{.fieldClass = agiru::FieldClass::FlowField, .editable = false});
+  fields[output++] = agiru::Declare<&Painted::SystemCreatedByFullName>(
+      kAuditNameNumbers[1],
+      "SystemCreatedByFullName",
+      "SystemCreatedByFullName",
+      offsetof(Painted, SystemCreatedByFullName),
+      agiru::Declared{.fieldClass = agiru::FieldClass::FlowField, .editable = false});
+  fields[output++] = agiru::Declare<&Painted::SystemModifiedByUserName>(
+      kAuditNameNumbers[2],
+      "SystemModifiedByUserName",
+      "SystemModifiedByUserName",
+      offsetof(Painted, SystemModifiedByUserName),
+      agiru::Declared{.fieldClass = agiru::FieldClass::FlowField, .editable = false});
+  fields[output] = agiru::Declare<&Painted::SystemModifiedByFullName>(
+      kAuditNameNumbers[3],
+      "SystemModifiedByFullName",
+      "SystemModifiedByFullName",
+      offsetof(Painted, SystemModifiedByFullName),
+      agiru::Declared{.fieldClass = agiru::FieldClass::FlowField, .editable = false});
+  return fields;
+}
+
+inline constexpr auto kPaintedImplicitFields = PaintedImplicitProfile();
+
 inline constexpr agiru::TableDef kPaintedTable{.id = Painted::kId,
                                                .name = Painted::kName,
                                                .caption = Painted::kName,
-                                               .fields = kPaintedFields,
+                                               .fields = kPaintedImplicitFields,
                                                .keys = kPaintedKeys};
 
 } // namespace
@@ -385,6 +449,58 @@ const agiru::RegisterTable<Painted> kPaintedInCatalogue;
 }
 
 namespace {
+
+void ImplicitFieldsDoNotEnterTheDeclaredIndex() {
+  constexpr agiru::BigInteger kTimestampValue = 37;
+  Painted record;
+  record.SystemRowVersion = kTimestampValue;
+  record.SystemCreatedByUserName = "CREATOR";
+  RecordRef ref;
+  ref.GetTable(record);
+  CHECK_TRUE("all ten implicit fields are present in the authored Runtime-18 fixture",
+             kPaintedTable.fields.size() == kPaintedDeclaredCount + kRuntime18ImplicitCount);
+  CHECK_TRUE("FieldCount excludes timestamp and all nine reserved fields", ref.FieldCount() == 4);
+  constexpr std::array declared{2, 1, 3, 4};
+  for (std::size_t i = 0; i < declared.size(); ++i) {
+    CHECK_TRUE("the AL field index preserves declared fields and primary-first order",
+               ref.FieldIndex(static_cast<int>(i + 1)).Number() == declared[i]);
+  }
+  constexpr std::array implicit{0,
+                                2000000000,
+                                2000000001,
+                                2000000002,
+                                2000000003,
+                                2000000004,
+                                2000000005,
+                                2000000006,
+                                2000000007,
+                                2000000008};
+  for (const int no : implicit) {
+    CHECK_TRUE("every implicit field remains reachable by number", ref.FieldExist(no));
+    CHECK_TRUE("the shared implicit predicate recognizes every reference identity",
+               agiru::IsImplicitSystemField(agiru::FieldNo{no}));
+  }
+  CHECK_TRUE("timestamp retains its typed value", ref.Field(0).Value().IsBigInteger());
+  CHECK_TEXT("timestamp reflection reads actual member storage", ref.Field(0).ToText(), "37");
+  CHECK_TEXT("audit-name reflection reads actual member storage",
+             ref.Field(kAuditNameNumbers[0].Value()).ToText(),
+             "CREATOR");
+  std::string refused;
+  try {
+    (void)ref.FieldIndex(static_cast<int>(kPaintedDeclaredCount + 1));
+  } catch (const Error &error) { refused = error.what(); }
+  CHECK_TRUE("the first implicit field cannot be reached through a declared index",
+             !refused.empty());
+  CHECK_TRUE("the reserved range does not include timestamp",
+             !agiru::IsReservedSystemField(agiru::FieldNo{0}));
+  CHECK_TRUE("the reserved-range boundary excludes its immediate predecessor",
+             !agiru::IsImplicitSystemField(agiru::FieldNo{1999999999}));
+  CHECK_TRUE("the reserved range includes its largest signed identifier",
+             agiru::IsImplicitSystemField(agiru::FieldNo{2147483647}));
+  CHECK_TRUE("ordinary and invalid negative numbers are not implicit fields",
+             !agiru::IsImplicitSystemField(agiru::FieldNo{1}) &&
+                 !agiru::IsImplicitSystemField(agiru::FieldNo{-1}));
+}
 
 /// AN ENUM FIELD REPORTS `Option`, AND THAT IS THE PLATFORM'S ANSWER RATHER THAN A SIMPLIFICATION.
 /// `fieldtype-option.md` tabulates every member of the FieldType that `FieldRef.Type()` returns and
@@ -524,6 +640,7 @@ int main() {
     AnEnumFieldReportsOption();
     TheFieldTypeCarriesThePlatformsOwnNumbers();
     TheEnumAccessorsAnswerByPositionAndByOrdinal();
+    ImplicitFieldsDoNotEnterTheDeclaredIndex();
     AFieldAnswersTheClassItsTableDeclared();
     AFormulaTermOverAFlowFieldIsASubquery();
   });

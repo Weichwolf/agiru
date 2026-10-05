@@ -1,4 +1,5 @@
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "platform/AllObj.h"
 #include "platform/AllObjWithCaption.h"

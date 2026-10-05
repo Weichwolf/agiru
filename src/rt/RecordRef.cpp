@@ -1,8 +1,8 @@
 #include "runtime/RecordRef.h"
 
-#include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
@@ -660,7 +660,7 @@ std::vector<const FieldDef *> IndexedFields(const TableDef &table) {
     }
   }
   for (const FieldDef &def : table.fields) {
-    if (def.no.Value() >= kSystemFields.front().no.Value()) { continue; }
+    if (IsImplicitSystemField(def.no)) { continue; }
     if (std::ranges::find(indexed, &def) == indexed.end()) { indexed.push_back(&def); }
   }
   return indexed;

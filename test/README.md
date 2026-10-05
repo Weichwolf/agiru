@@ -98,10 +98,11 @@ temporary cursors and compiled no-borrow/no-restore/assignment-alias controls ar
 selected-record identity, opening triggers, explicit-action precedence and card
 ModifyAllowed policy. View navigation and general command permissions remain open (0030).
 
-`runtime/reflection-metadata.sh` verifies declaration projection and shared compiled
-record filters, including group intersections, cross-column OR, FlowFilters and
-owned expression snapshots. Sixteen controls must reject. Temporary operations
-use the same predicate; this does not activate live metadata providers (0044).
+`runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
+field indices and shared compiled record filters, including group intersections,
+cross-column OR, FlowFilters and owned expression snapshots. Twenty-three compiled
+controls and the narrow system-field header dependency control must reject.
+Temporary operations use the same predicate; live metadata providers stay guarded (0044).
 
 `make record-order JOBS=2` verifies mixed field directions, global reversal,
 primary-key ties, filters, relative searches and cursor/keyset direction changes.

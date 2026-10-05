@@ -5,6 +5,18 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
 
 ## Evidence
 
+- `meta/SystemFields.h` now owns base identities and reserved/implicit predicates
+  without typed record helpers. RecordRef's declared index excludes timestamp 0;
+  132 checks retain all previous cases and exercise an authored ten-field Runtime-18
+  profile, primary-first order and by-number values. Restored range-only filtering
+  fails four checks on the same population. `make reflection-metadata` passes
+  229/2,917/132 checks; 23 compiled controls and the typed-header dependency control
+  reject. `/tmp/agiru-implicit-field-index.xIGT1A/` and
+  `/tmp/agiru-reflection-metadata.rrYA7W/` retain receipts. This does not generate
+  the complete profile, calculate user lookups, activate providers or prove rowversion.
+  Gate analysis has no own findings; 36 header findings remain. Full integration
+  of this increment is pending; the live CDS replay predates it.
+
 - Exact original native creation is now executed for all 234 tables (0044).
   Original Table Metadata has 33 effective fields: 23 declared plus timestamp 0,
   SystemId, four audit fields and four Runtime-18 user-name/full-name FlowFields;
@@ -100,11 +112,12 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
    `NativeManifest.cpp`, `AppManifest.cpp` and `meta/ModuleDef.h` currently discard it.
    Derive generator system-name recognition (`BodyWriter.cpp::IsSystemFieldName`)
    from the same profile instead of its separate six-name list.
-   Keep that profile independent of typed declaration helpers: three no-PCH rounds
-   currently measure `meta/Declare.h` 849.8 ms, `meta/TableDef.h` 243.9 ms and
-   `platform/ReflectionTypes.h` 368.1 ms. `make include-cost` receipt:
-   `/tmp/agiru-include-cost.2NI3iZ/results.tsv`. Concurrent-host baseline, not a
-   speedup claim; compare the same consumers after separating the profile.
+   Extend the narrow `meta/SystemFields.h` identities into the complete versioned
+   profile; do not reintroduce typed declaration dependencies or derive the reserved
+   range from an array's first member. Header dependency controls reject the old
+   `meta/Declare.h` consumer. Three no-PCH rounds measure standalone SystemFields
+   474.6 ms versus Declare 1,825.6 ms; `/tmp/agiru-include-cost.veRnns/results.tsv`.
+   Concurrent-host header measurements, not a production/build speedup claim.
    Guard AL assignment and `FieldRef::SetValue`, not the common `SetFieldText`:
    `Table.cpp::Store`/`CalcField` and SQL navigation also use that internal writer.
    Reuse the existing Lookup formula for current User names; prove changed/missing

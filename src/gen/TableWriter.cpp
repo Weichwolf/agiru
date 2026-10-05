@@ -1,7 +1,7 @@
 #include "TableWriter.h"
 
-#include "meta/Declare.h"
-#include "meta/TableDef.h"
+#include "meta/Ids.h"
+#include "meta/SystemFields.h"
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
@@ -153,7 +153,7 @@ const FieldIdentifiers &IdentifiersOf(const al::TableObject &table) {
   for (const al::FieldDecl &field : table.fields) {
     const std::string bare = Identifier(field.name);
     const std::string lowerBare = LowerKey(bare);
-    const bool platform = field.number >= kSystemFields.front().no.Value();
+    const bool platform = IsReservedSystemField(FieldNo{field.number});
     const bool hidesABaseMethod = !platform && DeclaredByBase("Table.h", bare);
     const bool collides = (!taken.insert(lowerBare).second || hidesABaseMethod) && !platform;
     const std::string spelled = collides ? bare + "_" + std::to_string(field.number) : bare;
@@ -271,7 +271,7 @@ std::string Includes(const al::TableObject &table,
 }
 
 bool IsSystemField(const al::FieldDecl &field) {
-  return field.number >= kSystemFields.front().no.Value();
+  return IsReservedSystemField(FieldNo{field.number});
 }
 
 al::TableObject WithSystemFields(al::TableObject table) {
@@ -858,7 +858,7 @@ void RequireDistinctNativeFields(const al::TableObject &table) {
   std::set<int> numbers;
   std::set<std::string> names;
   for (const auto &field : table.fields) {
-    if (field.number >= kSystemFields.front().no.Value()) {
+    if (IsReservedSystemField(FieldNo{field.number})) {
       throw std::runtime_error("native source declares a reserved system field number: " +
                                table.name + "." + field.name);
     }

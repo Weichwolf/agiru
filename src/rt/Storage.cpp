@@ -1,8 +1,8 @@
 #include "runtime/Storage.h"
 
-#include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/ProfileDef.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "platform/AllObj.h"
 #include "platform/AllObjType.h"

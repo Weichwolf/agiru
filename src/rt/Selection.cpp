@@ -1,7 +1,7 @@
 #include "Selection.h"
 
-#include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordState.h"

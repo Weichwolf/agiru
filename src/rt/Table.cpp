@@ -1,8 +1,8 @@
 #include "runtime/Table.h"
 
-#include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Database.h"
@@ -580,7 +580,7 @@ void RuntimeTransferFields(void *into,
                            bool withPrimaryKey,
                            bool skipMismatchingTypes) {
   for (const FieldDef &target : table.fields) {
-    if (target.no.Value() >= kSystemFields.front().no.Value()) { continue; }
+    if (IsReservedSystemField(target.no)) { continue; }
     if (!withPrimaryKey && InPrimaryKey(table, target.no)) { continue; }
     const FieldDef *held = Field(source, target.no);
     if (held == nullptr) { continue; }

@@ -2,6 +2,7 @@
 
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
@@ -43,39 +44,6 @@ namespace agiru {
 /// AL's `field(2; "Code"; Code[20])` states a type, and everything else about the storage follows
 /// from it: the type tag, the declared length, and an enumeration's values. Those are derived here
 /// rather than repeated in the declaration, so that a table says each thing once.
-/// \brief One system field, as `devenv-table-system-fields.md` tabulates it.
-struct SystemFieldDecl {
-  FieldNo no;              ///< The reserved field number.
-  std::string_view name;   ///< The AL name, which is also the caption.
-  std::string_view alType; ///< The AL data type, which the generated member is declared with.
-};
-
-/// \brief The system fields, in field-number order.
-///
-/// \note THIS IS THE ONLY PLACE IN THE TREE THAT SPELLS THEM. The generator writes the members from
-///       it, `SystemFieldNumbers` takes its constants from it, and `WithSystemFields` builds their
-///       declarations from it -- so a name, a number and a type are each said once.
-inline constexpr std::array<SystemFieldDecl, kSystemFieldCount> kSystemFields{{
-    {.no = FieldNo{2000000000}, .name = "SystemId", .alType = "Guid"},
-    {.no = FieldNo{2000000001}, .name = "SystemCreatedAt", .alType = "DateTime"},
-    {.no = FieldNo{2000000002}, .name = "SystemCreatedBy", .alType = "Guid"},
-    {.no = FieldNo{2000000003}, .name = "SystemModifiedAt", .alType = "DateTime"},
-    {.no = FieldNo{2000000004}, .name = "SystemModifiedBy", .alType = "Guid"},
-}};
-
-/// \brief The field numbers the platform gives every table.
-///
-/// A generated table's `Field_No` struct DERIVES from this, so the five numbers are said once in
-/// the door instead of once per table. They are static constants, so inheriting them costs no
-/// layout -- which the storage they belong to cannot say for itself (see `WithSystemFields`).
-struct SystemFieldNumbers {
-  static constexpr FieldNo SystemId = kSystemFields[0].no;        ///< The row's immutable identity.
-  static constexpr FieldNo SystemCreatedAt = kSystemFields[1].no; ///< The instant it was written.
-  static constexpr FieldNo SystemCreatedBy = kSystemFields[2].no; ///< The SID that wrote it.
-  static constexpr FieldNo SystemModifiedAt = kSystemFields[3].no; ///< The instant it last changed.
-  static constexpr FieldNo SystemModifiedBy = kSystemFields[4].no; ///< The SID that changed it.
-};
-
 template <typename T> struct FieldTypeOf;
 
 /// \brief `Code[N]` -- a code field of declared length N.

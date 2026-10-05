@@ -6,12 +6,49 @@ CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-reflection-metadata.XXXXXX)
 gate="$B/gate_ReflectionMetadataGate"
 "$gate" > "$proof/current.log" 2>&1
+indexed_gate="$B/gate_RecordRefGate"
+"$indexed_gate" > "$proof/indexed-fields.log" 2>&1
 if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
   "$gate" "$AGIRU_METADATA_ID_REFERENCE" > "$proof/reference.log" 2>&1
   sha256sum "$AGIRU_METADATA_ID_REFERENCE" > "$proof/reference.sha256"
 fi
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
+
+has_typed_dependencies() {
+  rg -q '/(type|runtime)/|/c\+\+/v1/(vector|map|unordered_map|memory|format)([[:space:]]|$)' "$1"
+}
+
+for header in SystemFields Declare; do
+  "$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude \
+    -include "meta/$header.h" -x c++ -M /dev/null > "$proof/$header.d"
+done
+if has_typed_dependencies "$proof/SystemFields.d"; then
+  printf 'reflection-metadata: system-field identities depend on typed record machinery\n' >&2
+  exit 1
+fi
+if ! has_typed_dependencies "$proof/Declare.d"; then
+  printf 'reflection-metadata: typed declaration dependency control was not detected\n' >&2
+  exit 1
+fi
+
+awk '
+  /if \(IsImplicitSystemField\(def.no\)\) \{ continue; \}/ {
+    sub(/IsImplicitSystemField\(def.no\)/, "IsReservedSystemField(def.no)"); changed++
+  }
+  { print }
+  END { if (changed != 1) exit 2 }
+' src/rt/RecordRef.cpp > "$proof/indexed-timestamp.cpp"
+"$CXX" "${flags[@]}" "$proof/indexed-timestamp.cpp" -L"$B" -Wl,-rpath,"$B" \
+  -lagiru_rt -lagiru_net -lagiru_db -o "$proof/indexed-timestamp.so"
+if LD_PRELOAD="$proof/indexed-timestamp.so" "$indexed_gate" \
+    > "$proof/indexed-timestamp.log" 2>&1; then
+  printf 'reflection-metadata: timestamp escaped the declared field index control\n' >&2
+  exit 1
+fi
+rg -q 'FAIL .*FieldCount excludes timestamp' "$proof/indexed-timestamp.log"
+sha256sum "$proof/indexed-timestamp.cpp" "$proof/indexed-timestamp.so" > "$proof/indexed-control.sha256"
+rm -- "$proof/indexed-timestamp.cpp" "$proof/indexed-timestamp.so"
 
 if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
   "$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
@@ -162,4 +199,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, stable identities, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; twenty-two controls refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; twenty-three compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
