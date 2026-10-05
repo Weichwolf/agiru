@@ -15,6 +15,15 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Fresh `make census` on BCApps `bb7111877f` retains 36,874 AL files/36,783 objects,
+  4,171 test codeunits/113,013 raw methods; fifteen approved exclusions leave
+  112,998 required raw methods. Zero unmeasured files; seven conditional assignments
+  in three files remain refusals (Make exit 2). 25,169 files lie outside configured
+  app roots: visible coverage gaps, not approved exclusions or a runnable denominator.
+  `/tmp/agiru-convert-carrier-integration.ytBvMq/scope-inventory.json`, SHA256
+  `19b6378cf973d936641cc81c32a88734aaf2624f5624d9c44424631053351d5a` (0058/0725).
+  This independent census does not replace the configured 80/2,314 UT milestone.
+
 - `9a60a46` is pushed. Production regeneration activates original Hash→Convert
   bodies; package bytes agree pre/post. Translation remains red: 67 Native methods,
   215 native tables and 90 other native sources unactivated, 5,683 unacted properties;
