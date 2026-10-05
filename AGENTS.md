@@ -17,7 +17,7 @@ documentation and commits are English.
   or a declaration has Scope=Cloud. Do not substitute always-success licensing stubs.
 - Inventory source objects and tests before filtering. Report raw population, selected
   population and explicit excluded identities/reasons separately. Other unsupported
-  behaviour remains a gap, not an approved exclusion (board 0725).
+  behaviour remains a gap, not an approved exclusion (WI 0058).
 - Root `scope.json` is the single selection policy for the transpiler and independent
   inventory. Product exclusions name bounded source paths and approved reasons;
   namespace/area reachability is not a complete product classification.
@@ -39,8 +39,8 @@ documentation and commits are English.
    business runtime and prove representative workflow/SQL parity; keep its bounds separate
    from production multi-user and scale guarantees.
 
-Historical pass counts are not current measurements. `board/README.md` gives the reviewed
-state and execution order. Do not trade the full target for a green subset.
+Historical pass counts are not current measurements. WIs 0058 → 0720 → 0721 own
+G1 → G2 → G3; 0724 depends on G2. Do not trade the full target for a green subset.
 
 ## References before semantic changes
 
@@ -211,7 +211,7 @@ direct build; freeze only when continued editing or reproducible isolation requi
 - Native package/layout qualifiers use original verified sources, owners and notices.
   Keep raw inventories, provenance hashes and explicit refusals; declaration/fixture
   success is not a live provider, layout installation/rendering or ERP milestone.
-  Specialist acceptance belongs in 0034/0063/0589 and the owning WI, not this workflow.
+  Specialist acceptance belongs in WIs 0058/0721, not this workflow.
 - Preserve pipeline exit statuses; patches must fail on missing anchors. Use
   `build/times.log` and current receipts, not historical timing/pass claims.
 
@@ -230,14 +230,18 @@ A seed used as A/B proof needs a `complete` provenance row and a sealed template
 
 ## Work items
 
-`board/` holds open work only. Keep one concise WI per coherent outcome: evidence, priority,
-dependencies, source references, implementation steps and acceptance tests. Prefer short lists;
-remove narratives, repeated history and completed steps. Sol must be able to start from the
-named files without reconstructing a session transcript.
+`board/` contains only WIs, no README, index or activity diary. Keep one WI in progress
+and a small set of concrete outcomes; neither one WI per detail nor giant milestone WIs.
+Each WI owns its priority, dependencies, next action, evidence, source files and acceptance.
+Keep later work queued behind explicit prerequisite contracts, without dependency cycles.
+Use durable source/test paths, pinned revisions and reproducible commands; never make a
+WI depend on disposable `/tmp` receipts. Search the refreshed `~/Git/openerp/` code and
+board for reusable implementation details and rejected approaches. Prefer short lists;
+remove repeated history and completed steps. Preserve implemented code and regression tests.
 
 Keep existing IDs when consolidating. Allocate new IDs from all Git history, never from
 open files alone. Delete completed or superseded items; Git preserves their history. Record
-consolidation mappings in the board index. Do not claim ownership through stale `active` text.
+absorbed IDs and a recovery revision in the receiving WI. Do not claim stale ownership.
 Keep only current build recipes in the working tree; Git preserves superseded instructions.
 
 ## Commits and pushes

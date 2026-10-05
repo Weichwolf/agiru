@@ -1,64 +1,57 @@
-# 0063 — Reports will execute datasets and render declared layouts
+# 0063 — Execute report datasets and render real layouts
 
-Status: open | Priority: P0 | Stage: UT compile/datasets; All rendering | Reviewed: 2026-10-03
-Depends on: 0030 request lifecycle; 0019 aggregates; 0074 streams.
+Status: queued | Priority: P1
+Depends on: 0013/0044's declared metadata and record/filter/aggregate contracts.
+G1: finish dataset/native successor faults required by UT. After G1: layout engine.
+Client request presentation uses 0720's dispatcher; no dependency on complete G3.
+Next: qualify installed native layouts/dataset rows, then bind one request-page model.
 
-## Evidence
+## Implementation and useful refreshed details
 
-- `eb8aa06`: compiler manifests retain all named bound/unresolved layouts; offline packaging verifies actual app/version/source, safe relative files, SHA256/size and original notices. Nearest source-project manifests fix seven ownerless layouts in four definitions without changing business bodies. Full frozen BC source produces 423/423 named assets (306 RDLC/85 Word/32 Excel); no path loss. Missing/unresolved/foreign/version/path/symlink/duplicate/output/byte/notice/writer controls reject; nested project and dot-path fixtures pass. Original/source-bound native variants each pass 562 checks and both real fixture link modes. 117 local cases/188 toolchain tests green. Current receipts: README. No installation, approval, selection, legacy-asset completeness, rendering or G1 proof.
-- Report dataset/request-page paths exist. Remittance UT failures already require dataset work before clients.
-- PDF/Print/Preview have no complete renderer; page-shaped report metadata needs separation.
-- `ReportDataset` retains every formatted row, then `Xml()` builds a second whole-document string. `WriteReportFile` checks opening but not write/flush completion.
-- Upstream `bf484e5871` retired UpgradeCompositeReportParts (104067) in favour of
-  reportextension 9666, Composite Layout, with fourteen Word layouts. Its obsolete
-  slice entry is now a retirement comment; the generated platform Tenant Report
-  Defaults registration library carries the original native target and all fourteen
-  extension declarations. No stale/empty seeder is restored. Registration/packaging
-  does not prove installation, approval, selection or rendering; these stay open.
-- Code `c62879f`: named layouts reach immutable `ReportTraits::kLayouts` declarations through `include/meta/ReportLayoutDef.h` and `src/gen/ReportLayoutsWriter.cpp`: all property tokens, localized captions, typed report/extension IDs, declaring app GUID and root-relative source. Extension ownership survives cross-app merging; compile-time assertions require exactly one declaring ID. `make report-layout-metadata` compiles all 416 emitted declarations from 326 actual reports; ownerless control refuses. Fourteen native-target declarations remain unresolved/not emitted. No asset installation, selection, obsoletion-diagnostic, renderer or complete-app proof.
-- Capability census now visits bound and unresolved rendering properties exactly once, including source-only invocations. Emission counts distinguish bound AST layouts from written metadata; source-only mode reports zero emitted declarations and refuses unknown bound properties. Initial full regeneration exposed 88 previously missed declarations: 29 each of ObsoleteState/Reason/Tag and one layout-level ExcelLayoutMultipleDataSheets. Values reach compiled metadata and remain explicitly partial; warning/catalogue rules, worksheet precedence and workbook output are pending. Unknown properties, unrelated dropped-property names and explicitly refused layout properties abort, including unresolved targets. All 325,464 properties counted; zero unclassified properties after documented metadata retention, not complete behavioural coverage.
-- Terminal local replay: 108 cases/149 toolchain tests green; 27 parser-fixture/73 actual-source/39 compiled two-app checks. Wrong owner/app, ownerless metadata, unknown/refused property and parser-discard controls fail. All 24,389 generated paths retained; exactly 652 report headers/definitions change, no business-body changes. Exact raw 80/2,314 UT identities unchanged. `build/report-layouts-metadata-{tests-source-only.log,generation-source-only.log,actual.log,generated-before.sha256,generated-final.sha256,changed-final.txt,ut-before.json,ut-after.json}`. Full AL UT milestone still open.
-- User-selected architecture: native C++ layout/pagination over a documented HTML/CSS print profile; translate versioned DOCX/RDLC layouts once and bind XML datasets at runtime. Cairo writes the resulting PDF; shared vector/glyph output supplies SVG previews and static Business Charts. No FOP, Office, Typst or browser engine dependency. Genuine XLSX layouts stay separate. Linux/container multi-user resources drive the design; identical functional code must build for the single-user WASM demo, not production through a WASM VM. Cairo/Emscripten compatibility, text shaping/font packaging, fidelity and performance remain unproved; no renderer dependency installed.
-- Reuse official WPT CSS reftests/wptrunner with a custom engine adapter, pinned revision/fonts/viewport and unchanged match/mismatch/fuzzy metadata. Render test and reference through the same engine; comparisons against a browser are separate differential checks. Inventory the declared print profile and unexecuted/unsupported cases; do not convert observed failures into passing expectations. WPT tests layout conformance, not DOCX/RDLC translation, BC bindings or ERP chart semantics.
-- Analysis widened to 122/205 units through the Ids.h dependency graph: initial 119 red. Three new writer/runner findings fixed; final targeted writer and runner are clean, layout gate clean. PageWriter/Main remain red on inherited diagnostics; their canonical comparison changes only Scan complexity 100→89, while WritePage remains 118. No suppression/baseline increase or full-analysis pass. `build/report-layouts-metadata-{lint.log,targeted-status.txt,Main-tidy-source-only.log,caller-diagnostics-{before,final,added,removed}.txt}`. Standalone cold-header frontend: 217 ms/three rounds; generated fixture header 1.99→1.81 s under load, not performance proof (`includes.log`, `header-cost.log`). Fresh raw census retains 113,005 methods/fifteen exclusions and the same seven conditional refusals/exit 2; canonical hash unchanged after removing only source_root, `build/report-layouts-metadata-census.sha256`.
-- Native authority found: public OnPrem `29.0.54011.55407` contains original System `29.0.55365.0`/Runtime 18 source `src/Reports/TenantReportDefaults.Report.al`, report 2000000001, explicitly empty dataset/request page and two Word parts. Verified package SHA256 `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`; `layout/LayoutManifest.xml` and both DOCX/DOTX assets agree. SymbolReference still has zero reports; it is not the source denominator. BCApps `bb7111877f`/app 30 and demo 28.4 remain separately identified; no pin change or production activation.
-- Production `--system-symbols` reads native report ASTs, merges extensions through the common binder and emits a separate `platform` app. Module/layout ownership comes from the original namespaced `NavxManifest.xml`; compiler-side libxml2 is private and adds no runtime-tier dependency. Original-source and source-loaded variants each pass 562 checks for two native/fourteen extension layouts, including registration, tokens, defaults and distinct app origins. Owner/property/asset controls reject. Raw inventory retains 398 files/368 objects, zero unmeasured; all native objects remain business-unexecuted. Native tables/other kinds keep source-loaded translation exit 1. Full-tree linking, installation, selection and rendering remain unproved. Eleven loader controls cover filename-independent parsing, source-only counts, damaged/duplicate/DTD/symlink manifests, GUIDs, report-ID collisions and retained UT/refusal populations. Receipts: board index.
-- CompositeLayoutLookupHelper separately resolves header/theme through six precedence levels and requires Approved parts; source declarations and successful registration do not implement selection, approval or migration.
-- `d16fafb`: actual frozen CMake app/fixture-slice builds and registry-only consumers pass; omitted registration library fails under Linux `--as-needed`. Static retention, zero/one missing-procedure and missing-data controls pass. Direct foundation links and platform-aware refusal generation are fixed. Root slice is unchanged; full-tree linking, installation and business execution remain unproved. Current receipts: README. The new consumer exposes 44 unchanged public-header lint findings; no baseline increase.
-- `91190e8`: ReportRegistry.h holds the existing ABI with no dataset/page/vector dependency; signature/layout mutants and forced full-header inclusion fail. Native/app/fixture-slice replays remain green; 115 local cases/188 toolchain tests pass. Both registry/native consumers analyse cleanly; changed lint still fails three of five/219 units on inherited findings. No new execution capability; full-tree/assets/G1 remain open. Receipts and header-cost samples: README.
+1. Preserve `src/gen/{ReportAssets,ReportLayoutsWriter,CodeunitWriter}.cpp`,
+   `src/rt/Report.cpp` and registry-only `include/runtime/ReportRegistry.h`.
+   Source/package/link fixtures do not prove installed/approved/selected assets.
+   Resolve original native consumer losses and versioned owner/default selection.
+2. Qualify nested dataitem ordering, links/views/filters, temporary sources, columns,
+   Skip/Break/Quit and report/extension/substitution triggers. One bounded typed XML
+   dataset pipeline serves all output; errors remain errors, not empty PDF success.
+3. `~/Git/openerp/openerp/web/client/request_page.py::{model,apply,schedule}`:
+   request options read their control values/captions/choices; recursively flatten
+   dataitems and expose RequestFilterFields including FlowFilters. Answer applies
+   options and filters before execution. CLI reqset/reqfilter and web use one model.
+   Reuse agiru's generated request controls; unknown supplied fields must refuse.
+4. `runtime/base/report.py` and predecessor 1806: SaveValues differs for Print/Send
+   versus Preview/Cancel; Schedule serializes request parameters into Job Queue/
+   Report Inbox. Reuse generic background primitives, not UI-specific scheduling.
+   Keep PDF, genuine Word/Excel layouts and XML/data-only exports distinct.
+5. Inventory DOCX/RDLC/Excel/custom assets, owners/versions/hashes/notices. Install
+   catalogue approval/company/private defaults and upgrade/rollback independently.
+   Translate each DOCX/RDLC version once into typed layout + documented HTML/CSS
+   print profile, bind XML at execution; preserve expressions/groups/nested data.
+6. Implement C++ layout/pagination/shaped text/packaged fonts and positioned scenes
+   for Cairo PDF/SVG. Reuse exact Business Chart measures/scenes; interactive
+   selection/drilldown remains 0720. No FOP/Office/Python renderer or generic table fallback.
+7. Pin WPT wptrunner/reftests, same-engine match/mismatch/fuzzy oracle, fonts/viewport
+   and declared profile. Count failures/crashes/unsupported/unexecuted; independently
+   compare BC datasets/layouts/paginated PDFs/workbooks. Bound spool/concurrency/memory.
+   Prove the shared Cairo/shaping build in WASM; don't impose demo constraints on Linux.
 
-## Implementation
+## Acceptance and references
 
-1. Qualify the complete System-29 source-generated tree/link without its known table/consumer losses (0034); prove installed/selected successor layouts, not only registration/packaging. Unsupported native binding must refuse explicitly. Follow with missing/wrong dataset rows and exact dataitem/trigger traces; rendering follows dataset correctness.
-2. Separate report dataset/lifecycle metadata from page request controls without duplicating the page engine. Verify nested dataitem ordering, link/view filters, column expressions, temporary items, Skip/Break/Quit and all report/extension triggers.
-3. Resolve request filters per dataitem/table identity; preserve page-owned members over control-name collisions. Wire report substitution and declared platform events through normal event dispatch.
-4. Install verified named-layout bundles into the production catalogue using their declaring app/version/source and content hashes; prove approval, independent company/private selections, upgrades and rollback. Bind the native target through verified platform declarations (0034), never a guessed ID. Complete legacy-asset inventory/packaging with explicit precedence, language/format region, limits and timeouts. Implement layout obsoletion diagnostics/catalogue rules and layout-level Excel worksheet overrides without replacing report defaults. Translate RDLC/Word/theme inputs once per asset version/hash to a typed layout and documented HTML/CSS print profile with exact XML dataset bindings. Implement C++ layout/pagination, shaped text and embedded fonts; emit positioned vector/glyph commands to Cairo PDF and SVG preview adapters. Keep genuine Excel workbooks separate. Unsupported conversion/layout features refuse by source identity, never fall back to a generic dataset table.
-   Inventory RDLC/Word/Excel/custom layouts independently; unsupported formats remain ERP gaps. Feed a typed dataset sink into bounded streaming/spooling; use bounded native concurrency, immutable caches, explicit resource resolution and cancellation. Measure full renderer CPU/memory against equivalent BC workloads (0721). Verify the browser build with packaged fonts/assets and matching representative pages/workflows, without imposing single-user execution on production.
-5. Implement request-page handlers, preview lifecycle, streams/files and scheduling using the same dataset pipeline. Unsupported layout features must refuse with names/counts.
-6. Reuse one typed chart scene for PDF/SVG Business Charts, preserving declared series/types, labels, legends, culture, empty/null values and exact measures until coordinate projection. 0035 owns AL/.NET chart contracts; 0720 owns interactive selection/drilldown and ledger analysis. Never duplicate business aggregation inside the renderer.
-7. Add a wptrunner product/executor adapter for the headless engine and reuse upstream CSS reftests unchanged. Cover report-required block/inline/table layout, fonts, sizing, page breaks and print/fragmentation tests where the adapter supports them. Report raw/selected/unexecuted identities separately; add BC-specific conversion and pagination fixtures alongside WPT.
+- Existing `make native-report-layouts`, `native-bindings`, `layout-assets-check`
+  and `test/reporting/` controls remain; qualified original package retains
+  sixteen assets and ordinary/source-bound 562+562 fixture checks.
+  These checks are not rendered business reports.
+- Request options/filters/SaveValues/scheduling and genuine output effects match
+  CLI/web/SQL on disposable clones; malformed or unsupported layouts refuse by identity.
+- Reviewed reusable tests:
+  `~/Git/openerp/test/openerp/runtime/test_client_request_page.py`,
+  `test_text_client.py`, `test_client_e2e_sales.py`;
+  `test/specs/client/{sales_order_preview,sales_order_post}.json`.
+- Developer report/request-page properties and user `ui-work-report.md` first;
+  `~/Git/openerp/openerp/runtime/report_render.py` only for layout findings,
+  never its Apache FOP architecture.
+- Preserve upstream asset/dependency notices; agiru ownership is not relicensing.
 
-## Acceptance
-
-- Golden dataset and lifecycle fixtures precede PDF comparison. Render a representative invoice and compare rows/totals/captions; preview must follow its documented second-run behaviour. Prove output failure rolls back only the intended boundary.
-- Full-disk/broken-output/renderer-timeout controls fail loudly; no successful truncated artifact. Large reports do not duplicate the full dataset in service memory; temporary artifacts have scoped cleanup.
-- Count all fourteen Composite Layout declarations/assets independently before and after translation. Removed rendering metadata and unresolved native target controls must refuse; declaring layouts alone does not prove installation, selection or document fidelity. An installed extension layout must not silently replace the selected default.
-- WPT match/mismatch controls and a deliberately wrong layout fail. Pin resources and retain upstream fuzzy limits without widening them; no expected-failure baseline generated from observed output. BC goldens verify repeated table headers, nested groups, page numbering, multi-page invoices, shaped international text and chart values. Linux and WASM produce equivalent pages; qualify native CPU/memory/concurrency independently.
-
-## References
-
-Code: `src/al/{Parser.cpp,Ast.h}`, `src/tc/Main.cpp::{MergeReportExtensions,NoteUnwrittenReports,NoteUnresolvedLayouts,AuditProperties}`, `include/meta/ReportLayoutDef.h`, `include/runtime/{Report,ReportRegistry}.h`, `src/gen/{ReportLayoutsWriter,PageWriter,BodyWriter}.cpp`, `src/rt/Report.cpp`, `test/gate/{GenReportGate,ReportLayoutGate}.cpp`, `test/reporting/report-layouts/{Fixture.h,Runner.cpp}`, `test/reporting/report-layouts.sh`, `test/tooling/header-dependencies.sh`, `test/tooling/toolchain.py::ReportRegistryHeaderGate`, `scripts/report_layout_metadata.sh`.
-
-Packaging: `src/gen/ReportAssets.{h,cpp}`, `src/tc/Main.cpp::{WriteModule,WriteReportAssets}`, `scripts/{layout_assets,verify_layout_assets}.sh`, `test/gate/ReportAssetGate.cpp`, `test/reporting/layout-assets.sh`. Manifest population is named `rendering` layouts, not an independent full-asset census; unresolved requests remain counted. Private JSON escaping avoids a gen→net dependency; control-byte limit `0x20` and hexadecimal nibble mask `0x0f` implement RFC 8259 §7, not AL semantics. Local source references above establish declaring-app file ownership and Runtime-18 portable separators. Prior 528 requires tenant authority/selection beyond packaged declarations; prior 938 rejects generic dataset files as layout fidelity.
-
-Native fixture: `test/reporting/native-report-layouts.sh`, `test/reporting/report-layouts/{NativeRunner,RegistryRunner}.cpp`, authored `LinkConsumer.Report.al`/`link-slice`, `cmake/GeneratedLink.cmake`, `scripts/unlinked.py`; reproduce the original package with `make symbols SYMBOL_VERSION=29.0.54011.55407` without changing `BC_VERSION`. Native app GUID `8874ed3a-0643-4247-9ced-7a7002f7135d`, BaseApp GUID `437dbf0e-84ff-417a-965d-ed2bb9650972`. Source-backed native layouts are `StandardHeaderFooter` and `StandardTheme`; preserve their assets/default separately from extension-owned parts. `SymbolReference` omission must not erase source/layout-manifest identities. Predecessor search finds no Tenant Report Defaults/native-report contract.
-
-Platform: devenv-report-object.md, report/dataitem triggers, rendering/layout properties and reportinstance overloads. AL: report declarations and extensions. Predecessor: WI-1082 (request-page name precedence) and report view/layout findings.
-
-Layout references: developer `devenv-report-{ext-object,layout-declaration}.md`, properties `devenv-{type-report,layoutfile,summary}-property.md` at `ff5939a46`; BCApps `src/Layers/W1/BaseApp/Foundation/Reporting/{CompositeLayout.ReportExt.al,CompositeLayoutLookupHelper.Codeunit.al}` at `6261b1c458`; user `ui-{manage-report-layouts,set-report-layout}.md` at `634710c42`; predecessor board 938 (generic dataset tables are not layout fidelity), 528 (tenant layout authority/company selection), 1310 (inspect emitted behaviour, not runtime name presence). BCApps AL-Go repoVersion 30/Sandbox 30.0.55525.0 and Runtime-18 guarantees differ from pinned System 28/Runtime 17 and demo 28.4; make compatibility explicit.
-
-Backend/conformance: [Cairo PDF surfaces](https://www.cairographics.org/manual/cairo-PDF-Surfaces.html), [glyph API versus toy text](https://www.cairographics.org/manual/cairo-text.html), [WPT reftests](https://web-platform-tests.org/writing-tests/reftests.html), [wptrunner adapter architecture](https://web-platform-tests.org/tools/wptrunner/docs/design.html). These establish available interfaces/test semantics, not agiru integration or WASM proof. Chart declaration/data contract: 0035; interactive analysis: 0720/0064/0019.
-
-Property metadata: developer `properties/devenv-{obsoletestate,obsoletereason,obsoletetag,excellayoutmultipledatasheets}-property.md`; BCApps `Sales/Reports/CustomerItemSales.Report.al` obsolete RDLC declaration and `Manufacturing/Document/ProdOrderList.Report.al` layout-level worksheet override, same revisions above. User `ui-excel-report-layouts.md`; predecessor 913 requires measured classification/merge evidence rather than plausible causes or namespace exclusions. These establish retained declarations, not implemented workbook or obsoletion behaviour.
-
-Property scope: `allowscheduling`, `clearlayout`, `dataitemlink`, `dataitemlink-reports`, `dataitemlinkreference`, `dataitemtableview`, `defaultlayout`, `defaultrenderinglayout`, `enableexternalimages`, `enablehyperlinks`, `excellayout`, `excellayoutmultipledatasheets`, `executiontimeout`, `formatevaluate`, `id`, `includecaption`, `ispreview`, `layoutfile`, `maximumdatasetsize`, `maximumdocumentcount`, `mimetype`, `multiplenewlines`, `optionmembers`, `optionmembers-report`, `previewmode`, `printonlyifdetail`, `processingonly`, `promptmode`, `rdlclayout`, `requestfilterfields`, `requestfilterheading`, `savevalues`, `sharedlayout`, `showprintstatus`, `summary`, `tableno`, `testhttprequestpolicy`, `topnumberofrows`, `type-report`, `userequestpage`, `usesystemprinter`, `version`, `wordlayout`, `wordmergedataitem`.
+Previous absorbed IDs/matrices:
+Git `356dadda4a4aa435899bc8aa9e9c4f24a8c0fa21:board/`.

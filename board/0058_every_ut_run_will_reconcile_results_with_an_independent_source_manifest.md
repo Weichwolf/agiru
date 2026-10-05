@@ -1,73 +1,108 @@
-# 0058 — Every UT run will reconcile results with an independent source manifest
+# 0058 — Complete the source-counted UT milestone (G1)
 
-Status: open | Priority: P0 | Stage: UT; All population expansion | Reviewed: 2026-10-04
-Depends on: 0589 trustworthy execution; 0004 sealed seed for acceptance.
+Status: queued | Priority: P0
+Depends on: 0013 effective profiles → 0044 live providers/record contracts;
+0073 call lowering; required native/report dataset contracts from 0063.
+Next: integrate each qualified repair and replay every configured UT identity;
+close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
-## Evidence
+## Current evidence
 
-- A refrozen source-only BC input lost the original notice and refused the local
-  layout qualifier after a successful build. `verify_snapshot.py` now requires
-  the original notice before dependency copying when `test` accompanies frozen
-  BC inputs; explicit relocated notices remain hashed/immutable. Layout refusal
-  names the missing input. Verify-check 22/tooling 228 tests pass; previous actual
-  freezer fails the new control. Original frozen inputs/failed result remain unchanged;
-  the matching original notice separately passes the frozen layout qualifier.
-  `/tmp/agiru-notice-preflight-{verify-check,previous,layout-final,all-tooling}.log`;
-  current measurements and original failure remain in README.
+- Last completed AL replay of `ae71f8d`: 2,173/2,314 passed, 141 failed,
+  zero incomplete; 80 codeunits, BCApps `bb7111877f`. Legacy null/unsealed seed:
+  diagnostic repeatability only, not causal A/B or G1. Reproduce through `make ut`;
+  compare method identities/statuses, not only totals.
+- Frozen `ae71f8d` replay: slice/build and local 146 cases / 233 tooling
+  tests passed; UT exits nonzero. Against `a59e992`, all 2,314 identities,
+  statuses and errors are unchanged: zero gains/losses/missing/added/duplicates.
+  Its source does not contain the later runtime/profile changes.
+- Raw census: 36,874 AL files, 36,783 objects, 4,171 test codeunits,
+  113,013 methods; fifteen approved exclusions leave 112,998 required.
+  Zero unmeasured files; seven conditional assignments still refuse.
+  Reproduce with `make census` against BCApps `bb7111877f` and the pinned policy.
+  This is not the configured 2,314-method executable milestone.
+- Native inventory retains 234 raw tables, 233 selected, eighteen bound and
+  215 unbound; 35 selected native codeunits have 67 unimplemented methods.
+  Other unactivated objects/properties and omitted app roots remain gaps.
+- Preserve existing primitive fixes, generated bindings and negative controls.
+  Package/declaration qualifiers are not full-app linking or business execution.
 
-- README owns the latest completed configured UT result and its exact identity/
-  source-hash comparison. The Hash/Convert replay retains all 80/2,314 identities,
-  with one code-challenge gain and no losses/missing/added/duplicates/changed errors.
-  Null/unsealed seeds prove diagnostic repeatability only, not causal A/B or the
-  independently larger full AL suite; slice/link success is not full-app/G1 proof.
-- Latest clean reference refresh `6261b1c458`→`bb7111877f`: 36,874 files/36,783 objects/4,171 test codeunits; 113,013 raw methods, fifteen approved exclusions, 112,998 required, zero unmeasured and the same seven conditional refusals (census exit 2). Exact identity comparison retains all 113,005 previous methods and adds eight: PowerBICoreTest.AssistedSetupShowsDeploymentChoiceForNonEvaluationCompany; SubcWIPTransCreateTest.{MultipleWIPReturnsFromOneProductionOrderOpenExactList,ReusedWIPReturnFromAnotherPurchaseOrderAppearsInList,SingleWIPReturnOpensRealTransferOrderCard}; PowerBISynchronizerTests.{TestDeploymentBufferCountsAndRemovesOutcomes,TestDeploymentBufferLoadsSelection}; HttpWebReqMgtTests.TestSetUseDefaultCredentials; TestJobQueueSNAP.RunCleanUpTaskWhenJobQueueRetriedByPlatformTwice. Product classification of mixed cloud/core cases remains 0725, not an implicit exclusion. Configured UT identities remain byte-identical at 80/2,314, no AL execution. `build/number-sequence-{census-before.log,raw-methods-{old,current,added,lost}.tsv,ut-{before,after}.json}`; generated-image refresh/link remains 0038.
+## Focused prerequisites
 
-- Conditional boundary inventory now tracks source offsets and complete symbol assignments, including implicit `#else`, nested boolean conditions and file-local define/undef. Same frozen source/apps/scope hashes: 36,873 files, 36,781→36,782 objects; only report 208 gains measurement, no object or Test identity loss. All 113,005 raw methods survive; fifteen approved exclusions leave 112,990 required raw methods. Zero unmeasured files does not imply a runnable population: seven refused CLEANSCHEMA assignments in three files remain explicit errors. Eight-symbol fallback work budget refuses rather than truncating. Proof: build/census-final/comparison.json; inventories: build/census-{before,final}/scope-inventory.json.
-- Raw inventory and UT runner now share scripts/source_revision.py; producer-pinned BC revision wins, an untracked frozen tree never borrows an ancestor Git revision. Five new toolchain tests retain every previous test: 145 green, 98 local cases/zero red, build/local-test-final.log. These are local checks, not AL execution.
-- BCApps a9ea4d845→6261b1c458 adds four configured UT methods, no suffix/population policy change: RemittanceREPCheckUT.RefundSharingPaymentDocShownOnRemittanceAdviceEntries and ERMVATVIESLookupUT.{DailyVIESCallQuotaBlocksWhenLimitReached,DailyVIESCallQuotaResetsOnNewDay,DailyVIESCallQuotaSkippedOnPrem}. Latest frozen manifest retains 80/2,314, identical to preceding snapshot; zero executed/all incomplete because root 085 cannot compile. Full raw population is separate from this UT milestone.
-- Seven refused assignments leave unmatched upstream field braces when CLEANSCHEMA26/28/31 is true; do not teach the scanner to ignore the resulting top-level keys. Current `.github/AL-Go-Settings.json` declares repoVersion 30 and Clean symbols CLEAN25–CLEAN30, not those CLEANSCHEMA symbols. `.github/actions/TestPreprocessorSymbols/action.ps1` validates symbol names/ranges, not enabled build assignments. Preserve raw variants/refusals and establish the resolved app/localization matrix before classifying executable profiles.
+- [0013](0013_system_fields_and_schema_keys_will_obey_their_declared_contracts.md):
+  complete source/host-selected fields, reflection and schema/key metadata.
+- [0044](0044_record_operations_will_share_one_correct_sql_and_temporary_contract.md):
+  live catalogues and SQL/temporary record, filter, cursor and aggregate contracts.
+- [0073](0073_generated_expressions_will_preserve_al_types_and_evaluation_effects.md):
+  declaration-owned calls, var/value context and expression lowering.
+- [0063](0063_reports_will_execute_datasets_and_render_declared_layouts.md):
+  required native report/dataset/request contracts; renderer work follows G1.
+- Qualified prerequisites do not require all future work of an owning WI;
+  activation still needs this WI's unchanged-population comparison.
 
-- Filter-group runtime changes no frozen AL/scanner/policy/generated/slice input. Independent W1 text manifest retains exactly 80/2,310 identities; no AL methods executed, all remain missing, separately from 140 green Python tests/97 local cases with the same 26 DB failures. Reused raw census remains incomplete: 112,055 raw methods/112,040 after the approved fifteen-method exclusion, one unmeasured GB report. No new complete-census/full-run claim. build/filter-group-integration-20261002/artifacts/{proof,ut-manifest,ut-statuses}.json.
-- Native record context retains byte-identical raw inventory: 36,697 files/36,605 objects/4,137 test codeunits/112,055 methods, same fifteen-method approved exclusion and one unmeasured GB report. Later generator/fixture corrections change no census input: frozen AL, scanner, apps and scope bytes are checked. Configured UT identities remain 80/2,310, zero executed/all missing. Receipts: build/native-record-context-integration-20261002/artifacts/{census-comparison,generation,proof}.json. The draft census refused source drift and is retained; no complete runnable-denominator/G1 claim.
-- Current-origin native-input prototype independently inventories the complete System package: 362 AL files, 333 objects/223 tables, zero unmeasured; all fifteen candidates and 208 unbound identities remain listed. Its production-policy generation preserves every configured W1 UT identity (80/2,310), scope/counter bytes and 14,212 slice paths; two UsersInPlans outputs appear, none disappear. This is separate from the raw BCApps/test population and does not prove runnable whole-source coverage. Exact hashes/identities: build/native-source-binding-integration-20261002/artifacts/{generation,system-raw-inventory,native-contracts}.json; product classification 0725, declaration activation 0034.
-- Fresh canonical-policy census retains 36,697 files, 36,605 recognized objects, 4,137 test codeunits and 112,055 methods; one approved fifteen-method exclusion, one unmeasured GB report. Ordinary binder activation changes no source policy, counter, slice or configured W1 UT identity: 80/2,310, all still missing. Whole-source runnable variant population remains unproved; current receipts are indexed in README.
-- `ut_manifest.py` counts AL text independently, but selects only UT-suffixed codeunits under W1 Tests. This is the milestone, not the whole AL suite.
-- Passing the complete frozen BCApps root to that scanner refuses RU codeunit 147202, ERM Human Resource UT: Subtype=Test, two PageHandlers, zero Test methods. Preserve its source/object identity and handler lifecycle; do not invent methods or silently omit other roots to claim a full population. Current W1 comparison and failed whole-root probe are retained in README's population receipt.
-- `ut_results.py` reconciles per-method identities and process exits; direct CLI totals still come from linked registrations.
-- Current `make census` retains every BCApps AL source, all object kinds, raw Test
-  attributes, methods, conditional variants and configured/declared app membership.
-  The GB report is measured; seven refused CLEANSCHEMA assignments in the three
-  files named in step 6 still keep the census red. Fresh receipts/populations are
-  in README. Namespace selection is not a product partition; localized variants
-  and omitted app roots are not an executable full-suite denominator.
-- Manifest counting now preserves quoted names/comment markers, ignores BOMs outside names and accepts case-insensitive file extensions. Quoted identifier contents cannot invent Test attributes. All previous controls remain; three new identity controls fail on the previous implementation. Current measurements and receipts are in README.
-- Source-policy fixtures exposed another lost identity: a codeunit after an inline namespace declaration. Object discovery now ignores line position, retaining multiple same-line declarations without matching quoted names; the previous scanner fails the new control. Independent inventory and production selection now read the same root policy (0725).
-- Escaped quotes at identifier boundaries are literal name characters. Strip only the syntactic outer pair: stripping all boundary quotes invented a UT suffix and collapsed distinct method identities. Three old controls fail; the separate token inventory agrees with the corrected identities. Current full population and receipts are in README.
-- Own Page Table Field run's source_revision incorrectly resolves the outer agiru repository: frozen BCApps lies outside the image's ROOT but inside another Git tree. The separate frozen-input receipt retains the actual BCApps revision/hash; no runner executed. Main provenance now requires tracked AL inside the requested source subtree before borrowing Git HEAD; untracked frozen inputs remain unknown without explicit producer provenance. Controls retain real checkouts and explicit revisions while rejecting unrelated ancestor/sibling provenance. Page-source recheck exports the recorded revision and rehashes both inputs; historical receipts remain unchanged.
-- Transpiler `UnitTestsIn` misses a valid `codeunit ... "Output UT" {` header; its line-ending heuristic also differs from the manifest's comment/case handling. Do not treat that diagnostic subtotal as authoritative. Reproduced during 0589 output controls; current source milestone remains separate.
-- Current measurement, revision and artifact paths belong in README only; old run narratives are removed.
-- Full-tree audit found 19 UTF-16 AL files and 53 internal test procedures. Integrated manifest handles BOM UTF-16 and internal methods: 48 toolchain tests green; new cases fail against the previous implementation. UT population remains 80 codeunits / 2,310 methods. Full-suite variant reconciliation remains open.
-- Predecessor corpus evidence separated 2,157 in-scope results from 126 out-of-scope IDs rather than silently dropping them. Its population and pass count are not comparable to agiru's 2,310-method milestone; retain per-source scope reasons here.
-- `make ut` saves the source manifest before building; preflight failures reuse the result reconciler, retaining every missing method, logs and infrastructure errors. Controls cover build refusal, stale/absent images, incomplete seeds and successful builds. Interrupted builds terminate their process group and retain the denominator: the pre-cancellation implementation times out under the negative control. Toolchain: 59/59 in both trees; old main preflight scripts/Makefile fail all five original controls. Frozen full run retains all 80 codeunits / 2,310 method identities with no status/diagnostic changes (README); seed identity remains null. Logs: `/home/cosmo/Git/agiru-worktrees/goal-20260928/build/ut-preflight-*.log`, `ut-build-interrupt-negative.log`.
+## Remaining G1 contracts, ordered by prerequisite
 
-## Implementation
+| Priority | Contract / next implementation | Files / prerequisite |
+|---|---|---|
+| P0 | Scope partition; sealed seed; mandatory independent manifest and missing/refused/crashed accounting | `scope.json`, `scripts/{scope_inventory,ut_manifest,ut_milestone,ut_results,seed_demo}.py`, `src/rt/RunnerDatabase.cpp`; source/package identity before activation |
+| P0 | Session-private state; explicit record/FieldRef/KeyRef ownership; clean transaction leases | `src/rt/{Session,SingleInstance,Events,Scopes}.cpp`, `include/runtime/{Table,RecordRef,Session}.h`; ownership before boundaries |
+| P0 | Durable Commit; distinct TryFunction/Codeunit.Run/asserterror and runner isolation; observed-version writes/LockTable | `src/rt/{Transaction,Scopes,Storage,Selection,TestRunner}.cpp`; schema versions and ownership |
+| P0 | XML DTD/resolver safety; JSON parent/Root/Path/Replace; exact Decimal core and conversion boundaries | `src/net/{XmlReader,JsonEngine,Json,DotNetJson,Decimal}.cpp`; parser policy before external input, Decimal before exact codecs |
+| P1 | App/namespace/dependency identity; extension ownership, Moved/obsolete storage; one declaration-owned overload/var/value-context binder | `src/gen/{Names,NativeSource,BodyWriter,TableWriter}.cpp`, `src/tc/Main.cpp`; identities before lowering/link |
+| P1 | Complete selected native table/report/enum/interface/method binding and full app libraries; no slice refusal substitutes | `src/gen/{NativeSource,NativeManifest,TableWriter,CodeunitWriter}.cpp`, `scripts/transpile.sh`; original package provenance, then consumers and unchanged-population replay |
+| P1 | SQL/temporary Record parity, dynamic cursors, mixed sort/Next, full-prefix keys, filters/GUIDs, FlowFields and query ON/WHERE/HAVING | `src/rt/{Table,Temporary,Navigate,Selection,Filter,Query}.cpp`; identity/profile → shared record/filter → aggregate/query |
+| P1 | Validation/xRec/relation/event order, isolated subscribers and Boolean failure-to-false versus statement errors | `src/rt/{Table,Events,Scopes}.cpp`, `src/gen/BodyWriter.cpp`; ownership and transaction boundaries |
+| P1 | Required TestPage, request-page and report dataset/native successor contracts; error-log RecordId/drilldown | `include/runtime/test/PageCore.h`, `src/rt/{TestPage,Report,Handlers}.cpp`, `src/gen/{PageWriter,CodeunitWriter,ReportLayoutsWriter}.cpp`; validation/filter/lifecycle first; no HTTP/client construction here |
+| P1 | Remaining .NET/encoding/stream/XMLport/native Base64 signatures from actual failing callers; exact culture/UTF/calendar semantics | `src/net/`, `src/rt/dotnet/`, `src/gen/CodeunitWriter.cpp`; shared primitives, explicit unsupported signatures |
+| P0 | User/company/app authorization, scoped encrypted storage, sequence identity/migration, provider-owned tenant facts | `include/runtime/{Table,RecordRef}.h`, `src/rt/{IsolatedStorage,NumberSequence,NumberSequenceStorage,Storage}.cpp`; context/schema identity before integration |
+| P1 | Reliable Make statuses, complete compiler inputs, no-PCH/app dependency controls and decreasing lint/suppression debt | `Makefile`, `scripts/`, `cmake/`, `test/{gate,runtime,transpiler,tooling}/`; never replace UT with tooling proof |
 
-1. Keep the UT source manifest authoritative. Record app + kind + ID + method, source/manifest/generated-image hashes, compiler symbols, runner/isolation, work date and seed identity. Provenance controls must reject a frozen source borrowing the owning/outer agiru Git revision; explicit frozen BCApps revision remains separate. For the approved product-scope changes (0725), retain the raw inventory and publish a disjoint selected/excluded partition with per-identity reasons; do not silently change scan() or classify missing methods as excluded.
-2. Expose the expected manifest to the CLI or its mandatory verifier; label deliberately filtered diagnostics. Remove the divergent `src/tc/Main.cpp::UnitTestsIn` heuristic or reconcile it against the independent manifest. A direct linked-only total must never claim the full milestone.
-3. Report missing, duplicate, refused, crashed, timed-out, skipped and unexpected results separately; none leaves the expected population. Retain process failures even after a printed success summary.
-4. Keep process-group cancellation, startup/second-interrupt cleanup and per-run artifacts under negative controls. Reconcile queued and running methods after interruption.
-5. After 0720 parity, add an explicit full-suite manifest over all test apps/codeunits, without the UT name suffix. Inventory omitted app roots independently of apps.json; only 0725's approved product exclusions are outside the selected requirement, all other omissions remain visible ERP gaps. Preserve the UT manifest as a separate regression set.
-   Classify localization overlays and compiler-symbol branches by build variant; retain source identities and reasons rather than collapsing duplicate IDs or adding mutually exclusive variants to one executable run.
-   Reconcile handler-only Test codeunits with zero Test methods separately from malformed/unmeasured methods; retain their OnRun lifecycle and source identity. Use the raw census and declared app/build variants before expanding the runner, not an unqualified scan of mutually exclusive localizations.
-6. Classify refused CLEANSCHEMA26/28/31 assignments against declared app/localization compiler symbols. Start at BCApps src/Apps/IN/INFADepreciation/app/src/table/FixedAssetShift.Table.al, src/Apps/W1/SalesOrderAgent/app/src/Setup/SOASetup.Table.al and src/Layers/FR/BaseApp/Bank/BankAccount/BankAccount.Table.al. Preserve measured identities, every variant refusal and the raw Test population; theoretical symbol assignments are not an executable build matrix or approved exclusions.
+## Scope audit (2026-10-05)
+
+- O365/Microsoft 365 and other Microsoft cloud integrations are excluded product
+  requirements. Retain core ERP, contact CRM, permissions, local APIs and generic
+  HTTP/SMTP/SFTP/file/Excel-workbook functionality. An O365 name is not sufficient:
+  `Invoicing/O365SalesCancelInvoice.Codeunit.al` uses generic document email.
+- Compared with the refreshed implementation policy, agiru additionally admits
+  `Microsoft.Integration.{Dataverse,D365Sales,SyncEngine}`,
+  `System.Azure.Identity`, `System.Privacy` and `System.Telemetry`;
+  it no longer excludes `Microsoft.CRM.Outlook` or the namespace-less Graph area.
+  These are technical reachability differences, not approved cloud requirements.
+- Concrete wrong admission: W1 `CRM/Outlook/O365GraphAuthentication.Codeunit.al`
+  (7108) requests Graph/O365 tokens; `O365BidirectionalSync.Codeunit.al`
+  (7106) calls graph.microsoft.com. Bound their service source exclusions and
+  incoming dependencies explicitly; do not exclude local contact CRM wholesale.
+- Audit Exchange/Outlook, Graph/OneDrive/SharePoint, Microsoft 365 email providers,
+  Teams/Excel-online/Power BI and Entra/cloud-specific branches from source before
+  changing `scope.json.product_exclude`. Preserve generic counterparts and mixed
+  settings/privacy/work-date/notification callers. No successful license/cloud stubs.
+- Existing four exact product rules exclude two private service/licensing
+  implementations, native TenantLicenseState and the fifteen-method notification
+  test object. Resolve mixed public callers rather than inventing Paid/tenant facts.
+- Prove raw = selected + explicitly excluded, with every identity and reason;
+  compare source-counted UT before/after. Reachability/namespace omissions remain gaps.
+  Predecessor 760/1134 rejects dependency-touch and no-op-based test exclusions.
+  This review did not change the executable policy or any test denominator.
 
 ## Acceptance
 
-- Lost parse/link/method, duplicate result, timeout, exit 42 after green summary, zero population and interrupted queued work all fail with unchanged totals.
-- Same source identities survive inline/multiline braces, keyword case, comments and escaped identifier quotes; an emission failure cannot alter the expected manifest.
-- UT gate: every expected method passed, zero incomplete/refused/crashed/skipped. Final gate: the same rule over the complete AL test population and client-driven workflows.
-- Status comparison lists every gain/loss and identity change. Sealed provenance is required for causal A/B; legacy-seed runs are diagnostic only.
+- Complete selected generated tree compiles/links; `agiru run-tests` passes every
+  source-counted milestone method. Every missing/duplicate/refused/crashed/timed-out/
+  skipped/unexecuted case stays reported; zero unexplained losses.
+- Fresh disposable clones have a complete sealed source/seed identity; receipts pin
+  Git/content/BCApps/System/compiler/image/work-date/runner/symbol identities.
+  Preserve raw variants and resolve seven CLEANSCHEMA assignments against the actual
+  build/localization matrix, not theoretical mutually exclusive populations.
+- Build, C++ gates, generator fixtures and lint pass without raised baselines.
+  New contracts have meaningful negative controls. G1 is not full-suite/G3 proof.
+- Scope retirement neither removes core ERP nor bypasses denied permissions.
+  Only then release [0720](0720_cli_and_web_will_execute_the_same_erp_operations.md).
 
-## References
+## Consolidation
 
-Code: `scripts/{scope_inventory.py,source_revision.py,ut_manifest.py,ut_results.py,ut_milestone.py,verify_snapshot.py}`, `src/{al/Lexer.cpp,cli/Main.cpp,rt/TestRunner.cpp}`, `test/{toolchain.py,gate/TestReportGate.cpp}`. Platform: `devenv-test-codeunits-and-test-methods.md`, `devenv-al-variables.md` (quoted identifiers), `directives/devenv-{directives-in-al,directive-region,directive-pragma-warning}.md`, `devenv-namespaces-overview.md`. AL controls: EDocumentServiceDE.PageExt.al, EmailConnector.Enum.al, SCMWarehouseShippingIII.Codeunit.al, ERMVATServCharge.Codeunit.al at current BCApps main. Predecessor: WI-1088; WI-1519's disabled-test subtraction is not adopted here; disabled/upstream-suppressed tests must remain visible. WI-927's always-undefined/unparseable-false policy is not a raw inventory strategy; every raw branch and refusal stays visible. No predecessor finding specifies escaped boundary quotes.
+Absorbs 0004, 0006, 0012, 0033, 0034, 0035, 0038, 0039, 0043,
+0055, 0057, 0059, 0061, 0062, 0064, 0065, 0066, 0589, 0718, 0719,
+0722, 0723, 0725. Focused owners 0013/0044/0073/0063 remain separate.
+Previous detailed receipts, acceptance matrices and transitive absorbed-ID mappings:
+Git `356dadda4a4aa435899bc8aa9e9c4f24a8c0fa21:board/`.
+Consolidation retires duplicate plans, not implementation, tests or requirements.
