@@ -148,11 +148,14 @@ for control in write-revision insert-notify update-notify delete-notify bulk-del
     bulk-delete-notify) source=src/rt/Navigate.cpp;;
   esac
   awk -v control="$control" '
+    /^std::optional<FieldValues> InsertRow/ { inserting = 1 }
+    /^std::optional<FieldValues> Updated/ { updating = 1 }
+    /^}/ { inserting = 0; updating = 0 }
     control == "write-revision" && /return observed_ == revision_->second.value;/ {
       sub(/observed_ == revision_->second.value/, "true"); changed++
     }
-    control == "insert-notify" && /if \(inserted\) \{ detail::RecordWritten/ { changed++; next }
-    control == "update-notify" && /^  detail::RecordWritten/ { changed++; next }
+    control == "insert-notify" && inserting && /^  detail::RecordWritten/ { changed++; next }
+    control == "update-notify" && updating && /^  detail::RecordWritten/ { changed++; next }
     control == "delete-notify" && /if \(deleted\) \{ detail::RecordWritten/ { changed++; next }
     control == "bulk-delete-notify" && /if \(written.Affected\(\) != 0\) \{ RecordWritten/ { changed++; next }
     control == "table-scope" && /if \(found != state->recordChanges->tables_.end\(\)\)/ {
