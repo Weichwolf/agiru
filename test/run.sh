@@ -25,11 +25,19 @@ for source in test/gate/*.cpp; do
 done
 for script in test/transpiler/builtins-reproduce.sh test/tooling/one-definition.sh; do
   n=$((n + 1))
-  if ! sh "$script"; then red=$((red + 1)); fi
+  if sh "$script"; then :; else
+    status=$?
+    printf 'test: %s failed (exit %s)\n' "$script" "$status" >&2
+    red=$((red + 1))
+  fi
 done
-for script in test/tooling/function-size.sh test/runtime/required-isolation.sh test/tooling/header-dependencies.sh test/tooling/slice-check.sh test/transpiler/interface-defaults.sh test/reporting/report-layouts.sh test/reporting/layout-assets.sh test/runtime/number-sequences.sh test/transpiler/table-keys.sh test/runtime/reflection-metadata.sh test/runtime/catalogue.sh test/transpiler/native-enums.sh test/runtime/test-contexts.sh test/runtime/text-positions.sh test/runtime/xml-reader.sh test/runtime/codeunit-record.sh test/runtime/page-navigation.sh test/runtime/boolean-expressions.sh test/transpiler/control-extensions.sh test/transpiler/native-table-ids.sh test/transpiler/native-codeunits.sh test/runtime/base64.sh test/runtime/encoding.sh test/runtime/hashing.sh test/runtime/conversion.sh test/runtime/record-order.sh test/runtime/streams.sh; do
+for script in test/tooling/function-size.sh test/runtime/required-isolation.sh test/tooling/header-dependencies.sh test/tooling/slice-check.sh test/transpiler/interface-defaults.sh test/reporting/report-layouts.sh test/reporting/layout-assets.sh test/runtime/number-sequences.sh test/transpiler/table-keys.sh test/runtime/reflection-metadata.sh test/runtime/catalogue.sh test/transpiler/native-enums.sh test/runtime/test-contexts.sh test/runtime/text-positions.sh test/runtime/xml-reader.sh test/runtime/codeunit-record.sh test/runtime/page-navigation.sh test/runtime/boolean-expressions.sh test/transpiler/control-extensions.sh test/transpiler/native-table-ids.sh test/transpiler/native-codeunits.sh test/runtime/base64.sh test/runtime/encoding.sh test/runtime/hashing.sh test/runtime/conversion.sh test/runtime/record-order.sh test/runtime/streams.sh test/transpiler/system-profile.sh; do
   n=$((n + 1))
-  if ! B="$B" bash "$script"; then red=$((red + 1)); fi
+  if B="$B" bash "$script"; then :; else
+    status=$?
+    printf 'test: %s failed (exit %s)\n' "$script" "$status" >&2
+    red=$((red + 1))
+  fi
 done
 n=$((n + 1))
 if ! B="$B" python3 test/tooling/toolchain.py; then red=$((red + 1)); fi

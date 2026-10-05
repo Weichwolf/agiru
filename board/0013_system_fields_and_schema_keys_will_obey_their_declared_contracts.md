@@ -3,8 +3,8 @@
 Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
-Next: wire explicit host selection into generated/native records and migrate remaining
-five-field declarations; qualify original source consumers and SQL profiles before
+Next: migrate remaining five-field native declarations to their selected host/kind
+profiles; qualify original source consumers and production generation before
 0044's catalogue activation.
 
 ## Implementation
@@ -52,7 +52,7 @@ five-field declarations; qualify original source consumers and SQL profiles befo
 - `test/transpiler/table-keys.sh`, `test/runtime/reflection-metadata.sh` and
   `test/transpiler/native-bindings.sh` provide reproducible source-owned tests.
   Every implicit field is addressable by number; declared index/count excludes them.
-- Developer `ff5939a46e`: `devenv-table-system-fields.md`, record-fieldname,
+- Developer `f928288ee840`: `devenv-table-system-fields.md`, record-fieldname,
   fieldref-name/value/validate, recordref-fieldcount/fieldindex and key properties.
   BCApps `bb7111877f`: ApplicationAreaMgmt, SLPopulateHistTables and
   ExpenseActivityLogTest; `src/gen/{TableKeys,TableWriter}.cpp`,
@@ -75,6 +75,16 @@ five-field declarations; qualify original source consumers and SQL profiles befo
   shadowing, readable fields, supplied identity/audit and reflected FieldRef writes.
   `GenSourceBindingGate` and the compiled writable-role mutant qualify this boundary;
   borrowed-var writes and source Validate/Clear paths remain separate gaps.
+- `make system-profiles`: 954 generator checks, 28 compiled host/kind/LinkedObject
+  consumers and eleven generated-AL/SQL checks on each host pass. Host 17/18 is
+  explicit (`agirutc --host-runtime`, Make `AGIRU_HOST_RUNTIME`), independent of
+  fixture app version 99 and minimum runtime 12. Binding/output mismatches,
+  wrong audit/lookup presence/count and unsupported/duplicate host options refuse.
+  Independent SQL checks the physical version and absence of alias/lookup columns.
+  Fixtures: `test/gate/GenSystemProfileGate.cpp`,
+  `test/transpiler/system-profile.sh` and `test/transpiler/system-profile/`.
+  External/LinkedObject declarations compile but translation remains nonzero and
+  their business paths are unexecuted; default five-field/native migration is pending.
 - Original-package audit: eighteen bound candidates compile without PCH; original
   page/source-library and offset/type/number/drop/namespace controls pass. All 215
   selected unbound tables remain red. Other native/generated records still use the

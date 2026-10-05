@@ -1,3 +1,5 @@
+#include "meta/SystemFields.h"
+
 #include "Apps.h"
 #include "Ast.h"
 #include "BodyWriter.h"
@@ -243,6 +245,7 @@ struct Job {
   std::filesystem::path output;
   std::filesystem::path apps;
   std::filesystem::path systemSymbols;
+  std::optional<agiru::SystemFieldProfile> hostProfile{};
 };
 
 void Keep(Run &run, const Output &where, const std::string &text) {
@@ -628,6 +631,10 @@ constexpr std::string_view kLayoutObsoletionStatus =
     "pending (board:0063,0033)";
 
 constexpr std::array kPartlyTranslatedProperties{
+    std::pair{std::string_view{"field.sqltimestamp"},
+              std::string_view{
+                  "stored BigInteger aliases share the SQL allocator/physical column; "
+                  "complete native/profile activation and concurrency remain (board:0013,0044)"}},
     std::pair{std::string_view{"table.scope"},
               std::string_view{"source scope retained; availability enforcement and live table "
                                "metadata pending (board:0034,0044)"}},
@@ -1804,7 +1811,8 @@ void RefreshTableIndex(const Tables &tables, agiru::gen::Objects &objects) {
                               "::agiru::" + agiru::gen::NamespaceSuffix(table.nameSpace) +
                                   agiru::gen::ClassName(agiru::gen::Identifier(table.name),
                                                         agiru::gen::ObjectKind::Table),
-                              TableHeaderPath(table));
+                              TableHeaderPath(table),
+                              objects.hostProfile);
     objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
     objects.tables.insert_or_assign(std::to_string(table.id), ref);
     if (!table.nameSpace.empty()) {
@@ -1974,7 +1982,7 @@ std::size_t BindNativeSources(const std::filesystem::path &package,
   extensions.emitted += MergeExtensions(store, nativeTables, agiru::gen::LowerKey(sources.app.id));
   sources.tables = std::move(nativeTables.objects);
   objects.nativeTables = sources.tables;
-  objects.tables = agiru::gen::PlatformTables(sources.tables);
+  objects.tables = agiru::gen::PlatformTables(sources.tables, objects.hostProfile);
   objects.fieldEnums = agiru::gen::PlatformFieldEnums(sources.tables, objects.tables);
   AddNativeSourceTables(sources, objects.tables, tables);
   return ReportNativeSources(sources, objects.tables);
@@ -3274,6 +3282,7 @@ int Scan(const Job &job) {
   Gathered gathered;
   agiru::gen::EnumIndex index;
   agiru::gen::Objects objects;
+  objects.hostProfile = job.hostProfile;
   std::size_t allReports = 0;
   LayoutCounts layouts;
   std::size_t allXmlPorts = 0;
@@ -3644,8 +3653,9 @@ int Scan(const Job &job) {
     std::println("          reaches the metadata and what does not.");
     return 1;
   }
-  return !HasUnboundNativeMethods(gathered) && failures.empty() && refusals.empty() &&
-                 nativeGaps == 0 && nativeOutput.gaps == 0 && store.unplaced == 0
+  return !HasUnboundNativeMethods(gathered) && gathered.refused.empty() && failures.empty() &&
+                 refusals.empty() && nativeGaps == 0 && nativeOutput.gaps == 0 &&
+                 store.unplaced == 0
              ? 0
              : 1;
 }
@@ -3656,7 +3666,7 @@ int main(int argc, char **argv) {
   const std::span<char *> arguments(argv, static_cast<std::size_t>(argc));
   if (arguments.size() < 3) {
     std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>] "
-               "[--system-symbols <package-root>]\n",
+               "[--system-symbols <package-root>] [--host-runtime <17.0|18.0>]\n",
                stderr);
     return 2;
   }
@@ -3666,12 +3676,26 @@ int main(int argc, char **argv) {
     if (at < arguments.size() && !std::string_view(arguments[at]).starts_with("--")) {
       job.output = arguments[at++];
     }
-    if (at < arguments.size()) {
-      if (std::string_view(arguments[at]) != "--system-symbols" || at + 2 != arguments.size()) {
-        throw std::runtime_error("expected --system-symbols <package-root>");
+    while (at < arguments.size()) {
+      const std::string_view option(arguments[at++]);
+      if (at == arguments.size()) { throw std::runtime_error("missing option value"); }
+      const std::string_view value(arguments[at++]);
+      if (option == "--system-symbols") {
+        if (!job.systemSymbols.empty()) { throw std::runtime_error("duplicate --system-symbols"); }
+        if (value.empty()) { throw std::runtime_error("System package path is empty"); }
+        job.systemSymbols = value;
+      } else if (option == "--host-runtime") {
+        if (job.hostProfile) { throw std::runtime_error("duplicate --host-runtime"); }
+        if (value == "17.0") {
+          job.hostProfile = agiru::SystemFieldProfile::Runtime17;
+        } else if (value == "18.0") {
+          job.hostProfile = agiru::SystemFieldProfile::Runtime18;
+        } else {
+          throw std::runtime_error("unsupported host runtime; expected 17.0 or 18.0");
+        }
+      } else {
+        throw std::runtime_error("expected --system-symbols or --host-runtime");
       }
-      job.systemSymbols = arguments[at + 1];
-      if (job.systemSymbols.empty()) { throw std::runtime_error("System package path is empty"); }
     }
     return Scan(job);
   } catch (const std::exception &e) {

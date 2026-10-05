@@ -1,9 +1,12 @@
 #pragma once
 
+#include "meta/SystemFields.h"
+
 #include "Ast.h"
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
 
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -17,8 +20,10 @@ struct TableHeader {
   DotNetUse absent;
 };
 
-[[nodiscard]] TableRef
-BindTable(const al::TableObject &table, std::string identifier, std::string header);
+[[nodiscard]] TableRef BindTable(const al::TableObject &table,
+                                 std::string identifier,
+                                 std::string header,
+                                 std::optional<SystemFieldProfile> hostProfile = std::nullopt);
 
 [[nodiscard]] std::string NativeTableAssertions(const al::TableObject &table,
                                                 const TableRef &binding);

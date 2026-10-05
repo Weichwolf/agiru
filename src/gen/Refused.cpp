@@ -115,6 +115,7 @@ void CollectRefused(const std::vector<al::Property> &properties,
                     std::vector<RefusedProperty> &into) {
   for (const al::Property &property : properties) {
     const std::string key = LowerKey(property.name);
+    if (key == "linkedobject" && LowerKey(property.text) == "false") { continue; }
     if (std::ranges::find(kRefused, key) == kRefused.end()) {
       const std::string value = LowerKey(property.text);
       bool named = false;

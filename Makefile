@@ -20,6 +20,7 @@ export CCACHE_SLOPPINESS
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order codeunit-record page-navigation boolean-expressions control-extensions native-table-ids native-codeunits streams
+.PHONY: system-profiles
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -153,6 +154,11 @@ number-sequences: comments db ## prove atomic SQL reservations, process parity a
 rowversions: comments db ## prove database-wide allocation, active fences, SQL records/aliases and negative controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_RowVersionGate gate_SqlRowVersionGate
 	@B="$(B)" bash "$(SELF)/test/runtime/rowversions.sh"
+
+system-profiles: comments db tc ## qualify selected host fields through generated declarations and SQL callers
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_GenSystemProfileGate agiru_rt
+	@"$(B)/gate_GenSystemProfileGate"
+	@B="$(B)" bash "$(SELF)/test/transpiler/system-profile.sh"
 
 table-keys: comments db tc ## prove implicit primary keys before extension merging and generated operations
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenTableKeysGate gate_GenNativeBindingGate

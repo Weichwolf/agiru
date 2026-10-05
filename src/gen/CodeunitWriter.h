@@ -1,5 +1,7 @@
 #pragma once
 
+#include "meta/SystemFields.h"
+
 #include "Ast.h"
 #include "EnumWriter.h"
 
@@ -40,6 +42,7 @@ struct TableRef {
   std::vector<std::string> interfaceBases{};
   std::string declarationAssertions{};
   bool native = false;
+  std::optional<SystemFieldProfile> hostProfile{};
 };
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects);
@@ -73,6 +76,7 @@ struct Objects {
 
   std::string module;
   std::string moduleHeader;
+  std::optional<SystemFieldProfile> hostProfile{};
 };
 
 const TableIndex &PageIndexFor(const Objects &objects, std::string_view type);
@@ -115,7 +119,9 @@ std::string OptionTypeName(const std::string &owner,
 
 [[nodiscard]] TableIndex PlatformTables();
 [[nodiscard]] bool NeedsNativeDefinition(const TableRef &binding);
-[[nodiscard]] TableIndex PlatformTables(std::span<const al::TableObject> declarations);
+[[nodiscard]] TableIndex
+PlatformTables(std::span<const al::TableObject> declarations,
+               std::optional<SystemFieldProfile> hostProfile = std::nullopt);
 [[nodiscard]] FieldEnums PlatformFieldEnums(std::span<const al::TableObject> declarations,
                                             const TableIndex &tables);
 

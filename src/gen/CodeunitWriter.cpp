@@ -1,5 +1,7 @@
 #include "CodeunitWriter.h"
 
+#include "meta/SystemFields.h"
+
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "EnumWriter.h"
@@ -2263,7 +2265,8 @@ std::optional<std::int32_t> NativeTableNumberOf(const Objects &objects, std::str
   return matched->id;
 }
 
-TableIndex PlatformTables(std::span<const al::TableObject> declarations) {
+TableIndex PlatformTables(std::span<const al::TableObject> declarations,
+                          std::optional<SystemFieldProfile> hostProfile) {
   const TableIndex bindings = PlatformTables();
   TableIndex tables;
   std::set<int> ids;
@@ -2274,7 +2277,8 @@ TableIndex PlatformTables(std::span<const al::TableObject> declarations) {
     }
     const auto binding = bindings.find(LowerKey(table.name));
     if (binding == bindings.end() || binding->second.id != table.id) { continue; }
-    TableRef ref = BindTable(table, binding->second.identifier, binding->second.header);
+    TableRef ref =
+        BindTable(table, binding->second.identifier, binding->second.header, hostProfile);
     for (const auto &field : table.fields) {
       const auto spelling =
           PlatformFieldSpelling(PlatformField{.table = table.name, .field = field.name});

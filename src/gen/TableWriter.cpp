@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "meta/SystemFields.h"
+#include "meta/TableType.h"
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
@@ -35,6 +36,78 @@
 namespace agiru::gen {
 
 namespace {
+
+constexpr std::array kTableKinds{
+    std::pair{std::string_view{"Normal"}, TableType::Normal},
+    std::pair{std::string_view{"CRM"}, TableType::CRM},
+    std::pair{std::string_view{"CDS"}, TableType::CDS},
+    std::pair{std::string_view{"ExternalSQL"}, TableType::ExternalSQL},
+    std::pair{std::string_view{"Exchange"}, TableType::Exchange},
+    std::pair{std::string_view{"MicrosoftGraph"}, TableType::MicrosoftGraph},
+    std::pair{std::string_view{"Temporary"}, TableType::Temporary}};
+
+TableType KindOf(const al::TableObject &table) {
+  const auto *property = Find(table.properties, "TableType");
+  if (property == nullptr) { return TableType::Normal; }
+  for (const auto &[name, kind] : kTableKinds) {
+    if (LowerKey(std::string(name)) == LowerKey(property->text)) { return kind; }
+  }
+  throw std::invalid_argument("unknown TableType: " + property->text);
+}
+
+std::string KindName(const al::TableObject &table) {
+  const auto kind = KindOf(table);
+  for (const auto &[name, candidate] : kTableKinds) {
+    if (kind == candidate) { return std::string(name); }
+  }
+  throw std::invalid_argument("unknown table kind");
+}
+
+bool Linked(const al::TableObject &table) {
+  const auto *property = Find(table.properties, "LinkedObject");
+  if (property == nullptr) { return false; }
+  const auto value = LowerKey(property->text);
+  if (value != "true" && value != "false") {
+    throw std::invalid_argument("LinkedObject must be true or false: " + property->text);
+  }
+  return value == "true";
+}
+
+std::string ProfileName(SystemFieldProfile profile) {
+  switch (profile) {
+    case SystemFieldProfile::Runtime17: return "::agiru::SystemFieldProfile::Runtime17";
+    case SystemFieldProfile::Runtime18: return "::agiru::SystemFieldProfile::Runtime18";
+  }
+  throw std::invalid_argument("unknown host system-field profile");
+}
+
+std::vector<SystemFieldDecl> SystemFieldsOf(const al::TableObject &table,
+                                            std::optional<SystemFieldProfile> profile) {
+  if (!profile) { return {kSystemFields.begin(), kSystemFields.end()}; }
+  static_cast<void>(ProfileName(*profile));
+  const auto kind = KindOf(table);
+  const bool linked = Linked(table);
+  std::vector<SystemFieldDecl> fields;
+  for (const auto &field : kImplicitSystemFields) {
+    if (IncludesSystemField(field, *profile, kind, linked)) { fields.push_back(field); }
+  }
+  return fields;
+}
+
+al::FieldDecl SystemDeclaration(const SystemFieldDecl &system) {
+  al::FieldDecl field{.number = system.no.Value(),
+                      .name = std::string(system.name),
+                      .type = std::string(system.alType),
+                      .subtype = {},
+                      .length = system.length,
+                      .properties = {},
+                      .triggers = {}};
+  if (system.role == SystemFieldRole::AuditLookup) {
+    field.properties.push_back(
+        al::Property{.name = "FieldClass", .value = {}, .text = "FlowField"});
+  }
+  return field;
+}
 
 struct OptionField {
   const al::FieldDecl *field;
@@ -127,7 +200,7 @@ const FieldIdentifiers &IdentifiersOf(const al::TableObject &table) {
                             .byName = {},
                             .byBare = {}};
   std::set<std::string> taken{"field_no", "state_block"};
-  for (const SystemFieldDecl &system : kSystemFields) {
+  for (const SystemFieldDecl &system : kImplicitSystemFields) {
     taken.insert(LowerKey(std::string(system.name)));
   }
   if (al::Find(table.properties, "QueryColumns") != nullptr) {
@@ -153,7 +226,7 @@ const FieldIdentifiers &IdentifiersOf(const al::TableObject &table) {
   for (const al::FieldDecl &field : table.fields) {
     const std::string bare = Identifier(field.name);
     const std::string lowerBare = LowerKey(bare);
-    const bool platform = IsReservedSystemField(FieldNo{field.number});
+    const bool platform = IsImplicitSystemField(FieldNo{field.number});
     const bool hidesABaseMethod = !platform && DeclaredByBase("Table.h", bare);
     const bool collides = (!taken.insert(lowerBare).second || hidesABaseMethod) && !platform;
     const std::string spelled = collides ? bare + "_" + std::to_string(field.number) : bare;
@@ -271,19 +344,13 @@ std::string Includes(const al::TableObject &table,
 }
 
 bool IsSystemField(const al::FieldDecl &field) {
-  return IsReservedSystemField(FieldNo{field.number});
+  return IsImplicitSystemField(FieldNo{field.number});
 }
 
-al::TableObject WithSystemFields(al::TableObject table) {
+al::TableObject WithSystemFields(al::TableObject table, std::optional<SystemFieldProfile> profile) {
   CompletePrimaryKey(table);
-  for (const SystemFieldDecl &system : kSystemFields) {
-    table.fields.push_back(al::FieldDecl{.number = system.no.Value(),
-                                         .name = std::string(system.name),
-                                         .type = std::string(system.alType),
-                                         .subtype = {},
-                                         .length = 0,
-                                         .properties = {},
-                                         .triggers = {}});
+  for (const auto &system : SystemFieldsOf(table, profile)) {
+    table.fields.push_back(SystemDeclaration(system));
   }
   return table;
 }
@@ -365,6 +432,23 @@ bool PropertyIs(const al::FieldDecl &field, std::string_view name, bool absent) 
   const std::string text = PropertyText(field, name);
   if (text.empty()) { return absent; }
   return LowerKey(text) == "true";
+}
+
+bool SqlTimestamp(const al::FieldDecl &field) {
+  const auto *property = Find(field.properties, "SqlTimestamp");
+  if (property == nullptr) { return false; }
+  const auto value = LowerKey(property->text);
+  if (value != "true" && value != "false") {
+    throw std::invalid_argument("SqlTimestamp must be true or false: " + field.name);
+  }
+  if (value == "false") { return false; }
+  const auto fieldClass = LowerKey(PropertyText(field, "FieldClass"));
+  if (TypeName(field.type) != "BigInteger" || (!fieldClass.empty() && fieldClass != "normal") ||
+      PropertyIs(field, "AutoIncrement", false)) {
+    throw std::invalid_argument(
+        "SqlTimestamp requires a stored BigInteger without AutoIncrement: " + field.name);
+  }
+  return true;
 }
 
 std::string PageNumber(const TableIndex &pages, std::string text) {
@@ -497,7 +581,7 @@ std::string DeclaredBlock(const al::FieldDecl &field,
   text("obsoleteTag", PropertyText(field, "ObsoleteTag"));
   text("externalName", PropertyText(field, "ExternalName"));
   text("optionOrdinalValues", PropertyText(field, "OptionOrdinalValues"));
-  flag("sqlTimestamp", PropertyIs(field, "SqlTimestamp", false), false);
+  flag("sqlTimestamp", SqlTimestamp(field), false);
   return out;
 }
 
@@ -506,12 +590,18 @@ std::string FieldTable(const al::TableObject &table,
                        const std::string &tableIdentifier,
                        const std::vector<OptionField> &options,
                        const EnumIndex &enums,
-                       const TableIndex &pages) {
-  const std::size_t declaredCount = sorted.size() - kSystemFieldCount;
+                       const TableIndex &pages,
+                       std::optional<SystemFieldProfile> profile) {
+  const std::size_t declaredCount = sorted.size() - SystemFieldsOf(table, profile).size();
   const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
-  std::string out = "constexpr auto k" + tableIdentifier + "Fields = WithSystemFields<" +
-                    tableClass + ">(std::array<FieldDef, " + std::to_string(declaredCount) +
-                    ">{{\n";
+  std::string materialize = "WithSystemFields<" + tableClass;
+  if (profile) {
+    materialize = "WithImplicitFields<" + tableClass + ", " + ProfileName(*profile) +
+                  ", ::agiru::TableType::" + KindName(table) + ", " +
+                  (Linked(table) ? "true" : "false");
+  }
+  std::string out = "constexpr auto k" + tableIdentifier + "Fields = " + materialize +
+                    ">(std::array<FieldDef, " + std::to_string(declaredCount) + ">{{\n";
   for (const al::FieldDecl *field : sorted) {
     if (IsSystemField(*field)) { continue; }
     const std::string identifier = FieldIdentifier(table, field->name);
@@ -600,7 +690,10 @@ std::string ProcedureIdentifier(const al::TableObject &table, const std::string 
   return Disambiguated(Identifier(name), "_Proc", taken);
 }
 
-TableRef BindTable(const al::TableObject &table, std::string identifier, std::string header) {
+TableRef BindTable(const al::TableObject &table,
+                   std::string identifier,
+                   std::string header,
+                   std::optional<SystemFieldProfile> hostProfile) {
   TableRef ref{.identifier = std::move(identifier),
                .header = std::move(header),
                .id = table.id,
@@ -617,7 +710,8 @@ TableRef BindTable(const al::TableObject &table, std::string identifier, std::st
   for (const al::FieldDecl &field : table.fields) {
     ref.fields.emplace(LowerKey(field.name), FieldIdentifier(table, field.name));
   }
-  for (const SystemFieldDecl &field : kSystemFields) {
+  ref.hostProfile = hostProfile;
+  for (const auto &field : SystemFieldsOf(table, hostProfile)) {
     ref.fields.emplace(LowerKey(std::string(field.name)), std::string(field.name));
   }
   ref.procedureDeclarations.reserve(table.procedures.size());
@@ -872,14 +966,8 @@ void RequireDistinctNativeFields(const al::TableObject &table) {
 std::string NativeSystemFields(const al::TableObject &table, const TableRef &binding) {
   const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
   std::string out;
-  for (const auto &system : kSystemFields) {
-    const al::FieldDecl field{.number = system.no.Value(),
-                              .name = std::string(system.name),
-                              .type = std::string(system.alType),
-                              .subtype = {},
-                              .length = 0,
-                              .properties = {},
-                              .triggers = {}};
+  for (const auto &system : SystemFieldsOf(table, binding.hostProfile)) {
+    const auto field = SystemDeclaration(system);
     out += NativeFieldAssertion(table, field, binding, nullptr);
     out += std::format(
         "static_assert({0}::Field_No::{1} == ::agiru::FieldNo{{{2}}}, {3});\n",
@@ -896,6 +984,19 @@ std::string NativeSystemFields(const al::TableObject &table, const TableRef &bin
         binding.identifier,
         system.name,
         Literal("native system field offset mismatch: " + table.name + "." + field.name));
+    if (binding.hostProfile) {
+      out += std::format(
+          "static_assert([] {{ const auto *field = ::agiru::Field({0}, "
+          "::agiru::FieldNo{{{1}}}); return field != nullptr && "
+          "field->sqlTimestamp == {2} && field->editable == {3} && field->calcFormula == {4}; "
+          "}}(), {5});\n",
+          metadata,
+          system.no.Value(),
+          system.role == SystemFieldRole::Timestamp,
+          system.role != SystemFieldRole::Timestamp && system.role != SystemFieldRole::AuditLookup,
+          Literal(std::string(system.calcFormula)),
+          Literal("native system field role mismatch: " + table.name + "." + field.name));
+    }
   }
   return out;
 }
@@ -919,6 +1020,12 @@ std::string NativeTableAssertions(const al::TableObject &table, const TableRef &
          std::to_string(table.fields.size()) + ";\n}(), " +
          Literal("native field count mismatch: " + table.name) + ");\n";
   const auto options = OptionFields(table, true);
+  if (binding.hostProfile) {
+    out += std::format("static_assert({}.fields.size() == {}, {});\n",
+                       metadata,
+                       table.fields.size() + SystemFieldsOf(table, binding.hostProfile).size(),
+                       Literal("native effective field count mismatch: " + table.name));
+  }
   for (const auto &field : table.fields) {
     out += NativeFieldAssertion(table, field, binding, OptionOf(options, field));
   }
@@ -1155,7 +1262,8 @@ std::string TableStorageAssertions(const al::TableObject &table,
                                    const std::string &tableIdentifier,
                                    const std::string &tableClass,
                                    const std::string &qualified,
-                                   std::size_t declaredFields) {
+                                   std::size_t declaredFields,
+                                   std::optional<SystemFieldProfile> profile) {
   std::string out = "static_assert(FieldsAreSorted(k";
   out += tableIdentifier;
   out += "Table),\n";
@@ -1177,7 +1285,9 @@ std::string TableStorageAssertions(const al::TableObject &table,
   out += tableIdentifier;
   out += "Fields.size() == ";
   out += std::to_string(declaredFields);
-  out += " + kSystemFieldCount, \"table ";
+  out += profile ? " + " + std::to_string(SystemFieldsOf(table, profile).size())
+                 : " + kSystemFieldCount";
+  out += ", \"table ";
   out += std::to_string(table.id);
   out += " declares ";
   out += std::to_string(declaredFields);
@@ -1260,15 +1370,8 @@ std::string TableDeclarationProperties(const al::TableObject &table,
   };
   text("ExternalName", "externalName");
   text("ExternalSchema", "externalSchema");
-  if (const auto *found = Find(table.properties, "TableType"); found != nullptr) {
-    static constexpr std::array types{
-        "Normal", "CRM", "CDS", "ExternalSQL", "Exchange", "MicrosoftGraph", "Temporary"};
-    const auto *const spelled = std::ranges::find_if(
-        types, [&](const char *name) { return LowerKey(name) == LowerKey(found->text); });
-    if (spelled == types.end()) {
-      throw std::invalid_argument("unknown TableType: " + found->text);
-    }
-    emit("tableType", "::agiru::TableType::" + std::string(*spelled));
+  if (Find(table.properties, "TableType") != nullptr) {
+    emit("tableType", "::agiru::TableType::" + KindName(table));
   }
   boolean("DataPerCompany", "dataPerCompany");
   boolean("ReplicateData", "replicateData");
@@ -1360,6 +1463,9 @@ std::string TableReflectionProperties(const al::TableObject &table,
 std::string NativeTableDefinition(const al::TableObject &table,
                                   const TableRef &binding,
                                   const Objects &objects) {
+  if (binding.hostProfile != objects.hostProfile) {
+    throw std::runtime_error("native binding and output host profiles differ: " + table.name);
+  }
   if (objects.module.empty() || objects.moduleHeader.empty()) {
     throw std::runtime_error("native table declaration has no original module: " + table.name);
   }
@@ -1381,14 +1487,15 @@ std::string NativeTableDefinition(const al::TableObject &table,
 std::string TableDefinitions(const al::TableObject &declared, const Objects &objects) {
   const std::string space = NamespaceOf(declared.nameSpace);
   const EnumIndex &enums = objects.enums;
-  const al::TableObject table = WithSystemFields(declared);
+  const al::TableObject table = WithSystemFields(declared, objects.hostProfile);
   const std::string tableIdentifier = Identifier(table.name);
   const std::vector<OptionField> options = OptionFields(table);
   const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
   const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
   const std::string qualified = space + "::" + tableClass;
   std::string out = "namespace " + space + " {\n\n";
-  out += FieldTable(table, sorted, tableIdentifier, options, enums, objects.pages);
+  out += FieldTable(
+      table, sorted, tableIdentifier, options, enums, objects.pages, objects.hostProfile);
 
   out += TableKeyDeclarations(table, tableIdentifier, tableClass);
 
@@ -1406,7 +1513,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   out += "};\n\n";
 
   out += TableStorageAssertions(
-      table, tableIdentifier, tableClass, qualified, sorted.size() - kSystemFieldCount);
+      table, tableIdentifier, tableClass, qualified, declared.fields.size(), objects.hostProfile);
   out += "\n";
   out += "} // namespace " + space + "\n\n";
   return out;
@@ -1416,7 +1523,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
                         const std::string &sourcePath,
                         const EnumIndex &enums,
                         const Objects &objects) {
-  const al::TableObject table = WithSystemFields(declared);
+  const al::TableObject table = WithSystemFields(declared, objects.hostProfile);
   const std::string tableIdentifier = Identifier(table.name);
   const std::string space = NamespaceOf(table.nameSpace);
   const std::string qualified = space + "::" + ClassName(tableIdentifier, ObjectKind::Table);
