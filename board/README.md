@@ -23,6 +23,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-system-field-write.UYh59R/` retains receipts. Both parser analyses
   pass; gate/Main analysis remains red on inherited/existing findings. Host/default
   resolution, full implicit profile, live provider and full replay remain open.
+  Original-package `make native-report-layouts` is now terminal/exit 0:
+  both ordinary/source-bound variants retain all sixteen layouts and pass 562
+  checks each; compiled ownership/property controls reject. App/slice platform
+  libraries and named-asset packaging pass; no rendering/provider/G1 claim.
+  `/tmp/agiru-native-report-layouts.Le25iF/` retains the complete receipt.
   Original reflected setter IL writes timestamp/buffer fields without an Editable
   check; preserve its distinction from typed source readonly semantics (0013).
 
@@ -152,6 +157,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   runner PID 300689, source SHA256
   `7e60e3057a71be09a24efd541643811e224c215f9f998f842ce40681f325805a`.
   Its snapshot/lane inputs remain immutable; development may resume in the main tree.
+  Build and complete local regression are now terminal/green: 146 cases/zero red,
+  including all 233 tooling tests. Its full AL UT target is live; no UT result yet.
+  These inputs predate the system-field index/runtime metadata increments above.
   Original ordinary NCL creation remains refused; no
   business/SQL lookup/Runtime-17 equivalence or new AL UT gain is claimed.
 

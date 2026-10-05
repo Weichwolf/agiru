@@ -15,6 +15,9 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
   against separate runtime/version assertions. Receipts:
   `/tmp/agiru-system-field-write.UYh59R/` and
   `/tmp/agiru-native-report-layouts.Le25iF/`. Both readers pass targeted lint;
+  The complete original-package layout qualifier exits 0: both generation variants
+  pass 562 checks each, retaining sixteen layouts and ownership/property controls.
+  App/slice libraries and named assets remain qualified, not rendered/activated.
   gate/Main analysis remains red on inherited BodyWriter and existing Main
   complexity/size findings. Host selection, omitted-runtime default resolution,
   runtime-string compatibility and complete implicit-profile activation remain open.
