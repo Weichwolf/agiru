@@ -7,11 +7,19 @@ dotnet
         type("System.Security.Cryptography.HashAlgorithm"; HashAlgorithm) { }
         type("System.Array"; Array) { }
         type("System.Text.Encoding"; Encoding) { }
+        type("System.Convert"; Convert) { }
     }
 }
 
 codeunit 50264 "Hash Consumer"
 {
+    procedure HashBase64(Input: Text; Algorithm: Text): Text
+    var
+        Convert: DotNet Convert;
+    begin
+        exit(Convert.ToBase64String(HashText(Input, Algorithm)));
+    end;
+
     procedure HashText(Input: Text; Algorithm: Text): DotNet Array
     var
         Hash: DotNet HashAlgorithm;

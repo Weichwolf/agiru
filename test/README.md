@@ -67,6 +67,16 @@ replays the separately measured CLR corpus. Header controls keep OpenSSL/Array
 implementation dependencies private. Keyed/stream/transform hashing, complete
 System.Array identity/type rules and WASM qualification remain open (0035).
 
+`make conversion JOBS=2` proves CLR Convert byte-array Base64 overloads, typed
+formatting options, regions, byte validation and block-seam line breaks through
+C++ and generated AL. Four compiled mutants must fail both consumers; converter/
+byte-array helpers and consumers run under ASan/UBSan, not the whole codec/runtime.
+Use `AGIRU_BASE64_REFERENCE=<original-core-TSV>` and
+`AGIRU_CONVERT_REFERENCE=<CLR-region-TSV>` for the measured external populations.
+`make hashing` additionally executes the generated HashAlgorithm→Convert chain.
+The four numeric Convert methods remain named refusals; no complete Convert,
+System.Array or ERP milestone is claimed (0035).
+
 `make streams JOBS=2` proves shared cursors, fresh/wrapper-local bindings, escaped
 local BLOB providers and independent BLOB values through C++ and generated AL.
 FileGate and that AL consumer also prove file binary/text modes, declared text

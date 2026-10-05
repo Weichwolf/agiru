@@ -34,6 +34,16 @@ compile_header dotnet/HashAlgorithm.h "$proof/HashAlgorithm.h.d"
 for forbidden in evp.h Regex.h Variant.h vector; do
   reject_dependency "$proof/HashAlgorithm.h.d" "$forbidden"
 done
+compile_header dotnet/Convert.h "$proof/Convert.h.d"
+for forbidden in Regex.h Variant.h vector evp.h; do
+  reject_dependency "$proof/Convert.h.d" "$forbidden"
+done
+compile_header dotnet/Convert.h "$proof/forced-Array.h.d" -include dotnet/Regex.h
+if reject_dependency "$proof/forced-Array.h.d" Regex.h \
+  > "$proof/forced-Array.h.log" 2>&1; then
+  printf 'header-dependencies: complete Array implementation escaped the control\n' >&2
+  exit 1
+fi
 compile_header dotnet/HashAlgorithm.h "$proof/forced-crypto.h.d" -include openssl/evp.h
 if reject_dependency "$proof/forced-crypto.h.d" evp.h \
   > "$proof/forced-crypto.h.log" 2>&1; then
@@ -90,4 +100,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: nine standalone headers; filesystem/regex/crypto/JSON/report/module/table controls refused\n'
+printf 'header-dependencies: ten standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table controls refused\n'

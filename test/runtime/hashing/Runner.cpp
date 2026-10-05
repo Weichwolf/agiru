@@ -40,6 +40,9 @@ void Disposal(agiru::Fixture::HashConsumer_Codeunit &consumer) {
 int main() {
   return gate::Run("Generated Hash Algorithms", [] {
     agiru::Fixture::HashConsumer_Codeunit consumer;
+    CHECK_TEXT("generated hash-to-Base64 preserves the actual CLR digest",
+               consumer.HashBase64("abc", "SHA256"),
+               "ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=");
     constexpr std::array<std::pair<std::string_view, std::string_view>, 5> vectors{{
         {"MD5", "900150983CD24FB0D6963F7D28E17F72"},
         {"SHA1", "A9993E364706816ABA3E25717850C26C9CD0D89D"},

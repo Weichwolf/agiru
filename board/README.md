@@ -15,6 +15,16 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Convert byte-array integration passes: 16,469 C++/14,615 generated-AL checks,
+  10,051 original-core and 710 CLR-region reference rows agree; four compiled
+  controls reject both consumers. Shared ByteArray/converter primitives and
+  consumers pass ASan/UBSan. Updated Hash→Base64 AL chain passes with all prior
+  hash checks/controls retained. `/tmp/agiru-conversion.FHI3rW`,
+  `/tmp/agiru-hashing.BKd4NG` (0035). Numeric conversions remain four named
+  refusals; Array null/type/reference identity remains unqualified. No own
+  source/gate analysis findings; 32 inherited header findings each and three
+  unchanged generator findings remain. Root regeneration/full replay are pending.
+
 - Generic byte hashing passes focused verification: five MD5/SHA families,
   1,182 C++ checks, 13 generated-AL checks, three compiled controls rejected by
   both consumers, primitive/consumer ASan/UBSan green. Private system OpenSSL;

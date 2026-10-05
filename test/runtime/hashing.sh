@@ -9,7 +9,7 @@ cp test/runtime/hashing/Fixture.Codeunit.al "$proof/source/Fixture.Codeunit.al"
 cp test/transpiler/native-enums/source/app.json "$proof/source/app.json"
 printf '%s\n' '{"apps":[{"name":"fixture","source":"source"}]}' > "$proof/apps.json"
 printf '%s\n' '{"include":["Microsoft"],"exclude":[],"product_exclude":[]}' > "$proof/scope.json"
-flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate
+flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate -Isrc/net
   "-I$proof/generated/fixture" "-I$proof/generated/absent" "-I$proof/generated/shared")
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
@@ -64,7 +64,7 @@ sanitizers=(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
   -o "$proof/sanitized-gate"
 "$CXX" "${flags[@]}" "${sanitizers[@]}" "$runner_source" "${sources[@]}" "${links[@]}" \
   -o "$proof/sanitized-runner"
-"$CXX" "${flags[@]}" "${sanitizers[@]}" -fPIC -shared src/net/HashAlgorithm.cpp \
+"$CXX" "${flags[@]}" "${sanitizers[@]}" -fPIC -shared src/net/HashAlgorithm.cpp src/net/ByteArray.cpp \
   "${links[@]}" -lcrypto -o "$proof/sanitized.so"
 for fixture in sanitized-gate sanitized-runner; do
   env ASAN_OPTIONS=detect_stack_use_after_return=1:symbolize=0 \
@@ -74,7 +74,7 @@ done
 sha256sum "$proof/sanitized-gate" "$proof/sanitized-runner" "$proof/sanitized.so" \
   > "$proof/sanitizers.sha256"
 rm -- "$proof/sanitized-gate" "$proof/sanitized-runner" "$proof/sanitized.so"
-sha256sum src/net/HashAlgorithm.cpp include/dotnet/HashAlgorithm.h \
+sha256sum src/net/HashAlgorithm.cpp src/net/ByteArray.cpp src/net/ByteArray.h include/dotnet/HashAlgorithm.h \
   test/gate/HashAlgorithmGate.cpp "$runner_source" test/runtime/hashing/Fixture.Codeunit.al \
   src/gen/RuntimeSurface.cpp "$B/libagiru_net.so" "$B/agirutc" "$gate" "$proof/runner" \
   > "$proof/inputs.sha256"

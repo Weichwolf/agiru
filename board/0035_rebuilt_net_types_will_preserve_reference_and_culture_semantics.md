@@ -5,6 +5,35 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Convert byte-array bridge reuses the original-core-qualified Base64 codec.
+  Typed formatting ordinals, checked regions and byte cells retain strict CLR
+  padding/whitespace policy; the transform decoder is not substituted. Encoding
+  reads 3,648-byte blocks (64 complete 57-byte/76-column lines), preserving CRLF
+  at seams without a full binary input copy. Output/decoded arrays still own
+  their complete contents; decode retains a temporary byte string, not constant
+  whole-operation memory. Shared private ByteArray checks also serve HashAlgorithm.
+  `make conversion`: 16,469 C++ and 14,615 generated-AL checks green; all 10,051
+  original byte-core rows and 710 CLR region/options rows agree (720,027 checks).
+  `/tmp/agiru-conversion.FHI3rW`, `/tmp/agiru-convert-reference.a6sz4g`; region
+  SHA256 `99bdeeb7ce7400b415c2af2b65b19b92a36b9c6a5a496d13eeb290f011875f8a`.
+  Four compiled offset/seam/formatting/byte-narrowing controls reject both consumers.
+  Converter/byte helpers and consumers pass ASan/UBSan; underlying codec/runtime
+  are not wholly instrumented. Updated hashing retains 1,182/52,195 C++ checks,
+  14 generated-AL checks including Hash→Base64, all three controls and sanitizer
+  proof: `/tmp/agiru-hashing.BKd4NG`. Header controls keep complete Array/backend
+  dependencies private. Source/gate analysis retains 32 inherited header findings
+  each, zero own findings; both runners pass; generator's three unchanged findings
+  remain unsuppressed. Numeric ToInt16/ToInt32/ToUInt16/ToUInt32 still refuse by name;
+  complete Array reference/null/byte-type identity and CLR diagnostics remain gaps.
+  Root regeneration/full local/full UT replay are pending, not an OAuth/G1 claim.
+  References: developer `ff5939a46e`, `devenv-get-started-call-dotnet-from-al.md`;
+  BCApps `bb7111877f`, CryptographyManagementImpl.Codeunit.al ConvertByteHashToBase64String,
+  DotNet Aliases/src/dotnet.al and DotNetBinaryWriter.Codeunit.al numeric consumers;
+  user docs `0ff62b2266`, finance-how-setup-edocuments.md (Base64 intent, not API authority).
+  Predecessor 1511 is an OutStream finding, not byte-array specification. CLR API:
+  https://learn.microsoft.com/en-us/dotnet/api/system.convert.tobase64string?view=net-10.0
+  and https://learn.microsoft.com/en-us/dotnet/api/system.convert.frombase64string?view=net-10.0.
+
 - Generic HashAlgorithm byte bridge: MD5/SHA1/SHA256/SHA384/SHA512 use private
   system OpenSSL Crypto 3.5.7, not a business-object workaround. Factories retain
   built-in aliases/null results; bound copies share provider disposal, rebinding

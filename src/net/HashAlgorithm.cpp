@@ -5,11 +5,13 @@
 #include "type/Integer.h"
 #include "type/Variant.h"
 
+#include "ByteArray.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <limits>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -56,15 +58,7 @@ void UpdateDigest(EVP_MD_CTX &context, const Array &bytes, Integer offset, Integ
   Integer consumed = 0;
   while (consumed < count) {
     const auto length = std::min(static_cast<std::size_t>(count - consumed), block.size());
-    for (std::size_t index = 0; index < length; ++index) {
-      const Variant &cell = bytes.GetValue(offset + consumed + static_cast<Integer>(index));
-      if (!cell.IsInteger()) { throw Error("HashAlgorithm.ComputeHash: expected a byte array"); }
-      const Integer value = cell;
-      if (value < 0 || value > std::numeric_limits<unsigned char>::max()) {
-        throw Error("HashAlgorithm.ComputeHash: byte value is outside [0,255]");
-      }
-      block[index] = static_cast<unsigned char>(value);
-    }
+    detail::ReadByteBlock(bytes, offset + consumed, std::span(block).first(length));
     if (EVP_DigestUpdate(&context, block.data(), length) != 1) {
       throw Error("HashAlgorithm.ComputeHash: digest update failed");
     }
@@ -101,9 +95,7 @@ Array HashAlgorithm::ComputeHash(const Array &bytes) const {
 Array HashAlgorithm::ComputeHash(const Array &bytes, Integer offset, Integer count) const {
   if (state_ == nullptr) { throw Error("HashAlgorithm.ComputeHash: reference is null"); }
   if (state_->digest == nullptr) { throw Error("HashAlgorithm.ComputeHash: object is disposed"); }
-  if (offset < 0 || count < 0 || offset > bytes.Length() || count > bytes.Length() - offset) {
-    throw Error("HashAlgorithm.ComputeHash: invalid byte-array region");
-  }
+  detail::ValidateByteRegion(bytes, offset, count);
   const std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> context{EVP_MD_CTX_new(),
                                                                         EVP_MD_CTX_free};
   if (context == nullptr || EVP_DigestInit_ex(context.get(), state_->digest.get(), nullptr) != 1) {
