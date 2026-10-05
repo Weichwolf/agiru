@@ -10,7 +10,9 @@
 #include "TableWriter.h"
 
 #include <array>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace {
 
@@ -364,6 +366,137 @@ void NativeRecordPropertiesUseTheirSourceBinding() {
                   .contains("Rec.FilterGroup()"));
 }
 
+constexpr std::array kReadOnlyImplicitNames{std::string_view{"SystemRowVersion"},
+                                            std::string_view{"SystemCreatedByUserName"},
+                                            std::string_view{"SystemCreatedByFullName"},
+                                            std::string_view{"SystemModifiedByUserName"},
+                                            std::string_view{"SystemModifiedByFullName"}};
+
+void ImplicitFieldAssignmentsRefuseAtTheSource() {
+  agiru::gen::Objects objects;
+  objects.tables = agiru::gen::PlatformTables();
+  for (const auto field : kReadOnlyImplicitNames) {
+    for (const auto *const receiver : {"Row.", "Rows[1]."}) {
+      for (const auto *const operation : {":=", "+=", "-=", "*=", "/="}) {
+        const auto source = std::string(R"(codeunit 50187 Fixture {
+          procedure Write()
+          var Row: Record "Table Metadata" temporary;
+              Rows: array[2] of Record "Table Metadata";
+          begin )") + receiver +
+                            std::string(field) + " " + operation + " 1; end; }";
+        bool refused = false;
+        try {
+          static_cast<void>(agiru::gen::WriteCodeunitSource(
+              agiru::al::ParseCodeunit(source), "Fixture.Codeunit.al", objects));
+        } catch (const std::runtime_error &error) {
+          refused =
+              error.what() == "AL assignment to read-only implicit field: " + std::string(field);
+        }
+        CHECK_TRUE("typed record writes to read-only implicit fields refuse", refused);
+      }
+    }
+    const auto self = std::string(R"(codeunit 50187 Fixture {
+      procedure Write() var Row: Record "Table Metadata" temporary;
+      begin Row.)") + std::string(field) +
+                      " := Row." + std::string(field) + "; end; }";
+    bool selfRefused = false;
+    try {
+      static_cast<void>(agiru::gen::WriteCodeunitSource(
+          agiru::al::ParseCodeunit(self), "Fixture.Codeunit.al", objects));
+    } catch (const std::runtime_error &error) {
+      selfRefused =
+          error.what() == "AL assignment to read-only implicit field: " + std::string(field);
+    }
+    CHECK_TRUE("read-only self assignment refuses before no-op lowering", selfRefused);
+    for (const auto *const receiver : {"", "Rec.", "xRec."}) {
+      const auto source = std::string(R"(page 50188 Fixture {
+        SourceTable = "Table Metadata";
+        procedure Write() begin )") +
+                          receiver + std::string(field) + " := 1; end; }";
+      bool refused = false;
+      try {
+        static_cast<void>(agiru::gen::WriteSource(
+            agiru::al::ParsePage(source), "Fixture.Page.al", objects, nullptr));
+      } catch (const std::runtime_error &error) {
+        refused =
+            error.what() == "AL assignment to read-only implicit field: " + std::string(field);
+      }
+      CHECK_TRUE("page record writes to read-only implicit fields refuse", refused);
+    }
+    for (const auto *const receiver : {"", "Rec.", "this."}) {
+      const auto source = std::string(R"(table 50189 Fixture {
+        fields { field(1; ID; Integer) {} }
+        procedure Write() begin )") +
+                          receiver + std::string(field) + " := 1; end; }";
+      bool refused = false;
+      try {
+        static_cast<void>(
+            agiru::gen::WriteSource(agiru::al::ParseTable(source), "Fixture.Table.al", objects));
+      } catch (const std::runtime_error &error) {
+        refused =
+            error.what() == "AL assignment to read-only implicit field: " + std::string(field);
+      }
+      CHECK_TRUE("table record writes to read-only implicit fields refuse", refused);
+    }
+  }
+}
+
+void DeclaredVariablesAndAuditWritesAreNotReadOnlyFields() {
+  agiru::gen::Objects objects;
+  objects.tables = agiru::gen::PlatformTables();
+  for (const auto field : kReadOnlyImplicitNames) {
+    const auto source = std::string(R"(page 50190 Fixture {
+      SourceTable = "Table Metadata";
+      var )") + std::string(field) +
+                        R"(: Integer;
+      procedure LocalWrite(): Integer var )" +
+                        std::string(field) + R"(: Integer;
+      begin )" + std::string(field) +
+                        " := 1; exit(" + std::string(field) + R"(); end;
+      procedure ParameterWrite(var )" +
+                        std::string(field) + R"(: Integer)
+      begin )" + std::string(field) +
+                        R"( += 1; end;
+      procedure Read(): Text begin exit(Rec.)" +
+                        std::string(field) + R"(); end;
+      procedure GlobalWrite() begin )" +
+                        std::string(field) + R"( := 2; end;
+      procedure ReturnWrite() )" +
+                        std::string(field) + R"(: Integer
+      begin )" + std::string(field) +
+                        R"( := 3; end;
+    })";
+    const auto page = agiru::al::ParsePage(source);
+    const auto body = agiru::gen::WriteSource(page, "Fixture.Page.al", objects, nullptr);
+    CHECK_TRUE("local variables shadow read-only system names on both sides",
+               body.contains(std::string(field) + " = 1;") &&
+                   body.contains("return " + std::string(field) + ";"));
+    CHECK_TRUE("var parameters retain ordinary writable value semantics",
+               body.contains(std::string(field) + " += 1;"));
+    CHECK_TRUE("read-only implicit fields remain readable",
+               body.contains("return Rec." + std::string(field) + ";"));
+    CHECK_TRUE(
+        "global variables shadow read-only system names",
+        body.contains(agiru::gen::PageVariableIdentifier(page, std::string(field)) + " = 2;"));
+    CHECK_TRUE("named return values shadow read-only system names",
+               body.contains(std::string(field) + " = 3;"));
+  }
+  const auto unit = agiru::al::ParseCodeunit(R"(codeunit 50191 Fixture {
+    procedure Write()
+    var Row: Record "Table Metadata" temporary; Value: Guid; Ref: FieldRef;
+    begin Row.SystemId := Value; Row.SystemCreatedBy := Value;
+      Row.SystemModifiedBy := Value; Ref.Value := Value;
+    end;
+  })");
+  const auto body = agiru::gen::WriteCodeunitSource(unit, "Fixture.Codeunit.al", objects);
+  CHECK_TRUE("supplied identity and audit-buffer assignment stay writable",
+             body.contains("Row.SystemId = Value;") &&
+                 body.contains("Row.SystemCreatedBy = Value;") &&
+                 body.contains("Row.SystemModifiedBy = Value;"));
+  CHECK_TRUE("FieldRef reflected writes keep their separate runtime contract",
+             body.contains("Ref.Value(Value);"));
+}
+
 }
 
 int main() {
@@ -374,5 +507,7 @@ int main() {
     PagesWithoutAnAstUseTheDeclaredOptionIndex();
     DataItemOptionsKeepTheirOwnRecordContext();
     NativeRecordPropertiesUseTheirSourceBinding();
+    ImplicitFieldAssignmentsRefuseAtTheSource();
+    DeclaredVariablesAndAuditWritesAreNotReadOnlyFields();
   });
 }

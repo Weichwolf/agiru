@@ -57,7 +57,7 @@ five-field declarations, and qualify PostgreSQL rowversion before catalogue acti
   ExpenseActivityLogTest; `src/gen/{TableKeys,TableWriter}.cpp`,
   `src/rt/{FieldMetadata,RecordRef,Storage}.cpp`.
 - `make reflection-metadata` passes the source, reflection, RecordRef, Field and
-  system-profile gates plus 31 mutation controls. The canonical profile selects
+  system-profile gates plus 32 mutation controls. The canonical profile selects
   kind/LinkedObject/host presence; all three reflection callers share original names.
   A real Record.FieldName → Field lookup → FieldRef.Value caller detects source-name
   substitution. The narrow identity header's typed-dependency control also passes.
@@ -68,6 +68,12 @@ five-field declarations, and qualify PostgreSQL rowversion before catalogue acti
   PostgreSQL User rows, including renamed and absent users. The fixture owns a
   connection-private PostgreSQL schema and rolls back; it never drops a shared User.
   Typed GetTable rejects an absent buffer instead of dereferencing null.
+- `BodyWriter.cpp` refuses direct/compound AL assignment to timestamp and user
+  lookups, including indexed records and no-op self-assignment. Native/ordinary
+  page/table/codeunit contexts preserve declared local/global/parameter/return
+  shadowing, readable fields, supplied identity/audit and reflected FieldRef writes.
+  `GenSourceBindingGate` and the compiled writable-role mutant qualify this boundary;
+  borrowed-var writes and source Validate/Clear paths remain separate gaps.
 - Original-package audit: eighteen bound candidates compile without PCH; original
   page/source-library and offset/type/number/drop/namespace controls pass. All 215
   selected unbound tables remain red. Other native/generated records still use the

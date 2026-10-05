@@ -11,6 +11,7 @@ indexed_gate="$B/gate_RecordRefGate"
 field_gate="$B/gate_PlatformFieldGate"
 "$field_gate" > "$proof/field-names.log" 2>&1
 "$B/gate_PlatformSystemFieldsGate" > "$proof/system-profiles.log" 2>&1
+"$B/gate_GenSourceBindingGate" > "$proof/source-binding.log" 2>&1
 if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
   "$gate" "$AGIRU_METADATA_ID_REFERENCE" > "$proof/reference.log" 2>&1
   sha256sum "$AGIRU_METADATA_ID_REFERENCE" > "$proof/reference.sha256"
@@ -51,6 +52,32 @@ fi
 rg -q 'FAIL .*Record.FieldName uses the original getter spelling' "$proof/source-name.log"
 sha256sum "$proof/source-name.cpp" "$proof/source-name.so" > "$proof/name-control.sha256"
 rm -- "$proof/source-name.cpp" "$proof/source-name.so"
+
+awk '
+  /void ValidateImplicitAssignment\(/ { inside=1 }
+  inside && /field.role == SystemFieldRole::Timestamp/ {
+    sub(/SystemFieldRole::Timestamp/, "SystemFieldRole::Identity"); changed++
+  }
+  inside && /field.role == SystemFieldRole::AuditLookup/ {
+    sub(/SystemFieldRole::AuditLookup/, "SystemFieldRole::Audit"); changed++
+  }
+  inside && /^  }$/ { inside=0 }
+  { print }
+  END { if (changed != 2 || inside) exit 2 }
+' src/gen/BodyWriter.cpp > "$proof/writable-implicit-fields.cpp"
+"$CXX" "${flags[@]}" -Isrc/gen -Isrc/al "$proof/writable-implicit-fields.cpp" \
+  -L"$B" -Wl,-rpath,"$B" -lagiru_gen -lagiru_al -o "$proof/writable-implicit-fields.so"
+write_status=0
+LD_PRELOAD="$proof/writable-implicit-fields.so" "$B/gate_GenSourceBindingGate" \
+  > "$proof/writable-implicit-fields.log" 2>&1 || write_status=$?
+if [ "$write_status" -ne 1 ]; then
+  printf 'reflection-metadata: implicit source writes were accepted or crashed (status %s)\n' "$write_status" >&2
+  exit 1
+fi
+rg -q 'FAIL .*typed record writes to read-only implicit fields refuse' "$proof/writable-implicit-fields.log"
+sha256sum "$proof/writable-implicit-fields.cpp" "$proof/writable-implicit-fields.so" \
+  > "$proof/source-write-control.sha256"
+rm -- "$proof/writable-implicit-fields.cpp" "$proof/writable-implicit-fields.so"
 
 for control in linked-audit old-profile-lookups; do
   mkdir -p "$proof/$control/meta"
@@ -326,4 +353,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-one compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-two compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

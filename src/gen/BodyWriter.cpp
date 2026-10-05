@@ -1131,6 +1131,40 @@ private:
     return Parens::None;
   }
 
+  void ValidateImplicitAssignment(const al::Expr &expression) const {
+    if (expression.text != ":=" && expression.text != "+=" && expression.text != "-=" &&
+        expression.text != "*=" && expression.text != "/=") {
+      return;
+    }
+    const auto &target = expression.children.front();
+    std::string_view name;
+    if (target.kind == al::ExprKind::Name) {
+      if (scope_.IsVariable(target.text) ||
+          (scope_.ThisTable().empty() && !scope_.IsRecord("Rec"))) {
+        return;
+      }
+      name = target.text;
+    } else if (target.kind == al::ExprKind::Binary && target.text == "." &&
+               target.children.size() == 2 && target.children.back().kind == al::ExprKind::Name) {
+      const auto &owner = Indexed(target.children.front());
+      if (owner.kind != al::ExprKind::Name) { return; }
+      const bool record = scope_.IsRecord(owner.text) ||
+                          SameName(scope_.DeclaredType(owner.text), "Record") ||
+                          (SameName(owner.text, "this") && !scope_.ThisTable().empty());
+      if (!record) { return; }
+      name = target.children.back().text;
+    } else {
+      return;
+    }
+    for (const auto &field : kImplicitSystemFields) {
+      if (SameName(field.name, name) && (field.role == SystemFieldRole::Timestamp ||
+                                         field.role == SystemFieldRole::AuditLookup)) {
+        throw std::runtime_error("AL assignment to read-only implicit field: " +
+                                 std::string(field.name));
+      }
+    }
+  }
+
   std::string PropertyAssignment(const al::Expr &expression) {
     if (expression.text != ":=" || expression.children.size() != 2) { return {}; }
     const al::Expr &target = expression.children.front();
@@ -1453,6 +1487,7 @@ private:
                                std::to_string(expression.children.size()) +
                                " operands has no translation");
     }
+    ValidateImplicitAssignment(expression);
     if (const std::string logical = BooleanExpression(expression); !logical.empty()) {
       return logical;
     }
