@@ -34,18 +34,22 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   All three Rename tests recover; source count stays 139, no losses/changed errors/
   missing/added/duplicates (`three-codeunits-comparison.json`). Source/image hashes
   match after execution. Owned diagnostic databases and the disposable 903 MiB
-  image are removed; hashes/results remain. Complete local/AL replay stays pending.
+  image are removed; hashes/results remain. Complete current-tree `make test JOBS=2`
+  on `81c5209` passes: 141 cases/232 tooling tests, exit 0. Source/image hashes match
+  before/after; all twenty-three record controls reject (`fAdRKi`).
+  `/tmp/agiru-rename-anchor.7GvVDQ/all-local.log`. Full AL with this fix stays pending.
 - Caller-fix integration: `20261004T232014Z-3101267`, frozen HEAD `e9be54d`,
   source `74b27d9d9fe48dbdfdc95a03895d9873db1e29bd87d8b2f430c8170ecd984375`;
-  `slice-check all test ut`, six jobs, runner PID 3102678 confirmed live.
-  Slice check/build/local tests pass (141 cases/232 tooling tests); full AL UT
-  is running. Dependencies match 223110.
+  `slice-check all test ut`, six jobs; terminal at 00:44:29 UTC, runner gone.
+  Slice check/build/local tests pass (141 cases/232 tooling tests); UT exits 2:
+  2,167/2,314 passed, 147 failed, zero incomplete, 80 codeunits/1,516 seconds.
+  Against 223110: no gains/losses/changed errors/missing/added/duplicates; source
+  manifest/file hashes match (`artifacts/ut-comparison-223110.json`). Dependencies
+  match 223110; frozen source/System/original-notice pre/post hashes match.
   Includes ModifyAll caller preservation, excludes the later Rename cascade fix.
-  Compare all 2,314 identities/statuses/errors against 223110 and retain all losses.
   Null/unsealed seed remains diagnostic, not causal A/B or G1.
-  Current-tree local replay on `81c5209` starts after this run enters UT; input
-  hashes match before starting. `/tmp/agiru-rename-anchor.7GvVDQ/all-local.log` is
-  its pending receipt; compiler inputs stay unchanged, no shared gate-DB overlap.
+  Current-tree local replay above starts only after this run enters UT; no shared
+  gate-DB overlap. Replay the later Rename fix against all 2,314 original identities.
 - ModifyAll caller preservation (0044): an independent filtered worker shares temporary
   rows, not caller buffers/cursors/globals. DynamicRecordGate: 7,493 checks green;
   the same fixture against the preceding implementation has 144 failures. SQL and
@@ -61,7 +65,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   (`default-gates-build.log`, `local-source-inputs.sha256`). Complete default-DB
   replay passes: 141 cases/232 tooling tests, exit 0; inputs unchanged before/after
   (`all-local.log`). It starts only after frozen 223110's local tests finish;
-  no shared-DB overlap. Full AL with this caller fix remains pending.
+  no shared-DB overlap. Full AL with this caller fix is terminal above, without a
+  UT status/error change.
 - Dynamic-write integration: `20261004T223110Z-2943281`, frozen HEAD `382ecce`,
   source `d6b5367a085aae5be3e0d154ba6caf8660df15047a41945ca6294ab6efa53a0e`;
   `slice-check all test ut`, six jobs; terminal at 23:14:22 UTC, runner gone.

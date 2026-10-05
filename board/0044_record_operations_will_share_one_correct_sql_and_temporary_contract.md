@@ -23,11 +23,17 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   Three Rename gains, no losses/changed errors/missing/added/duplicates, unchanged
   source denominator (`three-codeunits-comparison.json`). Source/image hashes match
   after execution. Owned diagnostic databases and the disposable image are removed;
-  receipts remain. Complete local/AL replay is pending;
+  receipts remain. Complete current-tree `make test JOBS=2` on `81c5209` passes:
+  141 cases/232 tooling tests, exit 0; input hashes match before/after. All
+  twenty-three record controls reject (`/tmp/agiru-record-order-controls.fAdRKi`);
+  `/tmp/agiru-rename-anchor.7GvVDQ/all-local.log`. Full AL with this fix is pending;
   that image retains all seven non-runtime hashes from 223110, replaces libagiru_rt
   only and does not qualify rebuilt ModifyAll callers or the full UT population.
-  Frozen 232014 includes the ModifyAll caller fix, not
-  this cascade fix; replay all original UT and investigate all remaining losses.
+  Frozen 232014 includes the ModifyAll caller fix, not this cascade fix. Its full
+  UT replay is terminal: 2,167/2,314 passed, 147 failed, zero incomplete; against
+  223110 no gains/losses/changed errors/missing/added/duplicates, source hashes match.
+  Frozen source/System/notice pre/post hashes match (`artifacts/ut-comparison-223110.json`).
+  Replay this cascade fix over all original UT and investigate remaining failures.
 - ModifyAll caller preservation: `Table.h` uses an independent filtered worker,
   copies NewValue before writes and borrows shared temporary rows. The caller's
   field buffer/SystemId/position survive; Next observes changed stored successors.
