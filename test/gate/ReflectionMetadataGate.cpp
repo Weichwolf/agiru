@@ -235,9 +235,12 @@ void TableProjectionVariants() {
         std::tuple{Property::MicrosoftGraph, Native::MicrosoftGraph, true}}) {
     auto source = kSourceTable;
     source.tableType = type;
+    source.dataPerCompany = true;
     const auto row = agiru::detail::ProjectTableMetadata(source);
     CHECK_TRUE("declared table type and external-data classification stay aligned",
                row.TableType == native && static_cast<bool>(row.DataIsExternal) == external);
+    CHECK_TRUE("non-Normal tables are not company-specific in runtime metadata",
+               !row.DataPerCompany && source.dataPerCompany);
   }
   auto source = kSourceTable;
   source.dataCaptionFields = {};
@@ -275,9 +278,40 @@ void TableProjectionDefaults() {
                declaration.dataClassification.empty() && declaration.access.empty() &&
                    declaration.compressionType.empty() && declaration.obsoleteState.empty() &&
                    declaration.scope.empty());
-    CHECK_TRUE("ordinary AL Boolean defaults survive the projection",
-               row.DataPerCompany && row.ReplicateData && row.PasteIsValid && !row.LinkedObject);
+    CHECK_TRUE("ordinary AL runtime company scope requires a Normal table",
+               static_cast<bool>(row.DataPerCompany) == (kind == agiru::TableType::Normal));
+    CHECK_TRUE("other ordinary AL Boolean defaults survive the projection",
+               row.ReplicateData && row.PasteIsValid && !row.LinkedObject);
     CHECK_TRUE("default projection allocates no record/session state",
+               row.State_Block.Peek() == nullptr);
+  }
+}
+
+void NativeTableProjectionDefaults() {
+  using namespace agiru::platform;
+  const agiru::TableDef source{
+      .id = TableMetadata_Table::kId, .name = "Native source defaults", .module = &kSourceModule};
+  for (const auto kind : {agiru::TableType::Normal, agiru::TableType::Temporary}) {
+    auto declaration = source;
+    declaration.tableType = kind;
+    const auto row = agiru::detail::ProjectTableMetadata(declaration);
+    CHECK_TRUE("native classification uses original compiler-emitted CustomerContent",
+               row.DataClassification == FieldDataClassification::CustomerContent);
+    CHECK_TRUE("native omitted Access uses original Public",
+               row.Access == TableMetadataAccess::Public);
+    CHECK_TRUE("native omitted compression uses original Unspecified",
+               row.CompressionType == TableMetadataCompressionType::Unspecified);
+    CHECK_TRUE("native omitted obsoletion uses original No",
+               row.ObsoleteState == TableMetadataObsoleteState::No);
+    CHECK_TRUE("native omitted Scope uses normalized original Personalization/Cloud",
+               row.Scope == TableMetadataScope::Cloud);
+    CHECK_TRUE("native runtime company scope is false without changing the source property",
+               !row.DataPerCompany && declaration.dataPerCompany);
+    CHECK_TRUE("native default projection keeps source property omissions",
+               declaration.dataClassification.empty() && declaration.access.empty() &&
+                   declaration.compressionType.empty() && declaration.obsoleteState.empty() &&
+                   declaration.scope.empty());
+    CHECK_TRUE("native projection does not allocate per-record catalogue state",
                row.State_Block.Peek() == nullptr);
   }
 }
@@ -308,8 +342,7 @@ void TableProjectionRefusals() {
     CHECK_TRUE("invalid explicit properties never fall back to ordinary AL defaults",
                refused(source, "Table Metadata."));
     source.id = agiru::platform::TableMetadata_Table::kId;
-    source.*member = {};
-    CHECK_TRUE("native property omission needs separate creation-metadata authority",
+    CHECK_TRUE("invalid explicit native properties cannot become effective defaults",
                refused(source, "Table Metadata."));
   }
   source = kSourceTable;
@@ -533,6 +566,7 @@ int main(int argc, char **argv) {
     TableProjection();
     TableProjectionVariants();
     TableProjectionDefaults();
+    NativeTableProjectionDefaults();
     TableProjectionRefusals();
     CompiledRecordFilters();
     MissingProviderIsNotAnEmptySnapshot<agiru::platform::PageMetadata>();

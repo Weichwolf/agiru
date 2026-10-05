@@ -103,7 +103,7 @@ for control in ordinal-cast cds-query default-fallback property-fallback propert
   rg -q 'FAIL ' "$proof/$control.log"
 done
 
-for control in caption-names absent-caption-field null-owner wrong-access wrong-default-classification native-defaults null-system-id wrong-system-provider; do
+for control in caption-names absent-caption-field null-owner wrong-access wrong-default-classification native-defaults declaration-company-scope null-system-id wrong-system-provider; do
   awk -v control="$control" '
     control == "caption-names" && /result \+= std::to_string\(no.Value\(\)\);/ {
       $0 = "    result += Field(source, no)->name;"; changed++
@@ -117,12 +117,16 @@ for control in caption-names absent-caption-field null-owner wrong-access wrong-
     control == "wrong-access" && /result.Access = Verified\(MetadataAccess\(EffectiveProperty/ {
       $0 = "  result.Access = platform::TableMetadataAccess::Public;"; changed++
     }
-    control == "wrong-default-classification" && /EffectiveProperty\(source, source.dataClassification, "CustomerContent"\)/ {
+    control == "wrong-default-classification" && /EffectiveProperty\(source.dataClassification, "CustomerContent"\)/ {
       sub(/"CustomerContent"/, "\"ToBeClassified\""); changed++
     }
-    control == "native-defaults" && /return value.empty\(\) && !IsPlatformTable\(source.id\)/ {
-      sub(/!IsPlatformTable\(source.id\)/, "source.id.Value() != 0"); changed++
+    control == "native-defaults" && /platform::TableMetadata_Table result;/ {
+      print "  if (IsPlatformTable(source.id) && source.dataClassification.empty()) { throw Error(\"native omitted property\"); }"; changed++
     }
+    control == "declaration-company-scope" && /result.DataPerCompany =/ {
+      print "  result.DataPerCompany = source.dataPerCompany;"; changed++; skipping=1; next
+    }
+    skipping { if (/;$/) skipping=0; next }
     control == "null-system-id" && /result.SystemId = MetadataSystemId/ {
       $0 = "  result.SystemId = Guid{};"; changed++
     }
@@ -130,7 +134,7 @@ for control in caption-names absent-caption-field null-owner wrong-access wrong-
       sub(/platform::TableMetadata_Table::kId/, "source.id"); changed++
     }
     { print }
-    END { if (changed != 1) exit 2 }
+    END { if (changed != 1 || skipping) exit 2 }
   ' src/rt/TableMetadata.cpp > "$proof/$control.cpp"
   "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
     -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
@@ -156,4 +160,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, stable identities, compiled filters, AL defaults and temporary rows pass; twenty controls refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, stable identities, compiled filters, qualified defaults/company scope and temporary rows pass; twenty-one controls refuse; %s\n' "$proof"

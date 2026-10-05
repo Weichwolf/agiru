@@ -24,9 +24,8 @@ auto Verified(const auto &value) {
   return *value;
 }
 
-std::string_view
-EffectiveProperty(const TableDef &source, std::string_view value, std::string_view fallback) {
-  return value.empty() && !IsPlatformTable(source.id) ? fallback : value;
+std::string_view EffectiveProperty(std::string_view value, std::string_view fallback) {
+  return value.empty() ? fallback : value;
 }
 
 Guid OriginalOwner(const TableDef &source) {
@@ -61,7 +60,8 @@ platform::TableMetadata_Table ProjectTableMetadata(const TableDef &source) {
   result.ID = source.id.Value();
   result.Name = source.name;
   result.Caption = source.caption;
-  result.DataPerCompany = source.dataPerCompany;
+  result.DataPerCompany =
+      source.dataPerCompany && source.tableType == TableType::Normal && !IsPlatformTable(source.id);
   result.LookupPageID = source.lookupPageId.Value();
   result.DrillDownPageID = source.drillDownPageId.Value();
   result.DataCaptionFields = CaptionFields(source);
@@ -72,18 +72,18 @@ platform::TableMetadata_Table ProjectTableMetadata(const TableDef &source) {
   result.TableType = Verified(MetadataTableType(source.tableType));
   result.ExternalName = source.externalName;
   result.ObsoleteState =
-      Verified(MetadataObsoleteState(EffectiveProperty(source, source.obsoleteState, "No")));
+      Verified(MetadataObsoleteState(EffectiveProperty(source.obsoleteState, "No")));
   result.ObsoleteReason = source.obsoleteReason;
-  result.DataClassification = Verified(MetadataDataClassification(
-      EffectiveProperty(source, source.dataClassification, "CustomerContent")));
+  result.DataClassification = Verified(
+      MetadataDataClassification(EffectiveProperty(source.dataClassification, "CustomerContent")));
   result.ReplicateData = source.replicateData;
-  result.CompressionType = Verified(
-      MetadataCompressionType(EffectiveProperty(source, source.compressionType, "Unspecified")));
+  result.CompressionType =
+      Verified(MetadataCompressionType(EffectiveProperty(source.compressionType, "Unspecified")));
   result.AppID = OriginalOwner(source);
   result.InherentPermissions = source.inherentPermissions;
   result.InherentEntitlements = source.inherentEntitlements;
-  result.Scope = Verified(MetadataScope(EffectiveProperty(source, source.scope, "Cloud")));
-  result.Access = Verified(MetadataAccess(EffectiveProperty(source, source.access, "Public")));
+  result.Scope = Verified(MetadataScope(EffectiveProperty(source.scope, "Cloud")));
+  result.Access = Verified(MetadataAccess(EffectiveProperty(source.access, "Public")));
   result.ALNamespace = source.nameSpace;
   result.SystemId = MetadataSystemId(platform::TableMetadata_Table::kId, source.id.Value());
   return result;

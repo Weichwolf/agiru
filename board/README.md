@@ -21,6 +21,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Missing-source/wrong-version controls reject. Original Table Metadata has 33
   fields, not agiru's current 28; complete implicit profile/live activation remain
   open. `/tmp/agiru-table-provider-authority.CyvRCA/native-profile.json`.
+  agiru now projects qualified native defaults and effective company scope:
+  all 234 original AL tables/2,340 property comparisons match original NCL.
+  The old company projection fails 23 comparisons. Focused/source gates pass
+  227/2,917 checks; twenty-one controls reject; reference and ASan/UBSan gates
+  pass 14,329 checks each. Native source omissions stay unchanged; no own
+  analysis findings, inherited headers remain red. `native-defaults.json` in
+  the same receipt directory. Live activation and full AL replay remain open.
 
 - Current full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.
@@ -37,8 +44,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   path (0044). All 14,101 original constructor observations agree; 204 projection
   checks/2,917 source checks/twenty controls pass. ASan/UBSan reference replay:
   14,306 checks/zero red. No own analysis findings; inherited header findings remain.
-  `/tmp/agiru-table-provider-authority.CyvRCA/receipt.json`. Native omitted-property,
-  implicit-field/schema and live read-only-provider gaps remain guarded. This batch
+  `/tmp/agiru-table-provider-authority.CyvRCA/receipt.json`. Native omitted properties
+  are qualified above; implicit-field/schema and live read-only-provider gaps remain
+  guarded. This batch
   has no new full UT result; the complete 2,173/2,314 baseline above is retained.
   Full integration on `976e479` is terminal: build exit 0/12s, local tests
   146 cases/zero red and 233 tooling tests/exit 0. All 25,285 compiler input

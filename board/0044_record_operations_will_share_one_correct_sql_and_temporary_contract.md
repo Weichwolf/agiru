@@ -20,6 +20,23 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   populations, original hashes and successful/failed probes. This qualifies the
   native property/creation path, not agiru's complete profile/provider or G1.
 
+- Qualified native property projection is implemented without a second profile
+  registry or public header change. `TableMetadata.cpp` shares the proven AL
+  string defaults, preserves explicit values/source omissions, and projects
+  company scope only for non-platform Normal tables. Production parsing of all
+  234 original AL tables feeds the C++ projection: ten properties/2,340 comparisons
+  match original NCL assignment exactly. Restoring source-only company scope
+  yields 23 native differences; no source/test identity disappears.
+  ReflectionMetadataGate retains prior cases: 227 checks/zero red; source gate
+  2,917/zero red. Twenty-one compiled controls reject, including restored native
+  omission refusal/company scope. Reference/ASan+UBSan gates pass 14,329 checks
+  each (gate/identity instrumented, other runtime dependencies normal).
+  Targeted runtime/gate analysis has no own findings; 30/30 inherited header
+  findings remain unsuppressed. `/tmp/agiru-table-provider-authority.CyvRCA/`
+  retains `native-source-comparison.json` and `native-defaults.json`.
+  Complete implicit profile, schema activation and shared live read-only provider
+  remain open/guarded. No new full UT result or business activation claim.
+
 - Current complete UT replay on `2ecc31e` retains 48 Table Metadata provider
   refusals, unchanged against the preceding full population; 2,173/2,314 pass,
   141 fail, zero incomplete. README retains the source/image/package hashes and
@@ -474,9 +491,10 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    catalogue freeze; no competing metadata registry or silent duplicate replacement.
    Preserve the implemented typed Record/RecordRef canonical binding and qualify
    the complete selected production image after 0725 retirement; no compiling-only
-   subset or stale ABI consumer is integration proof. Apply the qualified native
-   effective defaults and non-system Normal company predicate; complete timestamp
-   and four Runtime-18 FlowFields before enabling the live provider. Provider kind
+   subset or stale ABI consumer is integration proof. The qualified native
+   effective defaults and non-system Normal company predicate are implemented;
+   complete timestamp and four Runtime-18 FlowFields before enabling the live
+   provider. Provider kind
    is separate from TableType; folder names are not runtime proof.
    Validate table Scope eligibility at source admission: the reference compiler
    rejects an ordinary extension's Scope=OnPrem (AL0850), irrespective of its
