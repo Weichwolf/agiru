@@ -89,8 +89,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   inherits parent Make B=build, overriding its own absolute build directory.
   The exact case fails with parent overrides and passes with those overrides
   removed; `compiler-cache-{parent-negative,clean}.log` retain both observations.
-  Repair fixture isolation without changing the production apps target or dropping
-  its diagnostic-slice negative control. Lint is terminal/red:
+  Fixture isolation now shares one environment helper with MilestoneGate, stripping
+  parent Make flags/B/UT_LOG. The strengthened complete-app case still proves its
+  diagnostic-slice negative control; restoring inheritance fails that same case.
+  All 22 CompilerCacheGate/MilestoneGate tests pass; fresh whole-tooling/Make replay
+  remains required. `tooling-output-isolation-{negative,focused}.log` retain proof.
+  The production apps target is unchanged. Lint is terminal/red:
   55 suppression places against unchanged baseline 13. The full AL replay is
   terminal: 2,173/2,314 passed, 141 failed, zero incomplete over eighty codeunits/
   six workers/1,455s. Runner exits 1, Make 2, no infrastructure errors. Against

@@ -52,6 +52,13 @@ scope_inventory = importlib.util.module_from_spec(inventory_spec)
 inventory_spec.loader.exec_module(scope_inventory)
 
 
+def isolated_make_environment():
+    environment = dict(os.environ)
+    for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'B', 'UT_LOG'):
+        environment.pop(name, None)
+    return environment
+
+
 class NativeSourceCompilerGate(unittest.TestCase):
     def setUp(self):
         self.repository = Path(__file__).resolve().parents[2]
@@ -1927,15 +1934,25 @@ class CompilerCacheGate(unittest.TestCase):
             path = root / 'Makefile'
             path.write_text(prefix + recipe)
             command = ['make', '--no-print-directory', '-n', '-f', str(path), 'apps']
-            result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+            parent_build = root / 'parent-build'
+            parent_log = root / 'parent-ut.log'
+            with patch.dict(os.environ, {'MAKEFLAGS': f'-e -- B={parent_build}',
+                                        'MFLAGS': '-e', 'MAKEOVERRIDES': f'B={parent_build}',
+                                        'B': str(parent_build), 'UT_LOG': str(parent_log)}):
+                environment = isolated_make_environment()
+            result = subprocess.run(command, env=environment, capture_output=True,
+                                    text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn('diagnostic-slice-build', result.stdout)
             self.assertIn('-DAGIRU_BUILD_APPS=ON', result.stdout)
             self.assertIn('cmake --build ' + str(root / 'build/apps'), result.stdout)
             path.write_text(prefix + re.sub(r'^apps:[^\n]*', 'apps: all', recipe, count=1))
-            control = subprocess.run(command, capture_output=True, text=True, timeout=10)
+            control = subprocess.run(command, env=environment, capture_output=True,
+                                     text=True, timeout=10)
             self.assertEqual(control.returncode, 0, control.stdout + control.stderr)
             self.assertIn('diagnostic-slice-build', control.stdout)
+            self.assertFalse(parent_build.exists())
+            self.assertFalse(parent_log.exists())
 
     def test_missing_generated_slice_input_does_not_disable_handwritten_gates(self):
         cmake = (SCRIPT.parents[2] / 'CMakeLists.txt').read_text()
@@ -3320,10 +3337,8 @@ class MilestoneGate(unittest.TestCase):
         self.ninja = self.root / 'build/ninja'
         self.ninja.write_text('#!/bin/sh\necho "ninja: no work to do."\n')
         self.ninja.chmod(0o755)
-        self.env = dict(os.environ, AGIRU_BC_SOURCE=str(self.root / 'al'),
+        self.env = dict(isolated_make_environment(), AGIRU_BC_SOURCE=str(self.root / 'al'),
                         PATH=str(self.root / 'build') + os.pathsep + os.environ['PATH'])
-        for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'B', 'UT_LOG'):
-            self.env.pop(name, None)
         self.command = ['sh', str(self.root / 'scripts/ut-milestone.sh'),
                         str(self.root / 'build/ut.log'), '1']
 
