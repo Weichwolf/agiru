@@ -15,12 +15,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
-- Development XML contract (0035): XmlReaderGate grows 71 → 131 checks. Unchanged
-  runtime has 32 failures, all in the new DTD/settings cases; the original checks
-  stay green. `make gate GATE=XmlReaderGate JOBS=2` exits 2. No new own analysis
-  findings; 62 inherited header findings remain, lint exits 2.
-  `/tmp/agiru-xml-policy-contract.TJy7R1`. Runtime repair is pending; the expanded
-  fixture is outside frozen 004617. Do not report the editable tree as all-green.
+- First XML DTD-policy increment (0035): 134 XmlReaderGate checks green; unfiltered
+  compiled control has 33 failures. Six policy/cursor/close/Load controls reject;
+  the test-only loader tripwire sees no fixture request with policy and is triggered
+  by unfiltered input. `/tmp/agiru-xml-reader.3UuLuu`, input hashes match.
+  No own analysis findings; 36/62 reader/gate header findings remain, lint exits 2;
+  the resource probe analysis passes. Complete local/AL replay is pending, outside
+  frozen 004617. Parse/resolver authority, full encoding/Ignore/error-state contracts
+  and streaming bounds remain open; no blanket XML safety or all-green-tree claim.
 - Rename-fix integration: `20261005T004617Z-3255614`, frozen HEAD `24af1d8`,
   source `f484500aa41dfb2037f5267c3818bebf5227cd7e39656799382d02a3a47deb7a`;
   `slice-check all test ut`, six jobs; terminal at 01:26:10 UTC, runner gone.

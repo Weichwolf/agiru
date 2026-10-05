@@ -27,7 +27,7 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   141 cases/232 tooling tests, exit 0; input hashes match before/after. All
   twenty-three record controls reject (`/tmp/agiru-record-order-controls.fAdRKi`);
   `/tmp/agiru-rename-anchor.7GvVDQ/all-local.log`. The diagnostic
-  that image retains all seven non-runtime hashes from 223110, replaces libagiru_rt
+  image retains all seven non-runtime hashes from 223110, replaces libagiru_rt
   only and does not qualify rebuilt ModifyAll callers or the full UT population.
   Frozen 232014 includes the ModifyAll caller fix, not this cascade fix. Its full
   UT replay is terminal: 2,167/2,314 passed, 147 failed, zero incomplete; against

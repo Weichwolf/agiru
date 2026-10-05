@@ -12,7 +12,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -31,6 +33,162 @@ namespace {
 constexpr std::size_t kDeclarationOpen = 5;
 constexpr std::int32_t kXmlDeclaration = 17;
 constexpr std::size_t kFileReadBlock = 4096;
+
+class MarkupBytes {
+public:
+  explicit MarkupBytes(std::string_view bytes) : bytes_(bytes) {
+    if (bytes.starts_with(std::string_view("\xff\xfe\0\0", 4))) {
+      width_ = 4;
+      begin_ = 4;
+    } else if (bytes.starts_with(std::string_view("\0\0\xfe\xff", 4))) {
+      width_ = 4;
+      low_ = 3;
+      begin_ = 4;
+    } else if (bytes.starts_with("\xff\xfe")) {
+      width_ = 2;
+      begin_ = 2;
+    } else if (bytes.starts_with("\xfe\xff")) {
+      width_ = 2;
+      low_ = 1;
+      begin_ = 2;
+    } else if (bytes.starts_with("\xef\xbb\xbf")) {
+      begin_ = 3;
+    } else if (bytes.size() >= 4 && bytes.substr(0, 4) == std::string_view("<\0\0\0", 4)) {
+      width_ = 4;
+    } else if (bytes.size() >= 4 && bytes.substr(0, 4) == std::string_view("\0\0\0<", 4)) {
+      width_ = 4;
+      low_ = 3;
+    } else if (bytes.starts_with(std::string_view("<\0", 2))) {
+      width_ = 2;
+    } else if (bytes.starts_with(std::string_view("\0<", 2))) {
+      width_ = 2;
+      low_ = 1;
+    }
+  }
+
+  [[nodiscard]] std::size_t Begin() const { return begin_; }
+
+  [[nodiscard]] std::size_t Width() const { return width_; }
+
+  void Append(std::string &bytes, std::string_view text) const {
+    for (const char character : text) {
+      const std::size_t offset = bytes.size();
+      bytes.resize(offset + width_, '\0');
+      bytes[offset + low_] = character;
+    }
+  }
+
+  [[nodiscard]] char At(std::size_t offset) const {
+    if (offset > bytes_.size() || width_ > bytes_.size() - offset) { return '\0'; }
+    for (std::size_t index = 0; index < width_; ++index) {
+      if (index != low_ && bytes_[offset + index] != '\0') { return '\xff'; }
+    }
+    return bytes_[offset + low_];
+  }
+
+  [[nodiscard]] bool Is(std::size_t offset, std::string_view text) const {
+    for (const char character : text) {
+      if (At(offset) != character) { return false; }
+      offset += width_;
+    }
+    return true;
+  }
+
+  [[nodiscard]] std::size_t After(std::size_t offset, std::string_view terminal) const {
+    while (offset < bytes_.size()) {
+      if (Is(offset, terminal)) { return offset + terminal.size() * width_; }
+      offset += width_;
+    }
+    return bytes_.size();
+  }
+
+private:
+  std::string_view bytes_;
+  std::size_t width_ = 1;
+  std::size_t low_ = 0;
+  std::size_t begin_ = 0;
+};
+
+bool XmlSpace(char character) {
+  return character == ' ' || character == '\t' || character == '\r' || character == '\n';
+}
+
+std::size_t DoctypeEnd(const MarkupBytes &source, std::size_t start, std::size_t size) {
+  std::size_t subset = 0;
+  char quote = '\0';
+  for (std::size_t offset = start; offset < size; offset += source.Width()) {
+    const char character = source.At(offset);
+    if (quote != '\0') {
+      if (character == quote) { quote = '\0'; }
+    } else if (source.Is(offset, "<!--")) {
+      offset = source.After(offset, "-->") - source.Width();
+    } else if (source.Is(offset, "<?")) {
+      offset = source.After(offset, "?>") - source.Width();
+    } else if (character == '\'' || character == '"') {
+      quote = character;
+    } else if (character == '[') {
+      ++subset;
+    } else if (character == ']') {
+      if (subset == 0) { return start; }
+      --subset;
+    } else if (character == '>' && subset == 0) {
+      return offset + source.Width();
+    }
+  }
+  return start;
+}
+
+void RetainBytes(std::string &text, std::size_t begin, std::size_t end, std::size_t &written) {
+  const std::size_t count = end - begin;
+  if (begin != written && count != 0) {
+    const std::span bytes(text);
+    std::memmove(bytes.subspan(written).data(), bytes.subspan(begin).data(), count);
+  }
+  written += count;
+}
+
+std::string ApplyDtdPolicy(std::string &text, const XmlReaderSettings &settings) {
+  const auto processing = settings.DtdProcessing().Number();
+  if (processing == 2) { return {}; }
+  if (processing != 0 && processing != 1) {
+    throw Error("XmlReader.Create: invalid DtdProcessing value");
+  }
+  const MarkupBytes source(text);
+  std::size_t offset = source.Begin();
+  std::size_t retained = 0;
+  std::size_t segment = 0;
+  while (offset < text.size()) {
+    if (XmlSpace(source.At(offset))) {
+      offset += source.Width();
+    } else if (source.Is(offset, "<!--")) {
+      offset = source.After(offset, "-->");
+    } else if (source.Is(offset, "<?")) {
+      offset = source.After(offset, "?>");
+    } else if (source.Is(offset, "<!DOCTYPE")) {
+      if (processing == 0) {
+        RetainBytes(text, segment, offset, retained);
+        text.resize(retained);
+        source.Append(text, "<dtd-policy-boundary/>");
+        return "XmlReader.Read: DTD processing is prohibited";
+      }
+      const std::size_t end = DoctypeEnd(source, offset, text.size());
+      if (end == offset) {
+        RetainBytes(text, segment, offset, retained);
+        text.resize(retained);
+        source.Append(text, "<dtd-policy-boundary/>");
+        return "XmlReader.Read: the DTD is not well-formed XML";
+      }
+      RetainBytes(text, segment, offset, retained);
+      segment = end;
+      offset = end;
+    } else {
+      break;
+    }
+  }
+  RetainBytes(text, segment, text.size(), retained);
+  text.resize(retained);
+  return {};
+}
 
 xmlTextReaderPtr Held(const std::shared_ptr<void> &reader) {
   return static_cast<xmlTextReaderPtr>(reader.get());
@@ -85,6 +243,7 @@ struct XmlReader::State {
   bool over = false;
   bool declarationPending = false;
   bool atDeclaration = false;
+  std::string policyFailure;
   std::string declaration;
 };
 
@@ -94,7 +253,7 @@ StringReader StringReader::Binder::operator()(std::string_view text) const {
   return out;
 }
 
-XmlReader XmlReader::Over(std::string text) {
+XmlReader XmlReader::Over(std::string text, const XmlReaderSettings &settings) {
   XmlReader out;
   out.state_ = std::make_shared<State>();
   State &state = *out.state_;
@@ -112,6 +271,7 @@ XmlReader XmlReader::Over(std::string text) {
       }
     }
   }
+  state.policyFailure = ApplyDtdPolicy(text, settings);
   state.text = std::make_shared<std::string>(std::move(text));
   xmlTextReaderPtr reader = xmlReaderForMemory(state.text->data(),
                                                static_cast<int>(state.text->size()),
@@ -125,8 +285,7 @@ XmlReader XmlReader::Over(std::string text) {
   return out;
 }
 
-XmlReader XmlReader::Create(std::string_view path,
-                            [[maybe_unused]] const XmlReaderSettings &settings) {
+XmlReader XmlReader::Create(std::string_view path, const XmlReaderSettings &settings) {
   const std::unique_ptr<FILE, decltype(&std::fclose)> file(
       std::fopen(std::string(path).c_str(), "rb"), &std::fclose);
   if (file == nullptr) {
@@ -142,12 +301,11 @@ XmlReader XmlReader::Create(std::string_view path,
   if (std::ferror(file.get()) != 0) {
     throw Error("XmlReader.Create: the file '" + std::string(path) + "' cannot be read");
   }
-  return Over(std::move(text));
+  return Over(std::move(text), settings);
 }
 
-XmlReader XmlReader::Create(const ::agiru::InStream &stream,
-                            [[maybe_unused]] const XmlReaderSettings &settings) {
-  return Over(Bytes(stream));
+XmlReader XmlReader::Create(const ::agiru::InStream &stream, const XmlReaderSettings &settings) {
+  return Over(Bytes(stream), settings);
 }
 
 XmlReader XmlReader::Create([[maybe_unused]] const ::agiru::OutStream &stream,
@@ -155,9 +313,8 @@ XmlReader XmlReader::Create([[maybe_unused]] const ::agiru::OutStream &stream,
   throw Error("XmlReader.Create(OutStream): an OutStream is written and not read");
 }
 
-XmlReader XmlReader::Create(const StringReader &reader,
-                            [[maybe_unused]] const XmlReaderSettings &settings) {
-  return Over(std::string(reader.Text()));
+XmlReader XmlReader::Create(const StringReader &reader, const XmlReaderSettings &settings) {
+  return Over(std::string(reader.Text()), settings);
 }
 
 Boolean XmlReader::Read() {
@@ -169,7 +326,15 @@ Boolean XmlReader::Read() {
   }
   state_->atDeclaration = false;
   const int step = xmlTextReaderRead(Held(state_->reader));
-  if (step == 1) { return true; }
+  if (step == 1) {
+    if (!state_->policyFailure.empty() &&
+        xmlTextReaderNodeType(Held(state_->reader)) == XML_READER_TYPE_ELEMENT) {
+      state_->over = true;
+      state_->reader.reset();
+      throw Error(state_->policyFailure);
+    }
+    return true;
+  }
   state_->over = true;
   if (step < 0) { throw Error("XmlReader.Read: the data is not well-formed XML"); }
   return false;

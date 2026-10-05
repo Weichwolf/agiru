@@ -5,13 +5,28 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- First DTD-policy increment: Create snapshots its processing mode; the private
+  byte scanner stops Prohibit at a non-observable reader boundary and removes
+  Ignore declarations before backend entity/default-attribute parsing. Compaction
+  is iterative/in-place; cursor-consuming Load remains unchanged. XmlTextReader
+  constructors retain Parse, while Create retains factory defaults. XmlReaderGate:
+  134 checks green; unfiltered compiled control has 33 failures. Six compiled
+  policy/cursor/close/Load controls reject. The test-only external-loader tripwire
+  sees no fixture resource request with policy; unfiltered input triggers it.
+  `/tmp/agiru-xml-reader.3UuLuu`, hashes match after execution. Resource probe
+  analysis passes using its actual compiler command; reader/gate add no own
+  findings, 36/62 inherited header findings remain unsuppressed (lint exits 2).
+  Full local/AL replay is pending. This qualifies authored UTF-8/UTF-16LE cases,
+  not complete XML security/conformance: Parse/resolver authority, other encoding
+  profiles, full Ignore grammar/whitespace boundaries, native error states/messages,
+  encoded declarations and streaming limits remain open. No blanket safety claim.
 - Production-reader DTD contract reproduction (2026-10-05): existing XmlReaderGate
   grows from 71 to 131 checks; unchanged runtime has 32 failures, all in the new
   cases. UTF-8/UTF-16LE cover default Prohibit, Ignore before entity/default-attribute
   processing, reader/DOM consumers, fixture-owned external resources, preceding
   PI/error timing and settings snapshots. Internal Parse and DTD-looking literals
   remain green. `make gate GATE=XmlReaderGate JOBS=2` exits 2; this is a red
-  development contract, not a policy fix or a new green local baseline.
+  development contract, not a new green local baseline; the increment above follows it.
   Gate analysis has zero own findings; 62 inherited header findings remain
   unsuppressed, lint exits 2. `/tmp/agiru-xml-policy-contract.TJy7R1/{gate-qualified.log,
   lint-qualified-detail.log,qualified-inputs.sha256}`. Outside frozen 004617.

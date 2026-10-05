@@ -263,29 +263,29 @@ public:
 private:
   friend class XmlDocument;
   struct State;
-  static XmlReader Over(std::string text);
+  static XmlReader Over(std::string text, const XmlReaderSettings &settings);
   void LoadDocument(::agiru::detail::XmlHandle &into, bool preserveWhitespace) const;
   std::shared_ptr<State> state_;
 };
 
-/// \brief .NET `XmlTextReader`: the same reader under the name `XML DOM Management` uses.
+/// \brief .NET `XmlTextReader`: constructors use Parse; Create uses XmlReader factory settings.
 class XmlTextReader : public XmlReader {
 public:
   /// \brief The binder behind `R := R.XmlTextReader(...)`.
   struct Binder {
     /// \brief `new XmlTextReader(path)`. \param path The file. \return The reader.
     [[nodiscard]] class XmlTextReader operator()(std::string_view path) const {
-      return XmlTextReader::Over(XmlReader::Create(path));
+      return XmlTextReader::Construct(path);
     }
 
     /// \brief `new XmlTextReader(reader)`. \param reader The text. \return The reader.
     [[nodiscard]] class XmlTextReader operator()(const StringReader &reader) const {
-      return XmlTextReader::Over(XmlReader::Create(reader));
+      return XmlTextReader::Construct(reader);
     }
 
     /// \brief `new XmlTextReader(stream)`. \param stream The stream. \return The reader.
     [[nodiscard]] class XmlTextReader operator()(const ::agiru::InStream &stream) const {
-      return XmlTextReader::Over(XmlReader::Create(stream));
+      return XmlTextReader::Construct(stream);
     }
   };
 
@@ -299,6 +299,12 @@ public:
   }
 
 private:
+  template <typename Source> static class XmlTextReader Construct(const Source &source) {
+    XmlReaderSettings settings;
+    settings.DtdProcessing(dotnet::DtdProcessing::Parse());
+    return Over(XmlReader::Create(source, settings));
+  }
+
   static class XmlTextReader Over(XmlReader base) {
     class XmlTextReader out;
     static_cast<XmlReader &>(out) = std::move(base);

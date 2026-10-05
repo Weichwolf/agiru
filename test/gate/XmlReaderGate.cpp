@@ -183,6 +183,24 @@ void ReaderPolicyIsASnapshotAndMarkupLiteralsAreNotDtds() {
   }
 }
 
+void TextReaderConstructionAndFactoryHaveDistinctDtdDefaults() {
+  StringReader source;
+  source = source.StringReader("<!DOCTYPE root [<!ENTITY word 'hello'>]><root>&word;</root>");
+  agiru::dotnet::XmlTextReader reader;
+  reader = reader.XmlTextReader(source);
+  agiru::dotnet::XmlDocument document;
+  document.Load(reader);
+  CHECK_TEXT("XmlTextReader construction retains its Parse default",
+             document.DocumentType().Name().Value(),
+             "root");
+  CHECK_TEXT("constructed reader Load preserves internal entities",
+             document.DocumentElement().InnerText().Value(),
+             "hello");
+  CHECK_TRUE("XmlTextReader Create retains the factory's Prohibit default",
+             ReadFailure(agiru::dotnet::XmlTextReader::Create(source), false).find("DTD") !=
+                 std::string::npos);
+}
+
 void DocumentLoadConsumesTheSharedReader() {
   XmlReader reader = ReaderOver("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
                                 "<!--before--><?work one?><root xmlns:p=\"urn:one\" id=\"7\">"
@@ -429,5 +447,6 @@ int main() {
     ProhibitRejectsInternalAndExternalDtdsThroughBothConsumers();
     IgnoreDiscardsDeclarationsBeforeEntityAndAttributeProcessing();
     ReaderPolicyIsASnapshotAndMarkupLiteralsAreNotDtds();
+    TextReaderConstructionAndFactoryHaveDistinctDtdDefaults();
   });
 }
