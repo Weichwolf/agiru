@@ -5,6 +5,15 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Remaining XML doctype UT crosses `File.Open/Read` after XmlDocument.Save
+  (`XMLDOMManagementUT.Codeunit.al::CheckDoctypeElementWithEmptyInternalSubset`).
+  `AlFile.cpp::Read` always splits at LF; File.h defaults TextMode to true.
+  Original NavFile constructor leaves its CLR Boolean false; FileGate's line test
+  currently relies on the opposite default. `/tmp/agiru-file-mode.uH1HcI` retains
+  original IL/hashes (Ncl version below). Developer `file-{read,textmode}-method.md`
+  and predecessor 1351 distinguish text/binary modes. Qualify the native File.Read
+  dispatcher, typed capacity, terminators and encoding before changing this path;
+  this is a consumer hypothesis, not an XML fix or recovered UT.
 - Owned BLOB provider: streams retain bytes after a local wrapper ends or moves;
   BLOB value copies remain independent, while Set updates the retained provider.
   Default BLOBs allocate nothing. StreamGate: 89 green (all preceding 73 retained);
