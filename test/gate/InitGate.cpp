@@ -8,7 +8,7 @@
 #include "EnumWriter.h"
 #include "Parser.h"
 #include "ResourceCost.h"
-#include "TableWriter.h"
+#include "options/Types.h"
 
 #include <string>
 

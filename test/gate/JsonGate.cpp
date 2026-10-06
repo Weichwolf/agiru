@@ -7,6 +7,7 @@
 #include "type/JsonToken.h"
 #include "type/JsonValue.h"
 #include "type/List.h"
+#include "type/StringValue.h"
 #include "type/Text.h"
 
 #include "Check.h"

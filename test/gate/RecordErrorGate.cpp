@@ -3,10 +3,12 @@
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Record.h"
+#include "type/Code.h"
 #include "type/Option.h"
 
 #include "Check.h"
 #include "ResourceCost.h"
+#include "options/Types.h"
 
 #include <array>
 #include <string>

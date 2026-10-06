@@ -7,6 +7,7 @@
 #include "Check.h"
 #include "Cursor.h"
 #include "ResourceCost.h"
+#include "options/Types.h"
 
 #include <cstddef>
 #include <string>

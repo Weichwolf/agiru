@@ -1,12 +1,14 @@
 #include "dotnet/Queue.h"
 #include "runtime/ErrorValue.h"
 #include "type/Integer.h"
+#include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Variant.h"
 
 #include "Check.h"
 
 #include <string>
+#include <string_view>
 
 using agiru::Variant;
 using agiru::dotnet::Queue;

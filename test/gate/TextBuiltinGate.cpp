@@ -1,3 +1,5 @@
+#include "type/Char.h"
+
 #include "BuiltinsWritten.h"
 #include "Check.h"
 

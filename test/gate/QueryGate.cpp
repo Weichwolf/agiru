@@ -10,6 +10,7 @@
 
 #include "Check.h"
 #include "ResourceCost.h"
+#include "options/Types.h"
 
 #include <array>
 #include <cstddef>

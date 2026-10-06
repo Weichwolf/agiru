@@ -6,7 +6,6 @@
 #include "platform/Integer.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Codeunit.h"
-#include "runtime/Record.h"
 #include "runtime/RecordRef.h"
 #include "runtime/TableDefinition.h"
 

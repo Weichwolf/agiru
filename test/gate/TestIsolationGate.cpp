@@ -1,5 +1,6 @@
 #include "meta/CodeunitDef.h"
 #include "meta/Ids.h"
+#include "meta/Subtype.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
@@ -9,6 +10,7 @@
 #include "runtime/test/Handlers.h"
 #include "runtime/test/PageTraps.h"
 #include "runtime/test/TestPermissions.h"
+#include "type/Integer.h"
 #include "type/TransactionModel.h"
 
 #include "Check.h"

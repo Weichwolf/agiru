@@ -1,10 +1,10 @@
 #include "meta/CodeunitDef.h"
 #include "meta/Ids.h"
+#include "meta/Subtype.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 #include "runtime/TestRunner.h"
 #include "type/JsonObject.h"
-#include "type/Text.h"
 
 #include "Check.h"
 

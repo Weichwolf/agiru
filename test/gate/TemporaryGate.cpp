@@ -3,6 +3,7 @@
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
+#include "runtime/TemporaryRecord.h"
 #include "type/AlArray.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
@@ -11,6 +12,7 @@
 #include "Check.h"
 #include "LineNumberBuffer.h"
 #include "ResourceCost.h"
+#include "options/Types.h"
 
 #include <exception>
 #include <string>

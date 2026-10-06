@@ -1,9 +1,11 @@
 #include "runtime/Database.h"
+#include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "runtime/Transaction.h"
 
 #include "Check.h"
 
+#include <cstddef>
 #include <string>
 
 #include <unistd.h>

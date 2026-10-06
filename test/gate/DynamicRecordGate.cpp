@@ -4,6 +4,7 @@
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
 #include "runtime/TableDefinition.h"
+#include "runtime/TemporaryRecord.h"
 #include "type/Decimal.h"
 #include "type/Variant.h"
 

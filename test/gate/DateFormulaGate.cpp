@@ -1,5 +1,6 @@
 #include "type/Date.h"
 #include "type/DateFormula.h"
+#include "type/Integer.h"
 #include "type/Language.h"
 
 #include "Check.h"

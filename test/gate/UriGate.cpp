@@ -1,11 +1,11 @@
 #include "dotnet/Uri.h"
 #include "runtime/ErrorValue.h"
-#include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 
 #include "Check.h"
 
 #include <string>
+#include <string_view>
 
 using agiru::dotnet::Uri;
 using agiru::dotnet::UriBuilder;

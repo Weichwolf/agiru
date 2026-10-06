@@ -1,5 +1,4 @@
 #include "meta/SystemFields.h"
-#include "meta/TableDef.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"

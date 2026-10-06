@@ -1,5 +1,6 @@
 #include "Apps.h"
 #include "Check.h"
+#include "ObjectKind.h"
 #include "Scope.h"
 
 #include <filesystem>

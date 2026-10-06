@@ -1,6 +1,6 @@
 #include "Check.h"
 #include "Names.h"
-#include "Scope.h"
+#include "ObjectKind.h"
 
 #include <string>
 

@@ -1,8 +1,6 @@
 #include "dotnet/XmlDocument.h"
 #include "dotnet/XmlNode.h"
 #include "runtime/ErrorValue.h"
-#include "type/Blob.h"
-#include "type/Stream.h"
 #include "type/Text.h"
 #include "type/Variant.h"
 #include "type/XmlAttribute.h"

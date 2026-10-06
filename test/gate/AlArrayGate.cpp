@@ -6,7 +6,9 @@
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
+#include <cstddef>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 using agiru::AlArray;

@@ -6,6 +6,7 @@
 
 #include "Check.h"
 #include "ResourceCost.h"
+#include "options/Types.h"
 
 #include <string>
 
