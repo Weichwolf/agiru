@@ -7,6 +7,7 @@
 | `runtime/` | Runtime integration fixtures: isolation, test contexts, catalogue/reflection and number sequences. |
 | `reporting/` | Report declarations, layout asset integrity and registry/linking fixtures. Not full rendering coverage. |
 | `tooling/` | Build, lint, snapshot and test-runner checks; their Python helpers and existing diagnostic baselines. |
+| `ui/` | Shared semantic HTML, external agent CMD/MCP transports and future actual browser/SQL parity. |
 
 `transpiler/golden/` contains authored C++ output specifications. Do not regenerate
 them from observed compiler output. Keep authored AL fixtures with their owning
@@ -155,6 +156,16 @@ dynamic visibility before authorization. UTF-8 validation reuses
 the codec through a narrow header; malformed text never silently changes values.
 This is not HTTP/CMD/MCP/browser parity, production permission storage, a complete
 list window or complete page lifecycle. View navigation remains open (0720).
+
+`make client` builds the external Node 20+ TypeScript client from its locked
+dependencies. `make client-test` runs on the host: C++ `PageHtmlGate --html` produces
+the actual fragment in `agiru-dev`; a clearly labelled Node HTTP fixture checks
+lossless values, shell CMD and real MCP stdio calls over one agent library. Four
+executable mutants must expose rounded scalars, disabled-command execution,
+stale revisions and duplicate POSTs. This is not a Node ERP server or proof of
+production authentication, SQL effects, actual htmx browser behaviour or complete
+page/ERP parity. `AGIRU_PAGE_HTML_GATE` can select an explicitly built host producer.
+Fixtures and disposable mutant modules use `/tmp`; Node stays outside the ERP container.
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,

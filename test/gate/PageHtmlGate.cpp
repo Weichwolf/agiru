@@ -11,6 +11,8 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdio>
+#include <exception>
 #include <string>
 #include <string_view>
 
@@ -106,16 +108,19 @@ public:
 class Authorization final : public agiru::PageAuthorization {
 public:
   void Require(agiru::PageId id, const agiru::PageControlCommand &command) override {
-    CHECK_TRUE("HTML uses the declaration's page identity", id == kPage.id);
-    CHECK_TRUE("rendering only requests reads/discovery",
-               command.operation == agiru::PageControlOperation::ReadValue ||
-                   command.operation == agiru::PageControlOperation::Inspect);
+    if (verify) {
+      CHECK_TRUE("HTML uses the declaration's page identity", id == kPage.id);
+      CHECK_TRUE("rendering only requests reads/discovery",
+                 command.operation == agiru::PageControlOperation::ReadValue ||
+                     command.operation == agiru::PageControlOperation::Inspect);
+    }
     ++calls;
     if (revoked) { throw agiru::Error("revoked", "PermissionDenied"); }
   }
 
   int calls = 0;
   bool revoked = false;
+  bool verify = true;
 };
 
 void Semantics() {
@@ -217,7 +222,26 @@ void Refusals() {
 
 }
 
-int main() {
+int main(int argc, char **argv) {
+  if (argc == 2 && std::string_view(argv[1]) == "--html") {
+    try {
+      Page page;
+      Authorization auth;
+      auth.verify = false;
+      const auto result = agiru::RenderPageHtml(kPage, page, auth, kContext);
+      return static_cast<int>(std::fwrite(result.html.data(), 1, result.html.size(), stdout) !=
+                              result.html.size());
+    } catch (const std::exception &error) {
+      std::fputs("PageHtml fixture: ", stderr);
+      std::fputs(error.what(), stderr);
+      std::fputs("\n", stderr);
+      return 1;
+    } catch (...) {
+      std::fputs("PageHtml fixture: unknown exception\n", stderr);
+      return 1;
+    }
+  }
+  if (argc != 1) { return 2; }
   return gate::Run("PageHtml", [] {
     Semantics();
     Refusals();

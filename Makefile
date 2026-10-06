@@ -21,7 +21,15 @@ export CCACHE_SLOPPINESS
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
-.PHONY: page-profile
+.PHONY: page-profile client client-test
+
+client: ## build the external Node agent CMD/MCP client from locked dependencies
+	@npm ci --prefix "$(SELF)/src/client" --ignore-scripts --no-fund --no-audit
+	@npm run --prefix "$(SELF)/src/client" build
+	@ln -sfn "$(SELF)/src/client/node_modules" "$(SELF)/build/client/node_modules"
+
+client-test: client ## qualify CMD/MCP transports against a declared HTML/HTTP fixture, not ERP parity
+	@bash "$(SELF)/test/ui/agent-client.sh"
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get

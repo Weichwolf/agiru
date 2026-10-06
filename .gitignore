@@ -8,3 +8,4 @@ work/
 .claude/worktrees/
 build-asan/
 __pycache__/
+node_modules/

@@ -4,8 +4,9 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: build the Node semantic-HTML client with shared CMD/MCP adapters, then wire
-one list → card → validate → save slice through the C++ HTTP server.
+Next: wire one list → card → validate → save slice through the C++ HTTP server,
+including PostgreSQL authorization/session/revision/receipt ownership; use the
+external Node CMD/MCP client and representative real-browser/independent SQL checks.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -40,7 +41,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   definitions now emit it; complete compilation/linking remains unproven.
   `make transpile` still exits 1: 21 unresolved extension operations and 5,683 refused properties
   remain counted, not a green-subset claim. SQL-backed authorization, command receipts/
-  revisions, modal suspension, HTTP and Node CMD/MCP remain pending.
+  revisions, modal suspension and production HTTP remain pending. The external
+  Node CMD/MCP adapters now share one bounded semantic-HTML/HTTP agent library;
+  fixture transport qualification does not establish ERP parity.
   `RenderPageHtml` renders one current row through ReadValue/Inspect, not a second
   execution model: ordered controls, exact machine attributes, display text and shared
   htmx forms. Handles/revisions/receipt prefixes/CSRF come from the future server;
@@ -69,6 +72,25 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   PageInstance 205 ms, PageSession 1,788 ms (three frontend rounds, no PCH); not a runtime
   performance claim. Full integration/UT on this increment remains pending; 0058
   keeps the previous counted result.
+- External agent implementation: `src/client/{profile,ascii,http,command,cmd,mcp}.mts`.
+  `make client-test` builds the locked TypeScript package, consumes actual C++
+  `PageHtmlGate --html` and checks a declared Node HTTP transport fixture on the host.
+  Thirty-five tests pass: exact Decimal/Int64 and enum/temporal metadata, ordering,
+  Unicode/entity/terminal framing, strict profile/schema bounds, shell CMD and actual
+  MCP stdio discovery/read/set/action, stale/disabled/forged-command refusals,
+  redirect/body/UTF-8/timeout handling, private authentication files and uncertain
+  write identity without retries. Oversized ASCII explicitly refuses its presentation
+  while JSON/MCP retains full structured values. Four executable scalar-rounding,
+  disabled-fence, stale-revision and duplicate-POST mutants reject. C++ HTML still
+  passes 157 checks; its changed producer's targeted tidy passes. Fixtures make no
+  SQL/browser/production-authentication claim.
+  parse5 8.0.1 supplies HTML tree/entity semantics; official MCP SDK 1.32.1 and
+  zod 3.25.76 supply protocol/strict shared schemas, not another ERP implementation.
+  Locked dependencies/notices stay client-only; Node remains outside `agiru-dev`.
+  `~/Git/openerp/board/{1771,1772,1791,1903}_*.md` informed stable identities,
+  compact/noninteractive output and disabled-action guards; no Python port.
+  Current-row-only limits remain explicit: no production server, stored sessions,
+  modal/list/part/BC navigation support or command-receipt reconciliation endpoint yet.
 - Refreshed archive SHA256:
   `f654cb6576768cb90fff2e0fb701043139ab4d36723e7427a498132a2e2ee6a3`.
   Inspect `~/Git/openerp/openerp/web/client/{protocol,screen,page_model,ui,session,cli_api,request_page}.py`
@@ -151,8 +173,8 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
    private; PostgreSQL owns shared permission revisions, fencing and receipts.
    No connection or transaction during user think time; modal suspension is explicit.
    Drogon and daisyUI/Tailwind are proposals, not adopted dependencies.
-5. Implement the Node.js/TypeScript HTML-to-ASCII agent client; CMD and local
-   stdio MCP share one client library and the same HTTP business endpoints.
+5. Extend the Node.js/TypeScript HTML-to-ASCII agent client to production HTTP;
+   CMD and local stdio MCP share one client library and the same business endpoints.
    Parse a bounded, versioned semantic HTML profile, not a general browser/htmx engine.
    No Node ERP server, Python sidecar or second business implementation.
 6. Tagged Decimal/Int64 strings preserve exact values/scale; enum identity/ordinal
