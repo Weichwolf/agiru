@@ -1,6 +1,7 @@
 #include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Variant.h"
 #include "type/XmlCData.h"
@@ -24,7 +25,9 @@
 #include <utility>
 #include <vector>
 
+#include <libxml/globals.h>
 #include <libxml/tree.h>
+#include <libxml/xmlstring.h>
 
 namespace agiru {
 
@@ -155,9 +158,29 @@ bool Replace(const XmlHandle &self, const Variant &content) {
   return true;
 }
 
-bool Answer(std::string text, Text<0> &result) {
+bool Answer(const std::string &text, Text<0> &result) {
   result = std::string_view(text);
   return true;
+}
+
+XmlHandle MakeDeclaration(const detail::XmlDeclarationParts &parts) {
+  xmlDocPtr doc = xmlNewDoc(Bytes(std::string(parts.version)));
+  if (!parts.encoding.empty()) { doc->encoding = xmlStrdup(Bytes(std::string(parts.encoding))); }
+  doc->standalone = parts.standalone == "yes" ? 1 : parts.standalone == "no" ? 0 : -1;
+  return {detail::NewTree(doc), doc};
+}
+
+XmlHandle MakeDocumentType(const detail::XmlDocumentTypeParts &parts) {
+  xmlDocPtr doc = xmlNewDoc(Bytes("1.0"));
+  const std::string name(parts.name);
+  const std::string publicId(parts.publicId);
+  const std::string systemId(parts.systemId);
+  xmlDtdPtr dtd = xmlCreateIntSubset(doc,
+                                     Bytes(name),
+                                     publicId.empty() ? nullptr : Bytes(publicId),
+                                     systemId.empty() ? nullptr : Bytes(systemId));
+  static_cast<void>(parts.subset);
+  return {detail::NewTree(doc), dtd};
 }
 
 }
@@ -620,10 +643,8 @@ std::string XmlComment::Value(std::string_view NewValue) {
 ::agiru::XmlDeclaration XmlDeclaration::Create(std::string_view Version,
                                                std::string_view Encoding,
                                                std::string_view Standalone) {
-  xmlDocPtr doc = xmlNewDoc(Bytes(std::string(Version)));
-  if (!Encoding.empty()) { doc->encoding = xmlStrdup(Bytes(std::string(Encoding))); }
-  doc->standalone = Standalone == "yes" ? 1 : Standalone == "no" ? 0 : -1;
-  return XmlDeclaration(XmlHandle(detail::NewTree(doc), doc));
+  return XmlDeclaration(
+      MakeDeclaration({.version = Version, .encoding = Encoding, .standalone = Standalone}));
 }
 
 std::string XmlDeclaration::Encoding() {
@@ -677,16 +698,8 @@ std::string XmlDeclaration::Version(std::string_view NewValue) {
                                                  std::string_view PublicId,
                                                  std::string_view SystemId,
                                                  std::string_view InternalSubset) {
-  xmlDocPtr doc = xmlNewDoc(Bytes("1.0"));
-  const std::string name(Name);
-  const std::string publicId(PublicId);
-  const std::string systemId(SystemId);
-  xmlDtdPtr dtd = xmlCreateIntSubset(doc,
-                                     Bytes(name),
-                                     publicId.empty() ? nullptr : Bytes(publicId),
-                                     systemId.empty() ? nullptr : Bytes(systemId));
-  static_cast<void>(InternalSubset);
-  return XmlDocumentType(XmlHandle(detail::NewTree(doc), dtd));
+  return XmlDocumentType(MakeDocumentType(
+      {.name = Name, .publicId = PublicId, .systemId = SystemId, .subset = InternalSubset}));
 }
 
 ::agiru::Boolean XmlDocumentType::GetInternalSubset(::agiru::Text<0> &Result) {

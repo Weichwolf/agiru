@@ -2,6 +2,7 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Variant.h"
 #include "type/XmlAttribute.h"
@@ -31,7 +32,9 @@
 #include <utility>
 #include <vector>
 
+#include <libxml/globals.h>
 #include <libxml/tree.h>
+#include <libxml/xmlstring.h>
 
 namespace agiru {
 
@@ -455,7 +458,7 @@ std::string XmlNameTable::Add(std::string_view Key) {
   return true;
 }
 
-::agiru::Boolean XmlReadOptions::PreserveWhitespace() {
+::agiru::Boolean XmlReadOptions::PreserveWhitespace() const {
   return preserveWhitespace_;
 }
 
@@ -464,7 +467,7 @@ std::string XmlNameTable::Add(std::string_view Key) {
   return preserveWhitespace_;
 }
 
-::agiru::Boolean XmlWriteOptions::PreserveWhitespace() {
+::agiru::Boolean XmlWriteOptions::PreserveWhitespace() const {
   return preserveWhitespace_;
 }
 

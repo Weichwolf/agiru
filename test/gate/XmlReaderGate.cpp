@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -28,9 +29,13 @@ namespace {
 constexpr std::uint8_t kUtf16LeBomFirst = 0xff;
 constexpr std::uint8_t kUtf16LeBomSecond = 0xfe;
 
+static_assert(std::is_const_v<decltype(StringReader::StringReader)>);
+static_assert(std::is_const_v<decltype(XmlReaderSettings::XmlReaderSettings)>);
+static_assert(std::is_const_v<decltype(agiru::dotnet::XmlTextReader::XmlTextReader)>);
+
 XmlReader ReaderOver(std::string_view xml, const XmlReaderSettings &settings = {}) {
   StringReader source;
-  source = source.StringReader(xml);
+  source = StringReader::StringReader(xml);
   return XmlReader::Create(source, settings);
 }
 
@@ -125,7 +130,7 @@ void IgnoreDiscardsDeclarationsBeforeEntityAndAttributeProcessing() {
       std::string error;
       try {
         while (reader.Read()) {
-          dtd = dtd || reader.NodeType().Number() == 10;
+          dtd = dtd || reader.NodeType().Equals(XmlNodeType::DocumentType());
           if (reader.NodeType().Equals(XmlNodeType::Element())) {
             root = root || reader.Name().Value() == "root";
             defaultAttribute = defaultAttribute || reader.MoveToFirstAttribute();
@@ -185,9 +190,10 @@ void ReaderPolicyIsASnapshotAndMarkupLiteralsAreNotDtds() {
 
 void TextReaderConstructionAndFactoryHaveDistinctDtdDefaults() {
   StringReader source;
-  source = source.StringReader("<!DOCTYPE root [<!ENTITY word 'hello'>]><root>&word;</root>");
+  source =
+      StringReader::StringReader("<!DOCTYPE root [<!ENTITY word 'hello'>]><root>&word;</root>");
   agiru::dotnet::XmlTextReader reader;
-  reader = reader.XmlTextReader(source);
+  reader = agiru::dotnet::XmlTextReader::XmlTextReader(source);
   agiru::dotnet::XmlDocument document;
   document.Load(reader);
   CHECK_TEXT("XmlTextReader construction retains its Parse default",
@@ -413,7 +419,7 @@ void StylesheetInstructionsAreNotXmlDeclarations() {
 
 void AliasesShareOneCursorAndCloseState() {
   StringReader source;
-  source = source.StringReader(R"(<?xml version="1.0"?><a x="one"><b/></a>)");
+  source = StringReader::StringReader(R"(<?xml version="1.0"?><a x="one"><b/></a>)");
   XmlReader reader = XmlReader::Create(source);
   XmlReader alias = reader;
   CHECK_TRUE("one alias reads the declaration", alias.Read());
@@ -446,9 +452,9 @@ void AliasesShareOneCursorAndCloseState() {
 /// the attribute moves, and the whitespace between elements is a node like in .NET (board:0676).
 void AReaderWalksElementsAttributesAndText() {
   StringReader source;
-  source = source.StringReader(R"(<?xml version="1.0"?><a x="1"><b>hi</b><c/></a>)");
+  source = StringReader::StringReader(R"(<?xml version="1.0"?><a x="1"><b>hi</b><c/></a>)");
   XmlReaderSettings settings;
-  settings = settings.XmlReaderSettings();
+  settings = XmlReaderSettings::XmlReaderSettings();
   settings.DtdProcessing(agiru::dotnet::DtdProcessing::Ignore());
   XmlReader reader = XmlReader::Create(source, settings);
   std::vector<std::string> walk;
@@ -473,7 +479,7 @@ void AReaderWalksElementsAttributesAndText() {
   std::string said;
   try {
     StringReader bad;
-    bad = bad.StringReader("<a><b></a>");
+    bad = StringReader::StringReader("<a><b></a>");
     XmlReader broken = XmlReader::Create(bad, settings);
     while (broken.Read()) {}
   } catch (const agiru::Error &e) { said = e.what(); }

@@ -7,18 +7,21 @@
 #include "type/XmlHandle.h"
 #include "type/XmlNameTable.h"
 
-#include <concepts>
 #include <string>
 #include <string_view>
-#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace agiru::dotnet {
 
 class XmlAttributeCollection;
-class XmlDocument;
+class XmlTreeDocument;
+/// \brief AL `XmlDocument` names the native XML tree document.
+using XmlDocument = XmlTreeDocument;
 class XmlElement;
-class XmlNamespaceManager;
+class XmlNamespaces;
+/// \brief AL `XmlNamespaceManager` names the native XPath namespace bindings.
+using XmlNamespaceManager = XmlNamespaces;
 class XmlNodeList;
 
 /// \brief .NET `System.Xml.XmlNode`, over the same libxml2 tree the AL XML types walk
@@ -121,7 +124,12 @@ public:
     return T{};
   }
 
-protected:
+private:
+  friend class XmlTreeDocument;
+  friend class XmlElement;
+  friend class XmlAttribute;
+  friend class XmlDeclaration;
+  friend class XmlDocumentType;
   ::agiru::detail::XmlHandle handle_; ///< The node.
 };
 

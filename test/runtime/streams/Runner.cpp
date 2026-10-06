@@ -15,6 +15,9 @@
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
     agiru::Fixture::StreamAliasConsumer_Codeunit consumer;
+    CHECK_TEXT("generated XML factories and properties retain all original AL names",
+               consumer.ClrXml("<root xmlns='urn:test'><item>hällo</item></root>").Value(),
+               "hällo|hällo");
     const auto measure = agiru::Decimal::FromInvariantString("1234567890.123456789012345678");
     CHECK_TRUE("generated column/table/chart factories preserve exact typed data",
                consumer.ClrChart(measure) == measure);

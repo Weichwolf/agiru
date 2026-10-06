@@ -5,18 +5,25 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/XmlHandle.h"
 
 #include "XmlEngine.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <fstream>
+#include <ios>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <libxml/globals.h>
+#include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <libxml/valid.h>
+#include <libxml/xmlstring.h>
 
 namespace agiru::dotnet {
 
@@ -54,7 +61,7 @@ void Relink(const XmlHandle &into, const XmlHandle &node) {
 XmlHandle NewInDocument(const XmlHandle &document, xmlNodePtr node) {
   if (document.tree == nullptr) { return ::agiru::detail::Detached(node); }
   xmlSetTreeDoc(node, DocOf(document));
-  return XmlHandle(document.tree, node);
+  return {document.tree, node};
 }
 
 std::vector<std::pair<std::string, std::string>> NoNamespaces() {
@@ -69,6 +76,69 @@ std::vector<XmlHandle> ByTagName(const XmlHandle &from, std::string_view name) {
     }
   }
   return out;
+}
+
+struct QualifiedNameParts {
+  std::string_view prefix;
+  std::string_view local;
+  std::string_view uri;
+};
+
+XmlHandle MakeElement(const XmlHandle &document, const QualifiedNameParts &parts) {
+  xmlNodePtr node = xmlNewNode(nullptr, Bytes(std::string(parts.local)));
+  const XmlHandle made = NewInDocument(document, node);
+  if (!parts.uri.empty()) {
+    const std::string prefix(parts.prefix);
+    xmlNsPtr ns =
+        xmlNewNs(node, Bytes(std::string(parts.uri)), prefix.empty() ? nullptr : Bytes(prefix));
+    xmlSetNs(node, ns);
+  }
+  return made;
+}
+
+XmlHandle MakeAttribute(const QualifiedNameParts &parts) {
+  xmlNodePtr holder = xmlNewNode(nullptr, Bytes("attribute"));
+  const XmlHandle tree = ::agiru::detail::Detached(holder);
+  xmlAttrPtr attribute = nullptr;
+  if (parts.uri.empty()) {
+    attribute = xmlNewProp(holder, Bytes(std::string(parts.local)), Bytes(""));
+  } else {
+    const std::string prefix(parts.prefix);
+    xmlNsPtr ns =
+        xmlNewNs(holder, Bytes(std::string(parts.uri)), prefix.empty() ? nullptr : Bytes(prefix));
+    attribute = xmlNewNsProp(holder, ns, Bytes(std::string(parts.local)), Bytes(""));
+  }
+  return {tree.tree, attribute};
+}
+
+XmlHandle MakeDeclaration(const XmlHandle &document,
+                          const ::agiru::detail::XmlDeclarationParts &parts) {
+  xmlDocPtr doc = DocOf(document);
+  if (doc == nullptr) {
+    throw Error("XmlDocument.CreateXmlDeclaration: the document was never made");
+  }
+  xmlFree(const_cast<xmlChar *>(doc->version));
+  doc->version = xmlStrdup(Bytes(std::string(parts.version)));
+  xmlFree(const_cast<xmlChar *>(doc->encoding));
+  doc->encoding = parts.encoding.empty() ? nullptr : xmlStrdup(Bytes(std::string(parts.encoding)));
+  doc->standalone = parts.standalone == "yes" ? 1 : parts.standalone == "no" ? 0 : -1;
+  return {document.tree, doc};
+}
+
+XmlHandle MakeDocumentType(const XmlHandle &document,
+                           const ::agiru::detail::XmlDocumentTypeParts &parts) {
+  if (DocOf(document) == nullptr) {
+    throw Error("XmlDocument.CreateDocumentType: the document was never made");
+  }
+  static_cast<void>(parts.subset);
+  const std::string name(parts.name);
+  const std::string publicId(parts.publicId);
+  const std::string systemId(parts.systemId);
+  xmlDtdPtr dtd = xmlNewDtd(nullptr,
+                            Bytes(name),
+                            publicId.empty() ? nullptr : Bytes(publicId),
+                            systemId.empty() ? nullptr : Bytes(systemId));
+  return NewInDocument(document, reinterpret_cast<xmlNodePtr>(dtd));
 }
 
 }
@@ -396,7 +466,7 @@ std::vector<XmlAttribute>::const_iterator XmlAttributeCollection::end() const {
   return walked_.end();
 }
 
-void XmlNamespaceManager::AddNamespace(std::string_view prefix, std::string_view uri) {
+void XmlNamespaces::AddNamespace(std::string_view prefix, std::string_view uri) {
   for (auto &[held, value] : declared_) {
     if (held == prefix) {
       value = std::string(uri);
@@ -406,54 +476,52 @@ void XmlNamespaceManager::AddNamespace(std::string_view prefix, std::string_view
   declared_.emplace_back(std::string(prefix), std::string(uri));
 }
 
-::agiru::Text<0> XmlNamespaceManager::LookupNamespace(std::string_view prefix) const {
+::agiru::Text<0> XmlNamespaces::LookupNamespace(std::string_view prefix) const {
   for (const auto &[held, value] : declared_) {
     if (held == prefix) { return value; }
   }
   return {};
 }
 
-::agiru::Text<0> XmlNamespaceManager::LookupPrefix(std::string_view uri) const {
+::agiru::Text<0> XmlNamespaces::LookupPrefix(std::string_view uri) const {
   for (const auto &[held, value] : declared_) {
     if (value == uri) { return held; }
   }
   return {};
 }
 
-::agiru::Boolean XmlNamespaceManager::HasNamespace(std::string_view prefix) const {
-  for (const auto &[held, value] : declared_) {
-    if (held == prefix) { return true; }
-  }
-  return false;
+::agiru::Boolean XmlNamespaces::HasNamespace(std::string_view prefix) const {
+  return std::ranges::any_of(declared_,
+                             [prefix](const auto &entry) { return entry.first == prefix; });
 }
 
-void XmlDocument::Load(const ::agiru::InStream &stream) {
+void XmlTreeDocument::Load(const ::agiru::InStream &stream) {
   auto &input = const_cast<::agiru::InStream &>(stream);
   LoadXml(input.ReadBytes(input.Length()));
 }
 
-void XmlDocument::Load(std::string_view filename) {
+void XmlTreeDocument::Load(std::string_view filename) {
   auto result = ::agiru::detail::ReadXmlLocation(filename, preserveWhitespace_);
   if (!result.has_value()) { throw Error(result.error()); }
   handle_ = std::move(*result);
 }
 
-void XmlDocument::Load(const XmlReader &reader) {
+void XmlTreeDocument::Load(const XmlReader &reader) {
   reader.LoadDocument(handle_, preserveWhitespace_);
 }
 
-void XmlDocument::LoadXml(std::string_view text) {
+void XmlTreeDocument::LoadXml(std::string_view text) {
   auto result = ::agiru::detail::ReadXml(text, preserveWhitespace_);
   if (!result.has_value()) { throw Error(result.error()); }
   handle_ = std::move(*result);
 }
 
-void XmlDocument::Save(const ::agiru::OutStream &stream) {
+void XmlTreeDocument::Save(const ::agiru::OutStream &stream) {
   if (handle_.Empty()) { throw Error("XmlDocument.Save: the document was never loaded"); }
   const_cast<::agiru::OutStream &>(stream).WriteBytes(::agiru::detail::Dump(handle_));
 }
 
-void XmlDocument::Save(std::string_view filename) {
+void XmlTreeDocument::Save(std::string_view filename) {
   if (handle_.Empty()) { throw Error("XmlDocument.Save: the document was never loaded"); }
   const std::string bytes = ::agiru::detail::Dump(handle_);
   std::ofstream file{std::string(filename), std::ios::binary | std::ios::trunc};
@@ -461,73 +529,55 @@ void XmlDocument::Save(std::string_view filename) {
   file.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
 }
 
-XmlElement XmlDocument::DocumentElement() const {
+XmlElement XmlTreeDocument::DocumentElement() const {
   xmlDocPtr doc = DocOf(handle_);
   xmlNodePtr root = doc == nullptr ? nullptr : xmlDocGetRootElement(doc);
   return root == nullptr ? XmlElement{} : XmlElement(XmlHandle(handle_.tree, root));
 }
 
-XmlNode XmlDocument::DocumentType() const {
+XmlNode XmlTreeDocument::DocumentType() const {
   xmlDocPtr doc = DocOf(handle_);
   if (doc == nullptr || doc->intSubset == nullptr) { return {}; }
   return XmlNode(XmlHandle(handle_.tree, doc->intSubset));
 }
 
-XmlElement XmlDocument::CreateElement(std::string_view name) const {
+XmlElement XmlTreeDocument::CreateElement(std::string_view name) const {
   return XmlElement(NewInDocument(handle_, xmlNewNode(nullptr, Bytes(std::string(name)))));
 }
 
-XmlElement XmlDocument::CreateElement(std::string_view name, std::string_view uri) const {
+XmlElement XmlTreeDocument::CreateElement(std::string_view name, std::string_view uri) const {
   const std::string held(name);
   const std::size_t colon = held.find(':');
   if (colon == std::string::npos) { return CreateElement("", held, uri); }
   return CreateElement(held.substr(0, colon), held.substr(colon + 1), uri);
 }
 
-XmlElement XmlDocument::CreateElement(std::string_view prefix,
-                                      std::string_view local,
-                                      std::string_view uri) const {
-  xmlNodePtr node = xmlNewNode(nullptr, Bytes(std::string(local)));
-  const XmlHandle made = NewInDocument(handle_, node);
-  if (!uri.empty()) {
-    const std::string heldPrefix(prefix);
-    xmlNsPtr ns =
-        xmlNewNs(node, Bytes(std::string(uri)), heldPrefix.empty() ? nullptr : Bytes(heldPrefix));
-    xmlSetNs(node, ns);
-  }
-  return XmlElement(made);
+XmlElement XmlTreeDocument::CreateElement(std::string_view prefix,
+                                          std::string_view local,
+                                          std::string_view uri) const {
+  return XmlElement(MakeElement(handle_, {.prefix = prefix, .local = local, .uri = uri}));
 }
 
-XmlAttribute XmlDocument::CreateAttribute(std::string_view name) const {
+XmlAttribute XmlTreeDocument::CreateAttribute(std::string_view name) const {
   return CreateAttribute("", name, "");
 }
 
-XmlAttribute XmlDocument::CreateAttribute(std::string_view name, std::string_view uri) const {
+XmlAttribute XmlTreeDocument::CreateAttribute(std::string_view name, std::string_view uri) const {
   const std::string held(name);
   const std::size_t colon = held.find(':');
   if (colon == std::string::npos) { return CreateAttribute("", held, uri); }
   return CreateAttribute(held.substr(0, colon), held.substr(colon + 1), uri);
 }
 
-XmlAttribute XmlDocument::CreateAttribute(std::string_view prefix,
-                                          std::string_view local,
-                                          std::string_view uri) const {
-  xmlNodePtr holder = xmlNewNode(nullptr, Bytes("attribute"));
-  const XmlHandle tree = ::agiru::detail::Detached(holder);
-  xmlAttrPtr attribute = nullptr;
-  if (uri.empty()) {
-    attribute = xmlNewProp(holder, Bytes(std::string(local)), Bytes(""));
-  } else {
-    const std::string heldPrefix(prefix);
-    xmlNsPtr ns =
-        xmlNewNs(holder, Bytes(std::string(uri)), heldPrefix.empty() ? nullptr : Bytes(heldPrefix));
-    attribute = xmlNewNsProp(holder, ns, Bytes(std::string(local)), Bytes(""));
-  }
-  return XmlAttribute(XmlHandle(tree.tree, attribute));
+XmlAttribute XmlTreeDocument::CreateAttribute(std::string_view prefix,
+                                              std::string_view local,
+                                              std::string_view uri) const {
+  return XmlAttribute(MakeAttribute({.prefix = prefix, .local = local, .uri = uri}));
 }
 
-XmlNode
-XmlDocument::CreateNode(std::string_view type, std::string_view name, std::string_view uri) const {
+XmlNode XmlTreeDocument::CreateNode(std::string_view type,
+                                    std::string_view name,
+                                    std::string_view uri) const {
   if (type == "element") { return CreateElement(name, uri); }
   if (type == "attribute") { return CreateAttribute("", name, uri); }
   if (type == "text") { return CreateTextNode(""); }
@@ -535,61 +585,42 @@ XmlDocument::CreateNode(std::string_view type, std::string_view name, std::strin
               "' is not one this runtime makes");
 }
 
-XmlNode XmlDocument::CreateTextNode(std::string_view text) const {
+XmlNode XmlTreeDocument::CreateTextNode(std::string_view text) const {
   return XmlNode(NewInDocument(handle_, xmlNewText(Bytes(std::string(text)))));
 }
 
-XmlNode XmlDocument::CreateCDataSection(std::string_view text) const {
+XmlNode XmlTreeDocument::CreateCDataSection(std::string_view text) const {
   const std::string held(text);
   return XmlNode(NewInDocument(
       handle_, xmlNewCDataBlock(DocOf(handle_), Bytes(held), static_cast<int>(held.size()))));
 }
 
-XmlNode XmlDocument::CreateComment(std::string_view text) const {
+XmlNode XmlTreeDocument::CreateComment(std::string_view text) const {
   return XmlNode(NewInDocument(handle_, xmlNewComment(Bytes(std::string(text)))));
 }
 
-XmlNode XmlDocument::CreateProcessingInstruction(std::string_view target,
-                                                 std::string_view data) const {
+XmlNode XmlTreeDocument::CreateProcessingInstruction(std::string_view target,
+                                                     std::string_view data) const {
   return XmlNode(
       NewInDocument(handle_, xmlNewPI(Bytes(std::string(target)), Bytes(std::string(data)))));
 }
 
-XmlNode XmlDocument::CreateXmlDeclaration(std::string_view version,
-                                          std::string_view encoding,
-                                          std::string_view standalone) {
-  xmlDocPtr doc = DocOf(handle_);
-  if (doc == nullptr) {
-    throw Error("XmlDocument.CreateXmlDeclaration: the document was never made");
-  }
-  xmlFree(const_cast<xmlChar *>(doc->version));
-  doc->version = xmlStrdup(Bytes(std::string(version)));
-  xmlFree(const_cast<xmlChar *>(doc->encoding));
-  doc->encoding = encoding.empty() ? nullptr : xmlStrdup(Bytes(std::string(encoding)));
-  doc->standalone = standalone == "yes" ? 1 : standalone == "no" ? 0 : -1;
-  return XmlNode(XmlHandle(handle_.tree, doc));
+XmlNode XmlTreeDocument::CreateXmlDeclaration(std::string_view version,
+                                              std::string_view encoding,
+                                              std::string_view standalone) {
+  return XmlNode(MakeDeclaration(
+      handle_, {.version = version, .encoding = encoding, .standalone = standalone}));
 }
 
-XmlNode XmlDocument::CreateDocumentType(std::string_view name,
-                                        std::string_view publicId,
-                                        std::string_view systemId,
-                                        std::string_view subset) {
-  xmlDocPtr doc = DocOf(handle_);
-  if (doc == nullptr) {
-    throw Error("XmlDocument.CreateDocumentType: the document was never made");
-  }
-  static_cast<void>(subset);
-  const std::string heldName(name);
-  const std::string heldPublic(publicId);
-  const std::string heldSystem(systemId);
-  xmlDtdPtr dtd = xmlNewDtd(nullptr,
-                            Bytes(heldName),
-                            heldPublic.empty() ? nullptr : Bytes(heldPublic),
-                            heldSystem.empty() ? nullptr : Bytes(heldSystem));
-  return XmlNode(NewInDocument(handle_, reinterpret_cast<xmlNodePtr>(dtd)));
+XmlNode XmlTreeDocument::CreateDocumentType(std::string_view name,
+                                            std::string_view publicId,
+                                            std::string_view systemId,
+                                            std::string_view subset) {
+  return XmlNode(MakeDocumentType(
+      handle_, {.name = name, .publicId = publicId, .systemId = systemId, .subset = subset}));
 }
 
-XmlNodeList XmlDocument::GetElementsByTagName(std::string_view name) const {
+XmlNodeList XmlTreeDocument::GetElementsByTagName(std::string_view name) const {
   return XmlNodeList(ByTagName(handle_, name));
 }
 

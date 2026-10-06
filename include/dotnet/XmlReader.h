@@ -46,26 +46,41 @@ public:
   [[nodiscard]] static XmlNodeType CDATA() { return XmlNodeType{4}; } ///< `CDATA`.
 
   [[nodiscard]] static XmlNodeType ProcessingInstruction() {
-    return XmlNodeType{7};
+    return XmlNodeType{kProcessingInstruction};
   } ///< `ProcessingInstruction`.
 
-  [[nodiscard]] static XmlNodeType Comment() { return XmlNodeType{8}; } ///< `Comment`.
+  [[nodiscard]] static XmlNodeType Comment() { return XmlNodeType{kComment}; } ///< `Comment`.
 
-  [[nodiscard]] static XmlNodeType Document() { return XmlNodeType{9}; } ///< `Document`.
+  [[nodiscard]] static XmlNodeType Document() { return XmlNodeType{kDocument}; } ///< `Document`.
 
-  [[nodiscard]] static XmlNodeType Whitespace() { return XmlNodeType{13}; } ///< `Whitespace`.
+  /// \brief The .NET/libxml2 document type ordinal, 10.
+  [[nodiscard]] static XmlNodeType DocumentType() { return XmlNodeType{kDocumentType}; }
+
+  [[nodiscard]] static XmlNodeType Whitespace() {
+    return XmlNodeType{kWhitespace};
+  } ///< `Whitespace`.
 
   [[nodiscard]] static XmlNodeType SignificantWhitespace() {
-    return XmlNodeType{14};
+    return XmlNodeType{kSignificantWhitespace};
   } ///< `SignificantWhitespace`.
 
-  [[nodiscard]] static XmlNodeType EndElement() { return XmlNodeType{15}; } ///< `EndElement`.
+  [[nodiscard]] static XmlNodeType EndElement() {
+    return XmlNodeType{kEndElement};
+  } ///< `EndElement`.
 
   [[nodiscard]] static XmlNodeType XmlDeclaration() {
-    return XmlNodeType{17};
+    return XmlNodeType{kDeclaration};
   } ///< `XmlDeclaration`.
 
 private:
+  static constexpr std::int32_t kProcessingInstruction = 7;
+  static constexpr std::int32_t kComment = 8;
+  static constexpr std::int32_t kDocument = 9;
+  static constexpr std::int32_t kDocumentType = 10;
+  static constexpr std::int32_t kWhitespace = 13;
+  static constexpr std::int32_t kSignificantWhitespace = 14;
+  static constexpr std::int32_t kEndElement = 15;
+  static constexpr std::int32_t kDeclaration = 17;
   std::int32_t number_ = 0;
 };
 
@@ -121,20 +136,24 @@ public:
 
   /// \brief `XmlUrlResolver.Credentials := c`, accepted and unused.
   /// \tparam Credential Whatever was handed over.
-  template <typename Credential> void Credentials(const Credential &) {}
+  template <typename Credential> void Credentials([[maybe_unused]] const Credential &credential) {}
 };
 
 /// \brief .NET `StringReader`: text held for a reader to read.
-class StringReader {
+class BufferedStringReader;
+/// \brief AL `StringReader` names the native XML reader adapter.
+using StringReader = BufferedStringReader;
+
+class BufferedStringReader {
 public:
   /// \brief The binder behind `S := S.StringReader(text)`.
   struct Binder {
     /// \brief `new StringReader(text)`. \param text The text. \return The reader.
-    [[nodiscard]] class StringReader operator()(std::string_view text) const;
+    [[nodiscard]] class BufferedStringReader operator()(std::string_view text) const;
   };
 
   /// \brief `S.StringReader(text)`, the constructor as AL calls it.
-  Binder StringReader;
+  static constexpr Binder StringReader{};
 
   /// \brief The text held. \return It.
   [[nodiscard]] std::string_view Text() const { return text_; }
@@ -147,16 +166,20 @@ private:
 };
 
 /// \brief .NET `XmlReaderSettings`; reader DTD/resolver enforcement remains incomplete (0035).
-class XmlReaderSettings {
+class ReaderSettings;
+/// \brief AL `XmlReaderSettings` names the native XML reader adapter.
+using XmlReaderSettings = ReaderSettings;
+
+class ReaderSettings {
 public:
   /// \brief The binder behind `S := S.XmlReaderSettings()`.
   struct Binder {
     /// \brief `new XmlReaderSettings()`. \return Settings.
-    [[nodiscard]] class XmlReaderSettings operator()() const { return {}; }
+    [[nodiscard]] class ReaderSettings operator()() const { return {}; }
   };
 
   /// \brief `S.XmlReaderSettings()`, the constructor as AL calls it.
-  Binder XmlReaderSettings;
+  static constexpr Binder XmlReaderSettings{};
 
   /// \brief `Settings.DtdProcessing := d`. \param processing The value.
   void DtdProcessing(const dotnet::DtdProcessing &processing) { dtd_ = processing; }
@@ -168,7 +191,7 @@ public:
   [[nodiscard]] dotnet::DtdProcessing DtdProcessing() const { return dtd_; }
 
   /// \brief `Settings.XmlResolver := r`, accepted and unused. \tparam Resolver The resolver's type.
-  template <typename Resolver> void XmlResolver(const Resolver &) {}
+  template <typename Resolver> void XmlResolver([[maybe_unused]] const Resolver &resolver) {}
 
 private:
   dotnet::DtdProcessing dtd_;
@@ -261,7 +284,7 @@ public:
   [[nodiscard]] Boolean Eof() const;
 
 private:
-  friend class XmlDocument;
+  friend class XmlTreeDocument;
   struct State;
   static XmlReader Over(std::string text, const XmlReaderSettings &settings);
   void LoadDocument(::agiru::detail::XmlHandle &into, bool preserveWhitespace) const;
@@ -269,44 +292,49 @@ private:
 };
 
 /// \brief .NET `XmlTextReader`: constructors use Parse; Create uses XmlReader factory settings.
-class XmlTextReader : public XmlReader {
+class StreamingXmlTextReader;
+/// \brief AL `XmlTextReader` names the native XML reader adapter.
+using XmlTextReader = StreamingXmlTextReader;
+
+class StreamingXmlTextReader : public XmlReader {
 public:
   /// \brief The binder behind `R := R.XmlTextReader(...)`.
   struct Binder {
     /// \brief `new XmlTextReader(path)`. \param path The file. \return The reader.
-    [[nodiscard]] class XmlTextReader operator()(std::string_view path) const {
-      return XmlTextReader::Construct(path);
+    [[nodiscard]] class StreamingXmlTextReader operator()(std::string_view path) const {
+      return StreamingXmlTextReader::Construct(path);
     }
 
     /// \brief `new XmlTextReader(reader)`. \param reader The text. \return The reader.
-    [[nodiscard]] class XmlTextReader operator()(const StringReader &reader) const {
-      return XmlTextReader::Construct(reader);
+    [[nodiscard]] class StreamingXmlTextReader operator()(const StringReader &reader) const {
+      return StreamingXmlTextReader::Construct(reader);
     }
 
     /// \brief `new XmlTextReader(stream)`. \param stream The stream. \return The reader.
-    [[nodiscard]] class XmlTextReader operator()(const ::agiru::InStream &stream) const {
-      return XmlTextReader::Construct(stream);
+    [[nodiscard]] class StreamingXmlTextReader operator()(const ::agiru::InStream &stream) const {
+      return StreamingXmlTextReader::Construct(stream);
     }
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder XmlTextReader;
+  static constexpr Binder XmlTextReader{};
 
   /// \brief `XmlTextReader.Create(...)`, the same overloads. \tparam Arguments As `XmlReader`.
   /// \param arguments As `XmlReader`. \return The reader.
-  template <typename... Arguments> static class XmlTextReader Create(Arguments &&...arguments) {
+  template <typename... Arguments>
+  static class StreamingXmlTextReader Create(Arguments &&...arguments) {
     return Over(XmlReader::Create(std::forward<Arguments>(arguments)...));
   }
 
 private:
-  template <typename Source> static class XmlTextReader Construct(const Source &source) {
+  template <typename Source> static class StreamingXmlTextReader Construct(const Source &source) {
     XmlReaderSettings settings;
     settings.DtdProcessing(dotnet::DtdProcessing::Parse());
     return Over(XmlReader::Create(source, settings));
   }
 
-  static class XmlTextReader Over(XmlReader base) {
-    class XmlTextReader out;
+  static class StreamingXmlTextReader Over(XmlReader base) {
+    class StreamingXmlTextReader out;
     static_cast<XmlReader &>(out) = std::move(base);
     return out;
   }

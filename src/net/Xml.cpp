@@ -1,6 +1,7 @@
 #include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Variant.h"
 #include "type/XmlAttribute.h"
@@ -23,12 +24,15 @@
 
 #include "XmlEngine.h"
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <libxml/globals.h>
 #include <libxml/tree.h>
+#include <libxml/xmlstring.h>
 
 namespace agiru {
 

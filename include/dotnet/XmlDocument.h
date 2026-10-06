@@ -12,13 +12,18 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 namespace agiru::dotnet {
 
 /// \brief .NET `System.Xml.XmlElement`: a node that is an element.
 class XmlElement : public XmlNode {
 public:
-  using XmlNode::XmlNode;
+  /// \brief A null element reference.
+  XmlElement() = default;
+
+  /// \brief Retain an element's tree and node. \param handle The owned reference.
+  explicit XmlElement(::agiru::detail::XmlHandle handle) noexcept : XmlNode(std::move(handle)) {}
 
   /// \brief The node seen as an element, which AL's `XmlElement := XmlNode` does. \param node The
   /// node.
@@ -119,7 +124,11 @@ public:
 /// \brief .NET `System.Xml.XmlAttribute`: a node that is an attribute.
 class XmlAttribute : public XmlNode {
 public:
-  using XmlNode::XmlNode;
+  /// \brief A null attribute reference.
+  XmlAttribute() = default;
+
+  /// \brief Retain an attribute's tree and node. \param handle The owned reference.
+  explicit XmlAttribute(::agiru::detail::XmlHandle handle) noexcept : XmlNode(std::move(handle)) {}
 
   /// \brief The node seen as an attribute. \param node The node.
   explicit(false) XmlAttribute(const XmlNode &node) : XmlNode(node.Handle()) {}
@@ -179,20 +188,20 @@ private:
 };
 
 /// \brief .NET `XmlNamespaceManager`: the prefixes an XPath may use.
-class XmlNamespaceManager {
+class XmlNamespaces {
 public:
   /// \brief The binder behind `XmlNsMgr := XmlNsMgr.XmlNamespaceManager(NameTable)`.
   struct Binder {
     /// \brief A manager over a name table. \return An empty manager.
-    [[nodiscard]] class XmlNamespaceManager operator()(const ::agiru::XmlNameTable &) const;
+    [[nodiscard]] class XmlNamespaces operator()(const ::agiru::XmlNameTable &nameTable) const;
     /// \brief A manager over a name table this runtime has not rebuilt. \return An empty one.
     template <typename T>
       requires ::agiru::dotnet::IsAbsent<T>
-    [[nodiscard]] class XmlNamespaceManager operator()(const T &) const;
+    [[nodiscard]] class XmlNamespaces operator()(const T &nameTable) const;
   };
 
   /// \brief `XmlNsMgr.XmlNamespaceManager(...)`, the constructor as AL calls it.
-  Binder XmlNamespaceManager;
+  static constexpr Binder XmlNamespaceManager{};
 
   /// \brief `XmlNamespaceManager.AddNamespace(prefix, uri)`. \param prefix The prefix.
   /// \param uri The namespace.
@@ -230,31 +239,36 @@ private:
   std::vector<std::pair<std::string, std::string>> declared_;
 };
 
-inline class XmlNamespaceManager
-XmlNamespaceManager::Binder::operator()(const ::agiru::XmlNameTable &) const {
+inline class XmlNamespaces
+XmlNamespaces::Binder::operator()([[maybe_unused]] const ::agiru::XmlNameTable &nameTable) const {
   return ::agiru::dotnet::XmlNamespaceManager{};
 }
 
 template <typename T>
   requires ::agiru::dotnet::IsAbsent<T>
-class XmlNamespaceManager XmlNamespaceManager::Binder::operator()(const T &) const {
+class XmlNamespaces XmlNamespaces::Binder::operator()([[maybe_unused]] const T &nameTable) const {
   return ::agiru::dotnet::XmlNamespaceManager{};
 }
 
 /// \brief .NET `System.Xml.XmlDocument`, which the BaseApp's `XMLDOMManagement` wraps: a node that
 ///        is the whole tree.
-class XmlDocument : public XmlNode {
+class XmlTreeDocument : public XmlNode {
 public:
-  using XmlNode::XmlNode;
+  /// \brief A null document reference.
+  XmlTreeDocument() = default;
+
+  /// \brief Retain a document's tree. \param handle The owned document reference.
+  explicit XmlTreeDocument(::agiru::detail::XmlHandle handle) noexcept
+      : XmlNode(std::move(handle)) {}
 
   /// \brief The binder behind `XmlDoc := XmlDoc.XmlDocument()`.
   struct Binder {
     /// \brief An empty document. \return It.
-    [[nodiscard]] class XmlDocument operator()() const;
+    [[nodiscard]] class XmlTreeDocument operator()() const;
   };
 
   /// \brief `XmlDoc.XmlDocument()`, the constructor as AL calls it.
-  Binder XmlDocument;
+  static constexpr Binder XmlDocument{};
 
   /// \brief `XmlDocument.Load(stream)`: parses the stream, replacing the tree.
   /// \param stream The stream.
@@ -274,7 +288,7 @@ public:
   /// \tparam T The stub. \throws Error always (board:0035).
   template <typename T>
     requires ::agiru::dotnet::IsAbsent<T>
-  void Load(const T &) {
+  void Load([[maybe_unused]] const T &reader) {
     throw Error(
         "XmlDocument.Load over an XmlReader is declared and not implemented yet (board:0035)");
   }
@@ -282,7 +296,7 @@ public:
   /// \brief `XmlDocument.Load(OutStream)`, which AL writes and .NET refuses at run time: an
   ///        output stream cannot be read.
   /// \throws Error always.
-  void Load(const ::agiru::OutStream &) {
+  void Load([[maybe_unused]] const ::agiru::OutStream &stream) {
     throw Error("XmlDocument.Load: an OutStream cannot be read from; the platform refuses it too");
   }
 
@@ -294,7 +308,7 @@ public:
   /// \brief `XmlDocument.Save(InStream)`, which AL writes and cannot mean: an input stream is
   ///        not written to.
   /// \throws Error always.
-  void Save(const ::agiru::InStream &) {
+  void Save([[maybe_unused]] const ::agiru::InStream &stream) {
     throw Error("XmlDocument.Save: an InStream cannot be written to; the platform refuses it too");
   }
 
@@ -303,7 +317,7 @@ public:
   /// \tparam T The stub. \throws Error always.
   template <typename T>
     requires ::agiru::dotnet::IsAbsent<T>
-  void Save(const T &) {
+  void Save([[maybe_unused]] const T &stream) {
     throw Error(
         "XmlDocument.Save over a .NET Stream is declared and not implemented yet (board:0035)");
   }
@@ -370,7 +384,7 @@ public:
   /// \tparam Arguments The stubs. \throws Error always.
   template <typename... Arguments>
     requires(sizeof...(Arguments) == 4 && (::agiru::dotnet::IsAbsent<Arguments> || ...))
-  XmlNode CreateDocumentType(const Arguments &...) {
+  XmlNode CreateDocumentType([[maybe_unused]] const Arguments &...arguments) {
     throw Error("XmlDocument.CreateDocumentType over .NET String is declared and not implemented "
                 "yet (board:0035)");
   }
@@ -405,8 +419,8 @@ private:
   ::agiru::Boolean preserveWhitespace_ = false;
 };
 
-inline class XmlDocument XmlDocument::Binder::operator()() const {
-  return ::agiru::dotnet::XmlDocument(::agiru::detail::EmptyDocument());
+inline class XmlTreeDocument XmlTreeDocument::Binder::operator()() const {
+  return ::agiru::dotnet::XmlTreeDocument(::agiru::detail::EmptyDocument());
 }
 
 }

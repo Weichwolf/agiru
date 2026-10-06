@@ -5,7 +5,9 @@
 #include "type/Variant.h"
 #include "type/XmlAttribute.h"
 #include "type/XmlAttributeCollection.h"
+#include "type/XmlDeclaration.h"
 #include "type/XmlDocument.h"
+#include "type/XmlDocumentType.h"
 #include "type/XmlElement.h"
 #include "type/XmlNamespaceManager.h"
 #include "type/XmlNode.h"
@@ -20,6 +22,7 @@
 #include <fstream>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 using agiru::Error;
 using agiru::Text;
@@ -30,6 +33,9 @@ using agiru::XmlElement;
 using agiru::XmlNamespaceManager;
 using agiru::XmlNode;
 using agiru::XmlNodeList;
+
+static_assert(std::is_const_v<decltype(agiru::dotnet::XmlDocument::XmlDocument)>);
+static_assert(std::is_const_v<decltype(agiru::dotnet::XmlNamespaceManager::XmlNamespaceManager)>);
 
 namespace {
 
@@ -151,14 +157,14 @@ void EmptyNamespaceAliasesPreserveXPathTokens() {
 
 void DotNetEmptyNamespaceUsesTheSharedXPathEngine() {
   agiru::dotnet::XmlDocument document;
-  document = document.XmlDocument();
+  document = agiru::dotnet::XmlDocument::XmlDocument();
   document.LoadXml("<root/>");
   auto root = document.DocumentElement();
   auto child = document.CreateElement("empty", "item", "");
   child.InnerText("source-owned value");
   static_cast<void>(root.AppendChild(child));
   agiru::dotnet::XmlNamespaceManager manager;
-  manager = manager.XmlNamespaceManager(document.NameTable());
+  manager = agiru::dotnet::XmlNamespaceManager::XmlNamespaceManager(document.NameTable());
   manager.AddNamespace("empty", "");
   const auto found = root.SelectSingleNode("/root/empty:item", manager);
   CHECK_TRUE("the original XML DOM pattern finds its empty-namespace element",
@@ -177,7 +183,7 @@ void DotNetEmptyNamespaceUsesTheSharedXPathEngine() {
 /// node added to a tree is seen through every handle on it, because the types are references
 /// (`xmlelement-data-type.md`).
 void ElementsAreBuiltAndShared() {
-  XmlDocument document = XmlDocument{}.Create();
+  XmlDocument document = XmlDocument::Create();
   XmlElement root = XmlElement::Create("order");
   CHECK_TRUE("the root goes in", document.Add(root));
   XmlElement line = XmlElement::Create("line", agiru::Variant(std::string("first")));
@@ -208,17 +214,17 @@ void ElementsAreBuiltAndShared() {
 /// `IsNull`, `InnerText`, `AppendChild` and `OuterXml`, the members `XMLDOMManagement` names.
 void DotNetClassesWalkTheSameTree() {
   agiru::dotnet::XmlDocument document;
-  document = document.XmlDocument();
+  document = agiru::dotnet::XmlDocument::XmlDocument();
   CHECK_TRUE("a fresh document is not null", !agiru::IsNull(document));
   document.LoadXml(std::string(kSample));
   agiru::dotnet::XmlElement root = document.DocumentElement();
   CHECK_TEXT("the root is there", root.Name(), "root");
-  agiru::dotnet::XmlNode missing = root.SelectSingleNode("zzz");
+  const agiru::dotnet::XmlNode missing = root.SelectSingleNode("zzz");
   CHECK_TRUE("nothing found is null", agiru::IsNull(missing));
-  agiru::dotnet::XmlNode second = root.SelectSingleNode("a[@id='2']");
+  const agiru::dotnet::XmlNode second = root.SelectSingleNode("a[@id='2']");
   CHECK_TEXT("found reads its text", second.InnerText(), "two");
   agiru::dotnet::XmlNamespaceManager manager;
-  manager = manager.XmlNamespaceManager(document.NameTable());
+  manager = agiru::dotnet::XmlNamespaceManager::XmlNamespaceManager(document.NameTable());
   manager.AddNamespace("x", "urn:p");
   CHECK_TEXT("a prefixed path resolves through the manager",
              root.SelectSingleNode("x:b", manager).InnerText(),
@@ -229,7 +235,7 @@ void DotNetClassesWalkTheSameTree() {
   CHECK_TRUE("an appended child is in the markup",
              std::string_view(root.OuterXml()).find("<c>four</c></root>") != std::string::npos);
   int walked = 0;
-  for ([[maybe_unused]] auto &node : root.ChildNodes()) { ++walked; }
+  for ([[maybe_unused]] const auto &node : root.ChildNodes()) { ++walked; }
   CHECK_TRUE("and foreach walks every child", walked == 4);
   CHECK_TEXT("an attribute is read by name",
              root.SelectSingleNode("a").Attributes().GetNamedItem("id").Value(),
@@ -239,16 +245,16 @@ void DotNetClassesWalkTheSameTree() {
   // element's attributes that way; libxml2 keeps them apart, and without them here every
   // prefixed XPath of the PEPPOL import found nothing (Incoming Doc. To Data Exch.UT, 3 cases,
   // 2026-09-12).
-  agiru::dotnet::XmlAttributeCollection declared = root.Attributes();
+  const agiru::dotnet::XmlAttributeCollection declared = root.Attributes();
   CHECK_TRUE("the root's namespace declaration counts as an attribute", declared.Count() == 1);
   CHECK_TEXT("named xmlns:prefix", declared.Item(0).Name(), "xmlns:p");
   CHECK_TEXT("with the uri as its value", declared.GetNamedItem("xmlns:p").Value(), "urn:p");
   int named = 0;
-  for (auto &attribute : declared) {
+  for (const auto &attribute : declared) {
     if (std::string_view(attribute.Name()).starts_with("xmlns:")) { ++named; }
   }
   CHECK_TRUE("and foreach walks it", named == 1);
-  agiru::dotnet::XmlNode declaration = document.CreateXmlDeclaration("1.0", "UTF-8", "");
+  const agiru::dotnet::XmlNode declaration = document.CreateXmlDeclaration("1.0", "UTF-8", "");
   static_cast<void>(document.InsertBefore(declaration, document.DocumentElement()));
   static_cast<void>(document.AppendChild(declaration));
   CHECK_TRUE(
@@ -270,16 +276,17 @@ void DotNetLocationLoadAndDeclaration() {
     output << kSample;
   }
   agiru::dotnet::XmlDocument document;
-  document = document.XmlDocument();
+  document = agiru::dotnet::XmlDocument::XmlDocument();
   document.Load(path.string());
   CHECK_TEXT("Load(filename) reads XML", document.DocumentElement().Name(), "root");
-  agiru::dotnet::XmlDeclaration declaration = document.CreateXmlDeclaration("1.0", "UTF-8", "yes");
+  const agiru::dotnet::XmlDeclaration declaration =
+      document.CreateXmlDeclaration("1.0", "UTF-8", "yes");
   CHECK_TEXT("declaration version", declaration.Version(), "1.0");
   CHECK_TEXT("declaration encoding", declaration.Encoding(), "UTF-8");
   CHECK_TEXT("declaration standalone", declaration.Standalone(), "yes");
   bool wrongNode = false;
   try {
-    agiru::dotnet::XmlDeclaration element = document.DocumentElement();
+    const agiru::dotnet::XmlDeclaration element = document.DocumentElement();
     static_cast<void>(element.Version());
   } catch (const Error &) { wrongNode = true; }
   CHECK_TRUE("an element cannot masquerade as an XML declaration", wrongNode);
@@ -350,6 +357,47 @@ void DotNetParseFailuresRetainTheirKindAndPosition() {
 
 }
 
+namespace {
+
+void XmlFactoriesKeepTheOriginalArgumentRoles() {
+  auto declaration = agiru::XmlDeclaration::Create("1.0", "UTF-8", "yes");
+  CHECK_TEXT("AL declaration keeps its version argument", declaration.Version(), "1.0");
+  CHECK_TEXT("AL declaration keeps its encoding argument", declaration.Encoding(), "UTF-8");
+  CHECK_TEXT("AL declaration keeps its standalone argument", declaration.Standalone(), "yes");
+  auto type = agiru::XmlDocumentType::Create("invoice", "public-id", "system-id", "");
+  Text<0> text;
+  CHECK_TRUE("AL document type exposes its name", type.GetName(text));
+  CHECK_TEXT("AL document type keeps its name argument", text, "invoice");
+  CHECK_TRUE("AL document type exposes its public identifier", type.GetPublicId(text));
+  CHECK_TEXT("AL document type keeps its public identifier argument", text, "public-id");
+  CHECK_TRUE("AL document type exposes its system identifier", type.GetSystemId(text));
+  CHECK_TEXT("AL document type keeps its system identifier argument", text, "system-id");
+  auto document = agiru::dotnet::XmlDocument::XmlDocument();
+  const auto element = document.CreateElement("p", "invoice", "urn:invoice");
+  CHECK_TEXT("CLR element keeps its prefix argument", element.Prefix(), "p");
+  CHECK_TEXT("CLR element keeps its local name argument", element.LocalName(), "invoice");
+  CHECK_TEXT("CLR element keeps its namespace argument", element.NamespaceURI(), "urn:invoice");
+  const auto attribute = document.CreateAttribute("a", "number", "urn:attribute");
+  CHECK_TEXT("CLR attribute keeps its prefix argument", attribute.Prefix(), "a");
+  CHECK_TEXT("CLR attribute keeps its local name argument", attribute.LocalName(), "number");
+  CHECK_TEXT(
+      "CLR attribute keeps its namespace argument", attribute.NamespaceURI(), "urn:attribute");
+  const agiru::dotnet::XmlDeclaration clrDeclaration =
+      document.CreateXmlDeclaration("1.0", "UTF-8", "no");
+  CHECK_TEXT("CLR declaration keeps its version argument", clrDeclaration.Version(), "1.0");
+  CHECK_TEXT("CLR declaration keeps its encoding argument", clrDeclaration.Encoding(), "UTF-8");
+  CHECK_TEXT("CLR declaration keeps its standalone argument", clrDeclaration.Standalone(), "no");
+  const agiru::dotnet::XmlDocumentType clrType =
+      document.CreateDocumentType("invoice", "public-id", "system-id", "");
+  CHECK_TEXT("CLR document type keeps its name argument", clrType.LocalName(), "invoice");
+  CHECK_TEXT(
+      "CLR document type keeps its public identifier argument", clrType.PublicId(), "public-id");
+  CHECK_TEXT(
+      "CLR document type keeps its system identifier argument", clrType.SystemId(), "system-id");
+}
+
+}
+
 int main() {
   return gate::Run("Xml", [] {
     ReadFromAndWriteToRoundTrip();
@@ -361,5 +409,6 @@ int main() {
     DotNetClassesWalkTheSameTree();
     DotNetLocationLoadAndDeclaration();
     DotNetParseFailuresRetainTheirKindAndPosition();
+    XmlFactoriesKeepTheOriginalArgumentRoles();
   });
 }

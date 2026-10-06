@@ -2,6 +2,29 @@ namespace Microsoft.Fixture;
 
 codeunit 50261 "Stream Alias Consumer"
 {
+    procedure ClrXml(Value: Text): Text
+    var
+        Document: DotNet XmlDocument;
+        Namespaces: DotNet XmlNamespaceManager;
+        Settings: DotNet XmlReaderSettings;
+        Source: DotNet StringReader;
+        Reader: DotNet XmlTextReader;
+        Result: Text;
+    begin
+        Source := Source.StringReader(Value);
+        Settings := Settings.XmlReaderSettings();
+        Settings.DtdProcessing := 0;
+        Reader := Reader.Create(Source, Settings);
+        Document := Document.XmlDocument();
+        Document.Load(Reader);
+        Namespaces := Namespaces.XmlNamespaceManager(Document.NameTable);
+        Namespaces.AddNamespace('p', 'urn:test');
+        Result := Document.SelectSingleNode('/p:root/p:item', Namespaces).InnerText;
+        Reader := Reader.XmlTextReader(Source);
+        Document.Load(Reader);
+        exit(Result + '|' + Document.SelectSingleNode('/p:root/p:item', Namespaces).InnerText);
+    end;
+
     procedure ClrChart(Value: Decimal): Decimal
     var
         Table: DotNet DataTable;

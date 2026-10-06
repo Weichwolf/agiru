@@ -12,6 +12,19 @@
 
 namespace agiru::detail {
 
+struct XmlDeclarationParts {
+  std::string_view version;
+  std::string_view encoding;
+  std::string_view standalone;
+};
+
+struct XmlDocumentTypeParts {
+  std::string_view name;
+  std::string_view publicId;
+  std::string_view systemId;
+  std::string_view subset;
+};
+
 struct XmlTree {
   xmlDocPtr doc = nullptr;
   int count = 0;

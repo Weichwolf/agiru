@@ -290,8 +290,8 @@ struct XmlReader::State {
   std::string declaration;
 };
 
-StringReader StringReader::Binder::operator()(std::string_view text) const {
-  class StringReader out;
+StringReader BufferedStringReader::Binder::operator()(std::string_view text) const {
+  class BufferedStringReader out;
   out.text_ = std::string(text);
   return out;
 }
