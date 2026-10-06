@@ -33,6 +33,7 @@
 #include "BuiltinsWritten.h"
 #include "FieldMetadata.h"
 #include "Filter.h"
+#include "PageMetadata.h"
 #include "RenameCascade.h"
 #include "Rows.h"
 #include "Selection.h"
@@ -811,6 +812,9 @@ bool RuntimeGet(void *record, const TableDef &table) {
     return *found;
   }
   if (const auto found = GetInstalledTableMetadata(record, table); found.has_value()) {
+    return *found;
+  }
+  if (const auto found = GetInstalledPageMetadata(record, table); found.has_value()) {
     return *found;
   }
   RequireTableProvider(table);

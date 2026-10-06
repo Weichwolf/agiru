@@ -3982,6 +3982,8 @@ class PageRecordBindingGate(unittest.TestCase):
                     for name, number in (('Page Metadata', 2000000138), ('Table Metadata', 2000000136)):
                         self.assertEqual(text.count(f'Record "{name}" temporary;'), 1)
                         text = text.replace(f'Record "{name}" temporary;', f'Record {number} temporary;')
+                    self.assertEqual(text.count('Record "Page Metadata";'), 1)
+                    text = text.replace('Record "Page Metadata";', 'Record 2000000138;')
                 page.write_text(text)
                 output = Path(temp) / 'generated'
                 generated = subprocess.run([

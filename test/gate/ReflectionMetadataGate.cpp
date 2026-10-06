@@ -749,7 +749,8 @@ template <typename Row> void MissingProviderIsNotAnEmptySnapshot() {
       operation();
     } catch (const agiru::Error &error) {
       const std::string message = error.what();
-      if constexpr (Row::kId == agiru::platform::TableMetadata::kId) {
+      if constexpr (Row::kId == agiru::platform::TableMetadata::kId ||
+                    Row::kId == agiru::platform::PageMetadata::kId) {
         refused = message.contains(Row::kName) && message.contains("read-only live catalogue");
       } else {
         refused = message.contains(Row::kName) && message.contains("live ") &&
@@ -759,7 +760,8 @@ template <typename Row> void MissingProviderIsNotAnEmptySnapshot() {
     CHECK_TRUE("unqualified live metadata refuses before SQL or invented emptiness", refused);
   };
   refuses([&] { agiru::RequireTableProvider(agiru::TableTraits<Row>::kTable); });
-  if constexpr (Row::kId == agiru::platform::TableMetadata::kId) {
+  if constexpr (Row::kId == agiru::platform::TableMetadata::kId ||
+                Row::kId == agiru::platform::PageMetadata::kId) {
     row.SetRange(row.ID, kTemporaryId);
     CHECK_TRUE("qualified metadata Find distinguishes a missing installed table", !row.FindFirst());
     CHECK_TRUE("qualified metadata FindSet distinguishes a missing installed table",
@@ -771,7 +773,8 @@ template <typename Row> void MissingProviderIsNotAnEmptySnapshot() {
     refuses([&] { static_cast<void>(row.FindSet()); });
     refuses([&] { static_cast<void>(row.Get(kTemporaryId)); });
   }
-  if constexpr (Row::kId == agiru::platform::TableMetadata::kId) {
+  if constexpr (Row::kId == agiru::platform::TableMetadata::kId ||
+                Row::kId == agiru::platform::PageMetadata::kId) {
     CHECK_TRUE("qualified metadata Count distinguishes a missing installed table",
                row.Count() == 0);
   } else {

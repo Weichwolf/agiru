@@ -344,8 +344,7 @@ inline constexpr TableDef kPageMetadataTable{
     .keys = kPageMetadataKeys,
     .dataPerCompany = false,
     .inherentPermissions = "rX",
-    .providerRefusal =
-        "live page metadata projection and schema identity are unavailable (board:0034/0044/0013)",
+    .providerRefusal = "read-only live catalogue, not SQL storage (board:0044/0013)",
 };
 
 static_assert(FieldsAreSorted(kPageMetadataTable),

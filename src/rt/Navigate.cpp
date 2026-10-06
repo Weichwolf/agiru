@@ -9,6 +9,7 @@
 
 #include "Cursor.h"
 #include "FieldMetadata.h"
+#include "PageMetadata.h"
 #include "RecordChanges.h"
 #include "RecordOrder.h"
 #include "Selection.h"
@@ -183,6 +184,9 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
   if (const auto found = FindInstalledTableMetadata(record, table, which); found.has_value()) {
     return *found;
   }
+  if (const auto found = FindInstalledPageMetadata(record, table, which); found.has_value()) {
+    return *found;
+  }
   RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
@@ -223,6 +227,9 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
   if (const auto found = FindInstalledTableMetadata(record, table, "-"); found.has_value()) {
     return *found;
   }
+  if (const auto found = FindInstalledPageMetadata(record, table, "-"); found.has_value()) {
+    return *found;
+  }
   RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
@@ -247,6 +254,9 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
     return *moved;
   }
   if (const auto moved = NextInstalledTableMetadata(record, table, steps); moved.has_value()) {
+    return *moved;
+  }
+  if (const auto moved = NextInstalledPageMetadata(record, table, steps); moved.has_value()) {
     return *moved;
   }
   RequireTableProvider(table);
@@ -282,6 +292,9 @@ std::int32_t RuntimeCount(const void *record, const TableDef &table) {
   if (const auto count = CountInstalledTableMetadata(record, table); count.has_value()) {
     return *count;
   }
+  if (const auto count = CountInstalledPageMetadata(record, table); count.has_value()) {
+    return *count;
+  }
 
   const Selection made = Select(PeekOf(record), table);
   std::string sql = "SELECT count(*) FROM " + made.from;
@@ -298,6 +311,9 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table) {
     return *count == 0;
   }
   if (const auto count = CountInstalledTableMetadata(record, table, true); count.has_value()) {
+    return *count == 0;
+  }
+  if (const auto count = CountInstalledPageMetadata(record, table, true); count.has_value()) {
     return *count == 0;
   }
 

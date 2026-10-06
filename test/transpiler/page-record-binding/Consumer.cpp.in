@@ -66,6 +66,7 @@ int main() {
       return 1;
     }
     if (first.MetadataProperties() != 30 || second.MetadataProperties() != 30) { return 1; }
+    if (!first.InstalledPageMetadata() || !second.InstalledPageMetadata()) { return 1; }
     return 0;
   } catch (const std::exception &error) {
     std::fputs(error.what(), stderr);

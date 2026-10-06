@@ -8,23 +8,24 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Latest completed frozen integration: `61344f7` / content `0642312188b5`:
-  slice-check/all pass; C++ test is 147/150. Cursor/Filter fail on Integer rowversion;
-  DynamicRecord fails on missing Resource Cost. A local record-order qualifier briefly
-  overlapped its gate database; interference is possible, not proven as the cause.
-  All 235 tooling tests pass. AL execution: 2171/2314 passed, 143 failed, eighty codeunits,
-  zero incomplete/duplicate identities, 2473 seconds with six workers.
-  Against `00c187c`'s 2135/2314: 36 observed gains, zero losses/added/missing identities,
-  six changed failed errors. Gains span VAT-log pages, table-field metadata, workflow,
-  document aggregates, payment search, assembly and Data Exch. to RapidStart.
+- Latest completed frozen integration: `a554715` / content `56a0866bb13c`:
+  slice-check/all/test pass; C++/specialist test is 151/151.
+  AL execution: 2210/2314 passed, 104 failed, eighty codeunits,
+  zero incomplete/duplicate identities, 1392 seconds with six workers.
+  Against `61344f7`'s 2171/2314: forty observed gains, one loss, no added/missing
+  identities and 37 changed failed errors. Gains span remittance, currency reports,
+  sales aggregates, service timesheet posting, physical inventory and pick summaries.
+  The loss is Incoming Doc. To Data Exch.UT/TestProcessWithDataExchWithoutMappingFails:
+  Field's read-only provider guard. Investigate its actual caller; never remove the guard
+  or suppress the result to restore a historical count. Five Page Metadata and two
+  Table Metadata failures remain; their newer providers are absent from this snapshot.
   Seed identity remains null/unsealed: diagnostic comparison, not causal A/B or G1.
-  Sorted `[codeunit_id, method, status, error]` TSV SHA-256:
-  `9f94d7f42bbeee973653314d238a8f092bbd34854840f7a59c844daa75757382`.
-  Previous result projections/remaining losses against `9dca232`: recovery `a554715`.
-- Running frozen integration: `a554715` / content `56a0866bb13c`, same source/package
-  pins and full configured population. Includes shared SQL GetBySystemId, original
+  Sorted JSON `{codeunit_id, method, status, error}` projection SHA-256:
+  `140ceb229043c73a11da9579cb629ea1bd1521651170b8b9d771d29e742f8cb6`.
+  Source/dependency pins and full configured population are unchanged. Previous
+  result projections/remaining losses against `9dca232`: recovery `617b572`.
+  The completed snapshot includes shared SQL GetBySystemId, original
   Integer virtual timestamp/SQL alias and native positive-key Field Get/Find/Next/Count.
-  Wait for terminal target/AL receipts; do not infer gains from local gates.
   Serialized DynamicRecord/Storage/Temporary/Cursor/Filter pass 7493/71/95/255/129;
   native Field/FieldCatalogue pass 418/61 checks and 51 compiled reflection controls.
   Four Field attributes, authorization and full current-tree AL acceptance remain open.
@@ -41,7 +42,7 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Field/Table Metadata share one filter/order/bookmark kernel, with 55 compiled
   reflection controls plus the header control. Shared filter/bookmark mutants fail
   both gates; key-hole/Get-position controls fail the new gate. This increment is
-  not in the running `a554715` snapshot and still needs full AL replay.
+  not in the completed `a554715` snapshot and still needs full AL replay.
   Kernel/adapters/TableMetadata.cpp/new gate/generated Runner focused tidy pass;
   Table.cpp has sixteen diagnostics and the expanded gate exposes an uninitialized-ID
   StoredImage diagnostic absent from the previous gate. No full tidy/UT gain claim.
@@ -67,17 +68,19 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Developer `f928288ee840`: attributes/devenv-{tryfunction,normal}-attribute.md.
   `test/tooling/toolchain.py` owns DiscoveryGate/TranspilerAttributeCensusGate;
   the frozen failures are not suppressed and still need current-tree integration.
-- Integer projection's local repair passes Cursor/Filter 255/129 checks, shared
-  record-order controls and focused tidy (0013/0044). It addresses the observed
-  refusal path, but the full unchanged 2314-method replay must establish actual
-  gains/losses. Original BC29 Field catalogue starts at positive field numbers;
+- Integer projection passes Cursor/Filter 255/129 checks, shared record-order controls
+  and focused tidy (0013/0044), and is now included in the 2210/2314 replay above.
+  Original BC29 Field catalogue starts at positive field numbers;
   live native navigation now excludes timestamp zero without removing FieldRef(0).
   The aggregate UT must establish the expected count; gate success is not that replay.
-- Latest AL failure concentrations: seventy-two Integer rowversion paths,
-  five Page Metadata and two Table Metadata provider refusals, four Inventory Profile
-  missing temporary rows and four WorkbookWriter.Create refusals. The Table Metadata
-  cases are Incoming Doc. To Data Exch.UT's TestProcessWithDataExchSucceeds and
-  TestProcessWithDataExchWithInvalidNamespaceFails. Fix shared contracts, not callers.
+- Latest AL failure concentrations: thirteen incoming-document conversion failures,
+  seven Nothing-to-handle paths, five Field and five Page Metadata provider refusals,
+  four Inventory Profile missing temporary rows and four WorkbookWriter.Create refusals.
+  The two Table Metadata cases are Incoming Doc. To Data Exch.UT's
+  TestPEPPOLInvoiceToGenJnlLineFailsNoMapping and TestPeppolImportMultipleFails.
+  Native metadata FlowField lookups in BaseApp/System/DataExchange/
+  DataExchFieldMapping.Table.al are a concrete next probe, not an established root cause.
+  Fix shared contracts, not callers.
 - Raw census: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
   113,111 methods; fifteen approved exclusions leave 113,096 required.
   Zero unmeasured files; seven conditional assignments still refuse.

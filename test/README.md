@@ -33,7 +33,7 @@ forward anchors and property overrides across separate declaring/extension apps.
 Application identity, raw AL namespace and MultipleNewLines survive composition;
 defaults and independent names/captions execute. Three compiled metadata controls reject.
 Missing/cyclic anchors must refuse in both analysis and generation, retaining previous
-output. `make control-extensions JOBS=2` is the focused entry point; live Page Metadata,
+output. `make control-extensions JOBS=2` is the focused entry point; complete live Page Metadata,
 move operations and modified triggers remain separate gaps.
 
 `transpiler/native-table-ids.sh` executes source-owned `Database::` constants through
@@ -103,20 +103,29 @@ ModifyAllowed policy. View navigation and general command permissions remain ope
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,
-cross-column OR, FlowFilters and owned expression snapshots. Fifty-five compiled
+cross-column OR, FlowFilters and owned expression snapshots. Sixty-seven compiled
 controls and the narrow system-field header dependency control must reject.
 Installed Table Metadata.Get and positive-key Field.Get share typed/RecordRef readers;
 timestamp zero remains addressable through FieldRef, and temporary zero keys remain valid.
 Both readers check the native ABI before accessing their buffers. Typed missing reads
 retain optional-result semantics; ordinary filters stay unchanged. Native Field
 Find/FindSet/Next/Count/IsEmpty borrow a shared immutable positive-key index;
-Table Metadata borrows InstalledTables directly. One catalogue filter/order/navigation
+Table Metadata borrows InstalledTables directly; qualified Page Metadata rows borrow
+InstalledPages. One catalogue filter/order/navigation
 kernel uses call-scoped scratch rows, never SQL copies or per-session populations.
 `FieldCatalogueGate` checks independent bookmarks,
 filters/marks/signed navigation, the real name-derived FieldRef caller and exact metadata
 identity/version. `TableMetadataCatalogueGate` adds raw-identity counts, sparse filters,
 native option/mixed ordering, Get/Next anchoring, RecordRef parity and ownership/binding
-refusals; shared bookmark/filter mutants fail both gates. Native writes, including
+refusals. `PageMetadataCatalogueGate` covers native source/card IDs, Name/Caption,
+policy flags, original app identity, UTF-16 widths, bookmark/filter/mark/order and
+typed/RecordRef parity. Shared bookmark/filter/key-hole mutants fail all applicable
+catalogue gates; page-specific controls detect wrong projections and fabricated
+defaults. `PageRecordBindingGate` executes generated AL list-to-card Get and
+navigation in named/numeric forms without copying native source declarations.
+Canonical views, caption expressions/field lists, masks, dynamic properties, compiled
+API formats/defaults, absent-source contracts and non-English captions still explicitly
+refuse; key-only counts retain their identities. Native writes, including
 empty ModifyAll/DeleteAll(true), refuse; temporary rows
 remain independently writable. Four unprojected attributes refuse filtering/ordering.
 Complete metadata providers, authorization and secondary-order performance remain gaps (0044).

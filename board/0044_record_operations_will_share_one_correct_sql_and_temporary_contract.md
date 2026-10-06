@@ -3,16 +3,17 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay qualified Integer, Field and Table Metadata repairs with 0013/0058 on every UT
-identity. Complete Page Metadata from the native provider contract; qualify canonical
-views, static property resolution, localized text, masks, identity and permissions before activation.
+Next: replay current Field/Table/Page Metadata and RecordRef repairs with 0013/0058 on
+every UT identity. Investigate the new Incoming Documents Field-provider regression.
+Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
+resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
 Complete Field classification, SQLDataType, package provenance and permissions.
 Investigate StoredImage; qualify remaining virtual SystemId and diagnostic/localization contracts.
-Latest completed AL replay (`61344f7`) is 2171/2314 with 36 gains and zero losses
-against `00c187c`; two Table Metadata navigation refusals remain in Incoming Doc.
-To Data Exch.UT. Integer/live Field repairs are included only in the running `a554715`
-replay; shared Table Metadata navigation and RecordRef.Get consumption are not in that snapshot.
-Do not attribute unmeasured gains to either increment.
+Latest completed AL replay (`a554715`) is 2210/2314: forty gains and one loss against
+`61344f7`, no missing/added/duplicate identities, zero incomplete codeunits. Build and
+151 C++/specialist checks pass. Integer/live Field repairs are included; shared Table/Page
+Metadata navigation and RecordRef.Get consumption are not. The unsealed/null seed
+identity prevents causal A/B proof. No newer provider gain or full G1 is claimed.
 
 ## Implementation
 
@@ -90,32 +91,62 @@ Do not attribute unmeasured gains to either increment.
 
 ## Acceptance
 
-- `PageDef` now borrows its original ModuleDef and raw AL namespace and retains
-  MultipleNewLines (documented false default). `PageWriter.cpp` emits the identity
-  without widening public includes; known owners without headers and invalid Boolean
-  properties refuse. GenPageGate passes 37 checks; generated control-extension execution
-  retains 62 and adds thirteen, including separate extension-app ownership and request pages.
-  Replaying the new generator gate against frozen `a554715` fails eight new checks.
-  Three compiled missing-owner/C++-namespace/lost-property controls reject; original
-  missing/cyclic-anchor and order controls remain. Fixture focused tidy passes;
-  GenPageGate retains the existing BodyWriter.h adjacent-parameter finding. PageWriter's
-  23 normalized diagnostics match an independent frozen `a554715` replay exactly.
-  No suppressions/baseline increases. PageDef standalone frontend: 494.8 → 518.9 ms,
-  three rounds each/no PCH; no performance improvement claimed. Slice: 14225/0 missing.
+- `PageMetadata.{h,cpp}` and `PageMetadataNavigation.cpp` activate native
+  Get/Find/FindSet/Next/Count/IsEmpty for qualified English declaration rows over
+  `InstalledPages()`. They reuse CatalogueNavigation with three call-scoped scratch
+  rows, not SQL copies or per-session populations. Missing reads preserve consumed/
+  discarded semantics; original ownership, source/card IDs, native options, policies,
+  deterministic identity, frozen version 1 and unstamped audits remain exact.
+  Live writes/bulk writes/GetBySystemId refuse; temporary rows retain independent stores.
+  Key-only counts retain unqualified registered identities; projected reads refuse
+  unavailable source declarations/owners before copying attributes, not as missing rows.
+  `MetadataText.cpp` applies original page widths in UTF-16 units, preserves padding,
+  uses Name only for blank Caption and refuses unsupported isolated-surrogate cuts.
+  Native SourceTableTemporary includes the underlying Temporary table type.
+  Full provider remains open: nonempty canonical views, caption expressions/field lists,
+  masks, dynamic properties, unqualified API version formats/defaults, unknown source-
+  object presence and non-English captions explicitly refuse. These are counted gaps,
+  never approved exclusions. Authorization and virtual SystemId lookup remain unqualified.
+  `make reflection-metadata JOBS=2`: PageMetadataCatalogueGate 92, GenPageGate 40;
+  prior Reflection/TableMetadata/FieldCatalogue/PlatformField/RecordRef gates retain
+  294/53/61/418/159 checks. All 67 compiled controls and the header control reject.
+  Shared bookmark/filter/key-hole controls now also fail the Page gate; new controls
+  detect wrong names/widths, IDs, source-table type, app/system identity, version,
+  untranslated captions, fabricated policy defaults, byte truncation and lost native IDs.
+  `make verify-check VERIFY_CHECKS=PageRecordBindingGate JOBS=2` executes generated AL
+  list-to-card source/caption/policy lookup, filters, ordered navigation and optional
+  missing Get in named/numeric forms. It exposed a real PageWriter source-ID loss:
+  qualified native TableRef IDs now emit without a copied AST; invalid bound IDs refuse.
+  Frozen `a554715` fails eleven of the forty generator checks. Existing ownership,
+  namespace, MultipleNewLines and separate extension-app fixtures remain (recovery
+  `617b572`). PageDef includes are unchanged; its prior 494.8 → 518.9 ms three-round
+  standalone frontend measurement does not claim a speedup. Slice: 14225/0 missing.
   Verified-package regeneration still exits 1 with 5683 refused properties.
-  Sources: developer `f928288ee840`, properties/devenv-multiplenewlines-property.md;
+  MetadataText/PageMetadata/PageMetadataNavigation/PageMetadataCatalogueGate/Navigate
+  pass focused tidy. PageWriter/GenPage/Table/ReflectionMetadata retain 23/1/16/1
+  findings; fix the existing complexity/header/StoredImage defects before full tidy
+  acceptance. No suppression or baseline increase. Sources: developer `f928288ee840`,
+  properties/devenv-{multiplenewlines,editable,sourcetable,sourcetabletemporary,
+  apiversion-page}-property.md;
   BCApps `d99152ee35f0`, BaseApp/Utilities/PageManagement.Codeunit.al (Get/card/caption),
   user docs `bf5ffffa9b02`, business-central/ui-search.md; predecessor 1417/1752
   separate original names/captions and preserve all registered pages/native enum types.
   Original BC29 Ncl DLL SHA256 `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`:
   PageDataProvider iterator RVA `2ebe14` reads frozen extended declarations, original
-  names, truncated metadata text, static Editable, MultipleNewLines, AppID and normalized
-  ALNamespace; GenerateSourceTableViewString RVA `a6dbc` formats sorting/filter IDs,
-  not raw AL source. Artifact/source provenance is in 0013. Qualify these semantics
-  independently; predecessor field numbers/caption widths/doc-order enum ordinals are
-  not authority. The live provider remains explicitly refused: no claim that the five
-  ERM VAT Tool - UT page-navigation failures or full G1 are repaired. This increment
-  is not included in the running `a554715` snapshot.
+  names, locale lookup/fallback, truncated metadata text, static Editable,
+  MultipleNewLines and AppID. MetadataDataProvider.GetNormalizedNamespace RVA `a573b`
+  uses plain NavText.Create, not truncation; VirtualDataProvider.GetTruncatedTextValue
+  RVA `addc3` calls NavText.CreateTruncated. Source-table temporary helper RVA `1bfde0`
+  includes native Temporary. TableDataProvider iterator RVA `2efed4` instead uses plain
+  NavText.Create for Name/Caption: do not broaden the page truncation policy to tables.
+  GenerateSourceTableViewString RVA `a6dbc` formats sorting/filter IDs, not raw AL source.
+  Types DLL SHA256 `6e963283213bc64d2561e50cdc68dbb5709aec34bd35731f251c53c090bc58b2`:
+  MetaPageProperties ctor RVA `764e8` and MetaSourceObjectDefinition ctor `14932c`
+  distinguish stored/default properties from expressions. Their optional constructor
+  defaults alone do not prove AL compiler serialization. Artifact provenance: 0013.
+  Static SDK/fixture qualification is not live BC A/B, authorization or full provider
+  proof. This increment is absent from `a554715`; the five ERM VAT Tool - UT failures
+  still need current-tree execution. No full G1 or metadata conformance claim.
 - Integer SQL projection now preserves the selected Runtime-18 profile: original
   BC29 virtual timestamp 1, physical timestamp alias, blank identity/audit values
   and nonstored user lookups. Unknown/mistyped stored fields still refuse.

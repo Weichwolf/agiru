@@ -14,6 +14,9 @@ catalogue_gate="$B/gate_FieldCatalogueGate"
 "$catalogue_gate" > "$proof/field-catalogue.log" 2>&1
 metadata_gate="$B/gate_TableMetadataCatalogueGate"
 "$metadata_gate" > "$proof/table-metadata-catalogue.log" 2>&1
+page_gate="$B/gate_PageMetadataCatalogueGate"
+"$page_gate" > "$proof/page-metadata-catalogue.log" 2>&1
+"$B/gate_GenPageGate" > "$proof/page-source-binding.log" 2>&1
 "$B/gate_PlatformSystemFieldsGate" > "$proof/system-profiles.log" 2>&1
 "$B/gate_GenSourceBindingGate" > "$proof/source-binding.log" 2>&1
 if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
@@ -247,9 +250,108 @@ for control in catalogue-population catalogue-bookmark catalogue-filter catalogu
       if [ "$control" = catalogue-filter ]; then claim='metadata property filtering preserves native option members'; fi
       rg -q "FAIL .*${claim}" "$proof/$control.metadata.log";;
   esac
+  case "$control" in
+    catalogue-bookmark|catalogue-filter|catalogue-key-filter)
+      page_status=0
+      LD_PRELOAD="$proof/$control.so" "$page_gate" > "$proof/$control.page.log" 2>&1 || page_status=$?
+      [ "$page_status" -eq 1 ]
+      case "$control" in
+        catalogue-bookmark) claim='buffer edits do not replace the native page bookmark';;
+        catalogue-filter) claim='page ordinary predicates use original names';;
+        catalogue-key-filter) claim='page key filters retain holes in a narrowed interval';;
+      esac
+      rg -q "FAIL .*${claim}" "$proof/$control.page.log";;
+  esac
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/catalogue-controls.sha256"
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
+
+for control in page-name-width page-caption-name page-source-table page-card-id page-temporary-source page-null-owner page-system-provider page-zero-version page-unqualified-default page-language-fallback; do
+  awk -v control="$control" '
+    control == "page-name-width" && /row.Name = MetadataText\(source.name, Row::kNameLength\);/ {
+      sub(/Row::kNameLength/, "Row::kNameLength - 1"); changed++
+    }
+    control == "page-caption-name" && /row.Caption = MetadataText\(caption, Row::kCaptionLength\);/ {
+      sub(/MetadataText\(caption,/, "MetadataText((static_cast<void>(caption), source.name),"); changed++
+    }
+    control == "page-source-table" && /row.SourceTable = source.source.Value\(\);/ {
+      $0 = "  row.SourceTable = 0;"; changed++
+    }
+    control == "page-card-id" && /row.CardPageID = source.cardPageId.Value\(\);/ {
+      $0 = "  row.CardPageID = 0;"; changed++
+    }
+    control == "page-temporary-source" && /row.SourceTableTemporary =/ {
+      $0 = "  static_cast<void>(table); row.SourceTableTemporary = source.sourceTableTemporary;"; changed++
+    }
+    control == "page-null-owner" && /row.AppID = owner;/ {
+      $0 = "  static_cast<void>(owner); row.AppID = Guid{};"; changed++
+    }
+    control == "page-system-provider" && /row.SystemId = MetadataSystemId\(Row::kId, source.id.Value\(\)\);/ {
+      sub(/Row::kId/, "source.source"); changed++
+    }
+    control == "page-zero-version" && /constexpr auto kFrozenCatalogueRowVersion = 1;/ {
+      $0 = "constexpr auto kFrozenCatalogueRowVersion = 0;"; changed++
+    }
+    control == "page-unqualified-default" && /Refuse\(property, source\);/ {
+      $0 = "  static_cast<void>(source); static_cast<void>(property); return true;"; changed++
+    }
+    control == "page-language-fallback" && /if \(Language::Current\(\) != Language::kEnglishUnitedStates\)/ {
+      $0 = "  if (false) {"; changed++
+    }
+    {print} END {if (changed != 1) exit 2}
+  ' src/rt/PageMetadata.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  page_status=0
+  LD_PRELOAD="$proof/$control.so" "$page_gate" > "$proof/$control.log" 2>&1 || page_status=$?
+  [ "$page_status" -eq 1 ]
+  case "$control" in
+    page-name-width) claim='Name truncation uses the original name width';;
+    page-caption-name) claim='declared Caption remains independent';;
+    page-source-table|page-card-id) claim='declared source and card page IDs remain exact';;
+    page-temporary-source) claim='native SourceTableTemporary includes the underlying table type';;
+    page-null-owner) claim='App ID borrows the original declaring application';;
+    page-system-provider|page-zero-version) claim='page metadata uses a frozen version and its original identity encoding';;
+    page-unqualified-default) claim='unqualified properties never project fabricated defaults';;
+    page-language-fallback) claim='unqualified locale reads never substitute untranslated captions';;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/page-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
+
+awk '
+  /const auto result = value.substr\(0, ByteOfUnit\(value, length \+ 1\)\);/ {
+    $0 = "  const auto result = value.substr(0, length);"; changed++
+  }
+  /if \(Utf16Length\(result\) != length\)/ { $0 = "  if (false) {"; changed++ }
+  {print} END {if (changed != 2) exit 2}
+' src/rt/MetadataText.cpp > "$proof/page-byte-truncation.cpp"
+"$CXX" "${flags[@]}" "$proof/page-byte-truncation.cpp" -L"$B" -Wl,-rpath,"$B" \
+  -lagiru_rt -lagiru_net -lagiru_db -o "$proof/page-byte-truncation.so"
+page_status=0
+LD_PRELOAD="$proof/page-byte-truncation.so" "$page_gate" \
+  > "$proof/page-byte-truncation.log" 2>&1 || page_status=$?
+[ "$page_status" -eq 1 ]
+rg -q 'FAIL .*BMP Unicode truncation is not byte truncation' "$proof/page-byte-truncation.log"
+sha256sum "$proof/page-byte-truncation.cpp" "$proof/page-byte-truncation.so" >> "$proof/page-controls.sha256"
+rm -- "$proof/page-byte-truncation.cpp" "$proof/page-byte-truncation.so"
+
+awk '
+  /return binding->second.id;/ {
+    $0 = "  return std::nullopt;"; changed++
+  }
+  {print} END {if (changed != 1) exit 2}
+' src/gen/PageWriter.cpp > "$proof/lost-native-page-source.cpp"
+"$CXX" "${flags[@]}" -Isrc/gen -Isrc/al "$proof/lost-native-page-source.cpp" \
+  -L"$B" -Wl,-rpath,"$B" -lagiru_gen -lagiru_al -o "$proof/lost-native-page-source.so"
+page_status=0
+LD_PRELOAD="$proof/lost-native-page-source.so" "$B/gate_GenPageGate" \
+  > "$proof/lost-native-page-source.log" 2>&1 || page_status=$?
+[ "$page_status" -eq 1 ]
+rg -q 'FAIL .*native source identity survives without a copied table AST' "$proof/lost-native-page-source.log"
+sha256sum "$proof/lost-native-page-source.cpp" "$proof/lost-native-page-source.so" >> "$proof/page-controls.sha256"
+rm -- "$proof/lost-native-page-source.cpp" "$proof/lost-native-page-source.so"
 
 for control in field-access-default field-search-default field-customization-default field-customization-editable; do
   awk -v control="$control" '
@@ -637,4 +739,4 @@ fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -exec sha256sum {} + > "$proof/disposable.sha256"
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -delete
-printf 'reflection-metadata: shared live Table Metadata and positive-key Field Get/Find/Next/Count through typed/RecordRef paths, optional RecordRef.Get consumption, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; fifty-five compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: shared live Table/Page Metadata and positive-key Field Get/Find/Next/Count through typed/RecordRef paths, optional RecordRef.Get consumption, qualified page declarations, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; sixty-seven compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

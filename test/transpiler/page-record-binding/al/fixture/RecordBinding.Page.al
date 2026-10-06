@@ -4,6 +4,11 @@ using System.Reflection;
 
 page 50179 "Record Binding"
 {
+    PageType = List;
+    CardPageId = "Bound Card";
+    Caption = 'Independent list caption';
+    Editable = false;
+    MultipleNewLines = true;
     SourceTable = Field;
     SourceTableTemporary = true;
 
@@ -124,6 +129,47 @@ page 50179 "Record Binding"
         exit(PageMetadata.PageType + TableMetadata.TableType + TableMetadata.ObsoleteState +
              TableMetadata.DataClassification + TableMetadata.CompressionType +
              TableMetadata.Scope + TableMetadata.Access);
+    end;
+
+    procedure InstalledPageMetadata(): Boolean
+    var
+        PageMetadata: Record "Page Metadata";
+        OriginalSource: Integer;
+    begin
+        PageMetadata.SetRange(ID, Page::"Record Binding", Page::"Bound Card");
+        if PageMetadata.Count <> 2 then
+            Error('Installed page identities were lost');
+        PageMetadata.SetRange(Name, 'Not an AL object name');
+        if not PageMetadata.Get(Page::"Record Binding") then
+            Error('Installed list page is missing');
+        if (PageMetadata.Name <> 'Record Binding') or
+           (PageMetadata.Caption <> 'Independent list caption') or
+           (PageMetadata.PageType <> PageMetadata.PageType::List) or
+           PageMetadata.Editable or not PageMetadata.MultipleNewLines or
+           not PageMetadata.SourceTableTemporary or
+           (PageMetadata."AL Namespace" <> 'Microsoft.Fixture') then
+            Error('Installed list metadata differs from its AL declaration');
+        if PageMetadata.GetFilter(Name) <> 'Not an AL object name' then
+            Error('Installed Get changed ordinary filters');
+        OriginalSource := PageMetadata.SourceTable;
+        if PageMetadata.CardPageID <> Page::"Bound Card" then
+            Error('Installed card-page identity was lost');
+        PageMetadata.Get(PageMetadata.CardPageID);
+        if (PageMetadata.SourceTable <> OriginalSource) or
+           (PageMetadata.PageType <> PageMetadata.PageType::Card) or
+           (PageMetadata.Caption <> 'Independent card caption') or
+           not PageMetadata.Editable or PageMetadata.MultipleNewLines then
+            Error('Installed list-to-card lookup changed source or policies');
+        PageMetadata.SetRange(Name);
+        if not PageMetadata.FindFirst() then
+            Error('Installed filtered page navigation is empty');
+        if (PageMetadata.ID <> Page::"Record Binding") or (PageMetadata.Next() <> 1) then
+            Error('Installed page navigation changed order');
+        if PageMetadata.ID <> Page::"Bound Card" then
+            Error('Installed page navigation changed its bookmark');
+        if PageMetadata.Get(0) then
+            Error('Missing optional page lookup fabricated a row');
+        exit(true);
     end;
 
     procedure Read(var Target: Text)
