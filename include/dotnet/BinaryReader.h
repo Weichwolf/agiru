@@ -1,17 +1,22 @@
 #pragma once
 
 #include "dotnet/Refused.h"
+#include "type/Integer.h"
 #include "type/Stream.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 
 #include <concepts>
 #include <type_traits>
 
 namespace agiru::dotnet {
 
+class BinaryInputReader;
+/// \brief The AL name of the bound binary input reader.
+using BinaryReader = BinaryInputReader;
+
 /// \brief .NET `System.IO.BinaryReader` over an AL `InStream`, the reader of what `BinaryWriter`
 ///        writes: `BinReader := BinReader.BinaryReader(InStream); Note := BinReader.ReadString()`.
-class BinaryReader {
+class BinaryInputReader {
 public:
   /// \brief `BinaryReader.BaseStream`, of which AL reads `Position` and `Length` to see whether
   ///        there is anything to read at all.
@@ -45,16 +50,11 @@ public:
 
   /// \param input The stream read from; it must outlive the reader.
   /// \brief The binder behind the constructor call: `BinReader := BinReader.BinaryReader(...)`.
-  ///
-  /// \warning IT IS A DATA MEMBER NAMED AFTER THE CLASS, the shape every absent .NET stub already
-  ///          has, so the generated call `X.X(stream)` needs no rule of its own: a class with no
-  ///          user-declared constructor may carry a member of its own name, and a constructor here
-  ///          would forbid it.
   struct Binder {
     /// \brief Binds a reader to the stream.
     /// \param input The stream; it must outlive the reader.
     /// \return The bound reader.
-    [[nodiscard]] class BinaryReader operator()(InStream &input) const;
+    [[nodiscard]] BinaryReader operator()(InStream &input) const;
 
     /// \brief The .NET constructor over a .NET stream this runtime has not rebuilt (`Stream`,
     ///        `Encoding`): a reader bound to nothing, which refuses at its first use.
@@ -63,13 +63,14 @@ public:
     template <typename... Arguments>
       requires(sizeof...(Arguments) != 1 ||
                !(std::same_as<std::remove_cvref_t<Arguments>, InStream> && ...))
-    [[nodiscard]] class BinaryReader operator()(Arguments &&...) const {
+    [[nodiscard]] BinaryReader operator()(Arguments &&...arguments) const {
+      (static_cast<void>(arguments), ...);
       return ::agiru::dotnet::BinaryReader{};
     }
   };
 
   /// \brief `BinaryReader.BinaryReader(stream)`, the constructor as AL calls it.
-  Binder BinaryReader;
+  static constexpr Binder BinaryReader{};
 
   /// \brief `BinaryReader.BaseStream`.
   /// \return The stream's position and length.
@@ -80,7 +81,7 @@ public:
   ///        there.
   /// \return The text.
   /// \throws Error when the reader was never bound or the stream ends inside the string.
-  [[nodiscard]] ::agiru::Text<0> ReadString();
+  [[nodiscard]] ::agiru::Text<0> ReadString() const;
 
   /// \brief `BinaryReader.Close()`: nothing to release.
   void Close() const {}
@@ -149,8 +150,8 @@ private:
   InStream *input_ = nullptr;
 };
 
-inline class BinaryReader BinaryReader::Binder::operator()(InStream &input) const {
-  class BinaryReader bound;
+inline BinaryReader BinaryReader::Binder::operator()(InStream &input) const {
+  ::agiru::dotnet::BinaryReader bound;
   bound.input_ = &input;
   return bound;
 }

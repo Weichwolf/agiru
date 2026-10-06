@@ -452,7 +452,7 @@ const std::set<std::string> &RebuiltDotNet() {
     if (!std::filesystem::is_directory(where)) {
       throw std::runtime_error("the door has no dotnet/ directory at " + where.string());
     }
-    static const std::regex declared(R"((?:^|\n)(?:class|struct) ([A-Z][A-Za-z0-9]*))");
+    static const std::regex declared(R"((?:^|\n)(?:class|struct|using) ([A-Z][A-Za-z0-9]*))");
     std::set<std::string> found;
     for (const auto &entry : std::filesystem::directory_iterator(where)) {
       if (entry.path().extension() != ".h" || entry.path().filename() == "Refused.h") { continue; }

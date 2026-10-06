@@ -7,9 +7,26 @@
 #include "RuntimeSurface.h"
 #include "TableWriter.h"
 
+#include <initializer_list>
 #include <string>
 
 namespace {
+
+void NativeAliasesRemainRebuiltTypes() {
+  const auto &types = agiru::gen::RebuiltDotNet();
+  agiru::al::VarDecl declaration;
+  declaration.type = "DotNet";
+  for (const auto *name :
+       {"ArrayList", "JArray", "JObject", "JProperty", "JValue", "BinaryReader", "BinaryWriter"}) {
+    declaration.subtype = name;
+    CHECK_TRUE("an AL type alias remains implemented", types.contains(name));
+    CHECK_TRUE("the alias does not emit an absent CLR stub",
+               agiru::gen::AbsentDotNetOf(declaration).empty());
+  }
+  declaration.subtype = "MissingClrFixture";
+  CHECK_TRUE("an undeclared CLR type still refuses",
+             agiru::gen::AbsentDotNetOf(declaration) == "MissingClrFixture");
+}
 
 void DeclarationsTakePrecedenceOverGetterNames() {
   agiru::gen::Objects objects;
@@ -91,6 +108,7 @@ void ConversionResultNamesItsArrayDependency() {
 
 int main() {
   return gate::Run("GenReceiver", [] {
+    NativeAliasesRemainRebuiltTypes();
     DeclarationsTakePrecedenceOverGetterNames();
     HeadersAreNotInsertedTwice();
     ConversionResultNamesItsArrayDependency();

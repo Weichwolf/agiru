@@ -3,7 +3,7 @@
 #include "runtime/ErrorValue.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -23,7 +23,7 @@ std::string LengthPrefix(std::size_t length) {
   std::string out;
   std::size_t left = length;
   do {
-    const unsigned low = static_cast<unsigned>(left & kSevenBits);
+    const auto low = static_cast<unsigned>(left & kSevenBits);
     left >>= kBitsPerByte;
     out.push_back(static_cast<char>(left != 0 ? low | kCarryBit : low));
   } while (left != 0);
@@ -32,7 +32,7 @@ std::string LengthPrefix(std::size_t length) {
 
 }
 
-void BinaryWriter::Write(std::string_view text) {
+void BinaryWriter::Write(std::string_view text) const {
   if (output_ == nullptr) {
     throw Error("BinaryWriter.Write: the writer was never bound to an OutStream");
   }
@@ -47,7 +47,7 @@ BinaryReader::Stream BinaryReader::BaseStream() const {
   return Stream(*input_);
 }
 
-::agiru::Text<0> BinaryReader::ReadString() {
+::agiru::Text<0> BinaryReader::ReadString() const {
   if (input_ == nullptr) {
     throw Error("BinaryReader.ReadString: the reader was never bound to an InStream");
   }
@@ -65,7 +65,7 @@ BinaryReader::Stream BinaryReader::BaseStream() const {
   if (text.size() != length) {
     throw Error("BinaryReader.ReadString: the stream ends inside the string");
   }
-  return ::agiru::Text<0>{std::string_view(text)};
+  return {std::string_view(text)};
 }
 
 }

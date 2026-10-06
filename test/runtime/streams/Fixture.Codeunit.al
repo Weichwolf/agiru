@@ -2,6 +2,21 @@ namespace Microsoft.Fixture;
 
 codeunit 50261 "Stream Alias Consumer"
 {
+    procedure BinaryRoundTrip(var Store: Blob; Value: Text): Text
+    var
+        Output: OutStream;
+        Input: InStream;
+        Writer: DotNet BinaryWriter;
+        Reader: DotNet BinaryReader;
+    begin
+        Store.CreateOutStream(Output);
+        Writer := Writer.BinaryWriter(Output);
+        Writer.Write(Value);
+        Store.CreateInStream(Input);
+        Reader := Reader.BinaryReader(Input);
+        exit(Reader.ReadString());
+    end;
+
     procedure ReadByValue(Source: InStream; var Value: Text; Count: Integer): Integer
     begin
         exit(Source.Read(Value, Count));

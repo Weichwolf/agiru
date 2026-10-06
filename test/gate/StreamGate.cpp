@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -23,6 +24,9 @@ using agiru::InStream;
 using agiru::OutStream;
 
 namespace {
+
+static_assert(std::is_const_v<decltype(agiru::dotnet::BinaryReader::BinaryReader)>);
+static_assert(std::is_const_v<decltype(agiru::dotnet::BinaryWriter::BinaryWriter)>);
 
 /// A STREAM WRITES INTO THE BLOB IT WAS GIVEN, and does not own a copy of it. That is what makes
 /// `Rec.Blob.CreateOutStream(Out); Out.WriteText(x)` leave the value in the record -- and a stream
@@ -292,13 +296,13 @@ void ABinaryWriterAndReaderRoundTripANote() {
   OutStream out;
   blob.CreateOutStream(out);
   agiru::dotnet::BinaryWriter BinWriter{};
-  BinWriter = BinWriter.BinaryWriter(out);
+  BinWriter = agiru::dotnet::BinaryWriter::BinaryWriter(out);
   BinWriter.Write(std::string_view("h\xc3\xa4llo"));
   CHECK_TRUE("the prefix is one byte for a short string", blob.Length() == 7);
   InStream in;
   blob.CreateInStream(in);
   agiru::dotnet::BinaryReader BinReader{};
-  BinReader = BinReader.BinaryReader(in);
+  BinReader = agiru::dotnet::BinaryReader::BinaryReader(in);
   CHECK_TRUE("Position is zero-based", BinReader.BaseStream().Position() == 0);
   CHECK_TRUE("and Length is the blob's", BinReader.BaseStream().Length() == 7);
   CHECK_TEXT(
@@ -306,7 +310,7 @@ void ABinaryWriterAndReaderRoundTripANote() {
   const Blob empty;
   InStream none;
   empty.CreateInStream(none);
-  BinReader = BinReader.BinaryReader(none);
+  BinReader = agiru::dotnet::BinaryReader::BinaryReader(none);
   CHECK_TRUE("an empty stream is at its end before any read",
              BinReader.BaseStream().Position() == BinReader.BaseStream().Length());
   bool threw = false;
@@ -314,7 +318,7 @@ void ABinaryWriterAndReaderRoundTripANote() {
     static_cast<void>(BinReader.ReadString());
   } catch (const Error &) { threw = true; }
   CHECK_TRUE("and reading it is refused", threw);
-  agiru::dotnet::BinaryWriter unbound{};
+  const agiru::dotnet::BinaryWriter unbound{};
   threw = false;
   try {
     unbound.Write(std::string_view("x"));

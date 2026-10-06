@@ -11,6 +11,10 @@
 
 namespace agiru::dotnet {
 
+class BinaryOutputWriter;
+/// \brief The AL name of the bound binary output writer.
+using BinaryWriter = BinaryOutputWriter;
+
 /// \brief .NET `System.IO.BinaryWriter` over an AL `OutStream`, which the Record Link module uses
 ///        to write a note: `BinWriter := BinWriter.BinaryWriter(OutStream); BinWriter.Write(Note)`.
 ///
@@ -18,20 +22,15 @@ namespace agiru::dotnet {
 ///       bits per byte with the high bit carrying on, then the bytes -- and
 ///       `BinaryReader.ReadString` reads that back. A note written by BC is read by this reader and
 ///       the other way round, so the layout is .NET's and not this runtime's.
-class BinaryWriter {
+class BinaryOutputWriter {
 public:
   /// \param output The stream written to; it must outlive the writer.
   /// \brief The binder behind the constructor call: `BinWriter := BinWriter.BinaryWriter(...)`.
-  ///
-  /// \warning IT IS A DATA MEMBER NAMED AFTER THE CLASS, the shape every absent .NET stub already
-  ///          has, so the generated call `X.X(stream)` needs no rule of its own: a class with no
-  ///          user-declared constructor may carry a member of its own name, and a constructor here
-  ///          would forbid it.
   struct Binder {
     /// \brief Binds a writer to the stream.
     /// \param output The stream; it must outlive the writer.
     /// \return The bound writer.
-    [[nodiscard]] class BinaryWriter operator()(OutStream &output) const;
+    [[nodiscard]] BinaryWriter operator()(OutStream &output) const;
 
     /// \brief The .NET constructor over a .NET stream this runtime has not rebuilt (`Stream`,
     ///        `Encoding`): a writer bound to nothing, which refuses at its first use.
@@ -40,23 +39,24 @@ public:
     template <typename... Arguments>
       requires(sizeof...(Arguments) != 1 ||
                !(std::same_as<std::remove_cvref_t<Arguments>, OutStream> && ...))
-    [[nodiscard]] class BinaryWriter operator()(Arguments &&...) const {
+    [[nodiscard]] BinaryWriter operator()(Arguments &&...arguments) const {
+      (static_cast<void>(arguments), ...);
       return ::agiru::dotnet::BinaryWriter{};
     }
   };
 
   /// \brief `BinaryWriter.BinaryWriter(stream)`, the constructor as AL calls it.
-  Binder BinaryWriter;
+  static constexpr Binder BinaryWriter{};
 
   /// \brief `BinaryWriter.Write(string)`: a length-prefixed UTF-8 string.
   /// \param text The text.
   /// \throws Error when the writer was never bound.
-  void Write(std::string_view text);
+  void Write(std::string_view text) const;
 
   /// \brief `BinaryWriter.Write(string)` for an AL `Text`.
   /// \tparam N The declared length.
   /// \param text The text.
-  template <std::size_t N> void Write(const ::agiru::Text<N> &text) { Write(text.Value()); }
+  template <std::size_t N> void Write(const ::agiru::Text<N> &text) const { Write(text.Value()); }
 
   /// \brief `BinaryWriter.Write` of any other .NET type (`Boolean`, `Decimal`, `Int32`, bytes):
   ///        the platform's binary layout, which this runtime does not carry.
@@ -64,7 +64,8 @@ public:
   /// \throws Error always (board:0035).
   template <typename T>
     requires(!std::convertible_to<const T &, std::string_view>)
-  void Write(const T &) {
+  void Write(const T &value) const {
+    static_cast<void>(value);
     throw Error("BinaryWriter.Write of this type is declared and not implemented yet (board:0035)");
   }
 
@@ -98,8 +99,8 @@ private:
   OutStream *output_ = nullptr;
 };
 
-inline class BinaryWriter BinaryWriter::Binder::operator()(OutStream &output) const {
-  class BinaryWriter bound;
+inline BinaryWriter BinaryWriter::Binder::operator()(OutStream &output) const {
+  ::agiru::dotnet::BinaryWriter bound;
   bound.output_ = &output;
   return bound;
 }

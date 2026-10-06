@@ -13,6 +13,11 @@
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
     agiru::Fixture::StreamAliasConsumer_Codeunit consumer;
+    agiru::Blob note;
+    CHECK_TEXT("generated immutable CLR factories preserve Unicode data",
+               consumer.BinaryRoundTrip(note, "hällo").Value(),
+               "hällo");
+    CHECK_TRUE("generated binary write retains the CLR length prefix", note.Length() == 7);
     agiru::Blob blob;
     static_cast<void>(blob.CreateOutStream().WriteBytes("abcdef"));
     auto input = blob.CreateInStream();
