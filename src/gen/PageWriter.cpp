@@ -16,6 +16,7 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
@@ -835,6 +836,21 @@ std::string PageReflectionProperties(const al::PageObject &page, const Objects &
   return out;
 }
 
+std::optional<std::int32_t>
+PageSourceId(const al::PageObject &page, const Objects &objects, const al::TableObject *source) {
+  if (source != nullptr) { return source->id; }
+  const auto *property = Find(page.properties, "SourceTable");
+  if (property == nullptr) { return std::nullopt; }
+  std::string name;
+  for (const auto &token : property->value) { name += token.text; }
+  const auto binding = objects.tables.find(LowerKey(name));
+  if (binding == objects.tables.end()) { return std::nullopt; }
+  if (binding->second.id <= 0) {
+    throw std::runtime_error("invalid bound SourceTable identity: " + name);
+  }
+  return binding->second.id;
+}
+
 }
 
 std::string
@@ -867,8 +883,8 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
   out += caption == nullptr ? identifier + "::kName" : Literal(caption->text);
   out += ",\n";
   out += "    .type = PageType::" + PageTypeOf(page) + ",\n";
-  if (source != nullptr) {
-    out += "    .source = ::agiru::TableId{" + std::to_string(source->id) + "},\n";
+  if (const auto id = PageSourceId(page, objects, source); id) {
+    out += "    .source = ::agiru::TableId{" + std::to_string(*id) + "},\n";
   }
   const auto said = [&page](std::string_view name) {
     const al::Property *found = Find(page.properties, name);

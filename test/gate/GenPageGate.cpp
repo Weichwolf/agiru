@@ -217,6 +217,27 @@ void MultipleNewLinesHasNoGuessedValues() {
   CHECK_TRUE("a nonliteral value refuses instead of silently becoming false", refused);
 }
 
+void NativePageSourcesDoNotNeedCopiedDeclarations() {
+  agiru::gen::Objects objects;
+  objects.tables = agiru::gen::PlatformTables();
+  for (const auto *name : {"Field", "2000000041"}) {
+    const auto page = agiru::al::ParsePage(
+        std::string("page 50108 \"Native Source\" { SourceTable = ") + name + "; }");
+    const auto definition = agiru::gen::PageDefinition(page, objects, nullptr);
+    CHECK_TRUE("native source identity survives without a copied table AST",
+               definition.contains(".source = ::agiru::TableId{2000000041},"));
+  }
+  const auto page = agiru::al::ParsePage("page 50108 \"Native Source\" { SourceTable = Field; }");
+  objects.tables.at("field").id = 0;
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::gen::PageDefinition(page, objects, nullptr));
+  } catch (const std::runtime_error &error) {
+    refused = std::string_view(error.what()).contains("invalid bound SourceTable identity");
+  }
+  CHECK_TRUE("a bound source without a valid ID is not emitted as source zero", refused);
+}
+
 }
 
 int main() {
@@ -226,5 +247,6 @@ int main() {
     ComputedSourcesUseTheNormalBodyWriter();
     PageDeclarationsRetainSourceIdentity();
     MultipleNewLinesHasNoGuessedValues();
+    NativePageSourcesDoNotNeedCopiedDeclarations();
   });
 }
