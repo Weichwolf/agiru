@@ -1,34 +1,19 @@
 #include "runtime/RecordRef.h"
 
 #include "Check.h"
+#include "FailingAllocation.h"
 
-#include <cstddef>
-#include <cstdlib>
 #include <new>
 #include <utility>
 
+using gate::failAllocation;
+
 namespace {
-thread_local bool failAllocation = false;
 int released = 0;
 
-void ReleaseFixture(void *) {
+void ReleaseFixture([[maybe_unused]] void *record) {
   ++released;
 }
-}
-
-// Replace allocation only in this gate process to exercise the real ownership boundary.
-void *operator new(std::size_t size) {
-  if (std::exchange(failAllocation, false)) { throw std::bad_alloc(); }
-  if (void *memory = std::malloc(size == 0 ? 1 : size)) { return memory; }
-  throw std::bad_alloc();
-}
-
-void operator delete(void *memory) noexcept {
-  std::free(memory);
-}
-
-void operator delete(void *memory, std::size_t) noexcept {
-  std::free(memory);
 }
 
 namespace {
@@ -50,7 +35,9 @@ void TheLastOwnerReleasesExactlyOnce() {
   agiru::detail::SharedRecord owner(&record, &ReleaseFixture);
   auto copy = owner;
   agiru::detail::SharedRecord moved(std::move(owner));
-  CHECK_TRUE("move construction empties its source", owner.Get() == nullptr);
+  owner = {};
+  CHECK_TRUE("reusing a moved owner cannot prematurely release the transferred record",
+             released == 0 && owner.Get() == nullptr && moved.Get() == &record);
   moved.Reset();
   CHECK_TRUE("another owner keeps the record alive", released == 0 && copy.Get() == &record);
   copy.Reset();

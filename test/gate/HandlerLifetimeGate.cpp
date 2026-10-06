@@ -1,16 +1,16 @@
 #include "runtime/test/Handlers.h"
 
 #include "Check.h"
+#include "FailingAllocation.h"
 
 #include <array>
-#include <cstddef>
-#include <cstdlib>
 #include <new>
 #include <string_view>
 #include <utility>
 
+using gate::failAllocation;
+
 namespace {
-thread_local bool failAllocation = false;
 
 void Answer([[maybe_unused]] std::string_view message, [[maybe_unused]] void *response) {}
 
@@ -26,21 +26,6 @@ constexpr std::array<agiru::TestHandler, 1> kReplacement{{{.name = "Replacement"
                                                            .optional = false}}};
 constexpr std::array<std::string_view, 1> kOriginalNames{"Original"};
 constexpr std::array<std::string_view, 2> kReplacementNames{"Replacement", "Missing"};
-}
-
-// Allocation failure is confined to this gate process.
-void *operator new(std::size_t size) {
-  if (std::exchange(failAllocation, false)) { throw std::bad_alloc(); }
-  if (void *memory = std::malloc(size == 0 ? 1 : size)) { return memory; }
-  throw std::bad_alloc();
-}
-
-void operator delete(void *memory) noexcept {
-  std::free(memory);
-}
-
-void operator delete(void *memory, [[maybe_unused]] std::size_t size) noexcept {
-  std::free(memory);
 }
 
 namespace {
