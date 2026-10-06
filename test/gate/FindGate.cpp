@@ -249,7 +249,7 @@ void ACopyStepsFromTheCopiedRow() {
   CHECK_TEXT("and the original has not moved", std::string(first.Code.Value()), "R00");
 
   // THE NEGATIVE CONTROL: a copy of a record that stands nowhere stands nowhere.
-  ResourceCost unfound;
+  const ResourceCost unfound;
   ResourceCost copied;
   copied.Copy(unfound);
   CHECK_TRUE("a copy of an unpositioned record has no next row", copied.Next() == 0);

@@ -6,6 +6,7 @@
 #include "Check.h"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 
 #include <unistd.h>
@@ -14,15 +15,17 @@ namespace {
 
 std::size_t Rows(const agiru::Connection &connection, const std::string &table) {
   const agiru::Result result = connection.Execute("SELECT count(*) FROM " + table);
-  return static_cast<std::size_t>(std::stoul(std::string(*result.Value(0, 0))));
+  const auto value = result.Value(0, 0);
+  if (!value) { throw agiru::Error("Commit gate: count(*) returned NULL"); }
+  return static_cast<std::size_t>(std::stoul(std::string(*value)));
 }
 
 void ACommitIsVisibleOutsideTheWritingConnection() {
-  agiru::Connection observer(AGIRU_TEST_DSN);
+  const agiru::Connection observer(AGIRU_TEST_DSN);
   const std::string table = "agiru_commit_gate_" + std::to_string(getpid());
   observer.Run("CREATE TABLE " + table + " (value integer PRIMARY KEY)");
   {
-    agiru::Connection writer(AGIRU_TEST_DSN);
+    const agiru::Connection writer(AGIRU_TEST_DSN);
     agiru::Boundaries boundaries;
     const std::size_t depth = boundaries.Open(writer);
     writer.Run("INSERT INTO " + table + " VALUES (1)");
@@ -38,7 +41,7 @@ void ACommitIsVisibleOutsideTheWritingConnection() {
 }
 
 void AnAbortedTransactionCannotReportACommit() {
-  agiru::Connection writer(AGIRU_TEST_DSN);
+  const agiru::Connection writer(AGIRU_TEST_DSN);
   writer.Run("CREATE TEMP TABLE aborted_commit_gate (value integer PRIMARY KEY)");
   writer.Run("BEGIN");
   writer.Run("INSERT INTO aborted_commit_gate VALUES (1)");
@@ -59,7 +62,7 @@ void AnAbortedTransactionCannotReportACommit() {
 }
 
 void ADeferredCommitFailureLeavesNoStaleSavepoints() {
-  agiru::Connection writer(AGIRU_TEST_DSN);
+  const agiru::Connection writer(AGIRU_TEST_DSN);
   writer.Run("CREATE TEMP TABLE deferred_commit_gate "
              "(value integer UNIQUE DEFERRABLE INITIALLY DEFERRED)");
   agiru::Boundaries boundaries;
@@ -105,7 +108,7 @@ void ADeferredFailureUnwindsNestedScopesAndAllowsANewTransaction() {
 }
 
 void AnInnerRollbackRestoresTheOuterConsistencyMark() {
-  agiru::Connection writer(AGIRU_TEST_DSN);
+  const agiru::Connection writer(AGIRU_TEST_DSN);
   writer.Run("CREATE TEMP TABLE consistency_gate (value integer)");
   agiru::Boundaries boundaries;
   const std::size_t outer = boundaries.Open(writer);

@@ -17,6 +17,12 @@ using agiru::Integer;
 
 namespace {
 
+constexpr Integer kPastFourthElement = 5;
+constexpr Integer kFourthValue = 44;
+constexpr Integer kLastCellValue = 23;
+constexpr std::size_t kTextCapacity = 30;
+constexpr std::size_t kSparseCount = 5;
+
 struct RefusingCopy {
   RefusingCopy() = default;
 
@@ -62,13 +68,14 @@ Integer FourthOf(AlArray<Integer, 2> narrow) {
 }
 
 Integer FifthOf(AlArray<Integer, 2> narrow) {
-  return narrow[5];
+  return narrow[kPastFourthElement];
 }
 
 void AParameterKeepsTheArgumentsLength() {
   AlArray<Integer, 4> wide;
-  wide[4] = 44;
-  CHECK_TRUE("element 4 is read through a parameter declared with 2", FourthOf(wide) == 44);
+  wide[4] = kFourthValue;
+  CHECK_TRUE("element 4 is read through a parameter declared with 2",
+             FourthOf(wide) == kFourthValue);
   CHECK_TRUE("and ArrayLen answers the argument's length",
              ArrayLen(AlArray<Integer, 2>(wide)) == 4);
 
@@ -83,23 +90,23 @@ void AParameterKeepsTheArgumentsLength() {
 
 void TwoDimensionsConvertRowByRow() {
   AlArray<AlArray<Integer, 3>, 2> wide;
-  wide[2][3] = 23;
+  wide[2][3] = kLastCellValue;
   AlArray<AlArray<Integer, 1>, 2> narrow = wide;
-  CHECK_TRUE("the inner row keeps its three", narrow[2][3] == 23);
+  CHECK_TRUE("the inner row keeps its three", narrow[2][3] == kLastCellValue);
   AlArray<AlArray<Integer, 1>, 2> copied = narrow;
-  CHECK_TRUE("and a copy of it keeps them too", copied[2][3] == 23);
+  CHECK_TRUE("and a copy of it keeps them too", copied[2][3] == kLastCellValue);
   narrow[2][3] = 0;
-  CHECK_TRUE("while the copy is its own storage", copied[2][3] == 23);
+  CHECK_TRUE("while the copy is its own storage", copied[2][3] == kLastCellValue);
 }
 
 /// COMPRESSARRAY KEEPS THE LENGTH AND THE ORDER: `system-compressarray-method.md` says the
 /// result "has the same number of elements as the input array, but empty entries appear at the
 /// end", and the count it returns is where those begin.
 void CompressArrayMovesTheFullEntriesForward() {
-  AlArray<agiru::Text<30>, 5> spread;
+  AlArray<agiru::Text<kTextCapacity>, kSparseCount> spread;
   spread[1] = "one";
   spread[3] = "three";
-  spread[5] = "five";
+  spread[kSparseCount] = "five";
   const Integer kept = agiru::CompressArray(spread);
   CHECK_TRUE("the count is how many were not empty", kept == 3);
   CHECK_TRUE("and they keep their order at the front",
@@ -110,13 +117,13 @@ void CompressArrayMovesTheFullEntriesForward() {
                  spread.Length() == 5);
   // THE NEGATIVE CONTROL: an array with nothing empty is returned untouched, and one with
   // nothing full answers zero rather than moving anything.
-  AlArray<agiru::Text<30>, 2> full;
+  AlArray<agiru::Text<kTextCapacity>, 2> full;
   full[1] = "a";
   full[2] = "b";
   CHECK_TRUE("a full array is unchanged",
              agiru::CompressArray(full) == 2 && std::string_view(full[1]) == "a" &&
                  std::string_view(full[2]) == "b");
-  AlArray<agiru::Text<30>, 2> empty;
+  AlArray<agiru::Text<kTextCapacity>, 2> empty;
   CHECK_TRUE("an empty one answers zero", agiru::CompressArray(empty) == 0);
 }
 

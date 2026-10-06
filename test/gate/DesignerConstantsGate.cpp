@@ -45,7 +45,7 @@ void CompleteGetterFamiliesKeepTheirOriginalInt32Values() {
 
 void DesignerPropertiesAreIntegerDictionaryKeys() {
   dotnet::GenericDictionary2 properties;
-  properties = properties.Dictionary();
+  properties = agiru::dotnet::GenericDictionary2::Dictionary();
   properties.Add(DesignerFieldProperty::Caption(), "Caption");
   properties.Add(DesignerFieldProperty::Description(), "Description");
   properties.Add(DesignerFieldProperty::Editable(), "true");

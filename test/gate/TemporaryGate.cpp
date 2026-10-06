@@ -274,12 +274,14 @@ void AssignmentCopiesFieldsAndCopyCopiesFilters() {
   Temporary<LineNumberBuffer> source = With({1, 2, 3});
   source.SetRange(source.OldLineNumber, 2);
   CHECK_TRUE("the source is filtered", source.FindFirst() && source.Count() == 1);
-  Temporary<LineNumberBuffer> assigned = With({7, 8});
+  constexpr agiru::Integer kTargetFirst = 7;
+  constexpr agiru::Integer kTargetSecond = 8;
+  Temporary<LineNumberBuffer> assigned = With({kTargetFirst, kTargetSecond});
   assigned = source;
   CHECK_TRUE("assignment brings the fields", assigned.OldLineNumber == 2);
   CHECK_TEXT("and none of the filters", assigned.GetFilters(), "");
   CHECK_TRUE("so the target still walks its own rows", assigned.Count() == 2);
-  Temporary<LineNumberBuffer> copied = With({7, 8});
+  Temporary<LineNumberBuffer> copied = With({kTargetFirst, kTargetSecond});
   copied.Copy(source);
   CHECK_TRUE("Copy brings the fields", copied.OldLineNumber == 2);
   CHECK_TEXT("and the filters", copied.GetFilters(), source.GetFilters());
@@ -465,6 +467,7 @@ void SharedThroughAnInstanceAndByValue() {
 
 /// THE CODEUNIT SHAPE: a global that is MADE inside the argument conversion of the Copy, in a
 /// session, because that is where the BaseApp does it (`GenJnlCheckLine.GetErrors`).
+namespace {
 void SharedFromAGlobalMadeInTheCall() {
   std::string step = "session";
   try {
@@ -479,7 +482,7 @@ void SharedFromAGlobalMadeInTheCall() {
 
     Holder holder;
     step = "made";
-    Temporary<LineNumberBuffer> &made = holder.TempErrorMessage;
+    const Temporary<LineNumberBuffer> &made = holder.TempErrorMessage;
     CHECK_TRUE("the global made through the Instance is temporary", made.IsTemporary());
     step = "copy";
     Temporary<LineNumberBuffer> fourth;
@@ -507,10 +510,11 @@ void RowsAddedByABorrowerAreTheOwnersRows() {
 
   // THE NEGATIVE CONTROL: without the borrow the rows stay where they were written, which is what
   // `Copy` alone means -- a temporary record keeps its own.
-  Temporary<ResourceCost> apart;
+  const Temporary<ResourceCost> apart;
   ResourceCost copied;
   copied.Copy(apart);
   CHECK_TRUE("a copy alone shares nothing", apart.Count() == 0);
+}
 }
 
 int main() {

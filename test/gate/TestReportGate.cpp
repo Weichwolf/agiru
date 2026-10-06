@@ -94,7 +94,7 @@ void OutputFailureAbortsTheRun() {
 
 int main() {
   return gate::Run("TestReport", [] {
-    agiru::Session session(AGIRU_TEST_DSN);
+    const agiru::Session session(AGIRU_TEST_DSN);
     ReportsBelongToTheirInvocation();
     OutputFailureAbortsTheRun();
     IdentitiesAndDiagnosticsRoundTripAsOneJsonLine();

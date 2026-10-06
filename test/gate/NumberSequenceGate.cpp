@@ -231,7 +231,7 @@ void MissingIdentityKeepsTransactionUsable() {
   database.Run("BEGIN");
   database.Run("CREATE TEMP TABLE sequence_gate_prior_write (value integer)");
   database.Run("INSERT INTO sequence_gate_prior_write VALUES (1)");
-  for (const auto operation : {"current", "next", "delete", "restart"}) {
+  for (const auto *const operation : {"current", "next", "delete", "restart"}) {
     const bool success = agiru::Tried([&] {
       if (operation == std::string_view{"current"}) { NumberSequence::Current(name); }
       if (operation == std::string_view{"next"}) { NumberSequence::Next(name); }

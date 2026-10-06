@@ -12,7 +12,7 @@
 namespace {
 thread_local bool failAllocation = false;
 
-void Answer(std::string_view, void *) {}
+void Answer([[maybe_unused]] std::string_view message, [[maybe_unused]] void *response) {}
 
 constexpr std::array<agiru::TestHandler, 1> kOriginal{{{.name = "Original",
                                                         .kind = agiru::HandlerKind::Message,
@@ -39,7 +39,7 @@ void operator delete(void *memory) noexcept {
   std::free(memory);
 }
 
-void operator delete(void *memory, std::size_t) noexcept {
+void operator delete(void *memory, [[maybe_unused]] std::size_t size) noexcept {
   std::free(memory);
 }
 

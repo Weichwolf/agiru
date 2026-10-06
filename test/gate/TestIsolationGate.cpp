@@ -54,26 +54,26 @@ void Wrote(const char *who) {
   Db().Run(std::string("INSERT INTO isolation_gate (who) VALUES ('") + who + "')");
 }
 
-void ForeignException(void *) {
+void ForeignException([[maybe_unused]] void *instance) {
   Wrote("foreign");
   LeaveTrap();
   throw ForeignFailure{};
 }
 
-void DefaultLeaves(void *) {
+void DefaultLeaves([[maybe_unused]] void *instance) {
   Wrote("default");
   agiru::Commit();
 }
 
-void ImplicitLeaves(void *) {
+void ImplicitLeaves([[maybe_unused]] void *instance) {
   Wrote("implicit");
 }
 
-void RollbackLeavesNothing(void *) {
+void RollbackLeavesNothing([[maybe_unused]] void *instance) {
   Wrote("rollback");
 }
 
-void NestedCommitSurvivesTheInnerError(void *) {
+void NestedCommitSurvivesTheInnerError([[maybe_unused]] void *instance) {
   agiru::AssertError([] {
     Wrote("inner_committed");
     agiru::Commit();
@@ -82,7 +82,7 @@ void NestedCommitSurvivesTheInnerError(void *) {
   });
 }
 
-void AutoRollbackRefusesCommit(void *) {
+void AutoRollbackRefusesCommit([[maybe_unused]] void *instance) {
   bool refused = false;
   try {
     agiru::Commit();
@@ -90,16 +90,16 @@ void AutoRollbackRefusesCommit(void *) {
   if (!refused) { throw Error("AutoRollback accepted Commit"); }
 }
 
-void MissedHandlerWrites(void *) {
+void MissedHandlerWrites([[maybe_unused]] void *instance) {
   Wrote("missed");
 }
 
-void Fails(void *) {
+void Fails([[maybe_unused]] void *instance) {
   Wrote("failed");
   throw Error("this method fails on purpose");
 }
 
-void Reads(void *) {
+void Reads([[maybe_unused]] void *instance) {
   const agiru::Result rows = Db().Execute("SELECT who FROM isolation_gate ORDER BY who");
   g_saw.clear();
   for (std::size_t row = 0; row < rows.Rows(); ++row) {
@@ -113,7 +113,7 @@ void *MakeNothing() {
   return nullptr;
 }
 
-void FreeNothing(void *) {}
+void FreeNothing([[maybe_unused]] void *instance) {}
 
 constexpr std::array<std::string_view, 1> kUnusedHandler{"NeverCalled"};
 constexpr std::array<TestMethod, 7> kOrdered{{

@@ -118,6 +118,7 @@ void ACaptionJoinedToACaptionIsTheTwoCaptions() {
 }
 
 /// A CHARACTER ABOVE 127 JOINS A TEXT AS UTF-8, never as its low byte.
+namespace {
 void ACharacterAboveAsciiIsEncoded() {
   CHECK_TEXT("an ASCII character is one byte", std::string("A") + agiru::Char(66), "AB");
   CHECK_TEXT("a Latin-1 one is two",
@@ -128,6 +129,7 @@ void ACharacterAboveAsciiIsEncoded() {
              agiru::Char(133) + std::string("B"),
              "\xC2\x85"
              "B");
+}
 }
 
 int main() {

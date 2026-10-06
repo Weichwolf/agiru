@@ -124,7 +124,7 @@ void AnInnerBoundaryRollsBackAloneable() {
 void ACursorFromARolledBackBoundaryIsNotClosedLater() {
   Fresh();
   Row("A").Insert();
-  agiru::detail::Scope outer;
+  const agiru::detail::Scope outer;
   auto *rec = new ResourceCost;
   agiru::AssertError([&] {
     static_cast<void>(rec->FindSet());

@@ -18,11 +18,13 @@
 #include "Check.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <string>
 #include <string_view>
+#include <utility>
 
 using agiru::Date;
 using agiru::Error;
@@ -175,12 +177,19 @@ void ALessGeneralNumberReadsAsAMoreGeneralOne() {
   agiru::Integer &inPlace = spelled;
   CHECK_TRUE("a text that spells an Integer reads as one by reference", inPlace == 42);
   CHECK_TRUE("and the Variant now holds the Integer", spelled.IsInteger());
+  inPlace += 1;
+  CHECK_TRUE("the converted Integer reference writes into Variant storage",
+             spelled.Get<agiru::Integer>() == 43);
   Variant yes{std::string("Yes")};
   agiru::Boolean &flagged = yes;
   CHECK_TRUE("a text that spells a Boolean reads as one by reference", flagged);
+  flagged = false;
+  CHECK_TRUE("the converted Boolean reference writes into Variant storage",
+             !yes.Get<agiru::Boolean>());
   CHECK_TRUE("a text that spells nothing of the kind still refuses", Raises([] {
                Variant word{std::string("seven")};
                agiru::Integer &none = word;
+               none += 1;
                return none;
              }));
   CHECK_TRUE("and a Boolean is not a number at all", Raises([] {
@@ -190,6 +199,8 @@ void ALessGeneralNumberReadsAsAMoreGeneralOne() {
 }
 
 } // namespace
+
+namespace {
 
 /// AL `Option := Variant` WHERE THE VARIANT HOLDS AN INTEGER: `Option Lookup Buffer` writes
 /// `Option := FieldRef.Value()` and AL takes the number as the ordinal, which this runtime
@@ -207,7 +218,8 @@ void AnOptionTakesAnIntegerFromAVariant() {
 /// `Text[Index]` IS A CHAR WHEN AN `Any` TAKES IT: `Format(GLNValue[ExpectedSize])` in the GLN
 /// check digit hands a text position to Format, and the Variant held alternative 0 -- nothing.
 void ATextPositionHoldsItsChar() {
-  agiru::Code<20> code("ABC7");
+  constexpr std::size_t kCodeCapacity = 20;
+  agiru::Code<kCodeCapacity> code("ABC7");
   const agiru::Variant held(agiru::At(code, 4));
   CHECK_TRUE("the position is a Char",
              held.IsChar() || held.IsInteger() || held.IsText() || !held.IsEmpty());
@@ -223,10 +235,13 @@ void AnIntegerTakesAnOptionsOrdinalFromAVariant() {
   // RecRef)` hands a fresh Variant to an `Integer` parameter, and the reference conversion was
   // chosen over the value one and refused (47 UT cases still, chain 88, 2026-09-10).
   agiru::Variant fresh(agiru::Option<>::FromInteger(4));
-  agiru::Integer taken = fresh;
+  const agiru::Integer taken = fresh;
   CHECK_TRUE("a non-const Variant reads the same way", taken == 4);
   agiru::Integer &bound = fresh;
   CHECK_TRUE("and by reference, into the ordinal it holds", bound == 4);
+  bound = 1;
+  CHECK_TRUE("an Integer reference writes into the original option ordinal",
+             static_cast<agiru::Integer>(std::as_const(fresh)) == 1 && fresh.IsOption());
 }
 
 /// A VARIANT HANDED TO A TEXT RENDERS WHAT IT HOLDS (board:0694): `FieldRef.Value` on a Date field
@@ -261,14 +276,12 @@ void AVariantReadsAsTextWhateverItHolds() {
 
 void AVariantLendsTextFromItsOwnStorage() {
   agiru::Variant held{agiru::Text<0>{"before"}};
-  agiru::Text<0> &lent = held.Lend<agiru::Text<0>>();
+  auto &lent = held.Lend<agiru::Text<0>>();
   lent = "after";
   CHECK_TEXT("a var Text write reaches the Variant",
              std::string_view(held.Get<agiru::Text<0>>()),
              "after");
 }
-
-namespace {
 
 void OrdinalTextPreservesMetadataAndTypedValues() {
   static constexpr std::array values{

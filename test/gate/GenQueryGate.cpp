@@ -166,11 +166,12 @@ query 50001 "Open Steps"
                  columns.at("workflow_description") == "Workflow_Description");
 
   agiru::gen::Objects objects = Tables();
+  constexpr int kOpenStepsQuery = 50001;
   objects.queries.insert_or_assign(
       "open steps",
       agiru::gen::TableRef{.identifier = "::agiru::System::Automation::OpenSteps_Query",
                            .header = "system/automation/query/OpenSteps.h",
-                           .id = 50001,
+                           .id = kOpenStepsQuery,
                            .fields = columns,
                            .procedures = {},
                            .parts = {},

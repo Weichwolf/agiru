@@ -1,5 +1,4 @@
 #include "meta/Ids.h"
-#include "runtime/ErrorValue.h"
 #include "type/RecordId.h"
 
 #include "Check.h"
@@ -7,7 +6,6 @@
 #include <cstddef>
 #include <string>
 
-using agiru::Error;
 using agiru::RecordId;
 using agiru::TableId;
 

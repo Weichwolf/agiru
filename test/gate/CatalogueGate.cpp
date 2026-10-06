@@ -58,8 +58,10 @@ constexpr agiru::ProfileDef kFirstProfile{.profileId = "First Profile"};
 constexpr agiru::ProfileDef kLastProfile{.profileId = "Last Profile"};
 
 using Native = agiru::platform::Integer;
-constexpr agiru::ModuleDef kNativeModule{
-    "12345678-1234-1234-1234-123456789abc", "Authored Native", "agiru tests", "1.0.0.0"};
+constexpr agiru::ModuleDef kNativeModule{.id = "12345678-1234-1234-1234-123456789abc",
+                                         .name = "Authored Native",
+                                         .publisher = "agiru tests",
+                                         .version = "1.0.0.0"};
 constexpr agiru::TableDef kNativeSource = [] {
   auto table = agiru::TableTraits<Native>::kTable;
   table.caption = "Authored Native Caption";

@@ -98,7 +98,8 @@ template <typename Record> void MultipleBlocksPreserveLastReachedRow(Record &row
 }
 
 template <typename Record> void MultipleBlocks(Record &row) {
-  for (agiru::Integer key = 4; key <= 130; ++key) {
+  constexpr agiru::Integer kMultipleBlockRows = 130;
+  for (agiru::Integer key = 4; key <= kMultipleBlockRows; ++key) {
     row.OldLineNumber = key;
     row.NewLineNumber = key;
     row.Insert();

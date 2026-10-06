@@ -25,7 +25,7 @@ void operator delete(void *memory) noexcept {
   std::free(memory);
 }
 
-void operator delete(void *memory, std::size_t) noexcept {
+void operator delete(void *memory, [[maybe_unused]] std::size_t size) noexcept {
   std::free(memory);
 }
 
