@@ -96,8 +96,9 @@ seed prevents causal A/B proof; full G1 remains open (0058).
   whose non-invariant path uses Format; NavOptionFormatter `1b7bfc` distinguishes
   display 0/1 from numeric 2/9. Session culture/caption selection, invariant conversion
   and the broader native blank-member policy remain unqualified.
-  `make variant-text JOBS=2`: Variant/Format/RecordRef 89/43/161 checks; three
-  compiled caption/blank/conversion defects reject in both independent consumers.
+  `make variant-text JOBS=2`: Variant/Format/RecordRef/Report 89/43/161/42 checks;
+  five compiled defects reject across their consumers, including 0063's report
+  ordinal-display and XML-Boolean boundary.
   Isolated TestStartWorkflowWithNewlyAddedEvent passes 1/1 with current net preloaded
   into b2a8131; this mixed-image diagnostic is not full UT gain or causal A/B proof.
   The original and repaired diagnostic clones were removed; the unsealed seed was untouched.

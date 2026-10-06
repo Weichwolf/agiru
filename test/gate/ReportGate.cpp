@@ -1,4 +1,5 @@
 #include "meta/Declare.h"
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
@@ -69,6 +70,52 @@ template <> struct agiru::TableTraits<Linked> {
 namespace {
 
 using agiru::ReportDataset;
+
+void OrdinalColumnsKeepDisplayTextWithoutChangingXmlScalars() {
+  static constexpr std::array values{
+      agiru::EnumValueDef{.ordinal = 0, .name = "Blank", .caption = ""},
+      agiru::EnumValueDef{.ordinal = 10, .name = "Named", .caption = "Δ <ready>&"},
+      agiru::EnumValueDef{.ordinal = 20, .name = "", .caption = ""},
+      agiru::EnumValueDef{.ordinal = 30, .name = "Fallback", .caption = ""}};
+  static_assert(agiru::ValuesAreSorted(values));
+
+  struct Case {
+    agiru::Integer ordinal;
+    std::string_view xmlText;
+  };
+
+  static constexpr std::array cases{Case{.ordinal = 10, .xmlText = "Δ &lt;ready&gt;&amp;"},
+                                    Case{.ordinal = 20, .xmlText = ""},
+                                    Case{.ordinal = 30, .xmlText = "Fallback"},
+                                    Case{.ordinal = -7, .xmlText = "-7"}};
+  for (const Case &test : cases) {
+    ReportDataset dataset;
+    const agiru::Variant held{agiru::OrdinalInVariant{.ordinal = test.ordinal, .values = values}};
+    dataset.BeginRow();
+    dataset.Add("State", held, "xs:string");
+    dataset.Add("Ordinal", agiru::Variant{test.ordinal}, "xs:int");
+    dataset.Add("False", agiru::Variant{false}, "xs:boolean");
+    dataset.Add(
+        "Precise",
+        agiru::Variant{agiru::Decimal::FromInvariantString("0.1234567890123456789012345678")},
+        "xs:decimal");
+    dataset.EndRow();
+    const std::string xml = dataset.Xml();
+    CHECK_TRUE("an ordinal report column carries escaped declared display text",
+               xml.contains("<State>" + std::string(test.xmlText) + "</State>"));
+    CHECK_TRUE("the schema retains the display column's string type",
+               xml.contains("<xs:element name=\"State\" type=\"xs:string\" />"));
+    CHECK_TRUE("the same integer ordinal keeps its exact XML number",
+               xml.contains("<Ordinal>" + std::to_string(test.ordinal) + "</Ordinal>"));
+    CHECK_TRUE("Boolean report columns retain XML rather than display formatting",
+               xml.contains("<False>false</False>"));
+    CHECK_TRUE("Decimal report columns retain exact XML scale 28",
+               xml.contains("<Precise>0.1234567890123456789012345678</Precise>"));
+    CHECK_TRUE("report formatting does not mutate the ordinal's type or metadata",
+               held.IsOption() && !held.IsText() &&
+                   held.Get<agiru::OrdinalInVariant>().values.data() == values.data());
+  }
+}
 
 /// A `DataItemLink` TO A FLOWFILTER COPIES THE FILTER, NOT THE VALUE: `"Date Filter" =
 /// field("Date Filter")` hands the request page's date filter down to the child dataitem, and a
@@ -175,6 +222,7 @@ void TheParametersXmlNamesTheReport() {
 int main() {
   return gate::Run("Report", [] {
     TheDatasetWritesRowsAndASchema();
+    OrdinalColumnsKeepDisplayTextWithoutChangingXmlScalars();
     ARunByUnknownNumberRefusesWithTheNumber();
     TheParametersXmlNamesTheReport();
     AFlowFilterLinkCopiesTheFilterAndAValueLinkTheValue();

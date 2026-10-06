@@ -84,8 +84,10 @@ public:
 
   /// \brief Adds one column to the open row.
   /// \param name  The column's AL name.
-  /// \param value The value, formatted as `Format(Value, 0, 9)` -- the XML format.
+  /// \param value Option/Enum values retain declared display text; other values use
+  ///              `Format(Value, 0, 9)`. The held type and metadata remain unchanged.
   /// \param type  The `xs:` type the schema declares for the column.
+  /// \note XML escaping happens at serialization, not during value conversion.
   void Add(std::string_view name, const Variant &value, std::string_view type);
 
   /// \brief Closes the open row.

@@ -38,6 +38,34 @@ Next: qualify installed native layouts/dataset rows, then bind one request-page 
 
 ## Acceptance and references
 
+- Ordinal dataset text: `src/rt/Report.cpp::ReportDataset::Add` selects display
+  Format 0 only for held Option/Enum values; other scalars retain XML Format 9.
+  It reuses `OrdinalInVariant::ToText` without changing held types, numeric Format
+  2/9 or metadata. `ReportGate` covers sparse/unknown ordinals, caption/name fallback,
+  blank members, Unicode/XML escaping, unchanged metadata, exact integers,
+  XML Booleans and Decimal scale 28. `make variant-text JOBS=2`: 335 assertions
+  and five compiled defects across Variant/Format/RecordRef/Report; numeric report
+  ordinals and display-formatted Boolean XML must fail. No separate test script.
+  `GenReportGate` retains 27 checks. Focused Report.cpp/ReportGate tidy each retain
+  ten findings in unchanged Codeunit/Page/Report/Table declarations; no suppression.
+  BCApps `d99152ee35f0`: RemittanceAdviceEntries.Report.al column
+  DocType_VendLedgEntry2 and RemittanceREPCheckUT.Codeunit.al method
+  RefundSharingPaymentDocShownOnRemittanceAdviceEntries independently require
+  `Refund`, not `6`. Fresh-clone diagnostics fail before and pass 1/1 after;
+  only libagiru_rt's hash changes in the mixed image. This is neither full UT gain
+  nor causal A/B proof against a sealed native seed. The owned diagnostic clone
+  was removed; the unsealed/null seed was untouched. Reproduce with
+  `AGIRU_TEST_PROCEDURE=RefundSharingPaymentDocShownOnRemittanceAdviceEntries`
+  and `agiru run-tests --codeunit 'Remittance REP Check UT'` on an owned fresh clone.
+  Developer `f928288ee840`: devenv-format-report-field-data.md and
+  devenv-report-dataset.md; user docs `bf5ffffa9b026`: ui-work-report.md;
+  predecessor 1643 and runtime/base/report.py's separate preview/schema writer.
+  BC29 NCL SHA256 `277e35cbdfb8`: ReportProcessorXmlDatasetGenerator WriteValue
+  RVA 159700 / FormatOjectInstance 15975c formats CLR scalars separately and
+  otherwise uses ToString; this server-XML path does not prove all preview,
+  localization or schema guarantees. BigInteger/schema types, preview versus
+  server-XML shapes, regional/language formatting and bounded spooling remain gaps.
+
 - Direct sandbox reference (2026-10-05, CH BC 28.5/application 28.5.54151.54951):
   report 1306 exposes eleven installed
   layouts across multiple declaring extensions, including RDLC, Word, QR-enabled,

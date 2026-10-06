@@ -50,6 +50,7 @@ std::string Escaped(std::string_view text) {
   return out;
 }
 
+constexpr std::int32_t kDisplayFormat = 0;
 constexpr std::int32_t kXmlFormat = 9;
 constexpr int kFixedViewGroup = 2;
 
@@ -91,8 +92,9 @@ void ReportDataset::Add(std::string_view name, const Variant &value, std::string
     names_.emplace_back(name);
     types_.emplace_back(type);
   }
+  const auto format = value.IsOption() ? kDisplayFormat : kXmlFormat;
   rows_.back().push_back(
-      Column{.name = std::string(name), .text = std::string(Format(value, 0, kXmlFormat))});
+      Column{.name = std::string(name), .text = std::string(Format(value, 0, format))});
 }
 
 void ReportDataset::EndRow() {}

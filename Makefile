@@ -133,8 +133,8 @@ for-loops: comments db tc ## execute captured AL for-loop bounds and counter/con
 	@"$(B)/gate_GenCodeunitGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/for-loops.sh"
 
-variant-text: comments db ## prove shared Variant/Format ordinal text and strict typed identity
-	@cmake --build "$(B)" -j "$(JOBS)" --target gate_VariantGate gate_FormatGate gate_RecordRefGate
+variant-text: comments db ## prove shared ordinal text, report XML scalars and strict typed identity
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_VariantGate gate_FormatGate gate_RecordRefGate gate_ReportGate
 	@B="$(B)" bash "$(SELF)/test/runtime/variant-text.sh"
 
 native-enums: comments db tc ## execute source-loaded native enum fields, parameters and extensions

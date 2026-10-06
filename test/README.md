@@ -35,11 +35,12 @@ compiled controls reintroduce repeated Integer/Boolean/typed-queue evaluation an
 borrowed mutable bounds; all must fail. `make for-loops JOBS=2` is the focused entry point. Bound conversion,
 terminal overflow and Decimal/Date/Time stepping are not qualified by this profile.
 
-`make variant-text JOBS=2` proves shared Variant/Format display text, typed FieldRef
-assignment, sparse ordinals, captions/name fallbacks, blank members and exact
-Unicode. Three compiled caption/blank/conversion defects must fail both consumers;
-strict typed Get and numeric Format 2/9 remain distinct. Session-language caption
-selection and broader native conversion/culture guarantees remain open.
+`make variant-text JOBS=2` proves shared Variant/Format/report display text, typed
+FieldRef assignment, sparse ordinals, captions/name fallbacks, blank members and
+exact Unicode. Five compiled defects must fail their consumers, including numeric
+report ordinals and display-formatted XML Boolean scalars; Decimal scale 28 stays
+exact. Strict typed Get and numeric Format 2/9 remain distinct. Session-language
+caption selection and broader native conversion/culture guarantees remain open.
 
 `make rowversions JOBS=2` qualifies allocator fences and SQL record/SystemId paths.
 The disconnect gate observes the specific backend's termination before asserting
