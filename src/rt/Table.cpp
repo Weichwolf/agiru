@@ -37,6 +37,7 @@
 #include "Rows.h"
 #include "Selection.h"
 #include "SqlColumn.h"
+#include "TableMetadata.h"
 #include "Temporary.h"
 #include "Where.h"
 
@@ -787,6 +788,9 @@ void LoadRow(void *record, const TableDef &table, const FieldValues &row) {
 
 bool RuntimeGet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempGet(record, table); }
+  if (const auto found = GetInstalledTableMetadata(record, table); found.has_value()) {
+    return *found;
+  }
   RequireTableProvider(table);
 
   const FieldValues key = KeyOf(record, table);

@@ -23,8 +23,9 @@
 
 namespace agiru::platform {
 
-/// \brief System 28/29 `Table Metadata` declaration; live-provider/provenance acceptance is
-/// separate.
+/// \brief System 28/29 `Table Metadata` declaration. Primary-key Get projects qualified installed
+/// declarations through the shared runtime, also for RecordRef, without SQL snapshots. Other live
+/// reads and writes remain refused; temporary records keep their independent writable storage.
 class TableMetadata_Table : public Table<TableMetadata_Table> {
 public:
   /// \brief Original System table identity.

@@ -3,9 +3,10 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: complete Field classification, SQLDataType and package provenance,
-qualify implicit-field values, then installed Field Find/Next/Count and the
-actual FieldName → catalogue → FieldRef caller before retiring seed snapshots.
+Next: qualify installed Table Metadata filters/order/Find/Next/Count through the
+shared record primitives, and investigate the newly exposed StoredImage diagnostic.
+Complete Field classification, SQLDataType, package provenance and implicit values;
+then Field navigation and the actual FieldName → catalogue → FieldRef caller.
 
 ## Implementation
 
@@ -82,6 +83,25 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
 
 ## Acceptance
 
+- Installed `Table Metadata.Get` now reaches the immutable registry through
+  `src/rt/Table.cpp::RuntimeGet`, shared by typed records and RecordRef. It ignores
+  ordinary filters without replacing them, preserves optional-missing versus discarded
+  errors, projects before changing attributes and refuses unqualified field bindings.
+  No SQL snapshot or per-session catalogue; temporary reads still use their own store.
+  Frozen provider version 1 and blank audit fields follow the sampled BC 28.5 viewer,
+  not Integer or PostgreSQL rowversion. Find/Next/Count/GetBySystemId and live writes
+  remain explicitly refused; this is not complete provider or security-filter acceptance.
+  ReflectionMetadataGate passes 294 checks, including exact typed/RecordRef agreement
+  on all 29 stored fields. Generated source execution passes 115 checks.
+  `make reflection-metadata JOBS=2` rejects all 43 compiled controls plus the header
+  control, adding false-missing, zero-version and stored-FlowField mutants.
+  TableMetadata.cpp and generated Runner focused tidy pass. Table.cpp still reports
+  sixteen diagnostics; the expanded gate exposes a StoredImage uninitialized-ID
+  diagnostic not reported by the previous gate. No suppression or baseline increase.
+  Developer `f928288ee840`: devenv-virtual-tables.md and record-get-method.md;
+  BCApps `d99152ee35f0`: System/Workflow/WorkflowEvent.Table.al uses optional Get.
+  Predecessor 1229 distinguishes filter-blind Get from filter-aware Find.
+  Current-tree AL replay is still required; no UT gains are claimed.
 - Native/temporary `Field.Get` preserves optional-result semantics, searched keys,
   unchanged filters and zero-default omitted trailing keys. Non-missing projection
   errors still throw when the result is consumed. Moving `detail::Found` retains
@@ -91,7 +111,7 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   dependencies or a second mapper. `PlatformFieldGate`: 372 checks; PlatformField.cpp
   and gate focused tidy pass. ReflectionMetadata.cpp retains four existing
   std::expected include-cleaner diagnostics; no suppression or baseline increase.
-  `make reflection-metadata JOBS=2`: all 40 compiled controls plus the header control
+  `make reflection-metadata JOBS=2`: all 43 compiled controls plus the header control
   pass, including dropped-key, silent-miss, forced-Public and false-search mutants.
   The shared fallback mutant also fails unknown Field access/customization checks.
   Developer `f928288ee840`: `methods-auto/record/record-get-method.md`;
@@ -109,7 +129,7 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   structures or adding includes. The native Field projection treats Never as unavailable;
   ToBeClassified/AsReadOnly/AsReadWrite and deprecated Always are available, independently
   of Editable. Unknown values refuse before replacing projected attributes.
-  `make table-keys JOBS=2`: generated execution passes 84 checks, with separate base,
+  `make table-keys JOBS=2`: generated execution passes 115 checks, with separate base,
   extension, override and omitted-extension defaults; both new generated owner/override
   mutants fail two checks, while existing controls remain. The two new runtime mutants
   reject always-available and Editable-derived flags. This qualifies declared policy,

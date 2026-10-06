@@ -7,6 +7,7 @@
 #include "platform/TableMetadata.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/Record.h"
 #include "runtime/Table.h"
 #include "runtime/TableDefinition.h"
 #include "type/Guid.h"
@@ -119,6 +120,17 @@ void CheckSourceProjection() {
              row.LookupPageID == 50176 && row.DrillDownPageID == 50177);
   CHECK_TRUE("production declaring app GUID reaches the runtime projection",
              row.AppID == *agiru::Guid::FromText("118874ab-44bc-4ccb-9daf-59763539ab16"));
+  TableMetadata installed;
+  CHECK_TRUE("generated declarations are readable through native Table Metadata.Get",
+             installed.Get(Row::kId.Value()));
+  CHECK_TRUE("generated metadata retains the frozen provider version",
+             installed.SystemRowVersion == 1);
+  for (const auto &field : kTableMetadataFields) {
+    if (!agiru::Stored(field)) { continue; }
+    CHECK_TEXT("generated installed metadata Get matches every projected stored field",
+               agiru::detail::StorageText(&installed, field),
+               agiru::detail::StorageText(&row, field));
+  }
 }
 
 void CheckFieldCustomizationOwnership() {

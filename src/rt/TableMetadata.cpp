@@ -7,6 +7,9 @@
 #include "platform/TableMetadata.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/Record.h"
+#include "runtime/RecordState.h"
+#include "runtime/Table.h"
 #include "type/Guid.h"
 
 #include "MetadataSystemId.h"
@@ -19,6 +22,8 @@
 namespace agiru::detail {
 
 namespace {
+
+constexpr auto kFrozenCatalogueRowVersion = 1;
 
 auto Verified(const auto &value) {
   if (!value) { throw Error(value.error()); }
@@ -87,6 +92,7 @@ platform::TableMetadata_Table ProjectTableMetadata(const TableDef &source) {
   result.Access = Verified(MetadataAccess(EffectiveProperty(source.access, "Public")));
   result.ALNamespace = source.nameSpace;
   result.SystemId = MetadataSystemId(platform::TableMetadata_Table::kId, source.id.Value());
+  result.SystemRowVersion = kFrozenCatalogueRowVersion;
   return result;
 }
 
@@ -94,6 +100,25 @@ std::optional<platform::TableMetadata_Table> InstalledTableMetadata(TableId id) 
   const auto *entry = FindTable(id);
   if (entry == nullptr) { return std::nullopt; }
   return ProjectTableMetadata(*entry->table);
+}
+
+std::optional<bool> GetInstalledTableMetadata(void *record, const TableDef &table) {
+  if (table.id != platform::TableMetadata_Table::kId) { return std::nullopt; }
+  if (table.fields.data() != platform::kTableMetadataFields.data() ||
+      table.fields.size() != platform::kTableMetadataFields.size()) {
+    throw Error("Table Metadata.Get requires the qualified native field binding");
+  }
+  const auto &buffer = *static_cast<platform::TableMetadata_Table *>(record);
+  const auto row = InstalledTableMetadata(TableId{buffer.ID});
+  if (!row.has_value()) { return false; }
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    SetFieldText(record, field, StorageText(&*row, field));
+  }
+  RecordState &state = reinterpret_cast<StateHandle *>(record)->Ensure();
+  state.open.Forget();
+  state.positioned = true;
+  return true;
 }
 
 }

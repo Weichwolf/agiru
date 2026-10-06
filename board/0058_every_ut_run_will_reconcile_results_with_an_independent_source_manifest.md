@@ -13,13 +13,21 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   cannot synthesize SystemRowVersion. PostgreSQL is running; CursorGate's generic database label
   is misleading. Do not invent a constant or revert the selected profile. Preserve the
   full configured population. Six AL workers are executing; wait for final target receipts. This run
-  does not contain the later declaring-owner customization or Parser/TableWriter tidy repairs.
+  does not contain the later declaring-owner customization, Parser/TableWriter tidy repairs
+  or the shared native Table Metadata.Get implementation.
   Current Parser/AlParserGate focused tidy passes after removing three findings without
   suppressions; the Parser gate retains previous checks and adds seventeen (159 total).
   TableWriter.cpp also passes focused tidy after six repairs; GenTable passes 105 checks
   with unchanged golden files and four rejected compiled mutants. GenTableGate still
   reports the existing BodyWriter.h adjacent-parameter finding. These are local receipts,
   not current-tree full build/lint or AL execution proof.
+- Shared native Table Metadata.Get now passes 294 reflection checks, 115 generated
+  checks and 43 compiled reflection controls plus the header control (0044).
+  Typed/RecordRef agreement covers all 29 stored fields; missing results, projection
+  errors, unchanged filters and writable temporary isolation are qualified.
+  Navigation remains refused. TableMetadata.cpp/generated Runner focused tidy pass;
+  Table.cpp has sixteen diagnostics and the expanded gate exposes an uninitialized-ID
+  StoredImage diagnostic absent from the previous gate. No full tidy/UT gain claim.
 - Previous failed frozen attempt: `9fd1e13` / content `774f78b70460`, slice-check exits 0;
   all/test/ut exit 2 after PageTableFieldGate.cpp's legacy five-field static assertion
   disagrees with the selected native Runtime-18 profile. Inputs remain unchanged.

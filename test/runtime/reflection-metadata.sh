@@ -418,7 +418,7 @@ for control in ordinal-cast cds-query cds-refusal default-fallback property-fall
   fi
 done
 
-for control in caption-names absent-caption-field null-owner wrong-access wrong-default-classification native-defaults declaration-company-scope null-system-id wrong-system-provider; do
+for control in caption-names absent-caption-field null-owner wrong-access wrong-default-classification native-defaults declaration-company-scope null-system-id wrong-system-provider zero-metadata-version false-metadata-missing stored-metadata-flowfield; do
   awk -v control="$control" '
     control == "caption-names" && /result \+= std::to_string\(no.Value\(\)\);/ {
       $0 = "    result += Field(source, no)->name;"; changed++
@@ -448,6 +448,15 @@ for control in caption-names absent-caption-field null-owner wrong-access wrong-
     control == "wrong-system-provider" && /result.SystemId = MetadataSystemId/ {
       sub(/platform::TableMetadata_Table::kId/, "source.id"); changed++
     }
+    control == "zero-metadata-version" && /result.SystemRowVersion = kFrozenCatalogueRowVersion;/ {
+      $0 = "  result.SystemRowVersion = kFrozenCatalogueRowVersion - 1;"; changed++
+    }
+    control == "false-metadata-missing" && /if \(!row.has_value\(\)\) \{ return false; \}/ {
+      $0 = "  if (!row.has_value()) { return true; }"; changed++
+    }
+    control == "stored-metadata-flowfield" && /if \(!Stored\(field\)\) \{ continue; \}/ {
+      changed++; next
+    }
     { print }
     END { if (changed != 1 || skipping) exit 2 }
   ' src/rt/TableMetadata.cpp > "$proof/$control.cpp"
@@ -475,4 +484,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; forty compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: installed Table Metadata.Get through typed/RecordRef paths, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; forty-three compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

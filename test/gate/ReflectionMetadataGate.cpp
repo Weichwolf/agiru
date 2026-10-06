@@ -8,8 +8,10 @@
 #include "platform/ReflectionTypes.h"
 #include "platform/TableMetadata.h"
 #include "platform/User.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/Record.h"
 #include "runtime/RecordRef.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
@@ -81,6 +83,125 @@ constexpr agiru::TableDef kSourceTable{.id = agiru::TableId{60074},
                                        .obsoleteReason = "Original reason",
                                        .dataClassification = "AccountData",
                                        .linkedObject = true};
+
+constexpr agiru::TableDef kUnownedSourceTable{.id = agiru::TableId{60075},
+                                              .name = "Unowned source"};
+
+constexpr agiru::TableEntry MetadataSourceEntry(const agiru::TableDef &source) {
+  return {.table = &source,
+          .make = nullptr,
+          .free = nullptr,
+          .validate = nullptr,
+          .copy = nullptr,
+          .insert = nullptr,
+          .modify = nullptr,
+          .remove = nullptr,
+          .rename = nullptr};
+}
+
+constexpr auto kSourceEntry = MetadataSourceEntry(kSourceTable);
+constexpr auto kUnownedSourceEntry = MetadataSourceEntry(kUnownedSourceTable);
+
+void InstalledTableGetUsesTheSharedProjectionWithoutSQL() {
+  using agiru::platform::TableMetadata;
+  TableMetadata row;
+  row.SetRange(row.ID, kTemporaryId);
+  const auto *const state = row.State_Block.Peek();
+  row.SystemId = agiru::Guid("11111111-2222-3333-4444-555555555555");
+  row.SystemCreatedBy = row.SystemId;
+  row.SystemModifiedBy = row.SystemId;
+  row.SystemCreatedAt = agiru::DateTime::FromMilliseconds(kInsideTimestampInterval);
+  row.SystemModifiedAt = row.SystemCreatedAt;
+  row.SystemRowVersion = kOutsideTimestampInterval;
+  row.SystemCreatedByUserName = "Uncalculated";
+  CHECK_TRUE("installed Table Metadata.Get ignores the record's filters",
+             row.Get(kSourceTable.id.Value()));
+  CHECK_TEXT(
+      "installed Get retains the original AL table name", row.Name.Value(), kSourceTable.name);
+  CHECK_TEXT(
+      "installed Get keeps an independent caption", row.Caption.Value(), kSourceTable.caption);
+  CHECK_TRUE("installed Get uses the shared source property projection",
+             row.LookupPageID == kSourceTable.lookupPageId.Value() &&
+                 row.DataClassification == agiru::platform::FieldDataClassification::AccountData);
+  CHECK_TRUE("installed Get replaces the implicit identity with its deterministic metadata key",
+             row.SystemId == agiru::detail::MetadataSystemId(TableMetadata::kId, row.ID));
+  // The BC 28.5 Table Metadata viewer capture has version 1 and blank audit instants/identities.
+  // This is the frozen metadata population's version, not PostgreSQL's global rowversion.
+  CHECK_TRUE("immutable metadata uses its qualified provider version", row.SystemRowVersion == 1);
+  CHECK_TRUE("computed metadata has no persisted creation or modification identity",
+             row.SystemCreatedBy.IsNull() && row.SystemModifiedBy.IsNull());
+  CHECK_TRUE("computed metadata has no persisted audit instant",
+             row.SystemCreatedAt == agiru::DateTime{} && row.SystemModifiedAt == agiru::DateTime{});
+  CHECK_TEXT("an uncalculated FlowField is not loaded as a stored column",
+             row.SystemCreatedByUserName.Value(),
+             "Uncalculated");
+  CHECK_TRUE("installed Get retains the existing record state rather than making a snapshot",
+             row.State_Block.Peek() == state && state->positioned && state->temporary == nullptr);
+  CHECK_TEXT("installed Get leaves the record filters unchanged", row.GetFilter(row.ID), "50175");
+  CHECK_TRUE("a missing installed table is an optional false result", !row.Get(kTemporaryId));
+  CHECK_TRUE("a missing Get retains the searched key", row.ID == kTemporaryId);
+  CHECK_TEXT(
+      "a missing Get does not overwrite projected attributes", row.Name.Value(), kSourceTable.name);
+  std::string missing;
+  try {
+    row.Get(kTemporaryId);
+  } catch (const agiru::Error &error) { missing = error.what(); }
+  CHECK_TEXT("a discarded metadata Get retains its searched key diagnostic",
+             missing,
+             "The Table Metadata does not exist. Identification fields and values: 50175");
+  std::string unowned;
+  try {
+    static_cast<void>(static_cast<bool>(row.Get(kUnownedSourceTable.id.Value())));
+  } catch (const agiru::Error &error) { unowned = error.what(); }
+  CHECK_TRUE("projection errors throw even when the Get result is consumed",
+             unowned.contains("App ID has no original module"));
+  CHECK_TEXT("projection refusal does not replace the preceding metadata attributes",
+             row.Name.Value(),
+             kSourceTable.name);
+  CHECK_TRUE("other tables are not silently answered by this provider",
+             !agiru::detail::GetInstalledTableMetadata(nullptr, kSourceTable).has_value());
+  auto copiedFields = agiru::platform::kTableMetadataFields;
+  auto unbound = agiru::platform::kTableMetadataTable;
+  unbound.fields = copiedFields;
+  std::string binding;
+  try {
+    static_cast<void>(agiru::detail::GetInstalledTableMetadata(&row, unbound));
+  } catch (const agiru::Error &error) { binding = error.what(); }
+  CHECK_TEXT("metadata Get refuses an unqualified record ABI before reading its buffer",
+             binding,
+             "Table Metadata.Get requires the qualified native field binding");
+}
+
+void InstalledTableGetSharesItsRecordRefPath() {
+  agiru::platform::TableMetadata row;
+  row.ID = kSourceTable.id.Value();
+  row.Name = "Stale buffer";
+  row.SetRange(row.ID, kTemporaryId);
+  agiru::RecordRef reference;
+  reference.GetTable(row);
+  CHECK_TRUE("RecordRef.Get reads the same installed metadata provider",
+             reference.Get(row.RecordId()));
+  agiru::platform::TableMetadata loaded;
+  reference.SetTable(loaded);
+  CHECK_TEXT("RecordRef.Get projects the original name", loaded.Name.Value(), kSourceTable.name);
+  CHECK_TRUE("RecordRef.Get projects exact source identity and metadata version",
+             loaded.ID == kSourceTable.id.Value() && loaded.SystemRowVersion == 1 &&
+                 loaded.SystemId == agiru::detail::MetadataSystemId(
+                                        agiru::platform::TableMetadata::kId, loaded.ID));
+  agiru::platform::TableMetadata typed;
+  typed.Get(kSourceTable.id.Value());
+  for (const auto &field : agiru::platform::kTableMetadataFields) {
+    if (!agiru::Stored(field)) { continue; }
+    CHECK_TEXT("typed and RecordRef metadata Get agree on each stored field",
+               agiru::detail::StorageText(&loaded, field),
+               agiru::detail::StorageText(&typed, field));
+  }
+  CHECK_TEXT(
+      "RecordRef.Get leaves copied record filters unchanged", loaded.GetFilter(loaded.ID), "50175");
+  row.ID = kTemporaryId;
+  CHECK_TRUE("RecordRef.Get retains optional missing metadata behavior",
+             !reference.Get(row.RecordId()));
+}
 
 void MetadataIdentities() {
   using agiru::detail::MetadataSystemId;
@@ -636,7 +757,12 @@ template <typename Row> void MissingProviderIsNotAnEmptySnapshot() {
   refuses([&] { agiru::RequireTableProvider(agiru::TableTraits<Row>::kTable); });
   refuses([&] { static_cast<void>(row.FindFirst()); });
   refuses([&] { static_cast<void>(row.FindSet()); });
-  refuses([&] { static_cast<void>(row.Get(kTemporaryId)); });
+  if constexpr (Row::kId == agiru::platform::TableMetadata::kId) {
+    CHECK_TRUE("qualified metadata Get distinguishes a missing installed table",
+               !row.Get(kTemporaryId));
+  } else {
+    refuses([&] { static_cast<void>(row.Get(kTemporaryId)); });
+  }
   refuses([&] { static_cast<void>(row.Count()); });
   refuses([&] { static_cast<void>(row.Insert()); });
   refuses([&] { static_cast<void>(row.Modify()); });
@@ -659,6 +785,10 @@ template <typename Row> void MissingProviderIsNotAnEmptySnapshot() {
 
 int main(int argc, char **argv) {
   return gate::Run("ReflectionMetadata", [&] {
+    agiru::RegisterTableEntry(&kSourceEntry);
+    agiru::RegisterTableEntry(&kUnownedSourceEntry);
+    InstalledTableGetUsesTheSharedProjectionWithoutSQL();
+    InstalledTableGetSharesItsRecordRefPath();
     MetadataIdentities();
     PageTypes();
     TableTypes();

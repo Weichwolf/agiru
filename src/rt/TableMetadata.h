@@ -18,6 +18,8 @@ namespace detail {
 
 [[nodiscard]] std::optional<platform::TableMetadata_Table> InstalledTableMetadata(TableId id);
 
+[[nodiscard]] std::optional<bool> GetInstalledTableMetadata(void *record, const TableDef &table);
+
 }
 
 }
