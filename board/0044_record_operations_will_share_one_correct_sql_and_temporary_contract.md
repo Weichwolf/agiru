@@ -9,12 +9,14 @@ Complete Page Metadata canonical views, caption expressions/field lists, static 
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
 Complete Field classification, SQLDataType, package provenance and permissions;
 qualify calculated catalogue predicates.
-Investigate StoredImage; qualify remaining virtual SystemId and diagnostic/localization contracts.
-Latest completed AL replay (`a554715`) is 2210/2314: forty gains and one loss against
-`61344f7`, no missing/added/duplicate identities, zero incomplete codeunits. Build and
-151 C++/specialist checks pass. Integer/live Field repairs are included; shared Table/Page
-Metadata navigation and RecordRef.Get consumption are not. The unsealed/null seed
-identity prevents causal A/B proof. No newer provider gain or full G1 is claimed.
+Qualify Record/RecordRef position syntax, caption defaults and primary-key-only assignment
+from the SDK; investigate StoredImage, virtual SystemId and diagnostic/localization contracts.
+Latest completed AL replay (`feff11f`, content `2ba8b347ffe5`) is 2212/2314:
+two gains and no losses/added/missing/duplicate identities versus `a554715`, zero
+incomplete codeunits. Build and 153 C++/specialist checks pass. Shared Table/Page
+navigation, source-owned page IDs and RecordRef.Get consumption are included;
+scalar catalogue CalcFields and Unicode caption fallback are not. The unsealed/null
+seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Implementation
 
@@ -109,7 +111,7 @@ identity prevents causal A/B proof. No newer provider gain or full G1 is claimed
   128 checks fail; after the repair, all 128 pass. `make reflection-metadata JOBS=2`
   retains the 77 earlier controls and adds ASCII-only/zero-width-as-whitespace controls:
   all 79 plus the typed-header control reject. MetadataText.cpp, PageMetadata.cpp and
-  the expanded gate pass focused tidy. This repair is not included in the running AL replay.
+  the expanded gate pass focused tidy. This repair is not included in the completed AL replay.
 - Scalar `CalcFields` uses `CatalogueFlowField.cpp` for qualified native Field/Table/Page
   targets; it no longer sends them to SQL storage. The shared CalcFormula resolver emits
   typed predicates, preserving literal apostrophes, whitespace, at-signs, range/wildcard
@@ -137,7 +139,7 @@ identity prevents causal A/B proof. No newer provider gain or full G1 is claimed
   Table.cpp retains sixteen earlier findings and the gate inherits two earlier Table.h
   constness findings. No new diagnostic, suppression or golden/baseline increase.
   Frozen `feff11f` / content `2ba8b347ffe5` passes build and 153/153 C++/specialist cases;
-  its AL replay is running and excludes this scalar calculation. Full G1 remains open.
+  its AL replay is 2212/2314 and excludes this scalar calculation. Full G1 remains open.
 - `PageMetadata.{h,cpp}` and `PageMetadataNavigation.cpp` activate native
   Get/Find/FindSet/Next/Count/IsEmpty for qualified English declaration rows over
   `InstalledPages()`. They reuse CatalogueNavigation with three call-scoped scratch

@@ -8,79 +8,31 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Frozen `feff11f` / content `2ba8b347ffe5`: slice-check/all/test pass;
-  153/153 C++/specialist cases, including source-owned Page Metadata and native source IDs.
-  AL execution is still running. The newer scalar catalogue CalcFields repair is not
-  included; its 67 native/SQL checks, generated AL and 77 compiled metadata controls
-  are local contract evidence only (0044), not a new UT total or causal gain.
-- Latest completed frozen integration: `a554715` / content `56a0866bb13c`:
-  slice-check/all/test pass; C++/specialist test is 151/151.
-  AL execution: 2210/2314 passed, 104 failed, eighty codeunits,
-  zero incomplete/duplicate identities, 1392 seconds with six workers.
-  Against `61344f7`'s 2171/2314: forty observed gains, one loss, no added/missing
-  identities and 37 changed failed errors. Gains span remittance, currency reports,
-  sales aggregates, service timesheet posting, physical inventory and pick summaries.
-  The loss is Incoming Doc. To Data Exch.UT/TestProcessWithDataExchWithoutMappingFails:
-  Field's read-only provider guard. Investigate its actual caller; never remove the guard
-  or suppress the result to restore a historical count. Five Page Metadata and two
-  Table Metadata failures remain; their newer providers are absent from this snapshot.
-  Seed identity remains null/unsealed: diagnostic comparison, not causal A/B or G1.
-  Sorted JSON `{codeunit_id, method, status, error}` projection SHA-256:
-  `140ceb229043c73a11da9579cb629ea1bd1521651170b8b9d771d29e742f8cb6`.
-  Source/dependency pins and full configured population are unchanged. Previous
-  result projections/remaining losses against `9dca232`: recovery `617b572`.
-  The completed snapshot includes shared SQL GetBySystemId, original
-  Integer virtual timestamp/SQL alias and native positive-key Field Get/Find/Next/Count.
-  Serialized DynamicRecord/Storage/Temporary/Cursor/Filter pass 7493/71/95/255/129;
-  native Field/FieldCatalogue pass 418/61 checks and 51 compiled reflection controls.
-  Four Field attributes, authorization and full current-tree AL acceptance remain open.
-  Current Parser/AlParserGate focused tidy passes after removing three findings without
-  suppressions; the Parser gate retains previous checks and adds seventeen (159 total).
-  TableWriter.cpp also passes focused tidy after six repairs; GenTable passes 105 checks
-  with unchanged golden files and four rejected compiled mutants. GenTableGate still
-  reports the existing BodyWriter.h adjacent-parameter finding. These are local receipts,
-  not current-tree full build/lint or AL execution proof.
-- Shared native Table Metadata.Get retains 294 reflection checks and 115 generated
-  checks; live navigation/RecordId reads now have 53 TableMetadataCatalogue checks (0044).
-  Typed/RecordRef agreement covers all 29 stored fields; missing results, projection
-  errors, unchanged filters and writable temporary isolation are qualified.
-  Field/Table Metadata share one filter/order/bookmark kernel, with 55 compiled
-  reflection controls plus the header control. Shared filter/bookmark mutants fail
-  both gates; key-hole/Get-position controls fail the new gate. This increment is
-  not in the completed `a554715` snapshot and still needs full AL replay.
-  Kernel/adapters/TableMetadata.cpp/new gate/generated Runner focused tidy pass;
-  Table.cpp has sixteen diagnostics and the expanded gate exposes an uninitialized-ID
-  StoredImage diagnostic absent from the previous gate. No full tidy/UT gain claim.
-- RecordRef.Get now shares consumed/discarded missing-result semantics and owned
-  captioned-key diagnostics with typed Get (0044). Native/temporary gates pass 53/159;
-  owned SQL gate adds nine to 114 checks. Generated AL Get forms execute in all four
-  source-binding contexts. This repair/diagnostic change is not in `a554715`; reconcile
-  every identity/error after full activation, including any newly exposed seed gaps.
-  Focused RecordRef/Table source and RecordRef/SQL gate tidy retain 5/16/2/3 findings,
-  identical normalized messages to independent `a554715` analysis. Native metadata/
-  Field gates pass; no diagnostics are suppressed. Full tidy remains red.
-- Shared SQL GetBySystemId passes 114 record checks and all seventeen compiled
-  rowversion/SystemId controls (0044). Typed/RecordRef missing-result consumption,
-  searched diagnostics, exact values, unchanged filters, provider errors and cursor
-  positioning are qualified. Generated AL value/statement forms compile in all four
-  source-binding contexts; these are not executed AL workflow or UT-gain receipts.
-  RecordRef/RecordImage retain 147/28 checks; focused SQL gate/Table.cpp tidy retain
-  three/sixteen findings. Temporary/virtual SystemId providers remain refused.
-- Current tree: `make verify-check VERIFY_CHECKS='' JOBS=2` passes all 235 tooling
-  tests. Discovery independently includes system-profile.sh and refuses each missing
-  script/binary without shrinking totals. Attribute-census positives use legal Normal
-  TryFunction methods; two malformed declarations remain counted and exit 1.
-  Developer `f928288ee840`: attributes/devenv-{tryfunction,normal}-attribute.md.
-  `test/tooling/toolchain.py` owns DiscoveryGate/TranspilerAttributeCensusGate;
-  the frozen failures are not suppressed and still need current-tree integration.
-- Integer projection passes Cursor/Filter 255/129 checks, shared record-order controls
-  and focused tidy (0013/0044), and is now included in the 2210/2314 replay above.
-  Original BC29 Field catalogue starts at positive field numbers;
-  live native navigation now excludes timestamp zero without removing FieldRef(0).
-  The aggregate UT must establish the expected count; gate success is not that replay.
+- Latest completed integration: `feff11f` / content `2ba8b347ffe5`:
+  slice-check/all/test pass; 153/153 C++/specialist cases.
+  AL: 2212/2314 passed, 102 failed, eighty codeunits, zero incomplete/duplicate
+  identities; six workers, 1507 seconds. Target exits: 0/0/0/2; G1 remains open.
+  Compared with `a554715`'s 2210/2314: two gains, no losses or added/missing
+  identities, twelve changed failed errors. Gains: ERM VAT Tool - UT (134061),
+  ShowItemChargeInVATRateChangeLogEntries and ShowResourceVATRateChangeLogEntries.
+  Page Metadata now exposes DataCaptionFields/SourceTableView gaps; Item navigation
+  reaches the unimplemented EntityText.ReadPermission instead of the provider guard.
+  Original BCApps/System pins and all source/input hashes remain unchanged.
+  Seed identity is null/unsealed: diagnostic comparison, not causal A/B or G1.
+  Result digest from `jq -sc 'sort_by(.codeunit_id,.method)|map({codeunit_id,method,status,error})'
+  followed by `sha256sum`: `c20475839605efefa8f8fa07643782f36c14543c0e4f3527b9f24991d5bd2eef`.
+- This completed snapshot includes native Table/Page Metadata navigation,
+  source-owned page IDs and RecordRef.Get consumption/diagnostics. It excludes
+  scalar catalogue CalcFields (`b221e0d`) and Unicode caption fallback (`48fcd03`).
+  Their local gates pass 67/128 checks, generated AL bindings pass, and all 79
+  compiled metadata controls plus the header control reject. Replay the complete
+  population before attributing gains. Runtime contract evidence belongs in 0013/0044;
+  superseded local receipts and predecessor result details are recoverable at `48fcd03`.
 - Latest AL failure concentrations: thirteen incoming-document conversion failures,
-  seven Nothing-to-handle paths, five Field and five Page Metadata provider refusals,
+  seven Nothing-to-handle paths, five Field and two Table Metadata storage refusals,
   four Inventory Profile missing temporary rows and four WorkbookWriter.Create refusals.
+  Three EntityText.ReadPermission refusals remain; Page Metadata's canonical views
+  and DataCaptionFields still refuse rather than project defaults.
   The two Table Metadata cases are Incoming Doc. To Data Exch.UT's
   TestPEPPOLInvoiceToGenJnlLineFailsNoMapping and TestPeppolImportMultipleFails.
   Native scalar CalcFields previously sent Field/Table/Page Metadata to the guarded SQL
