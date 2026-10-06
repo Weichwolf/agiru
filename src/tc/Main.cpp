@@ -30,7 +30,6 @@
 #include <format>
 #include <fstream>
 #include <ios>
-#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -2013,87 +2012,74 @@ UnitTestPopulation UnitTestsIn(const std::string &source) {
   return found.tests != 0 ? found : UnitTestPopulation{};
 }
 
+constexpr std::string_view kProcedureKeyword = "procedure";
+
+struct ProcedureName {
+  std::string name;
+  std::size_t after;
+};
+
+std::optional<ProcedureName> ProcedureAt(std::string_view source, std::size_t at) {
+  const bool wordStart = at == 0 || std::isalnum(static_cast<unsigned char>(source[at - 1])) == 0;
+  std::size_t cursor = at + kProcedureKeyword.size();
+  if (!wordStart || cursor >= source.size() ||
+      std::isspace(static_cast<unsigned char>(source[cursor])) == 0) {
+    return {};
+  }
+  while (cursor < source.size() && std::isspace(static_cast<unsigned char>(source[cursor])) != 0) {
+    ++cursor;
+  }
+  if (cursor < source.size() && source[cursor] == '"') {
+    const std::size_t close = source.find('"', cursor + 1);
+    if (close == std::string_view::npos || close == cursor + 1) { return {}; }
+    return ProcedureName{.name = std::string(source.substr(cursor + 1, close - cursor - 1)),
+                         .after = close + 1};
+  }
+  std::size_t end = cursor;
+  while (end < source.size() &&
+         (std::isalnum(static_cast<unsigned char>(source[end])) != 0 || source[end] == '_')) {
+    ++end;
+  }
+  if (end == cursor) { return {}; }
+  return ProcedureName{.name = std::string(source.substr(cursor, end - cursor)), .after = end};
+}
+
 std::map<std::string, std::string> DeclaredProcedures(std::string_view source) {
   std::map<std::string, std::string> procedures;
-  static constexpr std::string_view kKeyword = "procedure";
-  for (std::size_t at = source.find(kKeyword); at != std::string_view::npos;
-       at = source.find(kKeyword, at + kKeyword.size())) {
-    const bool wordStart = at == 0 || std::isalnum(static_cast<unsigned char>(source[at - 1])) == 0;
-    std::size_t cursor = at + kKeyword.size();
-    if (!wordStart || cursor >= source.size() ||
-        std::isspace(static_cast<unsigned char>(source[cursor])) == 0) {
-      continue;
-    }
-    while (cursor < source.size() &&
-           std::isspace(static_cast<unsigned char>(source[cursor])) != 0) {
-      ++cursor;
-    }
-    std::string named;
-    if (cursor < source.size() && source[cursor] == '"') {
-      const std::size_t close = source.find('"', cursor + 1);
-      if (close == std::string_view::npos) { continue; }
-      named = std::string(source.substr(cursor + 1, close - cursor - 1));
-    } else {
-      std::size_t end = cursor;
-      while (end < source.size() &&
-             (std::isalnum(static_cast<unsigned char>(source[end])) != 0 || source[end] == '_')) {
-        ++end;
-      }
-      named = std::string(source.substr(cursor, end - cursor));
-    }
-    if (!named.empty()) {
-      procedures.emplace(agiru::gen::LowerKey(named), agiru::gen::Identifier(named));
+  for (std::size_t at = source.find(kProcedureKeyword); at != std::string_view::npos;
+       at = source.find(kProcedureKeyword, at + kProcedureKeyword.size())) {
+    if (const auto named = ProcedureAt(source, at)) {
+      procedures.emplace(agiru::gen::LowerKey(named->name), agiru::gen::Identifier(named->name));
     }
   }
   return procedures;
 }
 
+std::size_t ParameterListEnd(std::string_view source, std::size_t cursor) {
+  const std::size_t open = source.find('(', cursor);
+  if (open == std::string_view::npos) { return open; }
+  int depth = 0;
+  for (std::size_t close = open; close < source.size(); ++close) {
+    if (source[close] == '(') { ++depth; }
+    if (source[close] == ')' && --depth == 0) { return close; }
+  }
+  return std::string_view::npos;
+}
+
 std::set<std::string> InterfaceReturns(std::string_view source) {
   std::set<std::string> returning;
-  static constexpr std::string_view kKeyword = "procedure";
-  for (std::size_t at = source.find(kKeyword); at != std::string_view::npos;
-       at = source.find(kKeyword, at + kKeyword.size())) {
-    const bool wordStart = at == 0 || std::isalnum(static_cast<unsigned char>(source[at - 1])) == 0;
-    std::size_t cursor = at + kKeyword.size();
-    if (!wordStart || cursor >= source.size() ||
-        std::isspace(static_cast<unsigned char>(source[cursor])) == 0) {
-      continue;
-    }
-    while (cursor < source.size() &&
-           std::isspace(static_cast<unsigned char>(source[cursor])) != 0) {
-      ++cursor;
-    }
-    std::string named;
-    if (cursor < source.size() && source[cursor] == '"') {
-      const std::size_t close = source.find('"', cursor + 1);
-      if (close == std::string_view::npos) { continue; }
-      named = std::string(source.substr(cursor + 1, close - cursor - 1));
-      cursor = close + 1;
-    } else {
-      std::size_t end = cursor;
-      while (end < source.size() &&
-             (std::isalnum(static_cast<unsigned char>(source[end])) != 0 || source[end] == '_')) {
-        ++end;
-      }
-      named = std::string(source.substr(cursor, end - cursor));
-      cursor = end;
-    }
-    if (named.empty()) { continue; }
-    const std::size_t open = source.find('(', cursor);
-    if (open == std::string_view::npos) { continue; }
-    int depth = 0;
-    std::size_t close = open;
-    for (; close < source.size(); ++close) {
-      if (source[close] == '(') { ++depth; }
-      if (source[close] == ')' && --depth == 0) { break; }
-    }
-    if (close >= source.size()) { continue; }
+  for (std::size_t at = source.find(kProcedureKeyword); at != std::string_view::npos;
+       at = source.find(kProcedureKeyword, at + kProcedureKeyword.size())) {
+    const auto named = ProcedureAt(source, at);
+    if (!named) { continue; }
+    const std::size_t close = ParameterListEnd(source, named->after);
+    if (close == std::string_view::npos) { continue; }
     const std::size_t eol = source.find('\n', close);
     const std::string_view after =
         source.substr(close + 1, eol == std::string_view::npos ? eol : eol - close - 1);
     static const std::regex kInterface(R"(:\s*Interface\b)", std::regex::icase);
     if (std::regex_search(after.begin(), after.end(), kInterface)) {
-      returning.insert(agiru::gen::LowerKey(named));
+      returning.insert(agiru::gen::LowerKey(named->name));
     }
   }
   return returning;
@@ -3199,63 +3185,132 @@ PropertyAudit AuditProperties(const std::map<std::string, std::size_t> &properti
   return result;
 }
 
-int Scan(const Job &job) {
-  const std::vector<agiru::gen::App> apps = agiru::gen::ReadApps(job.apps);
-  const agiru::gen::TranspileScope scope =
-      agiru::gen::ReadScope(job.apps.parent_path() / "scope.json");
-  NoteProductExclusions(job, scope);
-  agiru::gen::NativeSources nativeSources = job.systemSymbols.empty()
-                                                ? agiru::gen::NativeSources{}
-                                                : agiru::gen::ReadNativeSources(job.systemSymbols);
-  const auto rawNativeTables = nativeSources.tables.size();
-  const auto rawNativeCodeunits = nativeSources.codeunits.size();
-  agiru::gen::SelectNativeSources(nativeSources, scope);
-  for (const auto &excluded : nativeSources.excluded) {
-    std::println("native product-excluded {} {} {}.{}: {} ({})",
-                 excluded.kind,
-                 excluded.id,
-                 excluded.nameSpace,
-                 excluded.name,
-                 excluded.source,
-                 excluded.reason);
+agiru::SystemFieldProfile HostProfile(std::string_view value) {
+  if (value == "17.0") { return agiru::SystemFieldProfile::Runtime17; }
+  if (value == "18.0") { return agiru::SystemFieldProfile::Runtime18; }
+  throw std::runtime_error("unsupported host runtime; expected 17.0 or 18.0");
+}
+
+void ApplyJobOption(Job &job, std::string_view option, std::string_view value) {
+  if (option == "--system-symbols") {
+    if (!job.systemSymbols.empty()) { throw std::runtime_error("duplicate --system-symbols"); }
+    if (value.empty()) { throw std::runtime_error("System package path is empty"); }
+    job.systemSymbols = value;
+  } else if (option == "--host-runtime") {
+    if (job.hostProfile) { throw std::runtime_error("duplicate --host-runtime"); }
+    job.hostProfile = HostProfile(value);
+  } else {
+    throw std::runtime_error("expected --system-symbols or --host-runtime");
   }
-  std::println(
-      "native parsed table declarations: {} before policy, {} selected, {} product-excluded",
-      rawNativeTables,
-      nativeSources.tables.size(),
-      rawNativeTables - nativeSources.tables.size());
-  std::println(
-      "native parsed codeunit declarations: {} before policy, {} selected, {} product-excluded",
-      rawNativeCodeunits,
-      nativeSources.codeunits.size(),
-      rawNativeCodeunits - nativeSources.codeunits.size());
-  if ((!nativeSources.reports.empty() || !nativeSources.enums.empty() ||
-       !nativeSources.interfaces.empty() || !nativeSources.codeunits.empty() ||
-       (!nativeSources.tables.empty() && !nativeSources.app.id.empty())) &&
-      std::ranges::any_of(apps, [](const auto &app) { return app.name == "platform"; })) {
-    throw std::runtime_error("apps.json: platform is reserved for the supplied System package");
+}
+
+Job JobFrom(std::span<char *> arguments) {
+  Job job{.source = arguments[1], .output = {}, .apps = arguments[2], .systemSymbols = {}};
+  std::size_t at = 3;
+  if (at < arguments.size() && !std::string_view(arguments[at]).starts_with("--")) {
+    job.output = arguments[at++];
   }
-  ClaimOutput(job.output);
+  while (at < arguments.size()) {
+    const std::string_view option(arguments[at++]);
+    if (at == arguments.size()) { throw std::runtime_error("missing option value"); }
+    const std::string_view value(arguments[at++]);
+    ApplyJobOption(job, option, value);
+  }
+  return job;
+}
+
+class ScanExecution {
+public:
+  explicit ScanExecution(const Job &request) : job(request) {}
+
+  int Execute() {
+    ReadInputs();
+    IndexNative();
+    for (const agiru::gen::App &app : apps) { ScanApp(app); }
+    const auto nativeOutput = WriteNativeObjects(job,
+                                                 nativeSources,
+                                                 nativeEnums,
+                                                 nativeReports,
+                                                 objects,
+                                                 gathered,
+                                                 everyTable,
+                                                 kept,
+                                                 layouts,
+                                                 unresolvedTables,
+                                                 refusals);
+    written += nativeOutput.written;
+    changed += nativeOutput.changed;
+    allReports += nativeReports.objects.size();
+    NoteUnresolvedLayouts(store, gathered);
+    WriteReportAssets(job, gathered.reportAssets, kept);
+    return Finish(nativeOutput);
+  }
+
+private:
+  const Job &job;
+  std::vector<agiru::gen::App> apps;
+  agiru::gen::TranspileScope scope;
+  agiru::gen::NativeSources nativeSources;
+  Extensions store;
+  Enums nativeEnums;
+  Pages nativeReports;
+  std::size_t nativeGaps = 0;
+
+  void ReadInputs() {
+    apps = agiru::gen::ReadApps(job.apps);
+    scope = agiru::gen::ReadScope(job.apps.parent_path() / "scope.json");
+    NoteProductExclusions(job, scope);
+    nativeSources = job.systemSymbols.empty() ? agiru::gen::NativeSources{}
+                                              : agiru::gen::ReadNativeSources(job.systemSymbols);
+    const auto rawNativeTables = nativeSources.tables.size();
+    const auto rawNativeCodeunits = nativeSources.codeunits.size();
+    agiru::gen::SelectNativeSources(nativeSources, scope);
+    for (const auto &excluded : nativeSources.excluded) {
+      std::println("native product-excluded {} {} {}.{}: {} ({})",
+                   excluded.kind,
+                   excluded.id,
+                   excluded.nameSpace,
+                   excluded.name,
+                   excluded.source,
+                   excluded.reason);
+    }
+    std::println(
+        "native parsed table declarations: {} before policy, {} selected, {} product-excluded",
+        rawNativeTables,
+        nativeSources.tables.size(),
+        rawNativeTables - nativeSources.tables.size());
+    std::println(
+        "native parsed codeunit declarations: {} before policy, {} selected, {} product-excluded",
+        rawNativeCodeunits,
+        nativeSources.codeunits.size(),
+        rawNativeCodeunits - nativeSources.codeunits.size());
+    if ((!nativeSources.reports.empty() || !nativeSources.enums.empty() ||
+         !nativeSources.interfaces.empty() || !nativeSources.codeunits.empty() ||
+         (!nativeSources.tables.empty() && !nativeSources.app.id.empty())) &&
+        std::ranges::any_of(apps, [](const auto &app) { return app.name == "platform"; })) {
+      throw std::runtime_error("apps.json: platform is reserved for the supplied System package");
+    }
+    ClaimOutput(job.output);
+
+    Run reader{.scope = &scope,
+               .sourceRoot = job.source,
+               .root = job.source,
+               .output = {},
+               .failures = {},
+               .refusals = {},
+               .written = 0,
+               .changed = 0,
+               .kept = {}};
+    store = ReadExtensions(reader, allExtensionsRead, apps, job.source);
+    NoteTargets(store);
+  }
 
   Counts allExtensionsRead;
-  Run reader{.scope = &scope,
-             .sourceRoot = job.source,
-             .root = job.source,
-             .output = {},
-             .failures = {},
-             .refusals = {},
-             .written = 0,
-             .changed = 0,
-             .kept = {}};
-  const Extensions store = ReadExtensions(reader, allExtensionsRead, apps, job.source);
-  NoteTargets(store);
-
   std::map<std::string, std::size_t> unresolvedEnums;
   std::map<std::string, std::size_t> unresolvedTables;
   Gathered gathered;
   agiru::gen::EnumIndex index;
   agiru::gen::Objects objects;
-  objects.hostProfile = job.hostProfile;
   std::size_t allReports = 0;
   LayoutCounts layouts;
   std::size_t allXmlPorts = 0;
@@ -3278,61 +3333,97 @@ int Scan(const Job &job) {
   ForeignImplementations foreignImplementations;
 
   std::size_t column = 0;
-  for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
 
-  const std::size_t nativeGaps = BindNativeSources(
-      job.systemSymbols, nativeSources, store, objects, everyTable, allExtensions);
-  IndexNativeCodeunits(nativeSources, objects);
-  Enums nativeEnums{.objects = nativeSources.enums, .paths = nativeSources.enumPaths};
-  Counts nativeEnumCounts;
-  MergeAndIndexEnums(nativeEnums, nativeEnumCounts, store, index);
-  objects.enums = index;
-  for (const auto &face : nativeSources.interfaces) {
-    IndexInterface(face, objects);
-    NoteOptions({}, face.procedures, gathered.options);
-  }
-  NoteNativeFieldEnums(nativeSources, objects);
-  allExtensions.emitted += nativeEnumCounts.emitted;
-  const auto nativeReports = BindNativeReports(nativeSources, store, objects);
-  for (const auto &report : nativeReports.objects) {
-    const auto name = "report " + agiru::gen::LowerKey(report.name);
-    if (store.consumed.contains(name)) { allExtensions.emitted += store.consumed.at(name); }
+  void IndexNative() {
+    objects.hostProfile = job.hostProfile;
+    for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
+
+    nativeGaps = BindNativeSources(
+        job.systemSymbols, nativeSources, store, objects, everyTable, allExtensions);
+    IndexNativeCodeunits(nativeSources, objects);
+    nativeEnums = Enums{.objects = nativeSources.enums, .paths = nativeSources.enumPaths};
+    Counts nativeEnumCounts;
+    MergeAndIndexEnums(nativeEnums, nativeEnumCounts, store, index);
+    objects.enums = index;
+    for (const auto &face : nativeSources.interfaces) {
+      IndexInterface(face, objects);
+      NoteOptions({}, face.procedures, gathered.options);
+    }
+    NoteNativeFieldEnums(nativeSources, objects);
+    allExtensions.emitted += nativeEnumCounts.emitted;
+    nativeReports = BindNativeReports(nativeSources, store, objects);
+    for (const auto &report : nativeReports.objects) {
+      const auto name = "report " + agiru::gen::LowerKey(report.name);
+      if (store.consumed.contains(name)) { allExtensions.emitted += store.consumed.at(name); }
+    }
   }
 
   std::map<std::string, std::string> symbols;
   std::vector<std::string> collisions;
-  for (const agiru::gen::App &app : apps) {
-    const std::filesystem::path source = job.source / app.source;
-    if (!std::filesystem::is_directory(source)) {
-      std::println("{:<10} {} -- no such tree, skipped", app.name, source.string());
-      continue;
-    }
-    Run run{.scope = &scope,
-            .sourceRoot = job.source,
-            .symbols = &symbols,
-            .collisions = &collisions,
-            .root = source,
-            .output = job.output.empty() ? std::filesystem::path{} : job.output / app.name,
-            .failures = {},
-            .refusals = {},
-            .written = 0,
-            .changed = 0,
-            .kept = {}};
-    gathered.reportAssets.apps.push_back(
-        {.identity = WriteModule(run, app, source, objects), .source = app.source});
+
+  struct AppStage {
+    Run run;
     Counts enums;
     Counts interfaces;
     Counts tables;
     Counts codeunits;
     Counts pages;
     Counts extensions;
+    Enums heldEnums;
+    Pages reports;
+    Pages xmlPorts;
+    Queries queries;
+    Tables *tablesParsed = nullptr;
+    Interfaces interfacesParsed;
+    Pages pagesParsed;
+  };
+
+  void ScanApp(const agiru::gen::App &app) {
+    const std::filesystem::path source = job.source / app.source;
+    if (!std::filesystem::is_directory(source)) {
+      std::println("{:<10} {} -- no such tree, skipped", app.name, source.string());
+      return;
+    }
+    AppStage stage;
+    stage.run = Run{.scope = &scope,
+                    .sourceRoot = job.source,
+                    .symbols = &symbols,
+                    .collisions = &collisions,
+                    .root = source,
+                    .output = job.output.empty() ? std::filesystem::path{} : job.output / app.name,
+                    .failures = {},
+                    .refusals = {},
+                    .written = 0,
+                    .changed = 0,
+                    .kept = {}};
+    ReadApp(app, stage);
+    WriteApp(app, stage);
+    KeepApp(app, stage);
+  }
+
+  void ReadApp(const agiru::gen::App &app, AppStage &stage) {
+    Run &run = stage.run;
+    const auto &source = run.root;
+    auto &enums = stage.enums;
+    auto &interfaces = stage.interfaces;
+    auto &tables = stage.tables;
+    auto &pages = stage.pages;
+    auto &extensions = stage.extensions;
+    auto &heldEnums = stage.heldEnums;
+    auto &parsedReports = stage.reports;
+    auto &parsedXmlPorts = stage.xmlPorts;
+    auto &parsedQueries = stage.queries;
+    auto &parsedInterfaces = stage.interfacesParsed;
+    auto &parsed = stage.pagesParsed;
+    gathered.reportAssets.apps.push_back(
+        {.identity = WriteModule(run, app, source, objects), .source = app.source});
     ClaimApp(run.output);
     for (const std::filesystem::path &path : SourcesEndingIn(run, ".al")) {
       agiru::gen::NoteDotNetSpellings(Read(path));
     }
     agiru::gen::FixDotNetSpellings();
     IndexCodeunits(run, objects, nativeSources);
-    Pages parsedReports = IndexReports(run, objects, nativeSources);
+    parsedReports = IndexReports(run, objects, nativeSources);
     layouts.reports += CountLayouts(parsedReports);
     extensions.emitted += MergeReportExtensions(store, parsedReports);
     layouts.bound += CountLayouts(parsedReports);
@@ -3341,26 +3432,26 @@ int Scan(const Job &job) {
       agiru::gen::AddReportAssets(gathered.reportAssets, report);
     }
     NoteUnwrittenReports(run, parsedReports, gathered);
-    const Pages parsedXmlPorts = IndexXmlPorts(run, objects);
-    const Queries parsedQueries = IndexQueries(run, objects);
-    Enums heldEnums;
+    parsedXmlPorts = IndexXmlPorts(run, objects);
+    parsedQueries = IndexQueries(run, objects);
     ScanEnums(run, enums, store, index, heldEnums, nativeSources);
     objects.enums = index;
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables));
+    stage.tablesParsed = &parsedTables;
     CheckNativeTableIdentities(parsedTables, nativeSources);
     extensions.emitted += MergeExtensions(store, parsedTables, {}, source);
     RefreshTableIndex(parsedTables, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
     }
-    const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects, nativeSources);
+    parsedInterfaces = IndexInterfaces(run, interfaces, objects, nativeSources);
     for (const auto &face : parsedInterfaces.objects) {
       NoteOptions({}, face.procedures, gathered.options);
     }
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       everyTable.insert_or_assign(agiru::gen::LowerKey(table.name), &table);
     }
-    Pages parsed = IndexPages(run, pages, objects);
+    parsed = IndexPages(run, pages, objects);
     RefreshReportControls(parsedReports, objects);
     extensions.emitted += MergePageExtensions(store, parsed);
     for (const agiru::al::PageObject &page : parsed.objects) {
@@ -3370,6 +3461,18 @@ int Scan(const Job &job) {
       }
     }
     agiru::gen::NoteObjectNames(objects);
+  }
+
+  void WriteApp(const agiru::gen::App &app, AppStage &stage) {
+    Run &run = stage.run;
+    auto &codeunits = stage.codeunits;
+    const auto &parsedTables = *stage.tablesParsed;
+    const auto &heldEnums = stage.heldEnums;
+    const auto &parsedReports = stage.reports;
+    const auto &parsedXmlPorts = stage.xmlPorts;
+    const auto &parsedQueries = stage.queries;
+    const auto &parsedInterfaces = stage.interfacesParsed;
+    auto &parsed = stage.pagesParsed;
     WriteQueries(run, parsedQueries, objects, queryCounts);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
@@ -3406,7 +3509,15 @@ int Scan(const Job &job) {
     WritePages(run, parsedXmlPorts, objects, gathered, everyTable);
     allXmlPorts += parsedXmlPorts.objects.size();
     WriteProfiles(run, objects, profileCounts);
+  }
 
+  void KeepApp(const agiru::gen::App &app, AppStage &stage) {
+    Run &run = stage.run;
+    const auto &enums = stage.enums;
+    const auto &tables = stage.tables;
+    const auto &codeunits = stage.codeunits;
+    const auto &pages = stage.pages;
+    const auto &extensions = stage.extensions;
     std::println("{:<{}}{} table(s), {} codeunit(s), {} page(s), {} enum(s), {} [Test] method(s){}",
                  app.name,
                  column,
@@ -3430,103 +3541,90 @@ int Scan(const Job &job) {
     refusals.insert(refusals.end(), run.refusals.begin(), run.refusals.end());
   }
 
-  const auto nativeOutput = WriteNativeObjects(job,
-                                               nativeSources,
-                                               nativeEnums,
-                                               nativeReports,
-                                               objects,
-                                               gathered,
-                                               everyTable,
-                                               kept,
-                                               layouts,
-                                               unresolvedTables,
-                                               refusals);
-  written += nativeOutput.written;
-  changed += nativeOutput.changed;
-  allReports += nativeReports.objects.size();
+  void ReportCounts() {
+    if (!job.output.empty()) {
+      const std::size_t swept =
+          failures.empty() && refusals.empty() && store.unplaced == 0 ? Sweep(job.output, kept) : 0;
+      std::println("written   {} objects into {}; {} changed, {} swept",
+                   written,
+                   job.output.string(),
+                   changed,
+                   swept);
+    }
+    Report("enums", allEnums);
+    Report("tables", allTables);
+    Report("codeunits", allCodeunits);
+    Report("pages", allPages);
+    Report("extensions", allExtensionsRead);
+    std::println("merged     {} extension(s) into the objects they extend", allExtensions.emitted);
+    if (foreignImplementations.registered != 0 || !foreignImplementations.pending.empty()) {
+      std::println("registered {} enum-extension implementation(s) from the app that declares the "
+                   "codeunit; {} name a codeunit no app in this run carries",
+                   foreignImplementations.registered,
+                   foreignImplementations.pending.size());
+    }
+    ReportUnplacedControls(store);
+  }
 
-  NoteUnresolvedLayouts(store, gathered);
-  WriteReportAssets(job, gathered.reportAssets, kept);
-
-  if (!job.output.empty()) {
-    const std::size_t swept =
-        failures.empty() && refusals.empty() && store.unplaced == 0 ? Sweep(job.output, kept) : 0;
-    std::println("written   {} objects into {}; {} changed, {} swept",
-                 written,
-                 job.output.string(),
-                 changed,
-                 swept);
-  }
-  Report("enums", allEnums);
-  Report("tables", allTables);
-  Report("codeunits", allCodeunits);
-  Report("pages", allPages);
-  Report("extensions", allExtensionsRead);
-  std::println("merged     {} extension(s) into the objects they extend", allExtensions.emitted);
-  if (foreignImplementations.registered != 0 || !foreignImplementations.pending.empty()) {
-    std::println("registered {} enum-extension implementation(s) from the app that declares the "
-                 "codeunit; {} name a codeunit no app in this run carries",
-                 foreignImplementations.registered,
-                 foreignImplementations.pending.size());
-  }
-  ReportUnplacedControls(store);
-  std::map<std::string, std::size_t> orphans;
-  for (const auto &[name, total] : store.held) {
-    const auto taken = store.consumed.find(name);
-    if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
-  }
-  const PropertyAudit propertyAudit = AuditProperties(gathered.properties);
-  std::size_t silentAttributes = 0;
-  for (const auto &[what, found] : gathered.contradictions) {
-    std::println("declared  {:>5} x {} -- carried as declared, and it cannot mean what it says "
-                 "(board:0339)",
-                 found,
-                 what);
-  }
-  if (!declaredOnly.empty()) {
-    std::size_t total = 0;
-    for (const auto &[kind, found] : declaredOnly) { total += found; }
-    std::println("declared  {} object(s) whose kind carries its NUMBER, NAME and a refusing "
-                 "surface, and no body (board:0034)",
-                 total);
-    std::vector<std::pair<std::string, std::size_t>> ranked(declaredOnly.begin(),
-                                                            declaredOnly.end());
-    std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
-    for (const auto &[kind, found] : ranked) { std::println("          {:>5} x {}", found, kind); }
-  }
-  std::println("reports   {} translated: the dataset walk and the request page, no renderer yet "
-               "(board:0063)",
-               allReports);
-  ReportLayouts(store, layouts);
-  std::println(
-      "xmlports  {} translated: the schema walked out and in over three formats (board:0065)",
-      allXmlPorts);
-  std::println("profiles  {} translated, {} naming a role centre page this run does not have",
-               profileCounts.written,
-               profileCounts.unresolved);
-  std::println("queries   {} translated, {} stubbed because a dataitem's table is out of scope, "
-               "{} trigger(s) not translated (board:0064)",
-               queryCounts.written,
-               queryCounts.stubs,
-               queryCounts.triggers);
-  {
-    std::vector<std::pair<std::string, std::size_t>> ranked(queryCounts.missing.begin(),
-                                                            queryCounts.missing.end());
-    std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
-    for (const auto &[name, count] : ranked) { std::println("          {:>5} x {}", count, name); }
-  }
-  if (!untranslated.empty()) {
-    std::size_t total = 0;
-    for (const auto &[kind, found] : untranslated) { total += found; }
+  void ReportObjects() {
+    for (const auto &[what, found] : gathered.contradictions) {
+      std::println("declared  {:>5} x {} -- carried as declared, and it cannot mean what it says "
+                   "(board:0339)",
+                   found,
+                   what);
+    }
+    if (!declaredOnly.empty()) {
+      std::size_t total = 0;
+      for (const auto &[kind, found] : declaredOnly) { total += found; }
+      std::println("declared  {} object(s) whose kind carries its NUMBER, NAME and a refusing "
+                   "surface, and no body (board:0034)",
+                   total);
+      std::vector<std::pair<std::string, std::size_t>> ranked(declaredOnly.begin(),
+                                                              declaredOnly.end());
+      std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+      for (const auto &[kind, found] : ranked) {
+        std::println("          {:>5} x {}", found, kind);
+      }
+    }
+    std::println("reports   {} translated: the dataset walk and the request page, no renderer yet "
+                 "(board:0063)",
+                 allReports);
+    ReportLayouts(store, layouts);
     std::println(
-        "untranslated {} object(s) in scope whose kind has no generator at all (board:0034)",
-        total);
-    std::vector<std::pair<std::string, std::size_t>> ranked(untranslated.begin(),
-                                                            untranslated.end());
-    std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
-    for (const auto &[kind, found] : ranked) { std::println("          {:>5} x {}", found, kind); }
+        "xmlports  {} translated: the schema walked out and in over three formats (board:0065)",
+        allXmlPorts);
+    std::println("profiles  {} translated, {} naming a role centre page this run does not have",
+                 profileCounts.written,
+                 profileCounts.unresolved);
+    std::println("queries   {} translated, {} stubbed because a dataitem's table is out of scope, "
+                 "{} trigger(s) not translated (board:0064)",
+                 queryCounts.written,
+                 queryCounts.stubs,
+                 queryCounts.triggers);
+    {
+      std::vector<std::pair<std::string, std::size_t>> ranked(queryCounts.missing.begin(),
+                                                              queryCounts.missing.end());
+      std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+      for (const auto &[name, count] : ranked) {
+        std::println("          {:>5} x {}", count, name);
+      }
+    }
+    if (!untranslated.empty()) {
+      std::size_t total = 0;
+      for (const auto &[kind, found] : untranslated) { total += found; }
+      std::println(
+          "untranslated {} object(s) in scope whose kind has no generator at all (board:0034)",
+          total);
+      std::vector<std::pair<std::string, std::size_t>> ranked(untranslated.begin(),
+                                                              untranslated.end());
+      std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+      for (const auto &[kind, found] : ranked) {
+        std::println("          {:>5} x {}", found, kind);
+      }
+    }
   }
-  {
+
+  void ReportRefusedProperties() {
     std::map<std::string, std::size_t> refused;
     for (const agiru::gen::RefusedProperty &found : gathered.refused) { ++refused[found.property]; }
     std::println("refused   {} property declaration(s) the transpiler will not act on",
@@ -3538,7 +3636,8 @@ int Scan(const Job &job) {
       std::println("          {} in {}", found.property, found.where);
     }
   }
-  {
+
+  std::size_t ReportAttributes() {
     std::size_t dropped = 0;
     std::vector<std::pair<std::string, std::size_t>> ranked;
     std::size_t acknowledged = 0;
@@ -3558,7 +3657,6 @@ int Scan(const Job &job) {
       ranked.emplace_back(name, count);
     }
     std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
-    if (dropped != 0) { silentAttributes = dropped; }
     std::println("attributes acted on {} of {} kind(s) declared, {} declaration(s) acknowledged as "
                  "no-ops; {} declaration(s) of {} kind(s) are read and dropped (board:0190)",
                  actedKinds,
@@ -3571,71 +3669,96 @@ int Scan(const Job &job) {
           "          {:>5} x [Scope] {} -- deprecated in runtime 4.0 (board:0216)", found, dead);
     }
     for (const auto &[name, count] : ranked) { std::println("          {:>5} x {}", count, name); }
+    return dropped;
   }
-  ReportUnresolved("extension(s)", "object(s) no app declares", orphans);
-  if (allCodeunits.emitted != 0) {
-    std::println("moved     {} table(s) and extension(s) declare ObsoleteState = Moved and are "
-                 "left to the app their MovedTo names",
-                 allTables.moved);
-    std::println("emitted   {} of {} codeunits; the rest name what the runtime cannot do yet",
-                 allCodeunits.emitted,
-                 allCodeunits.parsed);
+
+  void ReportUnresolvedInputs(const std::map<std::string, std::size_t> &orphans) {
+    ReportUnresolved("extension(s)", "object(s) no app declares", orphans);
+    if (allCodeunits.emitted != 0) {
+      std::println("moved     {} table(s) and extension(s) declare ObsoleteState = Moved and are "
+                   "left to the app their MovedTo names",
+                   allTables.moved);
+      std::println("emitted   {} of {} codeunits; the rest name what the runtime cannot do yet",
+                   allCodeunits.emitted,
+                   allCodeunits.parsed);
+    }
+    ReportUnresolved("enum(s)", "field(s)", unresolvedEnums);
+    WriteAbsent(job.output, gathered.dotnet, gathered.absent);
+    WriteOptions(job.output, gathered.options);
+    ReportUnresolved("table(s)", "declaration(s)", unresolvedTables);
+    Cluster(failures);
+    if (!refusals.empty()) {
+      std::println("");
+      std::println("refused   what parses and cannot be written yet");
+      Cluster(refusals);
+    }
   }
-  ReportUnresolved("enum(s)", "field(s)", unresolvedEnums);
-  WriteAbsent(job.output, gathered.dotnet, gathered.absent);
-  WriteOptions(job.output, gathered.options);
-  ReportUnresolved("table(s)", "declaration(s)", unresolvedTables);
-  Cluster(failures);
-  if (!refusals.empty()) {
-    std::println("");
-    std::println("refused   what parses and cannot be written yet");
-    Cluster(refusals);
+
+  int Finish(const NativeObjectOutput &nativeOutput) {
+    ReportCounts();
+    std::map<std::string, std::size_t> orphans;
+    for (const auto &[name, total] : store.held) {
+      const auto taken = store.consumed.find(name);
+      if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
+    }
+    const PropertyAudit propertyAudit = AuditProperties(gathered.properties);
+    ReportObjects();
+    ReportRefusedProperties();
+    const std::size_t silentAttributes = ReportAttributes();
+    ReportUnresolvedInputs(orphans);
+    if (silentAttributes != 0) {
+      std::println("");
+      std::println("ABORT     {} attribute declaration(s) are read and dropped, and the count is 0 "
+                   "(board:0190)",
+                   silentAttributes);
+      std::println("          Every one belongs in `kActedOnAttributes` with a generator behind it "
+                   "or in");
+      std::println("          `kAcknowledgedAttributes` with the reason it is a no-op here.");
+      return 1;
+    }
+    if (!collisions.empty()) {
+      std::println(
+          "declared  {} object name(s) are declared by two apps and translated once, since "
+          "every app is linked into one image here (board:0686)",
+          collisions.size());
+      for (const std::string &one : collisions) { std::println("          {}", one); }
+    }
+    if (propertyAudit.refusedLayouts != 0) {
+      std::println("ABORT     {} report-layout property declaration(s) explicitly refused "
+                   "(board:0063)",
+                   propertyAudit.refusedLayouts);
+      return 1;
+    }
+    if (propertyAudit.silent != 0) {
+      std::println("");
+      std::println("ABORT     {} property declaration(s) are read and dropped in silence, and the "
+                   "count is 0 (board:0067)",
+                   propertyAudit.silent);
+      std::println(
+          "          Every one belongs in `kTranslatedProperties` with a member behind it, "
+          "in");
+      std::println(
+          "          `kDroppedProperties` with a reason, or in `kPartlyTranslatedProperties` "
+          "with what");
+      std::println("          reaches the metadata and what does not.");
+      return 1;
+    }
+    return !HasUnboundNativeMethods(gathered) && gathered.refused.empty() && failures.empty() &&
+                   refusals.empty() && nativeGaps == 0 && nativeOutput.gaps == 0 &&
+                   store.unplaced == 0
+               ? 0
+               : 1;
   }
-  if (silentAttributes != 0) {
-    std::println("");
-    std::println("ABORT     {} attribute declaration(s) are read and dropped, and the count is 0 "
-                 "(board:0190)",
-                 silentAttributes);
-    std::println("          Every one belongs in `kActedOnAttributes` with a generator behind it "
-                 "or in");
-    std::println("          `kAcknowledgedAttributes` with the reason it is a no-op here.");
-    return 1;
-  }
-  if (!collisions.empty()) {
-    std::println("declared  {} object name(s) are declared by two apps and translated once, since "
-                 "every app is linked into one image here (board:0686)",
-                 collisions.size());
-    for (const std::string &one : collisions) { std::println("          {}", one); }
-  }
-  if (propertyAudit.refusedLayouts != 0) {
-    std::println("ABORT     {} report-layout property declaration(s) explicitly refused "
-                 "(board:0063)",
-                 propertyAudit.refusedLayouts);
-    return 1;
-  }
-  if (propertyAudit.silent != 0) {
-    std::println("");
-    std::println("ABORT     {} property declaration(s) are read and dropped in silence, and the "
-                 "count is 0 (board:0067)",
-                 propertyAudit.silent);
-    std::println("          Every one belongs in `kTranslatedProperties` with a member behind it, "
-                 "in");
-    std::println(
-        "          `kDroppedProperties` with a reason, or in `kPartlyTranslatedProperties` "
-        "with what");
-    std::println("          reaches the metadata and what does not.");
-    return 1;
-  }
-  return !HasUnboundNativeMethods(gathered) && gathered.refused.empty() && failures.empty() &&
-                 refusals.empty() && nativeGaps == 0 && nativeOutput.gaps == 0 &&
-                 store.unplaced == 0
-             ? 0
-             : 1;
+};
+
+int Scan(const Job &job) {
+  return ScanExecution(job).Execute();
 }
 
 }
 
 int main(int argc, char **argv) {
+
   const std::span<char *> arguments(argv, static_cast<std::size_t>(argc));
   if (arguments.size() < 3) {
     std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>] "
@@ -3644,33 +3767,7 @@ int main(int argc, char **argv) {
     return 2;
   }
   try {
-    Job job{.source = arguments[1], .output = {}, .apps = arguments[2], .systemSymbols = {}};
-    std::size_t at = 3;
-    if (at < arguments.size() && !std::string_view(arguments[at]).starts_with("--")) {
-      job.output = arguments[at++];
-    }
-    while (at < arguments.size()) {
-      const std::string_view option(arguments[at++]);
-      if (at == arguments.size()) { throw std::runtime_error("missing option value"); }
-      const std::string_view value(arguments[at++]);
-      if (option == "--system-symbols") {
-        if (!job.systemSymbols.empty()) { throw std::runtime_error("duplicate --system-symbols"); }
-        if (value.empty()) { throw std::runtime_error("System package path is empty"); }
-        job.systemSymbols = value;
-      } else if (option == "--host-runtime") {
-        if (job.hostProfile) { throw std::runtime_error("duplicate --host-runtime"); }
-        if (value == "17.0") {
-          job.hostProfile = agiru::SystemFieldProfile::Runtime17;
-        } else if (value == "18.0") {
-          job.hostProfile = agiru::SystemFieldProfile::Runtime18;
-        } else {
-          throw std::runtime_error("unsupported host runtime; expected 17.0 or 18.0");
-        }
-      } else {
-        throw std::runtime_error("expected --system-symbols or --host-runtime");
-      }
-    }
-    return Scan(job);
+    return Scan(JobFrom(arguments));
   } catch (const std::exception &e) {
     std::fputs("agirutc: ", stderr);
     std::fputs(e.what(), stderr);

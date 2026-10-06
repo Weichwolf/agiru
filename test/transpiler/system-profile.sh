@@ -140,5 +140,30 @@ status=0
   --host-runtime 17.0 --host-runtime 18.0 > "$proof/duplicate.log" 2>&1 || status=$?
 [ "$status" -eq 1 ]
 rg -q 'duplicate --host-runtime' "$proof/duplicate.log"
+
+refuses_option() {
+  local name=$1 message=$2 status=0
+  shift 2
+  "$B/agirutc" "$proof/source" "$proof/apps.json" "$proof/option-$name" "$@" \
+    > "$proof/option-$name.log" 2>&1 || status=$?
+  [ "$status" -eq 1 ]
+  rg -Fxq "agirutc: $message" "$proof/option-$name.log"
+  [ ! -e "$proof/option-$name" ]
+}
+
+refuses_option missing-host 'missing option value' --host-runtime
+refuses_option missing-system 'missing option value' --system-symbols
+refuses_option unknown 'expected --system-symbols or --host-runtime' --unknown value
+refuses_option missing-unknown 'missing option value' --unknown
+refuses_option empty-system 'System package path is empty' --system-symbols ''
+refuses_option duplicate-system 'duplicate --system-symbols' \
+  --system-symbols unused --system-symbols another
+refuses_option duplicate-before-empty 'duplicate --system-symbols' \
+  --system-symbols unused --system-symbols ''
+refuses_option duplicate-before-invalid 'duplicate --host-runtime' \
+  --host-runtime 17.0 --host-runtime invalid
+refuses_option missing-before-duplicate 'missing option value' \
+  --host-runtime 17.0 --host-runtime
+
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
 printf 'system-profile: 28 host/kind/linked declarations and two production-wrapper profiles qualify; generated AL executes both hosts; presence/profile/options/empty-host controls refuse; %s\n' "$proof"
