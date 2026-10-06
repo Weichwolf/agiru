@@ -106,6 +106,10 @@ Retain the full 2314-case UT population through replay.
   still recognizes only five legacy audit/identity fields. Qualify computed rowversion
   and identity before changing it; do not invent zero/one stamps to obtain green.
   Local `devenv-integer-virtual-table.md` specifies Number/range, not these values.
+  Completed `00c187c` replay: seventy-two Integer-related failures, including
+  38 previously passing methods; one additional loss is Sales Invoice Aggregate's
+  normal-field count (expected 77, actual 78). Preserve every identity. Qualify the
+  provider and reflected field population together, rather than masking field 0.
 - Every bound native record now materializes the original Runtime-18 Normal,
   unlinked profile: ten implicit fields, typed offsets/capacities and nonstored
   User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;

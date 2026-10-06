@@ -8,13 +8,23 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Running frozen integration: `00c187c` / content `ef6d7cf62468` has completed compilation;
-  local test completes 150 cases with two red: Cursor/Filter. The selected Integer provider
-  cannot synthesize SystemRowVersion. PostgreSQL is running; CursorGate's generic database label
-  is misleading. Do not invent a constant or revert the selected profile. Preserve the
-  full configured population. Six AL workers are executing; wait for final target receipts. This run
-  does not contain the later declaring-owner customization, Parser/TableWriter tidy repairs
-  or the shared native Table Metadata.Get implementation.
+- Latest completed frozen integration: `00c187c` / content `ef6d7cf62468`:
+  slice-check/all pass; test is 148/150 with Cursor/Filter red on Integer SystemRowVersion.
+  AL execution is 2135/2314 passed, 179 failed, eighty codeunits, zero incomplete or
+  duplicate identities (1680 seconds, six workers). Against `9dca232`'s 2173/2314:
+  one observed gain, 39 losses, zero added/missing identities, 37 changed failed errors.
+  Thirty-eight losses and seventy-two current failures concern Integer SystemRowVersion;
+  the other loss is Sales Invoice Aggregate's normal-field count (77 versus 78).
+  The gain is SCM Planning PurchaseReturnWithNegativeQty; this does not close the four
+  missing temporary Inventory Profile rows. Workflow Engine's changed Variant error
+  also needs investigation. The seed remains null/unsealed: diagnostic comparison,
+  not causal A/B or G1. No constant, profile rollback or test removal is authorized.
+  Sorted identity/status/error projection SHA-256:
+  `169d0b39a12dcf340183ac9e18a232a9dac4131451000d82855303b2c52c48d1`.
+- Running frozen integration: `61344f7` / content `0642312188b5`, same BCApps/package
+  pins and complete configured population. It includes declaring-owner customization,
+  shared temporary arrays, Field.Get/property and Table Metadata.Get repairs. Wait for
+  final target receipts; this snapshot does not include the later GetBySystemId increment.
   Current Parser/AlParserGate focused tidy passes after removing three findings without
   suppressions; the Parser gate retains previous checks and adds seventeen (159 total).
   TableWriter.cpp also passes focused tidy after six repairs; GenTable passes 105 checks
@@ -28,24 +38,6 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Navigation remains refused. TableMetadata.cpp/generated Runner focused tidy pass;
   Table.cpp has sixteen diagnostics and the expanded gate exposes an uninitialized-ID
   StoredImage diagnostic absent from the previous gate. No full tidy/UT gain claim.
-- Previous failed frozen attempt: `9fd1e13` / content `774f78b70460`, slice-check exits 0;
-  all/test/ut exit 2 after PageTableFieldGate.cpp's legacy five-field static assertion
-  disagrees with the selected native Runtime-18 profile. Inputs remain unchanged.
-  UT execution never starts: all 2314 configured methods are unexecuted across
-  eighty incomplete codeunits. The current native fixture assertions are repaired:
-  1070 checks and all four focused tidy runs pass, without production-profile or
-  test-total changes. Repeat `make verify-start JOBS=6
-  VERIFY_TARGETS='slice-check all test ut'`. Field.Get/property repairs landed later
-  and are not covered by this snapshot.
-- Latest completed frozen replay: `9dca232` / content `fde18ee95496`, slice check
-  and complete slice build pass. Local test remains red: the native-codeunit
-  qualifier lacks a public-header include and three tooling checks have stale fixtures.
-  AL execution: 2173/2314 passed, 141 failed, eighty codeunits, zero incomplete
-  or duplicates (1719 seconds, six workers). Source manifest and result identities
-  match; every identity/status/error matches the preceding `d3e767` replay.
-  Canonical result hash: `b754b24c37ece93879414fdfc8061754d6238a5d1c2daf6d2c746334f6b4a358`.
-  These inputs do not contain the later native Runtime-18 migration, API repairs
-  or shared temporary-array storage fix. They are not current-tree G1 proof.
 - Current tree: `make verify-check VERIFY_CHECKS='' JOBS=2` passes all 235 tooling
   tests. Discovery independently includes system-profile.sh and refuses each missing
   script/binary without shrinking totals. Attribute-census positives use legal Normal
@@ -53,19 +45,8 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Developer `f928288ee840`: attributes/devenv-{tryfunction,normal}-attribute.md.
   `test/tooling/toolchain.py` owns DiscoveryGate/TranspilerAttributeCensusGate;
   the frozen failures are not suppressed and still need current-tree integration.
-- Last completed frozen AL replay: `d3e7671` / content `15e116850819`,
-  2,173/2,314 passed, 141 failed, zero incomplete; eighty codeunits,
-  BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. Legacy null/unsealed seed:
-  diagnostic repeatability only, not causal A/B or G1. Reproduce through `make ut`;
-  compare method identities/statuses, not only totals.
-- Frozen slice/build and local 146 cases / 233 tooling tests passed; UT exits
-  nonzero (1,701 seconds, six workers). Against `ae71f8d`, all 2,314 identities,
-  statuses and errors are unchanged: zero gains/losses/missing/added/duplicates.
-  This replay covers the earlier reflection-name/profile-selection changes,
-  not `b9f35e9` materialization/current User lookups, `5a4c3be` source-write refusal
-  or subsequent rowversion allocation/SQL integration.
-- Last measured AL failure concentrations: 48 Table Metadata provider refusals, thirteen
-  incoming-document conversion assertions, four Inventory Profile missing temporary rows
+- Latest AL failure concentrations: seventy-two Integer rowversion paths,
+  44 Table Metadata provider refusals, four Inventory Profile missing temporary rows
   and four WorkbookWriter.Create refusals. Fix their shared contracts, not callers.
 - Raw census: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
   113,111 methods; fifteen approved exclusions leave 113,096 required.
