@@ -4,6 +4,7 @@
 #include "dotnet/JObject.h"
 #include "runtime/Codeunit.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/ProcessDiagnostics.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
@@ -46,7 +47,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <format>
@@ -975,8 +975,7 @@ void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
 
 bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply) {
   const TestHandler *handler = HandlerTable::For(static_cast<HandlerKind>(kind));
-  static const bool traced = std::getenv("AGIRU_TRACE_UI") != nullptr;
-  if (traced) {
+  if (detail::TraceUi()) {
     std::println(
         stderr, "ui {}: {} -> {}", kind, text, handler == nullptr ? "no handler" : "handled");
   }

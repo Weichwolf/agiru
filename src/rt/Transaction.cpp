@@ -3,6 +3,7 @@
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/ProcessDiagnostics.h"
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
 #include "type/CommitBehavior.h"
@@ -12,7 +13,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdio>
-#include <cstdlib>
 #include <exception>
 #include <optional>
 #include <print>
@@ -202,8 +202,7 @@ void RememberError(std::string_view text) {
 }
 
 void RememberError(const Error &error) {
-  static const bool traced = std::getenv("AGIRU_TRACE_ERRORS") != nullptr;
-  if (traced) {
+  if (TraceErrors()) {
     std::println(stderr, "caught: {}", error.what());
     std::array<void *, kTraceFrames> frames{};
     const int depth = backtrace(frames.data(), static_cast<int>(frames.size()));

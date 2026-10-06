@@ -3,12 +3,13 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/ProcessDiagnostics.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/PageTraps.h"
 #include "type/Integer.h"
 #include "type/JsonObject.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/TransactionModel.h"
 
 #include "BuiltinsWritten.h"
@@ -17,7 +18,6 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
-#include <cstdlib>
 #include <exception>
 #include <mutex>
 #include <new>
@@ -38,7 +38,8 @@ namespace {
 
 void TracedAllocationFailure_() {
   std::println(stderr, "out of memory at:");
-  std::array<void *, 64> frames{};
+  constexpr std::size_t kAllocationTraceFrames = 64;
+  std::array<void *, kAllocationTraceFrames> frames{};
   const int depth = backtrace(frames.data(), static_cast<int>(frames.size()));
   backtrace_symbols_fd(frames.data(), depth, STDERR_FILENO);
   std::set_new_handler(nullptr);
@@ -48,9 +49,7 @@ void TracedAllocationFailure_() {
 void TraceAllocationFailures_() {
   static std::once_flag once;
   std::call_once(once, [] {
-    if (std::getenv("AGIRU_TRACE_ERRORS") != nullptr) {
-      std::set_new_handler(&TracedAllocationFailure_);
-    }
+    if (detail::TraceErrors()) { std::set_new_handler(&TracedAllocationFailure_); }
   });
 }
 
@@ -307,10 +306,11 @@ TestRun RunRegisteredTests(std::string_view codeunit, TestIsolation isolation) {
 }
 
 TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
-  return RunRegisteredTests(codeunit, &report, [](void *context, const TestResult &result) {
-    const auto callback = *static_cast<TestReport *>(context);
-    if (callback != nullptr) { callback(result); }
-  });
+  return RunRegisteredTests(
+      codeunit, static_cast<void *>(&report), [](void *context, const TestResult &result) {
+        const auto callback = *static_cast<TestReport *>(context);
+        if (callback != nullptr) { callback(result); }
+      });
 }
 
 TestRun RunRegisteredTests(std::string_view codeunit,
@@ -343,7 +343,7 @@ TestRun RunRegisteredTests(std::string_view codeunit,
         continue;
       }
     }
-    static const char *const only = std::getenv("AGIRU_TEST_PROCEDURE");
+    const char *const only = detail::SelectedTestProcedures();
     for (const TestMethod &method : catalogue->Methods()) {
       if (only != nullptr && !Named(only, method.name)) { continue; }
       AppendResult(run,

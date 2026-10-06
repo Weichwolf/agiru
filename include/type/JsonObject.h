@@ -531,7 +531,6 @@ public:
                                       const ::agiru::SecretText &Secret,
                                       ::agiru::SecretText &Result);
 
-public:
   /// \brief The node this value refers to, which is how two AL variables share one.
   ///
   /// \note A DECLARED VARIABLE ALREADY HOLDS ONE. AL's `JsonObject` starts as an empty

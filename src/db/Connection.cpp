@@ -1,4 +1,5 @@
 #include "runtime/Database.h"
+#include "runtime/ProcessDiagnostics.h"
 
 #include <cstddef>
 #include <cstdio>
@@ -22,6 +23,30 @@ PGresult *Handle(void *h) {
 
 PGconn *Conn(void *h) {
   return static_cast<PGconn *>(h);
+}
+
+void TraceStatement(std::string_view sql, std::span<const std::optional<std::string>> params) {
+  if (!detail::TraceSql()) { return; }
+  std::string line = "sql: " + std::string(sql);
+  for (const std::optional<std::string> &param : params) {
+    line += " | ";
+    line += param.has_value() ? *param : std::string("NULL");
+  }
+  line += '\n';
+  std::fputs(line.c_str(), stderr);
+}
+
+void TraceRows(PGresult *result) {
+  if (!detail::TraceSqlRows() || PQresultStatus(result) != PGRES_TUPLES_OK) { return; }
+  std::string line = "  -> " + std::to_string(PQntuples(result)) + " row(s)";
+  if (PQntuples(result) > 0) {
+    for (int column = 0; column < PQnfields(result); ++column) {
+      line += column == 0 ? ": " : " | ";
+      line += PQgetisnull(result, 0, column) != 0 ? "NULL" : PQgetvalue(result, 0, column);
+    }
+  }
+  line += '\n';
+  std::fputs(line.c_str(), stderr);
 }
 
 }
@@ -110,15 +135,7 @@ Result Connection::Execute(std::string_view sql,
   for (const std::optional<std::string> &p : params) {
     values.push_back(p.has_value() ? p->c_str() : nullptr);
   }
-  static const bool traced = std::getenv("AGIRU_TRACE_SQL") != nullptr;
-  if (traced) {
-    std::string line = "sql: " + std::string(sql);
-    for (const std::optional<std::string> &p : params) {
-      line += " | " + (p.has_value() ? *p : std::string("NULL"));
-    }
-    line += "\n";
-    std::fputs(line.c_str(), stderr);
-  }
+  TraceStatement(sql, params);
 
   PGresult *result = PQexecParams(Conn(handle_),
                                   std::string(sql).c_str(),
@@ -128,29 +145,15 @@ Result Connection::Execute(std::string_view sql,
                                   nullptr,
                                   nullptr,
                                   0);
+  Result owned(result);
 
   const ExecStatusType status = PQresultStatus(result);
   if (status != PGRES_COMMAND_OK && status != PGRES_TUPLES_OK) {
     const std::string message = PQresultErrorMessage(result);
-    PQclear(result);
     throw DatabaseError(message + "statement: " + std::string(sql));
   }
-  static const bool answered = [] {
-    const char *level = std::getenv("AGIRU_TRACE_SQL");
-    return level != nullptr && std::string_view(level) == "2";
-  }();
-  if (answered && status == PGRES_TUPLES_OK) {
-    std::string line = "  -> " + std::to_string(PQntuples(result)) + " row(s)";
-    if (PQntuples(result) > 0) {
-      for (int column = 0; column < PQnfields(result); ++column) {
-        line += column == 0 ? ": " : " | ";
-        line += PQgetisnull(result, 0, column) != 0 ? "NULL" : PQgetvalue(result, 0, column);
-      }
-    }
-    line += "\n";
-    std::fputs(line.c_str(), stderr);
-  }
-  return Result(result);
+  TraceRows(result);
+  return owned;
 }
 
 void Connection::Run(std::string_view sql,

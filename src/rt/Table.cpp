@@ -8,6 +8,7 @@
 #include "runtime/Catalogue.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/ProcessDiagnostics.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Relation.h"
@@ -27,7 +28,6 @@
 #include "type/Media.h"
 #include "type/MediaSet.h"
 #include "type/RecordId.h"
-#include "type/Refusal.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
 
@@ -50,11 +50,10 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <exception>
-#include <expected>
 #include <format>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <print>
@@ -72,8 +71,7 @@ namespace agiru::detail {
 namespace {
 
 void TraceRefusal(std::string_view what) {
-  static const bool traced = std::getenv("AGIRU_TRACE_ERRORS") != nullptr;
-  if (!traced) { return; }
+  if (!TraceErrors()) { return; }
   std::println(stderr, "refused: {}", what);
   constexpr int kTraceFrames = 32;
   std::array<void *, kTraceFrames> frames{};
@@ -242,7 +240,7 @@ namespace {
 
 template <typename T> T Read(std::string_view text, const FieldDef &def) {
   if (text.empty()) { return T{}; }
-  const std::expected<T, Refusal> got = T::FromText(text);
+  const auto got = T::FromText(text);
   if (got.has_value()) { return *got; }
   if constexpr (std::is_same_v<T, DateFormula>) {
     static_cast<void>(def);
@@ -326,7 +324,7 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
       return;
     }
     case FieldType::RecordId: {
-      const std::expected<RecordId, Refusal> read = RecordId::FromStorageText(text);
+      const auto read = RecordId::FromStorageText(text);
       if (!read.has_value()) {
         throw Error("the column of " + std::string(def.name) + " holds " + std::string(text) +
                     ", and " + std::string(read.error().what));
@@ -621,10 +619,19 @@ void AutoIncrement(void *record, const TableDef &table) {
   for (const FieldDef &def : table.fields) {
     if (!DrawsFromSequence(def)) { continue; }
     if (!IsBlank(record, def)) { continue; }
-    const std::string sequence = "'" + Quoted(SequenceName(table, def)) + "'";
-    const Result next = Session::Current().Database().Execute(
-        "SELECT setval(" + sequence + ", GREATEST(nextval(" + sequence +
-        "), (SELECT COALESCE(MAX(" + Quoted(def.name) + "), 0) FROM " + Name(table) + ") + 1))");
+    std::string sequence = "'";
+    sequence += Quoted(SequenceName(table, def));
+    sequence += '\'';
+    std::string sql = "SELECT setval(";
+    sql += sequence;
+    sql += ", GREATEST(nextval(";
+    sql += sequence;
+    sql += "), (SELECT COALESCE(MAX(";
+    sql += Quoted(def.name);
+    sql += "), 0) FROM ";
+    sql += Name(table);
+    sql += ") + 1))";
+    const Result next = Session::Current().Database().Execute(sql);
     const std::optional<std::string_view> value = next.Value(0, 0);
     detail::SetFieldText(record, def, value.has_value() ? std::string(*value) : "1");
   }
@@ -809,8 +816,7 @@ std::string ShownFilter(const FieldDef &def, std::string_view text) {
       text.back() != '\'') {
     return std::string(text);
   }
-  const std::expected<RecordId, Refusal> held =
-      RecordId::FromStorageText(text.substr(1, text.size() - 2));
+  const auto held = RecordId::FromStorageText(text.substr(1, text.size() - 2));
   return held.has_value() ? held->ToText() : std::string(text);
 }
 
@@ -872,6 +878,42 @@ Decimal DeclaredPlaces(const Decimal &value, std::string_view decimalPlaces) {
   return Round(value, Decimal::FromInvariantString(precision));
 }
 
+namespace {
+
+const FieldDef *RelationField(const TableDef &table, std::string_view name) {
+  const auto found = std::ranges::find_if(table.fields, [name](const FieldDef &candidate) {
+    return std::ranges::equal(candidate.name, name, [](unsigned char x, unsigned char y) {
+      return std::tolower(x) == std::tolower(y);
+    });
+  });
+  return found == table.fields.end() ? nullptr : &*found;
+}
+
+bool RelatedRow(const TableEntry &target,
+                const FieldDef &column,
+                const void *record,
+                const FieldDef &source,
+                std::span<const RelationFilter> filters) {
+  const TableDef &other = *target.table;
+  if (filters.empty()) {
+    RequireTablePermission(other, TableOperation::Read);
+    return GetRowWhere(Session::Current().Database(), other, column, StorageText(record, source))
+        .has_value();
+  }
+  const std::unique_ptr<void, decltype(target.free)> probe(target.make(), target.free);
+  if (TempOf(probe.get()) != nullptr) { return true; }
+  RecordState &state = reinterpret_cast<StateHandle *>(probe.get())->Ensure();
+  Narrow(state, column.no, Literally(FieldText(record, source)));
+  for (const RelationFilter &filter : filters) {
+    const FieldDef *narrowed = RelationField(other, filter.field);
+    if (narrowed == nullptr) { return true; }
+    Narrow(state, narrowed->no, filter.text);
+  }
+  return !RuntimeIsEmpty(probe.get(), other);
+}
+
+}
+
 void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
   const FieldDef *def = Field(table, no);
   if (def == nullptr || !def->validateTableRelation) { return; }
@@ -883,50 +925,14 @@ void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
   if (target == nullptr) { return; }
   const TableDef &other = *target->table;
   if (other.tableType == TableType::Temporary || IsPlatformTable(other.id)) { return; }
-  const auto named = [&other](std::string_view name) -> const FieldDef * {
-    for (const FieldDef &candidate : other.fields) {
-      if (candidate.name.size() == name.size() &&
-          std::ranges::equal(candidate.name, name, [](unsigned char x, unsigned char y) {
-            return std::tolower(x) == std::tolower(y);
-          })) {
-        return &candidate;
-      }
-    }
-    return nullptr;
-  };
   const FieldDef *column = nullptr;
   if (!resolved->field.empty()) {
-    column = named(resolved->field);
+    column = RelationField(other, resolved->field);
   } else if (!other.keys.empty() && !other.keys[0].fields.empty()) {
     column = Field(other, other.keys[0].fields.front());
   }
   if (column == nullptr) { return; }
-  bool found = false;
-  if (resolved->filters.empty()) {
-    RequireTablePermission(other, TableOperation::Read);
-    found = GetRowWhere(Session::Current().Database(), other, *column, StorageText(record, *def))
-                .has_value();
-  } else {
-    void *probe = target->make();
-    if (TempOf(probe) != nullptr) {
-      target->free(probe);
-      return;
-    }
-    RecordState &state = reinterpret_cast<StateHandle *>(probe)->Ensure();
-    Narrow(state, column->no, Literally(FieldText(record, *def)));
-    bool applicable = true;
-    for (const RelationFilter &filter : resolved->filters) {
-      const FieldDef *narrowed = named(filter.field);
-      if (narrowed == nullptr) {
-        applicable = false;
-        break;
-      }
-      Narrow(state, narrowed->no, filter.text);
-    }
-    found = !applicable || !RuntimeIsEmpty(probe, other);
-    target->free(probe);
-  }
-  if (found) { return; }
+  if (RelatedRow(*target, *column, record, *def, resolved->filters)) { return; }
   throw Error("The field " + std::string(def->caption.empty() ? def->name : def->caption) +
               " of table " + std::string(table.caption.empty() ? table.name : table.caption) +
               " contains a value (" + FieldText(record, *def) +
@@ -934,9 +940,13 @@ void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
               std::string(other.caption.empty() ? other.name : other.caption) + ").");
 }
 
+namespace {
+
 std::size_t &ImagesTaken() {
   static thread_local std::size_t taken = 0;
   return taken;
+}
+
 }
 
 void PushBefore(const void *record, const void *owner) {
@@ -1184,15 +1194,15 @@ private:
     Refuse("an unclosed parenthesis");
   }
 
-  static std::string Trimmed(std::string value) {
+  static std::string Trimmed(std::string_view value) {
     const std::size_t first = value.find_first_not_of(" \t\r\n");
     if (first == std::string::npos) { return {}; }
     const std::size_t last = value.find_last_not_of(" \t\r\n");
-    return value.substr(first, last - first + 1);
+    return std::string(value.substr(first, last - first + 1));
   }
 
   static std::string Unquoted(std::string value) {
-    value = Trimmed(std::move(value));
+    value = Trimmed(value);
     if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
       return value.substr(1, value.size() - 2);
     }
@@ -1474,6 +1484,39 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
   Store(record, *def, result.Rows() == 0 ? std::nullopt : result.Value(0, 0));
 }
 
+namespace {
+
+std::optional<Clause> CorrelatedFieldClause(const FlowTerm &term,
+                                            const TableDef &target,
+                                            const FieldDef &at,
+                                            const TableDef &table,
+                                            const RecordState *state,
+                                            const FieldDef &asked,
+                                            std::size_t next) {
+  const FieldDef *source = FieldNamed(table, term.value);
+  if (source == nullptr) {
+    throw Error("the CalcFormula of " + std::string(asked.name) + " reads " + term.value +
+                ", which " + std::string(table.name) + " does not declare");
+  }
+  const bool fromFilter = term.how == FlowTerm::How::FieldFilter ||
+                          term.how == FlowTerm::How::FieldUpperLimitFilter ||
+                          source->fieldClass == FieldClass::FlowFilter;
+  if (fromFilter) {
+    const std::optional<std::string> text = FilterOn(state, source->no);
+    if (!text.has_value()) { return std::nullopt; }
+    if (term.how == FlowTerm::How::FieldUpperLimitFilter ||
+        term.how == FlowTerm::How::FieldUpperLimit) {
+      const std::optional<std::string> upper = UpperOf(*text);
+      if (!upper.has_value()) { return std::nullopt; }
+      return TermClause(target, at, AtMost(*upper), next);
+    }
+    return TermClause(target, at, ParseFilter(*text), next);
+  }
+  const std::string outer = Name(table) + "." + SqlColumn(*source);
+  const bool upper = term.how == FlowTerm::How::FieldUpperLimit;
+  return Clause{.sql = SqlColumn(at) + (upper ? " <= " : " = ") + outer, .binds = {}};
+}
+
 Predicate CorrelatedPredicateOf(const FlowFormula &formula,
                                 const TableDef &target,
                                 const TableDef &table,
@@ -1496,35 +1539,14 @@ Predicate CorrelatedPredicateOf(const FlowFormula &formula,
         Add(made, TermClause(target, *at, detail::ParseFilter(term.value), next));
         break;
       default: {
-        const FieldDef *source = FieldNamed(table, term.value);
-        if (source == nullptr) {
-          throw Error("the CalcFormula of " + std::string(asked.name) + " reads " + term.value +
-                      ", which " + std::string(table.name) + " does not declare");
-        }
-        const bool fromFilter = term.how == FlowTerm::How::FieldFilter ||
-                                term.how == FlowTerm::How::FieldUpperLimitFilter ||
-                                source->fieldClass == FieldClass::FlowFilter;
-        if (fromFilter) {
-          const std::optional<std::string> text = FilterOn(state, source->no);
-          if (!text.has_value()) { break; }
-          if (term.how == FlowTerm::How::FieldUpperLimitFilter ||
-              term.how == FlowTerm::How::FieldUpperLimit) {
-            const std::optional<std::string> upper = UpperOf(*text);
-            if (upper.has_value()) { Add(made, TermClause(target, *at, AtMost(*upper), next)); }
-          } else {
-            Add(made, TermClause(target, *at, detail::ParseFilter(*text), next));
-          }
-          break;
-        }
-        const std::string outer = detail::Name(table) + "." + detail::SqlColumn(*source);
-        const bool upper = term.how == FlowTerm::How::FieldUpperLimit;
-        Add(made,
-            detail::Clause{.sql = detail::SqlColumn(*at) + (upper ? " <= " : " = ") + outer,
-                           .binds = {}});
+        const auto clause = CorrelatedFieldClause(term, target, *at, table, state, asked, next);
+        if (clause.has_value()) { Add(made, *clause); }
       }
     }
   }
   return made;
+}
+
 }
 
 Clause FlowFieldColumn(const TableDef &table,
