@@ -23,7 +23,7 @@ namespace detail {
 struct SessionState;
 }
 
-/// \brief An error raised when there is no session to work in.
+/// \brief An error raised for a missing session or refused user identity.
 class SessionError : public Error {
 public:
   using Error::Error;
@@ -49,10 +49,22 @@ constexpr ::agiru::Integer kEnglishUnitedStates = 1033;
 
 class Session {
 public:
-  /// \brief Opens a session on a database.
+  /// \brief Opens an unaccounted harness session with SYSTEM/blank user identity.
   /// \param connectionInfo A libpq connection string or URI.
+  /// \warning Not a production client sign-in or an authorization grant.
   /// \throws DatabaseError when the connection cannot be established.
   explicit Session(const std::string &connectionInfo);
+
+  /// \brief Opens a session for an already authenticated user from the system User table.
+  /// \param connectionInfo A libpq connection string or URI.
+  /// \param authenticatedUser Security ID established by the trusted host's authentication.
+  /// \throws SessionError for a blank, missing, unnamed, disabled or expired user.
+  /// \throws DatabaseError when the connection or User-table read fails.
+  /// \note Reads the name and status from PostgreSQL; does not authenticate credentials,
+  ///       grant permissions, invoke company sign-in triggers or gate features by license.
+  ///       Status is checked at construction; a persistent host must enforce revocation.
+  ///       Failure restores the previous thread-local session and language.
+  Session(const std::string &connectionInfo, const Guid &authenticatedUser);
 
   ~Session();
 
@@ -77,11 +89,7 @@ public:
   ///
   /// \return The security ID of the user this session runs as.
   ///
-  /// \note IT IS THE BLANK GUID UNTIL THERE IS AN AUTHENTICATION STORY, and that is a measured
-  ///       decision rather than a placeholder: the predecessor returned exactly this constant and
-  ///       reached 97.0 % of the UT subset over it (`~/Git/openerp`, `builtins/_system.py:409`). It
-  ///       lives on the SESSION rather than in a function, because a user is a property of a
-  ///       session and a hardcoded GUID inside a call could never become one.
+  /// \note The Guid from the system User row, or blank in the unaccounted harness constructor.
   [[nodiscard]] const Guid &UserSecurityId() const { return userSecurityId_; }
 
   /// \brief AL `GlobalLanguage()` -- the language this session runs in.
@@ -104,12 +112,7 @@ public:
   ///
   /// \return The name of the user this session runs as.
   ///
-  /// \note IT IS `SYSTEM` UNTIL THERE IS AN AUTHENTICATION STORY, and that is measured rather than
-  ///       chosen: the predecessor returns exactly this constant unless a test overrides it, and
-  ///       reached 97.0 % of the UT subset over it (`~/Git/openerp`,
-  ///       `builtins/_system.py:_al_user_id`). It sits beside `UserSecurityId()` for the reason
-  ///       that one gives -- a user is a property of a SESSION, and a constant inside a function
-  ///       could never become one.
+  /// \note A construction-time snapshot of User."User Name", or SYSTEM in a harness session.
   [[nodiscard]] std::string_view UserId() const { return userId_; }
 
   /// \brief AL `WorkDate()` -- the date a session posts under.

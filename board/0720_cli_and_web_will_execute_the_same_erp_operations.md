@@ -36,9 +36,17 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   backend/DB/session/thread includes; measured frontend cost is 764.9 ms over three
   no-PCH rounds, not a build-performance improvement or generated-app requirement.
   Handler SQL is a fixture receipt, not AL Validate/Save/posting or production
-  authentication/session/permission parity. Existing `Session` still owns a resident
-  DB connection and default SYSTEM/blank user identity; fix identity/transaction leases
-  before admitting persistent users, rather than allocating a thread/connection per user.
+  authentication/session/permission parity. `Session(dsn, authenticatedUser)` now resolves
+  the typed GUID/name from PostgreSQL's system User table and refuses blank/missing,
+  unnamed, disabled/unknown-state or expired users, without a license gate. The host
+  must authenticate first; this constructor does not verify credentials or permissions.
+  `make session-identity`: 75 checks and three compiled status/GUID/name defects reject;
+  independent SQL verifies committed creator/modifier ownership. Nested failures and
+  worker reuse restore private identity/language; the SYSTEM/blank harness stays compatible.
+  Persistent-session revocation, credential verification and page/table authorization
+  remain pending. Existing Session still owns a resident DB connection: add transaction
+  leases before admitting persistent users, not a thread/connection per user.
+  Unicode data is preserved; existing Code uppercasing is ASCII-only and remains a gap.
   Blocking-handler cancellation, durable command reconciliation and WASM transport
   remain unqualified. Preserve these limits in the next real page/SQL increment.
 
@@ -198,7 +206,8 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
    Run blocking AL/libpq on a bounded executor, not the event loop. Sessions remain
    private; PostgreSQL owns shared permission revisions, fencing and receipts.
    No connection or transaction during user think time; modal suspension is explicit.
-   Drogon and daisyUI/Tailwind are proposals, not adopted dependencies.
+   Native HTTP uses the adopted libmicrohttpd/nginx boundary; daisyUI/Tailwind remain
+   unadopted presentation proposals.
 5. Extend the Node.js/TypeScript HTML-to-ASCII agent client to production HTTP;
    CMD and local stdio MCP share one client library and the same business endpoints.
    Parse a bounded, versioned semantic HTML profile, not a general browser/htmx engine.
@@ -313,6 +322,13 @@ Control-dispatch references: developer revision
 user `business-central/ui-enter-data.md` at
 `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`;
 predecessor `openerp/web/client/protocol.py::{set_field,invoke_action}` and WI 1903.
+Session identity: developer `methods-auto/database/database-{userid,usersecurityid}-method.md`;
+BCApps `Modules/System/User/UserCard.Page.al` (State/Expiry Date) and
+`System Application/App/User Permissions/src/UserPermissionsImpl.Codeunit.al` (enabled users);
+user `business-central/ui-how-users-permissions.md` (disable/revoke); predecessor WIs
+1449/1792 retain typed-ID/sign-in findings, not its deferred-authentication policy.
+Revisions are those above. Implementation: `src/rt/Session.cpp`, `include/runtime/Session.h`;
+proof: `test/gate/SessionIdentityGate.cpp`, `test/runtime/session-identity.sh`.
 Shared-kernel extraction: developer `triggers-auto/page/devenv-onopenpage-page-trigger.md`,
 `properties/devenv-delayedinsert-property.md`,
 `methods-auto/testpage/testpage-getvalidationerror-method.md` and

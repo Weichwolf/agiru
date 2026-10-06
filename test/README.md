@@ -17,6 +17,11 @@ Retain original notices.
 `run.sh` runs the local regression population. `slice` is the ordered generated C++
 integration slice, not the AL test denominator.
 
+`make session-identity JOBS=2` qualifies host-supplied user GUIDs against the system
+User table, committed audit ownership and three compiled defects. Each run creates
+disposable databases. It is not credential authentication or page/table authorization;
+container qualifiers need `AGIRU_TEST_DSN` pointing at container-local PostgreSQL.
+
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.
 `make verify-check` checks build tooling without rebuilding C++.

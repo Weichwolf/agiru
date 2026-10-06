@@ -1,12 +1,14 @@
 #include "runtime/Session.h"
 
+#include "platform/User.h"
 #include "runtime/Database.h"
 #include "runtime/Events.h"
 #include "runtime/Transaction.h"
 #include "type/Date.h"
+#include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Language.h"
 
-#include "BuiltinsWritten.h"
 #include "SessionState.h"
 
 #include <string>
@@ -26,6 +28,19 @@ Session::Session(const std::string &connectionInfo)
   ::agiru::Language::MakeCurrent(language_);
 }
 
+Session::Session(const std::string &connectionInfo, const Guid &authenticatedUser)
+    : Session(connectionInfo) {
+  if (authenticatedUser.IsNull()) { throw SessionError("session user is not active"); }
+  platform::User user;
+  if (!user.Get(authenticatedUser) || user.UserName.Value().empty() ||
+      user.State != platform::UserState::Enabled ||
+      (!user.ExpiryDate.IsUndefined() && user.ExpiryDate <= CurrentDateTime())) {
+    throw SessionError("session user is not active");
+  }
+  userSecurityId_ = user.UserSecurityID;
+  userId_ = user.UserName.Value();
+}
+
 Session::~Session() {
   if (state_ != nullptr) { state_->ReleaseSingles(); }
   g_current = previous_;
@@ -43,7 +58,7 @@ bool Session::HasCurrent() {
 }
 
 Date Session::WorkDate() const {
-  return workDate_.IsUndefined() ? Today() : workDate_;
+  return workDate_.IsUndefined() ? CurrentDateTime().Date() : workDate_;
 }
 
 void Session::OpenCompany() {
