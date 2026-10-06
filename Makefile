@@ -20,7 +20,7 @@ export CCACHE_SLOPPINESS
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
-.PHONY: system-profiles variant-text
+.PHONY: system-profiles variant-text xmlport-import
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -132,6 +132,12 @@ for-loops: comments db tc ## execute captured AL for-loop bounds and counter/con
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenCodeunitGate
 	@"$(B)/gate_GenCodeunitGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/for-loops.sh"
+
+xmlport-import: comments db tc ## execute generated XMLport field validation and assignment order
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_GenXmlPortGate gate_XmlPortGate
+	@"$(B)/gate_GenXmlPortGate"
+	@"$(B)/gate_XmlPortGate"
+	@B="$(B)" bash "$(SELF)/test/runtime/xmlport-import.sh"
 
 variant-text: comments db ## prove shared ordinal text, report XML scalars and strict typed identity
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_VariantGate gate_FormatGate gate_RecordRefGate gate_ReportGate

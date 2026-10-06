@@ -68,19 +68,29 @@ seed prevents causal A/B proof; full G1 remains open (0058).
   NavXmlPortImporter `<AssignFieldValueAsync>d__25::MoveNext`, assigns through
   SourceFieldTableNode, fires OnAfterAssignField, then branches past ValidateAsync
   when that source table node is Temporary (IL 01de/01e5/0205/020a/023f).
-  `src/gen/BodyWriter.cpp::ElementImport` instead validates temporary fields and
-  fires the assignment trigger afterwards. GenXmlPortGate currently locks in the
-  wrong temporary-field behavior. Repair both orders; resolve the source owner,
-  retain explicit FieldValidate/default inheritance for physical nodes and qualify
-  generated execution with compiled negative controls. Preserve ordinary temporary
+  `src/gen/BodyWriter.cpp::ElementImport` now assigns the field, fires its assignment
+  trigger, then validates physical source nodes only. Resolve the declared source owner,
+  not the enclosing XML node; absent/Undefined FieldValidate inherits the default.
+  `make xmlport-import JOBS=2` passes GenXmlPort/XmlPort 27/41 and 54 generated AL
+  assertions over explicit false/true, omitted defaults and temporary sources.
+  Five compiled defects reject premature validation, ignored defaults/Undefined,
+  swallowed errors and validation of temporary imports. AutoSave=false writes no SQL
+  rows; assignment changes and the before-insert boundary remain checked.
+  Preserve ordinary temporary
   Record.Validate relation checks: predecessor 1663 proves those are required;
   1325 identifies XMLport flags/error-swallowing hazards, not this native exception.
   Developer `f928288ee840`: devenv-{fieldvalidate,defaultfieldsvalidation,
   usetemporary-xmlport}-property.md and OnAfterAssignField triggers. BCApps
   `d99152ee35f0`: ImpExpDataExchDefMap.XmlPort.al temporary TransformationRules
   and DataExchDefUT::DataExhangeDefinitionImportInsertsRuleFromNextTransformationRuleField.
-  Native static inspection is version-bounded, not an executed BC comparison;
-  current full replay remains red and no import repair is implemented yet.
+  Native static inspection is version-bounded, not an executed BC comparison.
+  Full source transpilation retains 5,683 refused properties (exit 1); 30 generated
+  files change, including the real import caller. Its old-image AL diagnostic fails
+  0/1; single-object preloads abort before import even with hidden inline symbols,
+  so they prove no AL gain. Replay a matching complete image, retaining that identity.
+  Runner focused tidy passes; BodyWriter/GenXmlPortGate retain 20/1 earlier findings,
+  including unchanged ElementImport complexity 94. Wider import/Skip/lexical policies
+  and full UT acceptance remain open; no diagnostic or population is suppressed.
 - RowVersion disconnect observation: frozen b2a8131's C++ integration has one red
   (`disconnect removes an uncommitted writer`). PQfinish closes the frontend without
   waiting for backend rollback; delaying the original Connection destructor with

@@ -3268,6 +3268,12 @@ bool ElementFlag(const al::PageControl &control, std::string_view property, bool
   return text == "true" || text == "yes";
 }
 
+bool FieldValidation(const al::PageControl &control, bool defaultValidation) {
+  const al::Property *property = al::Find(control.properties, "FieldValidate");
+  if (property == nullptr || LowerKey(property->text) == "undefined") { return defaultValidation; }
+  return ElementFlag(control, "FieldValidate", defaultValidation);
+}
+
 std::string ElementWidth(const al::PageControl &control) {
   const al::Property *width = al::Find(control.properties, "Width");
   return width == nullptr || width->text.empty() ? std::string("0") : width->text;
@@ -3565,7 +3571,7 @@ std::string ElementImport(const al::PageControl &control,
              " does not declare (board:0065)\");\n";
     }
     const std::string owner = PageVariableIdentifier(page, declared->name);
-    const bool validate = ElementFlag(control, "FieldValidate", validateByDefault);
+    const bool validate = !declared->temporary && FieldValidation(control, validateByDefault);
     const std::string text = attribute ? "In_().Attribute(" + xmlName + ")" : "In_().Text()";
     out += pad + (attribute ? "{\n" : "if (In_().Enter(" + xmlName + ")) {\n");
     if (!attribute && ContainerElement(control)) {
@@ -3584,16 +3590,14 @@ std::string ElementImport(const al::PageControl &control,
     out += pad + "  {\n" + pad + "    auto Value_Block = " + owner + "->" + field->second + ";\n";
     out += pad + "    static_cast<void>(::agiru::Evaluate(Value_Block, " + text +
            (control.kind.empty() ? "" : "") + "));\n";
-    if (validate) {
-      out +=
-          pad + "    " + owner + "->Validate(" + owner + "->" + field->second + ", Value_Block);\n";
-    } else {
-      out += pad + "    " + owner + "->" + field->second + " = Value_Block;\n";
-    }
+    out += pad + "    " + owner + "->" + field->second + " = Value_Block;\n";
     out += pad + "  }\n";
     if (!attribute) { out += pad + "  In_().Leave();\n"; }
     if (declares(control, "OnAfterAssignField")) {
       out += pad + "  " + trigger(control, "OnAfterAssignField") + "();\n";
+    }
+    if (validate) {
+      out += pad + "  " + owner + "->Validate(" + owner + "->" + field->second + ");\n";
     }
     out += pad + "}\n";
     return out;

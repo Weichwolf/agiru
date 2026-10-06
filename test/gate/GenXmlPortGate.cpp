@@ -224,9 +224,12 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
   // `CheckLineTypesImport`, 2026-09-12).
   CHECK_TRUE("a linked child takes its parent's key on import",
              Has(source, "Item_Block.CustomerNo = SomeLine->CustomerNo;"));
-  CHECK_TRUE("a field with FieldValidate = no is assigned, the other validated",
+  CHECK_TRUE("temporary source fields are assigned without automatic validation",
              Has(source, "SomeLine->EntryNo = Value_Block;") &&
-                 Has(source, "SomeLine->Validate(SomeLine->Amount, Value_Block);"));
+                 Has(source, "SomeLine->Amount = Value_Block;") &&
+                 !Has(source, "SomeLine->Validate("));
+  CHECK_TRUE("a nested physical source field still validates",
+             Has(source, "Detail->Validate(Detail->Amount);"));
   CHECK_TRUE("AutoSave inserts", Has(source, "static_cast<void>(Item_Block.Insert(true));"));
   CHECK_TRUE("and the record is written BEFORE its nested table elements, whose triggers read it",
              source.find("static_cast<void>(Item_Block.Insert(true));") <
