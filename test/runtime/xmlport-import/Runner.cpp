@@ -44,6 +44,13 @@ void ValuesAndOrder(bool temporary, bool defaults) {
   CHECK_TRUE("copy property writes retain the original import flag", consumer.ImportFile());
   CHECK_TEXT("method and property getter forms agree", copy.Filename().Value(), "copy.xml");
   CHECK_TRUE("method and property flag getter forms agree", !copy.ImportFile());
+  CHECK_TRUE("XMLport methods set and read another instance flag",
+             consumer.SetExternalImportProperties(copy, "external.xml", true));
+  CHECK_TEXT(
+      "XMLport methods set another instance filename", copy.Filename().Value(), "external.xml");
+  CHECK_TEXT("external property writes leave the caller filename owned",
+             consumer.Filename().Value(),
+             "fixture.xml");
   Import(consumer, "10");
   CHECK_TRUE("OnAfterAssignField sees the imported element before validation",
              consumer.ValueObserved() == 10);

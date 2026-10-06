@@ -2,7 +2,7 @@ namespace Microsoft.Fixture;
 
 xmlport 50264 "Import Validation Consumer"
 {
-    Direction = Import;
+    Direction = Both;
     Format = Xml;
     UseRequestPage = false;
     DefaultFieldsValidation = false;
@@ -81,6 +81,13 @@ xmlport 50264 "Import Validation Consumer"
     procedure PropertyFilename(): Text
     begin
         exit(CurrXmlPort.Filename);
+    end;
+
+    procedure SetExternalImportProperties(var OtherPort: XmlPort "Import Validation Consumer"; Name: Text; Importing: Boolean): Boolean
+    begin
+        OtherPort.Filename := Name;
+        OtherPort.ImportFile := Importing;
+        exit(OtherPort.ImportFile);
     end;
 
     procedure PropertyImporting(): Boolean

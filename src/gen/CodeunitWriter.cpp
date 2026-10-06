@@ -1278,6 +1278,11 @@ public:
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     if (MembersAreCalls(member.variable)) { return true; }
+    if (const auto call =
+            ObjectBaseMemberCall(objects_, Declaration(member.variable), member.field);
+        call.has_value()) {
+      return *call;
+    }
     if (const al::VarDecl *query = Declaration(member.variable);
         query != nullptr && TypeName(query->type) == "Query" && !query->subtype.empty()) {
       return !QueryColumnOf(objects_, query, member.field).isColumn &&
@@ -2163,6 +2168,18 @@ bool DeclaresAnObject(const al::VarDecl &declared) {
 
 const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects) {
   return NamesAnObject(declared) ? Reach(declared, objects) : nullptr;
+}
+
+std::optional<bool>
+ObjectBaseMemberCall(const Objects &objects, const al::VarDecl *declared, std::string_view member) {
+  if (declared == nullptr) { return std::nullopt; }
+  const std::string type = TypeName(declared->type);
+  if (type != "Report" && type != "XmlPort") { return std::nullopt; }
+  if (const TableRef *object = ReachObject(*declared, objects);
+      object != nullptr && object->fields.contains(LowerKey(std::string(member)))) {
+    return false;
+  }
+  return DeclaredByBase(type + ".h", RuntimeSpelling(member));
 }
 
 std::string InlineOptionsOf(const std::string &owner,

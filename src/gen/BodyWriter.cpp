@@ -1861,6 +1861,9 @@ public:
       if (const auto call = GlobalRecordCall(member); call.has_value()) { return *call; }
     }
     const al::VarDecl *held = local != nullptr ? local : Global(member.variable);
+    if (const auto call = ObjectBaseMemberCall(objects_, held, member.field); call.has_value()) {
+      return *call;
+    }
     if (held != nullptr && TypeName(held->type) == "Query" && !held->subtype.empty()) {
       const auto query = objects_.queries.find(LowerKey(held->subtype));
       const bool column = query != objects_.queries.end() &&
@@ -2455,6 +2458,11 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
+    if (const auto call =
+            ObjectBaseMemberCall(objects_, DeclarationOf(member.variable), member.field);
+        call.has_value()) {
+      return *call;
+    }
     if (const al::VarDecl *query = DeclarationOf(member.variable);
         query != nullptr && TypeName(query->type) == "Query" && !query->subtype.empty()) {
       return !QueryColumnOf(objects_, query, member.field).isColumn &&

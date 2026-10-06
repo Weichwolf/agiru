@@ -27,6 +27,7 @@
 
 #include "Check.h"
 #include "OwnedDatabase.h"
+#include "fixture/codeunit/NavigationPropertyConsumer.h"
 #include "fixture/page/NavigationBlockedList.h"
 #include "fixture/page/NavigationCard.h"
 #include "fixture/page/NavigationDelayed.h"
@@ -370,7 +371,12 @@ void RequestPageAdaptersRetainFieldsAndFilters() {
   CHECK_TRUE("copied request flag is enabled", copy.UseRequestPage());
   report.UseRequestPage(true);
   CHECK_TRUE("native setter and AL property getter share the flag", report.RequestPageEnabled());
+  agiru::Fixture::NavigationPropertyConsumer_Codeunit consumer;
+  CHECK_TRUE("codeunits set and read report instance properties", !consumer.Configure(copy, false));
+  CHECK_TRUE("a codeunit property write retains the separate report owner",
+             report.UseRequestPage());
   Row view;
+  CHECK_TRUE("table methods set and read report instance properties", !view.ReportRequestFlag());
   view.SetRange(view.ID, 3);
   report.SetTableView(view);
   {

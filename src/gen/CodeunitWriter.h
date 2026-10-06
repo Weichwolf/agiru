@@ -249,4 +249,7 @@ bool ArityFits(const std::vector<al::ProcedureDecl> &procedures,
 
 const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects);
 
+[[nodiscard]] std::optional<bool>
+ObjectBaseMemberCall(const Objects &objects, const al::VarDecl *declared, std::string_view member);
+
 }
