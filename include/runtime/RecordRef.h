@@ -1077,10 +1077,10 @@ public:
 
   /// \brief AL `RecordRef.GetPosition(Boolean)`. Gets a string that contains the primary key of the
   /// current record, the text `Record.GetPosition` writes.
-  /// \param UseNames Whether the fields are named rather than numbered.
-  /// \return `Field0=0(...)` per primary key field, the form `SetPosition` reads back.
+  /// \param UseNames Captions by default; false selects field numbers and option ordinals.
+  /// \return Ordered `Caption=CONST(value)` or `FieldN=0(value)` primary-key assignments.
   /// \throws Error when the RecordRef is not open.
-  [[nodiscard]] std::string GetPosition(::agiru::Boolean UseNames = {}) const {
+  [[nodiscard]] std::string GetPosition(::agiru::Boolean UseNames = true) const {
     return detail::PositionText(State().record, Table(), UseNames);
   }
 
@@ -1327,11 +1327,9 @@ public:
   /// \brief AL `RecordRef.SetPosition(Text)`. Sets the fields in a primary key on a record to the
   /// values specified in the String parameter. The remaining fields are not changed.
   /// \param String The AL `Text`, as `GetPosition` wrote it.
-  /// \throws Error when the reference is not open, or a part names a field the table lacks.
-  /// \note IT IS THE WAY BACK FROM `GetPosition` and reads the same text (`detail::TakePosition`,
-  ///       which `Record.SetPosition` uses): `Bin Content` pages hand a position through a
-  ///       `RecordRef` to reopen it (SCM - Warehouse UT, 3 cases, and ERM VAT Tool - UT, 1;
-  ///       2026-09-12).
+  /// \throws Error when not open, or the position is malformed, incomplete or not an ordered
+  ///         sequence of primary-key constants.
+  /// \note Shares Record's parser and invalidates navigation without fetching a row.
   void SetPosition(std::string_view String) {
     detail::TakePosition(State().record, Table(), String);
   }

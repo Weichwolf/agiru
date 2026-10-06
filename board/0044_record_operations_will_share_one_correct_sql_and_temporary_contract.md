@@ -9,8 +9,8 @@ Complete Page Metadata canonical views, caption expressions/field lists, static 
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
 Complete Field classification, SQLDataType, package provenance and permissions;
 qualify calculated catalogue predicates.
-Qualify Record/RecordRef position syntax, caption defaults and primary-key-only assignment
-from the SDK; investigate StoredImage, virtual SystemId and diagnostic/localization contracts.
+Replay the shared Record/RecordRef position repair; qualify regional scalar formatting,
+StoredImage, virtual SystemId and diagnostic/localization contracts.
 Latest completed AL replay (`feff11f`, content `2ba8b347ffe5`) is 2212/2314:
 two gains and no losses/added/missing/duplicate identities versus `a554715`, zero
 incomplete codeunits. Build and 153 C++/specialist checks pass. Shared Table/Page
@@ -61,7 +61,7 @@ seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Useful implementation details
 
-- Position protocol gap: developer `f928288ee840`, record/recordref
+- Shared position repair: developer `f928288ee840`, record/recordref
   `*-getposition-method.md` / `*-setposition-method.md`; BC29 NCL hash `277e35cbdfb8`.
   NavRecord.ALGetPosition RVA `47bdf` defaults to captions. RecordImplementation
   GetPosition/SetPosition `8de84`/`8ded8` serializes the declared primary key and
@@ -69,16 +69,33 @@ seed prevents causal A/B proof; full G1 remains open (0058).
   SetPosition does not fetch a SQL row. Helper `923f4`/`924c4`/`92520` emits
   caption=CONST(value) or FieldN=0(value); option names versus integer ordinals.
   Context `be3b0`/`be4c4` double-quotes boundary whitespace or closing parentheses
-  and doubles embedded quotes; empty values stay empty. Table.cpp currently emits
-  legacy single-quoted pairs and accepts arbitrary/incomplete field assignments;
-  Table.h/RecordRef.h incorrectly default UseNames to false. Replace the shared
-  codec and prove independent literal expectations, untouched nonkeys/filters,
-  exact typed values and cursor invalidation, not only an own-code roundtrip.
+  and doubles embedded quotes; empty values stay empty. `src/rt/RecordPosition.cpp`
+  replaces Table.cpp's legacy codec; both public defaults now select captions.
+  It validates complete ordered primary-key constants, retains borrowed input before
+  writing keys and invalidates the old cursor without a SQL Get or field validation.
+  One private whitespace classifier also serves metadata caption fallback.
+  `RecordPositionGate` passes 67 independent syntax/typed-value/refusal checks:
+  nonlocalized option names, escaped captions, Unicode literals, Decimal scale 28,
+  Int64 boundaries, incomplete keys, nonkeys/filters and current-key navigation.
+  `make record-position JOBS=2` proves nine compiled defects fail; the existing
+  `test/runtime/record-order.sh` owns this profile, without a duplicate script.
+  SelectionChangeGate passes 364 SQL/temporary typed/RecordRef checks, including
+  existing/missing/out-of-filter assigned anchors; RecordRefGate retains 159 passes.
+  `make record-order JOBS=2` passes the complete ordering profile and all 37 compiled
+  controls; PageMetadataCatalogueGate retains 128 passes after classifier reuse.
+  Closing dates retain their marker in the current invariant date foundation;
+  `devenv-format-property.md` requires `<Closing>` outside XML format 9.
+  Regional Decimal/date/time rendering and localized field lookup remain unqualified;
+  this is not full native position-format conformance or AL replay evidence.
+  Targeted MetadataText tidy passes; RecordPosition's four failures are existing
+  BuiltinsWritten complexity and Codeunit header declarations/self-assignment.
+  SelectionChange tidy passes; RecordPositionGate has only the two existing
+  Table.h BeforeImage constness findings. No defect/suppression baseline changed.
   BCApps `d99152ee35f0` DeltaAssert.Codeunit.al consumes SetPosition without Get;
   user docs `bf5ffffa9b026` ui-enter-criteria-filters.md distinguish literals from
   filter operators. Predecessor 1229/1609 motivates filter-preserving key-relative
   navigation; _table.py's position syntax/default and implicit Get are not authority.
-  This is source/SDK evidence, not yet an implemented or executed position repair.
+  Replay the complete source-counted AL population after the current scalar catalogue lane.
 - Direct sandbox metadata (2026-10-05, CH BC 28.5/platform 28.0.54688.0;
   not the frozen SDK/demo version): table viewer 2000000041 exposes
   `FieldName=$systemId`, but `FieldName=SystemCreatedAt`; the missing-index page's

@@ -505,8 +505,8 @@ template <typename Source> [[nodiscard]] const void *RecordAddress(const Source 
 /// \brief AL `Record.GetPosition([UseNames])` -- the primary key as text.
 /// \param record   The record.
 /// \param table    Its declaration.
-/// \param useNames Whether the parts are keyed by field name rather than by number.
-/// \return The position text.
+/// \param useNames Captions (falling back to names) rather than field numbers.
+/// \return Ordered `Caption=CONST(value)` or `FieldN=0(value)` primary-key assignments.
 [[nodiscard]] std::string PositionText(const void *record, const TableDef &table, bool useNames);
 
 /// \brief The key a MARK is kept under (`record-mark-method.md`): the primary key's values, each
@@ -522,7 +522,8 @@ template <typename Source> [[nodiscard]] const void *RecordAddress(const Source 
 /// \param record   The record.
 /// \param table    Its declaration.
 /// \param position The text `PositionText` wrote.
-/// \throws Error when a part names a field the table does not carry.
+/// \throws Error for malformed, incomplete, reordered or nonconstant primary-key assignments.
+/// \note Changes only primary-key values; invalidates navigation without reading a database row.
 void TakePosition(void *record, const TableDef &table, std::string_view position);
 
 /// \brief AL `Record.TransferFields` -- copies by field NUMBER between two tables.
@@ -1642,13 +1643,10 @@ public:
 
   /// \brief AL `Record.GetPosition([UseNames])`. The current record's primary key, as text.
   ///
-  /// \param UseNames Whether each part is keyed by the field's NAME rather than its number.
-  /// \return `<key>=<'value'>` per primary-key field, comma separated.
-  ///
-  /// \note IT IS THE ROUND TRIP `SetPosition` TAKES BACK, so the value is quoted and an inner
-  ///       quote is doubled -- a key whose text carries a comma or an equals sign would otherwise
-  ///       come back as two parts.
-  [[nodiscard]] std::string GetPosition(Boolean UseNames = false) const {
+  /// \param UseNames Captions by default; false selects field numbers and option ordinals.
+  /// \return Comma-separated `Caption=CONST(value)` or `FieldN=0(value)` assignments.
+  /// \note CONST literals use double quotes when required by their boundary whitespace or `)`.
+  [[nodiscard]] std::string GetPosition(Boolean UseNames = true) const {
     return detail::PositionText(Self(), TableDefinition<Derived>(), UseNames);
   }
 
@@ -2180,9 +2178,9 @@ public:
   }
 
   /// \brief AL `Record.SetPosition(Position)`. Puts the primary key back from what `GetPosition`
-  ///        wrote and positions on that row.
+  ///        wrote, without fetching a row or changing nonkey values and filters.
   /// \param Position The text `GetPosition` returned.
-  /// \throws Error when a part names a field the table does not carry.
+  /// \throws Error for malformed, incomplete, reordered or nonconstant primary-key assignments.
   void SetPosition(std::string_view Position) {
     detail::TakePosition(Self(), TableDefinition<Derived>(), Position);
   }

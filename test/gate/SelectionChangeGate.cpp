@@ -96,6 +96,30 @@ public:
     }
   }
 
+  void Position(std::string_view value) {
+    if constexpr (Reflected) {
+      reference_.SetPosition(value);
+    } else {
+      row_.SetPosition(value);
+    }
+  }
+
+  void CostValue(std::string_view value) {
+    const auto amount = agiru::Decimal::FromInvariantString(value);
+    if constexpr (Reflected) {
+      reference_.Field(Cost::Field_No::DirectUnitCost.Value()).Value(agiru::Variant{amount});
+    } else {
+      row_.DirectUnitCost = amount;
+    }
+  }
+
+  void CheckCost(std::string_view value) {
+    if constexpr (Reflected) { reference_.SetTable(row_); }
+    CHECK_TEXT("SetPosition retains nonkeys without fetching the anchor",
+               row_.DirectUnitCost.ToInvariantString(),
+               value);
+  }
+
   void Check(std::string_view code) {
     if constexpr (Reflected) { reference_.SetTable(row_); }
     CHECK_TEXT("the current selection determines the reached row", row_.Code.Value(), code);
@@ -165,6 +189,28 @@ template <bool Reflected> void Directions(Cost &row) {
   reader.View("WHERE(Code=FILTER(F..H))");
   CHECK_TRUE("a WHERE-only view replaces the active selection", reader.Next() == 1);
   reader.Check("F");
+}
+
+template <bool Reflected> void Positions(Cost &row) {
+  Begin(row);
+  Reader<Reflected> reader(row);
+  reader.Range("B", "G");
+  CHECK_TRUE("position assignment starts with an existing cursor", reader.Find());
+  reader.Check("B");
+  reader.CostValue("777.1234");
+  reader.Position("Field1=0(0),Field2=0(E),Field3=0(HOURS)");
+  reader.Check("E");
+  reader.CheckCost("777.1234");
+  CHECK_TRUE("Next follows the assigned primary key, not the old SQL or temporary cursor",
+             reader.Next() == 1);
+  reader.Check("F");
+  reader.Position("Field1=0(0),Field2=0(FF),Field3=0(HOURS)");
+  CHECK_TRUE("a position without a stored row resumes relative navigation", reader.Next() == 1);
+  reader.Check("G");
+  reader.Position("Field1=0(0),Field2=0(H),Field3=0(HOURS)");
+  CHECK_TRUE("positioning outside the filter preserves its upper bound", reader.Next() == 0);
+  CHECK_TRUE("backward navigation still applies the original filter", reader.Next(-1) == -1);
+  reader.Check("G");
 }
 
 void TypedChanges(Cost &row) {
@@ -254,6 +300,8 @@ void Variants(Cost &row) {
   Filters<true>(row);
   Directions<false>(row);
   Directions<true>(row);
+  Positions<false>(row);
+  Positions<true>(row);
   TypedChanges(row);
   MarksAndNoOps(row);
 }

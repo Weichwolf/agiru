@@ -19,7 +19,7 @@ export CCACHE_SLOPPINESS
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
-.PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order codeunit-record page-navigation boolean-expressions control-extensions native-table-ids native-codeunits streams
+.PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions control-extensions native-table-ids native-codeunits streams
 .PHONY: system-profiles
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
@@ -195,8 +195,12 @@ conversion: comments db tc ## prove CLR byte-array Base64, generated AL and comp
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ConvertGate
 	@B="$(B)" bash "$(SELF)/test/runtime/conversion.sh"
 
+record-position: comments db ## prove record position syntax and key-only navigation with compiled controls
+	@cmake --build $(B) -j $(JOBS) --target gate_RecordPositionGate
+	@B="$(B)" bash "$(SELF)/test/runtime/record-order.sh" --positions-only
+
 record-order: comments db ## prove record ordering, changing selections and negative controls
-	@cmake --build $(B) -j $(JOBS) --target gate_MixedOrderGate gate_SelectionChangeGate gate_CursorLifecycleGate gate_DynamicRecordGate gate_RenameGate gate_TemporaryGate gate_AlArrayGate gate_CursorGate gate_FilterGate
+	@cmake --build $(B) -j $(JOBS) --target gate_MixedOrderGate gate_SelectionChangeGate gate_CursorLifecycleGate gate_DynamicRecordGate gate_RenameGate gate_TemporaryGate gate_AlArrayGate gate_CursorGate gate_FilterGate gate_RecordPositionGate
 	@B="$(B)" bash "$(SELF)/test/runtime/record-order.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)

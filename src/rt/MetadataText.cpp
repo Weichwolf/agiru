@@ -10,7 +10,7 @@
 
 namespace agiru::detail {
 
-bool MetadataBlank(std::string_view value) {
+std::size_t WhitespacePrefix(std::string_view value) {
   constexpr std::string_view kAsciiWhitespace = "\t\n\v\f\r ";
   constexpr std::array<std::string_view, 19> kUnicodeWhitespace{"\u0085",
                                                                 "\u00A0",
@@ -31,17 +31,34 @@ bool MetadataBlank(std::string_view value) {
                                                                 "\u202F",
                                                                 "\u205F",
                                                                 "\u3000"};
+  if (value.empty()) { return 0; }
+  if (kAsciiWhitespace.find(value.front()) != std::string_view::npos) { return 1; }
+  const auto *const found = std::ranges::find_if(
+      kUnicodeWhitespace, [&](std::string_view space) { return value.starts_with(space); });
+  return found == kUnicodeWhitespace.end() ? 0 : found->size();
+}
+
+bool MetadataBlank(std::string_view value) {
   while (!value.empty()) {
-    if (kAsciiWhitespace.find(value.front()) != std::string_view::npos) {
-      value.remove_prefix(1);
-      continue;
-    }
-    const auto *const found = std::ranges::find_if(
-        kUnicodeWhitespace, [&](std::string_view space) { return value.starts_with(space); });
-    if (found == kUnicodeWhitespace.end()) { return false; }
-    value.remove_prefix(found->size());
+    const std::size_t size = WhitespacePrefix(value);
+    if (size == 0) { return false; }
+    value.remove_prefix(size);
   }
   return true;
+}
+
+std::string_view TrimWhitespace(std::string_view value) {
+  while (const std::size_t size = WhitespacePrefix(value)) { value.remove_prefix(size); }
+  constexpr std::size_t kWhitespaceUtf8Limit = 3;
+  while (!value.empty()) {
+    std::size_t size = 1;
+    for (; size <= std::min(value.size(), kWhitespaceUtf8Limit); ++size) {
+      if (WhitespacePrefix(value.substr(value.size() - size)) == size) { break; }
+    }
+    if (size > std::min(value.size(), kWhitespaceUtf8Limit)) { break; }
+    value.remove_suffix(size);
+  }
+  return value;
 }
 
 std::string_view MetadataText(std::string_view value, std::size_t length) {

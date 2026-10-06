@@ -4,6 +4,70 @@ cd "$(dirname "$0")/../.."
 B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-record-order-controls.XXXXXX)
+position="$B/gate_RecordPositionGate"
+"$position" > "$proof/position.log" 2>&1
+flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
+  -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
+for control in position-option-caption position-boolean-format position-quote position-key-order position-constant position-cursor position-integer-range; do
+  awk -v control="$control" '
+    control == "position-option-caption" && /return std::string\(member->name\);/ {
+      sub(/member->name/, "member->caption"); changed++
+    }
+    control == "position-boolean-format" && /field.type == FieldType::Boolean && !useNames/ {
+      sub(/!useNames/, "useNames"); changed++
+    }
+    control == "position-quote" && /value.find.*TrimWhitespace\(value\) != value/ {
+      sub(/if \(.*\) \{/, "if (false) {"); changed++
+    }
+    control == "position-key-order" && /if \(!Same\(name, field.name\)/ {
+      sub(/!Same\(name, field.name\)/, "false"); changed++
+    }
+    control == "position-constant" && /if \(!Same\(kind, "CONST"\)/ {
+      sub(/!Same\(kind, "CONST"\)/, "false"); changed++
+    }
+    control == "position-cursor" && /SelectionChanged\(state\);/ { changed++; next }
+    control == "position-integer-range" && /case FieldType::BigInteger: AssignWhole<BigInteger>/ {
+      sub(/AssignWhole<BigInteger>/, "AssignWhole<Integer>"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' src/rt/RecordPosition.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_db -lagiru_net -o "$proof/$control.so"
+  status=0
+  LD_PRELOAD="$proof/$control.so" "$position" > "$proof/$control.log" 2>&1 || status=$?
+  [ "$status" -eq 1 ]
+  rg -q 'FAIL ' "$proof/$control.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/position-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
+for control in position-record-default position-recordref-default; do
+  header=runtime/Table.h
+  if [ "$control" = position-recordref-default ]; then header=runtime/RecordRef.h; fi
+  mkdir -p "$proof/$control/runtime"
+  awk '
+    /std::string GetPosition\(.*UseNames = true\)/ { sub(/= true/, "= false"); changed++ }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' "include/$header" > "$proof/$control/$header"
+  "$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+    --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+    "-I$proof/$control" -Iinclude -Itest/gate -Isrc/rt \
+    test/gate/RecordPositionGate.cpp -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control/gate"
+  status=0
+  "$proof/$control/gate" > "$proof/$control.log" 2>&1 || status=$?
+  [ "$status" -eq 1 ]
+  rg -q 'FAIL .*default' "$proof/$control.log"
+  sha256sum "$proof/$control/$header" "$proof/$control/gate" >> "$proof/position-controls.sha256"
+  find "$proof/$control" -depth -delete
+done
+sha256sum src/rt/RecordPosition.cpp src/rt/MetadataText.{cpp,h} \
+  include/runtime/{Table,RecordRef}.h test/gate/RecordPositionGate.cpp \
+  "$B/libagiru_rt.so" "$position" > "$proof/position-inputs.sha256"
+printf 'record-position: literal syntax, exact keys and cursor invalidation pass; nine compiled controls reject; %s\n' "$proof"
+if [ "${1:-}" = --positions-only ]; then exit 0; fi
+if [ "$#" -ne 0 ]; then printf 'record-order: unknown argument\n' >&2; exit 2; fi
 gate="$B/gate_MixedOrderGate"
 "$gate" > "$proof/current.log" 2>&1
 selection="$B/gate_SelectionChangeGate"
@@ -42,8 +106,6 @@ bounded_walks() {
 }
 AGIRU_TRACE_SQL=1 "$lifecycle" --trace-walks > "$proof/lifecycle-trace.log" 2>&1
 bounded_walks "$proof/lifecycle-trace.log" > "$proof/lifecycle-statements.log"
-flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
-  -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
 for control in series-zero-version series-source-alias; do
   awk -v control="$control" '
     control == "series-zero-version" && /^constexpr std::int64_t kSeriesRowVersion = 1;/ {
@@ -328,4 +390,4 @@ sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   test/gate/DynamicRecordGate.cpp src/rt/Rename.cpp test/gate/RenameGate.cpp \
   test/gate/TemporaryGate.cpp test/gate/AlArrayGate.cpp test/gate/{Cursor,Filter}Gate.cpp \
   "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" "$rename" "$temporary" "$array" "$series" "$filter" > "$proof/inputs.sha256"
-printf 'record-order: order, selections, cursor lifecycle, dynamic writes, rename cascades, temporary arrays and native series pass; twenty-eight controls reject; %s\n' "$proof"
+printf 'record-order: order, selections, positions, cursor lifecycle, dynamic writes, rename cascades, temporary arrays and native series pass; thirty-seven controls reject; %s\n' "$proof"

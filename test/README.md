@@ -151,6 +151,12 @@ executes both AL Get forms in named/numeric and table/codeunit fixture contexts.
 
 `make record-order JOBS=2` verifies mixed field directions, global reversal,
 primary-key ties, filters, relative searches and cursor/keyset direction changes.
+`make record-position JOBS=2` selects its database-free position profile: one
+shared Record/RecordRef CONST codec, caption defaults, exact primary-key values,
+borrowed-input safety and cursor invalidation. Nine compiled defects must fail.
+The full ordering profile also executes assigned existing/missing/out-of-filter
+anchors through typed/RecordRef readers on SQL and temporary tables. Regional
+scalar formatting and full native position conformance remain open (0044).
 Cursor/Filter gates also qualify native Integer SQL/typed/RecordRef projections:
 virtual timestamp 1, blank identity/audit values, physical timestamp alias and
 explicit refusal of unknown or mistyped stored fields. Compiled zero-version and
@@ -170,7 +176,7 @@ table visits; session/table/connection isolation and failed/temporary writes are
 RenameGate retains the cascade reader's old key while a separate record writes the
 new key. Typed/reflected parent renames in both directions retain every keyed/non-key
 child and its exact aggregate at 1/64/130 rows, including unrelated-parent controls.
-Twenty-three compiled controls must reject, including caller-traversing ModifyAll
+Thirty-seven compiled controls must reject, including caller-traversing ModifyAll
 and a cascade that overwrites its read anchor;
 traced SQL counts reject a functional-green
 one-row fetch. Full AL dynamic-write replay and Query transaction contracts remain open;
