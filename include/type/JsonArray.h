@@ -42,77 +42,77 @@ public:
   /// \brief AL `JsonArray.Add(BigInteger)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `BigInteger`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::BigInteger Value);
+  void Add(::agiru::BigInteger Value) const;
 
   /// \brief AL `JsonArray.Add(Boolean)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::Boolean Value);
+  void Add(::agiru::Boolean Value) const;
 
   /// \brief AL `JsonArray.Add(Byte)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Byte`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::Byte Value);
+  void Add(::agiru::Byte Value) const;
 
   /// \brief AL `JsonArray.Add(Char)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Char`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::Char Value);
+  void Add(::agiru::Char Value) const;
 
   /// \brief AL `JsonArray.Add(Date)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Date`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::Date Value);
+  void Add(::agiru::Date Value) const;
 
   /// \brief AL `JsonArray.Add(DateTime)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `DateTime`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::DateTime Value);
+  void Add(::agiru::DateTime Value) const;
 
   /// \brief AL `JsonArray.Add(Decimal)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Decimal`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::Decimal Value);
+  void Add(::agiru::Decimal Value) const;
 
   /// \brief AL `JsonArray.Add(Duration)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Duration`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::Duration Value);
+  void Add(::agiru::Duration Value) const;
 
   /// \brief AL `JsonArray.Add(Integer)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::Integer Value);
+  void Add(::agiru::Integer Value) const;
 
   /// \brief AL `JsonArray.Add(JsonArray)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `JsonArray`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(const ::agiru::JsonArray &Value);
+  void Add(const ::agiru::JsonArray &Value) const;
 
   /// \brief AL `JsonArray.Add(JsonObject)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `JsonObject`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(const ::agiru::JsonObject &Value);
+  void Add(const ::agiru::JsonObject &Value) const;
 
   /// \brief AL `JsonArray.Add(JsonToken)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `JsonToken`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(const ::agiru::JsonToken &Value);
+  void Add(const ::agiru::JsonToken &Value) const;
 
   /// \brief AL `JsonArray.Add(JsonValue)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `JsonValue`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(const ::agiru::JsonValue &Value);
+  void Add(const ::agiru::JsonValue &Value) const;
 
   /// \brief AL `JsonArray.Add(Text)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(std::string_view Value);
+  void Add(std::string_view Value) const;
 
   /// \brief AL `JsonArray.Add(Time)`. Adds a new value at the end of the JsonArray.
   /// \param Value The AL `Time`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Add(::agiru::Time Value);
+  void Add(::agiru::Time Value) const;
 
   /// \brief AL `JsonArray.AsToken()`. Converts the value in a JsonArray to a JsonToken data type.
   /// \return The AL `JsonToken`.
@@ -144,7 +144,7 @@ public:
   /// \brief AL `JsonArray.Count()`. Gets the number of elements in the JsonArray.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer Count();
+  ::agiru::Integer Count() const;
 
   /// \brief AL `JsonArray.Get(Integer, JsonToken)`. Retrieves the value at the given index in the
   /// JsonArray.
@@ -152,7 +152,7 @@ public:
   /// \param Result The AL `JsonToken`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Get(::agiru::Integer Index, ::agiru::JsonToken &Result);
+  ::agiru::Boolean Get(::agiru::Integer Index, ::agiru::JsonToken &Result) const;
 
   /// \brief AL `JsonArray.GetArray(Integer)`. Retrieves the value at the given index in the
   /// JsonArray.
@@ -257,105 +257,105 @@ public:
   /// \param Value The AL `BigInteger`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::BigInteger Value);
+  ::agiru::Integer IndexOf(::agiru::BigInteger Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Boolean)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Boolean`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::Boolean Value);
+  ::agiru::Integer IndexOf(::agiru::Boolean Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Byte)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Byte`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::Byte Value);
+  ::agiru::Integer IndexOf(::agiru::Byte Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Char)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Char`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::Char Value);
+  ::agiru::Integer IndexOf(::agiru::Char Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Date)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Date`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::Date Value);
+  ::agiru::Integer IndexOf(::agiru::Date Value) const;
 
   /// \brief AL `JsonArray.IndexOf(DateTime)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `DateTime`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::DateTime Value);
+  ::agiru::Integer IndexOf(::agiru::DateTime Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Decimal)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Decimal`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::Decimal Value);
+  ::agiru::Integer IndexOf(::agiru::Decimal Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Duration)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Duration`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::Duration Value);
+  ::agiru::Integer IndexOf(::agiru::Duration Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Integer)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::Integer Value);
+  ::agiru::Integer IndexOf(::agiru::Integer Value) const;
 
   /// \brief AL `JsonArray.IndexOf(JsonArray)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `JsonArray`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(const ::agiru::JsonArray &Value);
+  ::agiru::Integer IndexOf(const ::agiru::JsonArray &Value) const;
 
   /// \brief AL `JsonArray.IndexOf(JsonObject)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `JsonObject`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(const ::agiru::JsonObject &Value);
+  ::agiru::Integer IndexOf(const ::agiru::JsonObject &Value) const;
 
   /// \brief AL `JsonArray.IndexOf(JsonToken)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `JsonToken`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(const ::agiru::JsonToken &Value);
+  ::agiru::Integer IndexOf(const ::agiru::JsonToken &Value) const;
 
   /// \brief AL `JsonArray.IndexOf(JsonValue)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `JsonValue`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(const ::agiru::JsonValue &Value);
+  ::agiru::Integer IndexOf(const ::agiru::JsonValue &Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Text)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Text`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(std::string_view Value);
+  ::agiru::Integer IndexOf(std::string_view Value) const;
 
   /// \brief AL `JsonArray.IndexOf(Time)`. Determines the index of a specific value in the
   /// JsonArray.
   /// \param Value The AL `Time`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(::agiru::Time Value);
+  ::agiru::Integer IndexOf(::agiru::Time Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, BigInteger)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -363,7 +363,7 @@ public:
   /// \param Value The AL `BigInteger`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::BigInteger Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::BigInteger Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Boolean)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -371,7 +371,7 @@ public:
   /// \param Value The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Boolean Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Boolean Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Byte)`. Inserts the value at the given index in the array
   /// while shifting all the values to the right by one position.
@@ -379,7 +379,7 @@ public:
   /// \param Value The AL `Byte`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Byte Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Byte Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Char)`. Inserts the value at the given index in the array
   /// while shifting all the values to the right by one position.
@@ -387,7 +387,7 @@ public:
   /// \param Value The AL `Char`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Char Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Char Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Date)`. Inserts the value at the given index in the array
   /// while shifting all the values to the right by one position.
@@ -395,7 +395,7 @@ public:
   /// \param Value The AL `Date`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Date Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Date Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, DateTime)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -403,7 +403,7 @@ public:
   /// \param Value The AL `DateTime`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::DateTime Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::DateTime Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Decimal)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -411,7 +411,7 @@ public:
   /// \param Value The AL `Decimal`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Decimal Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Decimal Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Duration)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -419,7 +419,7 @@ public:
   /// \param Value The AL `Duration`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Duration Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Duration Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Integer)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -427,7 +427,7 @@ public:
   /// \param Value The AL `Integer`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Integer Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Integer Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, JsonArray)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -435,7 +435,7 @@ public:
   /// \param Value The AL `JsonArray`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, const ::agiru::JsonArray &Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, const ::agiru::JsonArray &Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, JsonObject)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -443,7 +443,7 @@ public:
   /// \param Value The AL `JsonObject`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, const ::agiru::JsonObject &Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, const ::agiru::JsonObject &Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, JsonToken)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -451,7 +451,7 @@ public:
   /// \param Value The AL `JsonToken`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, const ::agiru::JsonToken &Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, const ::agiru::JsonToken &Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, JsonValue)`. Inserts the value at the given index in the
   /// array while shifting all the values to the right by one position.
@@ -459,7 +459,7 @@ public:
   /// \param Value The AL `JsonValue`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, const ::agiru::JsonValue &Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, const ::agiru::JsonValue &Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Text)`. Inserts the value at the given index in the array
   /// while shifting all the values to the right by one position.
@@ -467,7 +467,7 @@ public:
   /// \param Value The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, std::string_view Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, std::string_view Value) const;
 
   /// \brief AL `JsonArray.Insert(Integer, Time)`. Inserts the value at the given index in the array
   /// while shifting all the values to the right by one position.
@@ -475,7 +475,7 @@ public:
   /// \param Value The AL `Time`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Time Value);
+  ::agiru::Boolean Insert(::agiru::Integer Index, ::agiru::Time Value) const;
 
   /// \brief AL `JsonArray.Path()`. Retrieves the JSON path of the array relative to the root of its
   /// containing tree.
@@ -501,7 +501,7 @@ public:
   /// \param Index The AL `Integer`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean RemoveAt(::agiru::Integer Index);
+  ::agiru::Boolean RemoveAt(::agiru::Integer Index) const;
 
   /// \brief AL `JsonArray.SelectToken(Text, JsonToken)`. Selects a JsonToken using a JPath
   /// expression.
@@ -509,7 +509,7 @@ public:
   /// \param Result The AL `JsonToken`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean SelectToken(std::string_view Path, ::agiru::JsonToken &Result);
+  ::agiru::Boolean SelectToken(std::string_view Path, ::agiru::JsonToken &Result) const;
 
   /// \brief AL `JsonArray.SelectTokens(Text, List of [JsonToken])`. Selects tokens based on a JPath
   /// expression and returns them in a new list.
@@ -525,7 +525,7 @@ public:
   /// \param Result The AL `BigInteger`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::BigInteger Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::BigInteger Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Boolean)`. Replaces the value at the given index with a new
   /// value.
@@ -533,7 +533,7 @@ public:
   /// \param Result The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Boolean Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Boolean Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Byte)`. Replaces the value at the given index with a new
   /// value.
@@ -541,7 +541,7 @@ public:
   /// \param Result The AL `Byte`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Byte Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Byte Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Char)`. Replaces the value at the given index with a new
   /// value.
@@ -549,7 +549,7 @@ public:
   /// \param Result The AL `Char`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Char Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Char Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Date)`. Replaces the value at the given index with a new
   /// value.
@@ -557,7 +557,7 @@ public:
   /// \param Result The AL `Date`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Date Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Date Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, DateTime)`. Replaces the value at the given index with a new
   /// value.
@@ -565,7 +565,7 @@ public:
   /// \param Result The AL `DateTime`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::DateTime Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::DateTime Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Decimal)`. Replaces the value at the given index with a new
   /// value.
@@ -573,7 +573,7 @@ public:
   /// \param Result The AL `Decimal`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Decimal Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Decimal Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Duration)`. Replaces the value at the given index with a new
   /// value.
@@ -581,7 +581,7 @@ public:
   /// \param Result The AL `Duration`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Duration Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Duration Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Integer)`. Replaces the value at the given index with a new
   /// value.
@@ -589,7 +589,7 @@ public:
   /// \param Result The AL `Integer`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Integer Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Integer Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, JsonArray)`. Replaces the value at the given index with a
   /// new value.
@@ -597,7 +597,7 @@ public:
   /// \param Result The AL `JsonArray`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, const ::agiru::JsonArray &Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, const ::agiru::JsonArray &Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, JsonObject)`. Replaces the value at the given index with a
   /// new value.
@@ -605,7 +605,7 @@ public:
   /// \param Result The AL `JsonObject`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, const ::agiru::JsonObject &Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, const ::agiru::JsonObject &Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, JsonToken)`. Replaces the value at the given index with a
   /// new value.
@@ -613,7 +613,7 @@ public:
   /// \param Result The AL `JsonToken`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, const ::agiru::JsonToken &Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, const ::agiru::JsonToken &Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, JsonValue)`. Replaces the value at the given index with a
   /// new value.
@@ -621,7 +621,7 @@ public:
   /// \param Result The AL `JsonValue`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, const ::agiru::JsonValue &Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, const ::agiru::JsonValue &Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Text)`. Replaces the value at the given index with a new
   /// value.
@@ -629,7 +629,7 @@ public:
   /// \param Result The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, std::string_view Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, std::string_view Result) const;
 
   /// \brief AL `JsonArray.Set(Integer, Time)`. Replaces the value at the given index with a new
   /// value.
@@ -637,7 +637,7 @@ public:
   /// \param Result The AL `Time`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Time Result);
+  ::agiru::Boolean Set(::agiru::Integer Index, ::agiru::Time Result) const;
 
   /// \brief AL `JsonArray.WriteTo(OutStream)`. Serializes and writes the JSON data of the JsonArray
   /// to a given OutStream object.
@@ -651,7 +651,7 @@ public:
   /// \param String The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(::agiru::Text<0> &String);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &String) const;
 
   /// \brief The node this value refers to, which is how two AL variables share one.
   ///

@@ -29,10 +29,10 @@ agiru::JsonArray AnArray() {
 /// A DECLARED VARIABLE IS ALREADY AN EMPTY DOCUMENT: `JsonObject.Add` on one that nothing was
 /// read into is ordinary AL, and 106 UT cases did exactly that.
 void ADeclaredVariableIsAlreadyADocument() {
-  agiru::JsonObject fresh;
+  const agiru::JsonObject fresh;
   CHECK_TRUE("a declared object takes an Add",
              static_cast<bool>(fresh.Add("a", agiru::Integer{1})));
-  agiru::JsonArray list;
+  const agiru::JsonArray list;
   list.Add(agiru::Integer{1});
   CHECK_TRUE("and a declared array takes one too", list.Count() == 1);
   agiru::Text<0> written;
@@ -44,7 +44,7 @@ void ADeclaredVariableIsAlreadyADocument() {
 /// so through its Boolean, `WriteTo` renders what was added, and `Get` hands back a token that
 /// reads as the type the value has.
 void AnObjectHoldsWhatWasAddedToIt() {
-  agiru::JsonObject object = AnObject();
+  const agiru::JsonObject object = AnObject();
   CHECK_TRUE("a key is added once",
              static_cast<bool>(object.Add("name", std::string_view("Widget"))));
   CHECK_TRUE("and a number beside it", static_cast<bool>(object.Add("count", agiru::Integer{7})));
@@ -96,7 +96,7 @@ void ADecimalIsReadBackAsADecimal() {
 
 /// AN ARRAY COUNTS FROM ZERO, which `jsonarray-get-method.md` states and the BaseApp relies on.
 void AnArrayIsIndexedFromZero() {
-  agiru::JsonArray array = AnArray();
+  const agiru::JsonArray array = AnArray();
   array.Add(std::string_view("first"));
   array.Add(std::string_view("second"));
   CHECK_TRUE("both are in", array.Count() == 2);
@@ -117,7 +117,7 @@ void ATokenLooksIntoTheDocument() {
   CHECK_TRUE("the object is read", static_cast<bool>(object.ReadFrom(R"({"inner":{"n":1}})")));
   agiru::JsonToken inner;
   CHECK_TRUE("and the inner object found", static_cast<bool>(object.Get("inner", inner)));
-  agiru::JsonObject held = inner.AsObject();
+  const agiru::JsonObject held = inner.AsObject();
   CHECK_TRUE("a change through the token", static_cast<bool>(held.Replace("n", agiru::Integer{9})));
   agiru::Text<0> written;
   CHECK_TRUE("shows in the outer document", static_cast<bool>(object.WriteTo(written)));
@@ -177,7 +177,7 @@ void ExactNumbersRemainNumbers() {
   agiru::Text<0> written;
   CHECK_TRUE("numbers serialize", object.WriteTo(written));
   CHECK_TEXT("raw number lexemes survive without quoting", written, source);
-  agiru::JsonObject added;
+  const agiru::JsonObject added;
   CHECK_TRUE("Decimal Add succeeds",
              added.Add("amount", agiru::Decimal::FromInvariantString("999999999999999.99")));
   CHECK_TRUE("added Decimal serializes", added.WriteTo(written));
@@ -230,7 +230,8 @@ void RetainedNodesSurviveGrowthAndRemoval() {
     agiru::JsonObject object;
     CHECK_TRUE("alias source parses", object.ReadFrom(R"({"inner":{"n":1}})"));
     CHECK_TRUE("child retained", object.Get("inner", held));
-    for (agiru::Integer index = 0; index < 128; ++index) {
+    constexpr agiru::Integer siblingCount = 128;
+    for (agiru::Integer index = 0; index < siblingCount; ++index) {
       CHECK_TRUE("sibling appended", object.Add(std::to_string(index), index));
     }
     CHECK_TRUE("alias survives container growth", held.AsObject().GetInteger("n") == 1);
@@ -256,12 +257,13 @@ void SetValueDisconnectsAndUsesItsDeclaredRepresentation() {
   agiru::JsonToken token;
   CHECK_TRUE("setter child found", object.Get("n", token));
   agiru::JsonValue value = token.AsValue();
-  value.SetValue(agiru::Integer{9});
+  constexpr agiru::Integer replacement = 9;
+  value.SetValue(replacement);
   CHECK_TRUE("SetValue disconnects from its containing tree", object.GetInteger("n") == 1);
   CHECK_TRUE("other aliases retain the previous node", token.AsValue().AsInteger() == 1);
-  CHECK_TRUE("setter variable contains the new value", value.AsInteger() == 9);
+  CHECK_TRUE("setter variable contains the new value", value.AsInteger() == replacement);
   value.SetValue(agiru::Decimal::FromInvariantString("999999999999999.99"));
-  agiru::JsonObject wrapped;
+  const agiru::JsonObject wrapped;
   CHECK_TRUE("explicit JsonValue can be added", wrapped.Add("decimal", value));
   value.SetValue(std::numeric_limits<agiru::BigInteger>::max());
   CHECK_TRUE("explicit BigInteger JsonValue can be added", wrapped.Add("integer", value));
@@ -270,6 +272,46 @@ void SetValueDisconnectsAndUsesItsDeclaredRepresentation() {
   CHECK_TEXT("SetValue Decimal/BigInteger stores strings, unlike Add Decimal",
              written,
              R"({"decimal":"999999999999999.99","integer":"9223372036854775807"})");
+}
+
+void ConstHandlesPreserveSharedMutationAndIndependentRebinding() {
+  agiru::JsonObject object;
+  const agiru::JsonObject alias = object;
+  const agiru::Decimal amount =
+      agiru::Decimal::FromInvariantString("0.1234567890123456789012345678");
+  const auto maximum = std::numeric_limits<agiru::BigInteger>::max();
+  CHECK_TRUE("a const object handle can add to its referenced node", alias.Add("amount", amount));
+  CHECK_TRUE("an object alias retains exact Decimal digits", object.GetDecimal("amount") == amount);
+  CHECK_TRUE("a const handle can replace the referenced value", alias.Replace("amount", maximum));
+  agiru::JsonToken token;
+  CHECK_TRUE("the replaced exact Int64 can be retrieved", object.Get("amount", token));
+  const agiru::JsonToken retained = token;
+  const agiru::JsonValue scalar = retained.AsValue();
+  CHECK_TRUE("a const scalar handle retains the exact Int64", scalar.AsBigInteger() == maximum);
+  const agiru::JsonArray array;
+  array.Add(amount);
+  agiru::JsonArray arrayAlias = array;
+  const agiru::JsonArray &constArrayAlias = arrayAlias;
+  CHECK_TRUE("a const array alias can insert a referenced value",
+             constArrayAlias.Insert(0, retained));
+  CHECK_TRUE("the original array observes exact shared insertion",
+             array.Get(0, token) && token.AsValue().AsBigInteger() == maximum);
+  CHECK_TRUE("the original array retains the exact shifted Decimal",
+             array.Get(1, token) && token.AsValue().AsDecimal() == amount);
+  CHECK_TRUE("a const array handle can replace an element", constArrayAlias.Set(1, maximum));
+  CHECK_TRUE("the original array observes exact shared replacement",
+             array.Get(1, token) && token.AsValue().AsBigInteger() == maximum);
+  CHECK_TRUE("a const array handle can remove an element", constArrayAlias.RemoveAt(0));
+  CHECK_TRUE("the original array observes shared removal", array.Count() == 1);
+  CHECK_TRUE("ReadFrom rebinds only the array alias", arrayAlias.ReadFrom("[]"));
+  CHECK_TRUE("the original array survives its alias being rebound", array.Count() == 1);
+  CHECK_TRUE("ReadFrom rebinds the original object variable", object.ReadFrom("{}"));
+  CHECK_TRUE("the rebound original is empty", object.Keys().Count() == 0);
+  CHECK_TRUE("its alias retains the previous object node",
+             alias.Get("amount", token) && token.AsValue().AsBigInteger() == maximum);
+  CHECK_TRUE("a const object alias can remove a property", alias.Remove("amount"));
+  CHECK_TRUE("a retained child survives alias removal and owner rebinding",
+             scalar.AsBigInteger() == maximum);
 }
 
 } // namespace
@@ -286,5 +328,6 @@ int main() {
     InexactAndOverflowConversionsRefuse();
     RetainedNodesSurviveGrowthAndRemoval();
     SetValueDisconnectsAndUsesItsDeclaredRepresentation();
+    ConstHandlesPreserveSharedMutationAndIndependentRebinding();
   });
 }

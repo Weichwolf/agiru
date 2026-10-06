@@ -40,12 +40,12 @@ public:
   /// type.
   /// \return The AL `BigInteger`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::BigInteger AsBigInteger();
+  ::agiru::BigInteger AsBigInteger() const;
 
   /// \brief AL `JsonValue.AsBoolean()`. Converts the value in a JsonValue to a Boolean data type.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean AsBoolean();
+  ::agiru::Boolean AsBoolean() const;
 
   /// \brief AL `JsonValue.AsByte()`. Converts the value in a JsonValue to a Byte data type.
   /// \return The AL `Byte`.
@@ -60,7 +60,7 @@ public:
   /// \brief AL `JsonValue.AsCode()`. Converts the value in a JsonValue to a Code data type.
   /// \return The AL `Code`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string AsCode();
+  std::string AsCode() const;
 
   /// \brief AL `JsonValue.AsDate()`. Converts the value in a JsonValue to a Date data type.
   /// \return The AL `Date`.
@@ -75,7 +75,7 @@ public:
   /// \brief AL `JsonValue.AsDecimal()`. Converts the value in a JsonValue to a Decimal data type.
   /// \return The AL `Decimal`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Decimal AsDecimal();
+  ::agiru::Decimal AsDecimal() const;
 
   /// \brief AL `JsonValue.AsDuration()`. Converts the value in a JsonValue to a Duration data type.
   /// \return The AL `Duration`.
@@ -85,7 +85,7 @@ public:
   /// \brief AL `JsonValue.AsInteger()`. Converts the value in a JsonValue to an Integer data type.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer AsInteger();
+  ::agiru::Integer AsInteger() const;
 
   /// \brief AL `JsonValue.AsOption()`. Converts the value in a JsonValue to an Option data type.
   /// \return The AL `Option`.
@@ -95,7 +95,7 @@ public:
   /// \brief AL `JsonValue.AsText()`. Converts the value in a JsonValue to a Text data type.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Text<0> AsText();
+  ::agiru::Text<0> AsText() const;
 
   /// \brief AL `JsonValue.AsTime()`. Converts the value in a JsonValue to a Time data type.
   /// \return The AL `Time`.
@@ -116,7 +116,7 @@ public:
   /// NULL.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsNull();
+  ::agiru::Boolean IsNull() const;
 
   /// \brief AL `JsonValue.IsUndefined()`. Indicates whether the JsonValue contains the JSON value
   /// of UNDEFINED.

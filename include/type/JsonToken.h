@@ -42,17 +42,17 @@ public:
   /// \brief AL `JsonToken.AsArray()`. Converts the value in a JsonToken to a JsonArray data type.
   /// \return The AL `JsonArray`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::JsonArray AsArray();
+  ::agiru::JsonArray AsArray() const;
 
   /// \brief AL `JsonToken.AsObject()`. Converts the value in a JsonToken to a JsonObject data type.
   /// \return The AL `JsonObject`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::JsonObject AsObject();
+  ::agiru::JsonObject AsObject() const;
 
   /// \brief AL `JsonToken.AsValue()`. Converts the value in a JsonToken to a JsonValue data type.
   /// \return The AL `JsonValue`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::JsonValue AsValue();
+  ::agiru::JsonValue AsValue() const;
 
   /// \brief AL `JsonToken.Clone()`. Creates a deep-copy of the JsonToken value.
   /// \return The AL `JsonToken`.
@@ -62,17 +62,17 @@ public:
   /// \brief AL `JsonToken.IsArray()`. Indicates whether a JsonToken represents a JSON array.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsArray();
+  ::agiru::Boolean IsArray() const;
 
   /// \brief AL `JsonToken.IsObject()`. Indicates whether a JsonToken contains a JSON object.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsObject();
+  ::agiru::Boolean IsObject() const;
 
   /// \brief AL `JsonToken.IsValue()`. Indicates whether a JsonToken contains a JSON value.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsValue();
+  ::agiru::Boolean IsValue() const;
 
   /// \brief AL `JsonToken.Path()`. Retrieves the JSON path of the token relative to the root of its
   /// containing tree.
@@ -122,7 +122,7 @@ public:
   /// \param String The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(::agiru::Text<0> &String);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &String) const;
 
   /// \brief The node this value refers to, which is how two AL variables share one.
   ///

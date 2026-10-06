@@ -14,6 +14,7 @@
 #include "type/JsonToken.h"
 #include "type/JsonValue.h"
 #include "type/List.h"
+#include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Time.h"
 
@@ -167,363 +168,363 @@ Integer IndexIn(const detail::JsonHandle &handle, const Json &value) {
 
 namespace agiru {
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::BigInteger Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::BigInteger Value) const {
   return AddTo(Handle_, Key, Valued<BigInteger>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Boolean Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Boolean Value) const {
   return AddTo(Handle_, Key, Valued<Boolean>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Byte Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Byte Value) const {
   return AddTo(Handle_, Key, Valued<Byte>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Char Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Char Value) const {
   return AddTo(Handle_, Key, Valued<Char>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Date Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Date Value) const {
   return AddTo(Handle_, Key, Valued<Date>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::DateTime Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::DateTime Value) const {
   return AddTo(Handle_, Key, Valued<DateTime>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Decimal Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Decimal Value) const {
   return AddTo(Handle_, Key, Valued<Decimal>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Duration Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Duration Value) const {
   return AddTo(Handle_, Key, Valued<Duration>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Integer Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Integer Value) const {
   return AddTo(Handle_, Key, Valued<Integer>(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonArray &Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonArray &Value) const {
   return AddTo(Handle_, Key, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonObject &Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonObject &Value) const {
   return AddTo(Handle_, Key, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonToken &Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonToken &Value) const {
   return AddTo(Handle_, Key, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonValue &Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonValue &Value) const {
   return AddTo(Handle_, Key, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, std::string_view Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, std::string_view Value) const {
   return AddTo(Handle_, Key, Textual(Value));
 }
 
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Time Value) {
+::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Time Value) const {
   return AddTo(Handle_, Key, Valued<Time>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::BigInteger Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::BigInteger Value) const {
   return ReplaceIn(Handle_, Key, Valued<BigInteger>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Boolean Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Boolean Value) const {
   return ReplaceIn(Handle_, Key, Valued<Boolean>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Byte Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Byte Value) const {
   return ReplaceIn(Handle_, Key, Valued<Byte>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Char Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Char Value) const {
   return ReplaceIn(Handle_, Key, Valued<Char>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Date Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Date Value) const {
   return ReplaceIn(Handle_, Key, Valued<Date>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::DateTime Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::DateTime Value) const {
   return ReplaceIn(Handle_, Key, Valued<DateTime>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Decimal Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Decimal Value) const {
   return ReplaceIn(Handle_, Key, Valued<Decimal>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Duration Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Duration Value) const {
   return ReplaceIn(Handle_, Key, Valued<Duration>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Integer Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Integer Value) const {
   return ReplaceIn(Handle_, Key, Valued<Integer>(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonArray &Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonArray &Value) const {
   return ReplaceIn(Handle_, Key, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonObject &Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonObject &Value) const {
   return ReplaceIn(Handle_, Key, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonToken &Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonToken &Value) const {
   return ReplaceIn(Handle_, Key, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonValue &Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonValue &Value) const {
   return ReplaceIn(Handle_, Key, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, std::string_view Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, std::string_view Value) const {
   return ReplaceIn(Handle_, Key, Textual(Value));
 }
 
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Time Value) {
+::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Time Value) const {
   return ReplaceIn(Handle_, Key, Valued<Time>(Value));
 }
 
-void JsonArray::Add(::agiru::BigInteger Value) {
+void JsonArray::Add(::agiru::BigInteger Value) const {
   AppendVoid(Handle_, Valued<BigInteger>(Value));
 }
 
-void JsonArray::Add(::agiru::Boolean Value) {
+void JsonArray::Add(::agiru::Boolean Value) const {
   AppendVoid(Handle_, Valued<Boolean>(Value));
 }
 
-void JsonArray::Add(::agiru::Byte Value) {
+void JsonArray::Add(::agiru::Byte Value) const {
   AppendVoid(Handle_, Valued<Byte>(Value));
 }
 
-void JsonArray::Add(::agiru::Char Value) {
+void JsonArray::Add(::agiru::Char Value) const {
   AppendVoid(Handle_, Valued<Char>(Value));
 }
 
-void JsonArray::Add(::agiru::Date Value) {
+void JsonArray::Add(::agiru::Date Value) const {
   AppendVoid(Handle_, Valued<Date>(Value));
 }
 
-void JsonArray::Add(::agiru::DateTime Value) {
+void JsonArray::Add(::agiru::DateTime Value) const {
   AppendVoid(Handle_, Valued<DateTime>(Value));
 }
 
-void JsonArray::Add(::agiru::Decimal Value) {
+void JsonArray::Add(::agiru::Decimal Value) const {
   AppendVoid(Handle_, Valued<Decimal>(Value));
 }
 
-void JsonArray::Add(::agiru::Duration Value) {
+void JsonArray::Add(::agiru::Duration Value) const {
   AppendVoid(Handle_, Valued<Duration>(Value));
 }
 
-void JsonArray::Add(::agiru::Integer Value) {
+void JsonArray::Add(::agiru::Integer Value) const {
   AppendVoid(Handle_, Valued<Integer>(Value));
 }
 
-void JsonArray::Add(const ::agiru::JsonArray &Value) {
+void JsonArray::Add(const ::agiru::JsonArray &Value) const {
   AppendVoid(Handle_, Node(Value.Handle_));
 }
 
-void JsonArray::Add(const ::agiru::JsonObject &Value) {
+void JsonArray::Add(const ::agiru::JsonObject &Value) const {
   AppendVoid(Handle_, Node(Value.Handle_));
 }
 
-void JsonArray::Add(const ::agiru::JsonToken &Value) {
+void JsonArray::Add(const ::agiru::JsonToken &Value) const {
   AppendVoid(Handle_, Node(Value.Handle_));
 }
 
-void JsonArray::Add(const ::agiru::JsonValue &Value) {
+void JsonArray::Add(const ::agiru::JsonValue &Value) const {
   AppendVoid(Handle_, Node(Value.Handle_));
 }
 
-void JsonArray::Add(std::string_view Value) {
+void JsonArray::Add(std::string_view Value) const {
   AppendVoid(Handle_, Textual(Value));
 }
 
-void JsonArray::Add(::agiru::Time Value) {
+void JsonArray::Add(::agiru::Time Value) const {
   AppendVoid(Handle_, Valued<Time>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::BigInteger Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::BigInteger Value) const {
   return IndexIn(Handle_, Valued<BigInteger>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::Boolean Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::Boolean Value) const {
   return IndexIn(Handle_, Valued<Boolean>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::Byte Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::Byte Value) const {
   return IndexIn(Handle_, Valued<Byte>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::Char Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::Char Value) const {
   return IndexIn(Handle_, Valued<Char>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::Date Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::Date Value) const {
   return IndexIn(Handle_, Valued<Date>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::DateTime Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::DateTime Value) const {
   return IndexIn(Handle_, Valued<DateTime>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::Decimal Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::Decimal Value) const {
   return IndexIn(Handle_, Valued<Decimal>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::Duration Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::Duration Value) const {
   return IndexIn(Handle_, Valued<Duration>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::Integer Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::Integer Value) const {
   return IndexIn(Handle_, Valued<Integer>(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonArray &Value) {
+::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonArray &Value) const {
   return IndexIn(Handle_, Node(Value.Handle_));
 }
 
-::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonObject &Value) {
+::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonObject &Value) const {
   return IndexIn(Handle_, Node(Value.Handle_));
 }
 
-::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonToken &Value) {
+::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonToken &Value) const {
   return IndexIn(Handle_, Node(Value.Handle_));
 }
 
-::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonValue &Value) {
+::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonValue &Value) const {
   return IndexIn(Handle_, Node(Value.Handle_));
 }
 
-::agiru::Integer JsonArray::IndexOf(std::string_view Value) {
+::agiru::Integer JsonArray::IndexOf(std::string_view Value) const {
   return IndexIn(Handle_, Textual(Value));
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::Time Value) {
+::agiru::Integer JsonArray::IndexOf(::agiru::Time Value) const {
   return IndexIn(Handle_, Valued<Time>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::BigInteger Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::BigInteger Value) const {
   return InsertInto(Handle_, Index, Valued<BigInteger>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Boolean Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Boolean Value) const {
   return InsertInto(Handle_, Index, Valued<Boolean>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Byte Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Byte Value) const {
   return InsertInto(Handle_, Index, Valued<Byte>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Char Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Char Value) const {
   return InsertInto(Handle_, Index, Valued<Char>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Date Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Date Value) const {
   return InsertInto(Handle_, Index, Valued<Date>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::DateTime Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::DateTime Value) const {
   return InsertInto(Handle_, Index, Valued<DateTime>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Decimal Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Decimal Value) const {
   return InsertInto(Handle_, Index, Valued<Decimal>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Duration Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Duration Value) const {
   return InsertInto(Handle_, Index, Valued<Duration>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Integer Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Integer Value) const {
   return InsertInto(Handle_, Index, Valued<Integer>(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonArray &Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonArray &Value) const {
   return InsertInto(Handle_, Index, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonObject &Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonObject &Value) const {
   return InsertInto(Handle_, Index, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonToken &Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonToken &Value) const {
   return InsertInto(Handle_, Index, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonValue &Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonValue &Value) const {
   return InsertInto(Handle_, Index, Node(Value.Handle_));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, std::string_view Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, std::string_view Value) const {
   return InsertInto(Handle_, Index, Textual(Value));
 }
 
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Time Value) {
+::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Time Value) const {
   return InsertInto(Handle_, Index, Valued<Time>(Value));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::BigInteger Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::BigInteger Result) const {
   return SetIn(Handle_, Index, Valued<BigInteger>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Boolean Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Boolean Result) const {
   return SetIn(Handle_, Index, Valued<Boolean>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Byte Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Byte Result) const {
   return SetIn(Handle_, Index, Valued<Byte>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Char Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Char Result) const {
   return SetIn(Handle_, Index, Valued<Char>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Date Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Date Result) const {
   return SetIn(Handle_, Index, Valued<Date>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::DateTime Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::DateTime Result) const {
   return SetIn(Handle_, Index, Valued<DateTime>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Decimal Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Decimal Result) const {
   return SetIn(Handle_, Index, Valued<Decimal>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Duration Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Duration Result) const {
   return SetIn(Handle_, Index, Valued<Duration>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Integer Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Integer Result) const {
   return SetIn(Handle_, Index, Valued<Integer>(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonArray &Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonArray &Result) const {
   return SetIn(Handle_, Index, Node(Result.Handle_));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonObject &Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonObject &Result) const {
   return SetIn(Handle_, Index, Node(Result.Handle_));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonToken &Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonToken &Result) const {
   return SetIn(Handle_, Index, Node(Result.Handle_));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonValue &Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonValue &Result) const {
   return SetIn(Handle_, Index, Node(Result.Handle_));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, std::string_view Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, std::string_view Result) const {
   return SetIn(Handle_, Index, Textual(Result));
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Time Result) {
+::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Time Result) const {
   return SetIn(Handle_, Index, Valued<Time>(Result));
 }
 
@@ -575,12 +576,12 @@ void JsonValue::SetValue(::agiru::Time Value) {
 
 namespace agiru {
 
-Boolean JsonObject::Contains(std::string_view Key) {
+Boolean JsonObject::Contains(std::string_view Key) const {
   const Json &node = Node(Handle_);
   return node.is_object() && node.contains(std::string(Key));
 }
 
-Boolean JsonObject::Get(std::string_view Key, JsonToken &Result) {
+Boolean JsonObject::Get(std::string_view Key, JsonToken &Result) const {
   Json &node = Node(Handle_);
   const std::string name(Key);
   if (!node.is_object() || !node.contains(name)) { return false; }
@@ -588,7 +589,7 @@ Boolean JsonObject::Get(std::string_view Key, JsonToken &Result) {
   return true;
 }
 
-Boolean JsonObject::Remove(std::string_view Key) {
+Boolean JsonObject::Remove(std::string_view Key) const {
   Json &node = Node(Handle_);
   const std::string name(Key);
   if (!node.is_object() || !node.contains(name)) { return false; }
@@ -596,7 +597,7 @@ Boolean JsonObject::Remove(std::string_view Key) {
   return true;
 }
 
-::agiru::List<std::string> JsonObject::Keys() {
+::agiru::List<std::string> JsonObject::Keys() const {
   ::agiru::List<std::string> keys;
   const Json &node = Node(Handle_);
   if (node.is_object()) {
@@ -605,9 +606,9 @@ Boolean JsonObject::Remove(std::string_view Key) {
   return keys;
 }
 
-::agiru::List<::agiru::JsonToken> JsonObject::Values() {
+::agiru::List<::agiru::JsonToken> JsonObject::Values() const {
   ::agiru::List<::agiru::JsonToken> values;
-  Json &node = Node(Handle_);
+  const Json &node = Node(Handle_);
   if (node.is_object()) {
     for (const auto &[key, value] : node.Members()) {
       JsonToken token;
@@ -626,24 +627,24 @@ Boolean JsonObject::ReadFrom(std::string_view String) {
   return true;
 }
 
-Boolean JsonObject::WriteTo(::agiru::Text<0> &String) {
+Boolean JsonObject::WriteTo(::agiru::Text<0> &String) const {
   String = ::agiru::Text<0>{Node(Handle_).dump()};
   return true;
 }
 
-Integer JsonArray::Count() {
+Integer JsonArray::Count() const {
   const Json &node = Node(Handle_);
   return node.is_array() ? static_cast<Integer>(node.size()) : 0;
 }
 
-Boolean JsonArray::Get(Integer Index, JsonToken &Result) {
+Boolean JsonArray::Get(Integer Index, JsonToken &Result) const {
   Json &node = Node(Handle_);
   if (!WithinArray(node, Index)) { return false; }
   Result.Handle_ = detail::JsonHandle{Handle_.tree, &node[static_cast<std::size_t>(Index)]};
   return true;
 }
 
-Boolean JsonArray::RemoveAt(Integer Index) {
+Boolean JsonArray::RemoveAt(Integer Index) const {
   Json &node = Node(Handle_);
   if (!WithinArray(node, Index)) { return false; }
   node.erase(static_cast<std::size_t>(Index));
@@ -658,60 +659,60 @@ Boolean JsonArray::ReadFrom(std::string_view String) {
   return true;
 }
 
-Boolean JsonArray::WriteTo(::agiru::Text<0> &String) {
+Boolean JsonArray::WriteTo(::agiru::Text<0> &String) const {
   String = ::agiru::Text<0>{Node(Handle_).dump()};
   return true;
 }
 
-JsonValue JsonToken::AsValue() {
+JsonValue JsonToken::AsValue() const {
   JsonValue value;
   value.Handle_ = Handle_;
   return value;
 }
 
-JsonObject JsonToken::AsObject() {
+JsonObject JsonToken::AsObject() const {
   JsonObject object;
   object.Handle_ = Handle_;
   return object;
 }
 
-JsonArray JsonToken::AsArray() {
+JsonArray JsonToken::AsArray() const {
   JsonArray array;
   array.Handle_ = Handle_;
   return array;
 }
 
-Boolean JsonToken::IsValue() {
+Boolean JsonToken::IsValue() const {
   const Json &node = Node(Handle_);
   return !node.is_object() && !node.is_array();
 }
 
-Boolean JsonToken::IsObject() {
+Boolean JsonToken::IsObject() const {
   return Node(Handle_).is_object();
 }
 
-Boolean JsonToken::IsArray() {
+Boolean JsonToken::IsArray() const {
   return Node(Handle_).is_array();
 }
 
-Boolean JsonToken::WriteTo(::agiru::Text<0> &String) {
+Boolean JsonToken::WriteTo(::agiru::Text<0> &String) const {
   String = ::agiru::Text<0>{Node(Handle_).dump()};
   return true;
 }
 
-Boolean JsonValue::IsNull() {
+Boolean JsonValue::IsNull() const {
   return Node(Handle_).is_null();
 }
 
-::agiru::Text<0> JsonValue::AsText() {
+::agiru::Text<0> JsonValue::AsText() const {
   return TextOf(Node(Handle_));
 }
 
-std::string JsonValue::AsCode() {
+std::string JsonValue::AsCode() const {
   return TextOf(Node(Handle_));
 }
 
-Integer JsonValue::AsInteger() {
+Integer JsonValue::AsInteger() const {
   const Json &node = Node(Handle_);
   if (!node.is_number()) { throw Error("JsonValue.AsInteger requires a number"); }
   const std::int64_t value = detail::JsonInteger(node.Text());
@@ -721,7 +722,7 @@ Integer JsonValue::AsInteger() {
   return static_cast<Integer>(value);
 }
 
-BigInteger JsonValue::AsBigInteger() {
+BigInteger JsonValue::AsBigInteger() const {
   const Json &node = Node(Handle_);
   if (!node.is_number() && !node.is_string()) {
     throw Error("JsonValue.AsBigInteger requires a number or string");
@@ -729,7 +730,7 @@ BigInteger JsonValue::AsBigInteger() {
   return detail::JsonInteger(node.Text());
 }
 
-Decimal JsonValue::AsDecimal() {
+Decimal JsonValue::AsDecimal() const {
   const Json &node = Node(Handle_);
   if (!node.is_number() && !node.is_string()) {
     throw Error("JsonValue.AsDecimal requires a number or string");
@@ -737,7 +738,7 @@ Decimal JsonValue::AsDecimal() {
   return Decimal::FromInvariantString(detail::ExactJsonDecimal(node.Text()));
 }
 
-Boolean JsonValue::AsBoolean() {
+Boolean JsonValue::AsBoolean() const {
   const Json &node = Node(Handle_);
   if (!node.is_boolean()) { throw Error("JsonValue.AsBoolean requires a Boolean"); }
   return node.Boolean();
@@ -767,17 +768,17 @@ JsonToken FoundAt(const detail::JsonHandle &handle, std::string_view key, bool &
 
 }
 
-Boolean JsonObject::SelectToken(std::string_view Path, JsonToken &Result) {
+Boolean JsonObject::SelectToken(std::string_view Path, JsonToken &Result) const {
   return SelectIn(Handle_, Path, Result);
 }
 
-Boolean JsonArray::SelectToken(std::string_view Path, JsonToken &Result) {
+Boolean JsonArray::SelectToken(std::string_view Path, JsonToken &Result) const {
   return SelectIn(Handle_, Path, Result);
 }
 
-::agiru::Text<0> JsonObject::GetText(std::string_view Key, Boolean DefaultIfNotFound) {
+::agiru::Text<0> JsonObject::GetText(std::string_view Key, Boolean DefaultIfNotFound) const {
   bool found = false;
-  JsonToken token = FoundAt(Handle_, Key, found);
+  const JsonToken token = FoundAt(Handle_, Key, found);
   if (!found) {
     if (!DefaultIfNotFound) { NoSuchKey(Key); }
     return {};
@@ -785,9 +786,9 @@ Boolean JsonArray::SelectToken(std::string_view Path, JsonToken &Result) {
   return token.AsValue().AsText();
 }
 
-Integer JsonObject::GetInteger(std::string_view Key, Boolean DefaultIfNotFound) {
+Integer JsonObject::GetInteger(std::string_view Key, Boolean DefaultIfNotFound) const {
   bool found = false;
-  JsonToken token = FoundAt(Handle_, Key, found);
+  const JsonToken token = FoundAt(Handle_, Key, found);
   if (!found) {
     if (!DefaultIfNotFound) { NoSuchKey(Key); }
     return 0;
@@ -795,9 +796,9 @@ Integer JsonObject::GetInteger(std::string_view Key, Boolean DefaultIfNotFound) 
   return token.AsValue().AsInteger();
 }
 
-Decimal JsonObject::GetDecimal(std::string_view Key, Boolean DefaultIfNotFound) {
+Decimal JsonObject::GetDecimal(std::string_view Key, Boolean DefaultIfNotFound) const {
   bool found = false;
-  JsonToken token = FoundAt(Handle_, Key, found);
+  const JsonToken token = FoundAt(Handle_, Key, found);
   if (!found) {
     if (!DefaultIfNotFound) { NoSuchKey(Key); }
     return Decimal{};
@@ -805,9 +806,9 @@ Decimal JsonObject::GetDecimal(std::string_view Key, Boolean DefaultIfNotFound) 
   return token.AsValue().AsDecimal();
 }
 
-Boolean JsonObject::GetBoolean(std::string_view Key, Boolean DefaultIfNotFound) {
+Boolean JsonObject::GetBoolean(std::string_view Key, Boolean DefaultIfNotFound) const {
   bool found = false;
-  JsonToken token = FoundAt(Handle_, Key, found);
+  const JsonToken token = FoundAt(Handle_, Key, found);
   if (!found) {
     if (!DefaultIfNotFound) { NoSuchKey(Key); }
     return false;
@@ -815,9 +816,9 @@ Boolean JsonObject::GetBoolean(std::string_view Key, Boolean DefaultIfNotFound) 
   return token.AsValue().AsBoolean();
 }
 
-JsonObject JsonObject::GetObject(std::string_view Key, Boolean DefaultIfNotFound) {
+JsonObject JsonObject::GetObject(std::string_view Key, Boolean DefaultIfNotFound) const {
   bool found = false;
-  JsonToken token = FoundAt(Handle_, Key, found);
+  const JsonToken token = FoundAt(Handle_, Key, found);
   if (!found) {
     if (!DefaultIfNotFound) { NoSuchKey(Key); }
     JsonObject empty;
@@ -827,9 +828,9 @@ JsonObject JsonObject::GetObject(std::string_view Key, Boolean DefaultIfNotFound
   return token.AsObject();
 }
 
-JsonArray JsonObject::GetArray(std::string_view Key, Boolean DefaultIfNotFound) {
+JsonArray JsonObject::GetArray(std::string_view Key, Boolean DefaultIfNotFound) const {
   bool found = false;
-  JsonToken token = FoundAt(Handle_, Key, found);
+  const JsonToken token = FoundAt(Handle_, Key, found);
   if (!found) {
     if (!DefaultIfNotFound) { NoSuchKey(Key); }
     JsonArray empty;
@@ -838,5 +839,4 @@ JsonArray JsonObject::GetArray(std::string_view Key, Boolean DefaultIfNotFound) 
   }
   return token.AsArray();
 }
-
 }

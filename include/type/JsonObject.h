@@ -46,63 +46,63 @@ public:
   /// \param Value The AL `BigInteger`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::BigInteger Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::BigInteger Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Boolean)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::Boolean Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::Boolean Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Byte)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Byte`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::Byte Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::Byte Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Char)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Char`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::Char Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::Char Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Date)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Date`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::Date Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::Date Value) const;
 
   /// \brief AL `JsonObject.Add(Text, DateTime)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `DateTime`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::DateTime Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::DateTime Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Decimal)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Decimal`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::Decimal Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::Decimal Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Duration)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Duration`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::Duration Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::Duration Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Integer)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Integer`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::Integer Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::Integer Value) const;
 
   /// \brief AL `JsonObject.Add(Key, Option)` -- `jsonvalue-setvalue-option-method.md`: "When Value
   ///        is a Char, Byte, Option, Integer type, the integral value will be stored and serialized
@@ -113,7 +113,7 @@ public:
   /// \return Whether the key was added.
   template <typename O>
     requires requires(const O &value) { value.AsInteger(); } ::agiru::Boolean
-  Add(std::string_view Key, const O &Value) {
+  Add(std::string_view Key, const O &Value) const {
     return Add(Key, ::agiru::Integer{Value.AsInteger()});
   }
 
@@ -122,42 +122,42 @@ public:
   /// \param Value The AL `JsonArray`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, const ::agiru::JsonArray &Value);
+  ::agiru::Boolean Add(std::string_view Key, const ::agiru::JsonArray &Value) const;
 
   /// \brief AL `JsonObject.Add(Text, JsonObject)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `JsonObject`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, const ::agiru::JsonObject &Value);
+  ::agiru::Boolean Add(std::string_view Key, const ::agiru::JsonObject &Value) const;
 
   /// \brief AL `JsonObject.Add(Text, JsonToken)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `JsonToken`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, const ::agiru::JsonToken &Value);
+  ::agiru::Boolean Add(std::string_view Key, const ::agiru::JsonToken &Value) const;
 
   /// \brief AL `JsonObject.Add(Text, JsonValue)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `JsonValue`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, const ::agiru::JsonValue &Value);
+  ::agiru::Boolean Add(std::string_view Key, const ::agiru::JsonValue &Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Text)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, std::string_view Value);
+  ::agiru::Boolean Add(std::string_view Key, std::string_view Value) const;
 
   /// \brief AL `JsonObject.Add(Text, Time)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Time`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Key, ::agiru::Time Value);
+  ::agiru::Boolean Add(std::string_view Key, ::agiru::Time Value) const;
 
   /// \brief AL `JsonObject.AsToken()`. Converts the value in a JsonObject to a JsonToken data type.
   /// \return The AL `JsonToken`.
@@ -174,7 +174,7 @@ public:
   /// \param Key The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Contains(std::string_view Key);
+  ::agiru::Boolean Contains(std::string_view Key) const;
 
   /// \brief AL `JsonObject.Get(Text, JsonToken)`. Retrieves the value of a property with a given
   /// key from a JsonObject.
@@ -182,7 +182,7 @@ public:
   /// \param Result The AL `JsonToken`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Get(std::string_view Key, ::agiru::JsonToken &Result);
+  ::agiru::Boolean Get(std::string_view Key, ::agiru::JsonToken &Result) const;
 
   /// \brief AL `JsonObject.GetArray(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as a JsonArray.
@@ -190,7 +190,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `JsonArray`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::JsonArray GetArray(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
+  ::agiru::JsonArray GetArray(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {}) const;
 
   /// \brief AL `JsonObject.GetBigInteger(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as a BigInteger.
@@ -206,7 +206,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean GetBoolean(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
+  ::agiru::Boolean GetBoolean(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {}) const;
 
   /// \brief AL `JsonObject.GetByte(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as a Byte.
@@ -246,7 +246,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Decimal`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Decimal GetDecimal(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
+  ::agiru::Decimal GetDecimal(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {}) const;
 
   /// \brief AL `JsonObject.GetDuration(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as a Duration.
@@ -262,7 +262,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer GetInteger(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
+  ::agiru::Integer GetInteger(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {}) const;
 
   /// \brief AL `JsonObject.GetObject(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as a JsonObject.
@@ -270,7 +270,8 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `JsonObject`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::JsonObject GetObject(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
+  ::agiru::JsonObject GetObject(std::string_view Key,
+                                ::agiru::Boolean DefaultIfNotFound = {}) const;
 
   /// \brief AL `JsonObject.GetOption(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as an Option.
@@ -286,7 +287,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Text<0> GetText(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
+  ::agiru::Text<0> GetText(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {}) const;
 
   /// \brief AL `JsonObject.GetTime(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as a Time.
@@ -298,7 +299,7 @@ public:
 
   /// \brief AL `JsonObject.Keys()`. Gets a set of keys of the JsonObject.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::List<std::string> Keys();
+  [[nodiscard]] ::agiru::List<std::string> Keys() const;
 
   /// \brief AL `JsonObject.Path()`. Retrieves the JSON path of the object relative to the root of
   /// its containing tree.
@@ -338,7 +339,7 @@ public:
   /// \param Key The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Remove(std::string_view Key);
+  ::agiru::Boolean Remove(std::string_view Key) const;
 
   /// \brief AL `JsonObject.Replace(Text, BigInteger)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -346,7 +347,7 @@ public:
   /// \param Value The AL `BigInteger`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::BigInteger Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::BigInteger Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Boolean)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -354,7 +355,7 @@ public:
   /// \param Value The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Boolean Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Boolean Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Byte)`. Replaces the value of the property with the given
   /// key with the new value.
@@ -362,7 +363,7 @@ public:
   /// \param Value The AL `Byte`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Byte Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Byte Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Char)`. Replaces the value of the property with the given
   /// key with the new value.
@@ -370,7 +371,7 @@ public:
   /// \param Value The AL `Char`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Char Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Char Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Date)`. Replaces the value of the property with the given
   /// key with the new value.
@@ -378,7 +379,7 @@ public:
   /// \param Value The AL `Date`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Date Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Date Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, DateTime)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -386,7 +387,7 @@ public:
   /// \param Value The AL `DateTime`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::DateTime Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::DateTime Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Decimal)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -394,7 +395,7 @@ public:
   /// \param Value The AL `Decimal`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Decimal Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Decimal Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Duration)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -402,7 +403,7 @@ public:
   /// \param Value The AL `Duration`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Duration Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Duration Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Integer)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -410,7 +411,7 @@ public:
   /// \param Value The AL `Integer`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Integer Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Integer Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, JsonArray)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -418,7 +419,7 @@ public:
   /// \param Value The AL `JsonArray`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, const ::agiru::JsonArray &Value);
+  ::agiru::Boolean Replace(std::string_view Key, const ::agiru::JsonArray &Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, JsonObject)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -426,7 +427,7 @@ public:
   /// \param Value The AL `JsonObject`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, const ::agiru::JsonObject &Value);
+  ::agiru::Boolean Replace(std::string_view Key, const ::agiru::JsonObject &Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, JsonToken)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -434,7 +435,7 @@ public:
   /// \param Value The AL `JsonToken`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, const ::agiru::JsonToken &Value);
+  ::agiru::Boolean Replace(std::string_view Key, const ::agiru::JsonToken &Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, JsonValue)`. Replaces the value of the property with the
   /// given key with the new value.
@@ -442,7 +443,7 @@ public:
   /// \param Value The AL `JsonValue`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, const ::agiru::JsonValue &Value);
+  ::agiru::Boolean Replace(std::string_view Key, const ::agiru::JsonValue &Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Text)`. Replaces the value of the property with the given
   /// key with the new value.
@@ -450,7 +451,7 @@ public:
   /// \param Value The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, std::string_view Value);
+  ::agiru::Boolean Replace(std::string_view Key, std::string_view Value) const;
 
   /// \brief AL `JsonObject.Replace(Text, Time)`. Replaces the value of the property with the given
   /// key with the new value.
@@ -458,7 +459,7 @@ public:
   /// \param Value The AL `Time`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Time Value);
+  ::agiru::Boolean Replace(std::string_view Key, ::agiru::Time Value) const;
 
   /// \brief AL `JsonObject.SelectToken(Text, JsonToken)`. Selects a JsonToken using a JPath
   /// expression.
@@ -466,7 +467,7 @@ public:
   /// \param Result The AL `JsonToken`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean SelectToken(std::string_view Path, ::agiru::JsonToken &Result);
+  ::agiru::Boolean SelectToken(std::string_view Path, ::agiru::JsonToken &Result) const;
 
   /// \brief AL `JsonObject.SelectTokens(Text, List of [JsonToken])`. Selects tokens based on a
   /// JPath expression and returns them in a new list.
@@ -478,7 +479,7 @@ public:
 
   /// \brief AL `JsonObject.Values()`. Gets a set of values of the JsonObject.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::List<::agiru::JsonToken> Values();
+  [[nodiscard]] ::agiru::List<::agiru::JsonToken> Values() const;
 
   /// \brief AL `JsonObject.WriteTo(OutStream)`. Serializes and writes the JSON data of the
   /// JsonObject to a given OutStream object.
@@ -492,7 +493,7 @@ public:
   /// \param String The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(::agiru::Text<0> &String);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &String) const;
 
   /// \brief AL `JsonObject.WriteToYaml(OutStream)`. Serializes and writes the content of the
   /// JsonObject as YAML text to a given OutStream object.
