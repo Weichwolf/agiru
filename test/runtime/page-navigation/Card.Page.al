@@ -15,6 +15,7 @@ page 50340 "Navigation Card"
             field(Open; OpeningMode) { }
             field(Move; LoadedValue) { }
             field(Declaration; LoadedValue) { }
+            field(ControlValue; OpeningMode) { }
         }
     }
     trigger OnOpenPage()

@@ -146,8 +146,15 @@ instances, not headless page runs; mode/cursor/RecordId paths use the same kerne
 AL controls Open/Move/Declaration retain their names. Missing/null/mismatched factories
 refuse. Eleven execution mutants and a control-shadowing compile refusal must reject;
 the narrow PageInstance interface must not pull in typed page/control/record headers.
-This is not HTTP/client parity, production permission storage, exact typed wire values
-or complete page lifecycle. View navigation remains open (0720).
+`make page-profile JOBS=2` additionally checks exact bound scalar values and a bounded
+current-row semantic HTML fragment over the same production handles. Display text is
+separate from canonical Decimal/Int64, enum domains/member names and temporal flags.
+Unqualified variable/expression bindings, parts and non-scalar/filter values remain
+counted gaps. Nine scalar/HTML execution mutants must reject, including execution of
+dynamic visibility before authorization. UTF-8 validation reuses
+the codec through a narrow header; malformed text never silently changes values.
+This is not HTTP/CMD/MCP/browser parity, production permission storage, a complete
+list window or complete page lifecycle. View navigation remains open (0720).
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,

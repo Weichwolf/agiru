@@ -6,6 +6,7 @@
 #include "runtime/Page.h"
 #include "runtime/PageCore.h"
 #include "runtime/PageInstance.h"
+#include "runtime/PageValue.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Relation.h"
@@ -580,6 +581,21 @@ public:
     } else {
       return {};
     }
+  }
+
+  [[nodiscard]] PageValue Control_Value(std::string_view control) const override {
+    AttachedForReading_();
+    static_cast<void>(Page_());
+    const ControlDef *def = ControlNamed_(control);
+    if constexpr (kHasRecord) {
+      if (def != nullptr && def->field.Value() != 0) {
+        const auto &table = RecordTraits_().kTable;
+        if (const FieldDef *field = Field(table, def->field)) {
+          return ReadPageValue(&Record_(), table, *field);
+        }
+      }
+    }
+    return PageCore::Control_Value(control);
   }
 
   void RunControlTrigger(std::string_view control, ControlTriggerKind kind) override {

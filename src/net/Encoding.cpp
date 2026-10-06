@@ -5,6 +5,7 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/StringValue.h"
+#include "type/Utf8.h"
 #include "type/Variant.h"
 
 #include "CodePage.h"
@@ -412,6 +413,27 @@ class ASCIIEncoding ASCIIEncoding::Binder::operator()() const {
   class ASCIIEncoding out;
   static_cast<class Encoding &>(out) = Encoding::ASCII();
   return out;
+}
+
+}
+
+namespace agiru {
+
+bool IsValidUtf8(std::string_view bytes) {
+  std::size_t position = 0;
+  std::string scalar;
+  while (position < bytes.size()) {
+    if (static_cast<unsigned char>(bytes[position]) < dotnet::kAsciiLimit) {
+      ++position;
+      continue;
+    }
+    const std::size_t start = position;
+    const std::int32_t code = dotnet::NextUtf8(bytes, position, false);
+    scalar.clear();
+    dotnet::AppendUtf8(scalar, code);
+    if (scalar != bytes.substr(start, position - start)) { return false; }
+  }
+  return true;
 }
 
 }

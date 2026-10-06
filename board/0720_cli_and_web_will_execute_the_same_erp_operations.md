@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: deliver exact typed values, semantic HTML and one
-list → card → validate → save slice through HTTP, Node CMD and MCP.
+Next: build the Node semantic-HTML client with shared CMD/MCP adapters, then wire
+one list → card → validate → save slice through the C++ HTTP server.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -23,7 +23,12 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   adapter and its declaration, requires authorization on every operation and rejects
   wrong identities/kinds and current hidden/disabled/read-only client operations.
   It reuses existing field/trigger bindings, not separate business rules. Display
-  text/Option ordinals stay separate; general exact typed wire values are still pending.
+  text/Option ordinals stay separate. `ReadValue` carries exact bound scalar values:
+  Decimal scale, Int64 digits, Boolean tokens, temporal undefined/closing flags and
+  Option/Enum ordinals/member names with qualified table/field domains. Global Enum
+  object identities and variable/computed-expression bindings remain unqualified.
+  RecordId storage bytes use explicit Base64; binary/media/filter values refuse rather
+  than fabricate scalars. FlowFilters need the session filter model, not raw storage.
   `PageSession<P>` now owns the common lifecycle/validation/save/trigger/part kernel;
   `TestPage<P>` adds generated test controls, traps and explicit row-error collection.
   Production row-save errors propagate; production handles are not publicly copyable.
@@ -35,17 +40,31 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   definitions now emit it; complete compilation/linking remains unproven.
   `make transpile` still exits 1: 21 unresolved extension operations and 5,683 refused properties
   remain counted, not a green-subset claim. SQL-backed authorization, command receipts/
-  revisions, modal suspension, HTML/HTTP and Node CMD/MCP remain pending.
+  revisions, modal suspension, HTTP and Node CMD/MCP remain pending.
+  `RenderPageHtml` renders one current row through ReadValue/Inspect, not a second
+  execution model: ordered controls, exact machine attributes, display text and shared
+  htmx forms. Handles/revisions/receipt prefixes/CSRF come from the future server;
+  rendering them is not validation or persistence. It never saves/navigates/invokes.
+  Authorization precedes dynamic visibility; hidden leaves disappear and disabled
+  actions remain discoverable. Unsupported controls and scalar bindings remain
+  counted alerts. Bounded bytes/declarations/depth refuse
+  atomically; unsafe controls or malformed UTF-8 never silently normalize. The narrow
+  UTF-8 validator reuses the existing codec without importing its Array/Regex headers.
+  This is not a list window, part/dialog implementation, BC-styled UI or HTTP parity.
   Failed-new-row retry recovery, non-delayed primary-key insertion and complete lifecycle
   semantics are not qualified by extraction.
-  Container verification: 96 dispatcher checks and 66 generated navigation/lifecycle/
+  Container verification: 105 dispatcher checks and 70 generated navigation/lifecycle/
   handle/request-page checks pass. Direct SQL confirms saved identity/value and missing
   refused inserts. Eleven execution mutants and the AL-control shadowing compile
-  control reject. Generator page 42/report 27, catalogue 54 and isolation 17 checks pass.
-  Thirteen standalone header probes and forced dependencies pass. Targeted dispatcher-
-  source, production factory source and generated-fixture runner
-  tidy pass; the gate consumer retains 16 findings in existing Page/PageSession/
-  Table/Codeunit implementations; BodyWriter retains 20 findings including existing
+  control reject. Scalar 34, semantic HTML 157 and codec 102 checks pass; nine additional
+  scalar/HTML execution mutants reject. Generated controls also retain ControlValue
+  without colliding with the new typed-value primitive. Generator page 42/report 27,
+  catalogue 54 and isolation 17 checks passed on the preceding factory increment.
+  Sixteen standalone header probes and forced dependencies pass. Targeted dispatcher,
+  scalar, HTML, default-adapter sources, both new gates and generated-fixture runner
+  tidy pass; the dispatcher gate retains 16 findings in existing Page/PageSession/
+  Table/Codeunit implementations. Codec-source tidy retains four existing Encoding/
+  Regex/TimeSpan header findings; BodyWriter retains 20 findings including existing
   complexity/function-size debt, without suppression changes. Standalone include cost:
   PageInstance 205 ms, PageSession 1,788 ms (three frontend rounds, no PCH); not a runtime
   performance claim. Full integration/UT on this increment remains pending; 0058
@@ -235,8 +254,9 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 
 ## References and consolidation
 
-agiru: `include/meta/PageDef.h`, `include/runtime/{PageCore,PageDispatcher,PageInstance,PageSession}.h`,
-`src/gen/{BodyWriter,PageWriter}.cpp`, `src/rt/{PageInstance,TestPage,Session}.cpp`, `src/cli/Main.cpp`.
+agiru: `include/meta/PageDef.h`, `include/runtime/{PageCore,PageDispatcher,PageInstance,PageSession,PageValue,PageHtml}.h`,
+`include/type/Utf8.h`, `src/gen/{BodyWriter,PageWriter}.cpp`,
+`src/rt/{PageInstance,PageValue,PageHtml,TestPage,Session}.cpp`, `src/net/Encoding.cpp`, `src/cli/Main.cpp`.
 Control-dispatch references: developer revision
 `f928288ee840334be73142e5fc0202c0e19b246d`,
 `properties/devenv-{enabled,editable,visible}-property.md`; BCApps revision
@@ -259,6 +279,15 @@ with repeated headless Page.Run calls. Reference revisions are those above.
 Reproduce control dispatch with `make gate GATE=PageDispatcherGate JOBS=2`;
 navigation/compiled refusal controls with `make page-navigation JOBS=2`.
 These authored primitive tests are not live client or ERP parity evidence.
+Scalar/HTML references: developer `methods-auto/decimal/decimal-totext--method.md`,
+`properties/devenv-fieldclass-property.md`, `devenv-flowfilter-overview.md`;
+BCApps `Finance/GeneralLedger/Account/GLAccount.Table.al` fields 28–30;
+user `business-central/ui-enter-criteria-filters.md`; predecessor WI 1347 and
+`openerp/web/client/page_model.py::std_filters`. Revisions are those above.
+`make page-profile JOBS=2` owns the generated current-row/scalar/HTML acceptance and
+compiled negative controls under `test/ui/page-profile.sh`; it is not complete parity.
+Container reproduction:
+`make dev-exec COMMAND='env AGIRU_TEST_DSN=postgresql://agiru:agiru@127.0.0.1:5432/agiru_gate make page-profile JOBS=2 B=/workspace/build/podman'`.
 Local developer: page/control methods, `devenv-testing-pages.md`,
 `properties/devenv-analysismodeenabled-property.md`; user:
 `business-central/analysis-mode.md`. Read current local guarantees before porting.

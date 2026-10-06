@@ -12,6 +12,7 @@
 namespace agiru {
 
 struct TableDef;
+struct PageValue;
 
 /// \brief The triggers a control carries, named the way AL names them.
 enum class ControlTriggerKind : std::uint8_t {
@@ -51,6 +52,12 @@ public:
   /// \param control The control's AL name.
   /// \return The ordinal as text; empty for a control that is not an option.
   [[nodiscard]] virtual std::string ControlOrdinal(std::string_view control) const = 0;
+
+  /// \brief Reads the exact typed source independently of localized display formatting.
+  /// \param control The declared field control's AL identity.
+  /// \return An owned scalar value suitable for semantic HTML and machine clients.
+  /// \throws Error when no lossless typed binding exists; never infers type from display.
+  [[nodiscard]] virtual PageValue Control_Value(std::string_view control) const;
 
   /// \brief Runs one of a control's triggers.
   /// \param control The control's AL name; `OK`, `Cancel`, `Yes` and `No` are the page's own.

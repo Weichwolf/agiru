@@ -28,6 +28,8 @@ ControlTriggerKind TriggerFor(PageControlOperation operation) {
     case PageControlOperation::DrillDown: return ControlTriggerKind::DrillDown;
     case PageControlOperation::AssistEdit: return ControlTriggerKind::AssistEdit;
     case PageControlOperation::Read:
+    case PageControlOperation::ReadValue:
+    case PageControlOperation::Inspect:
     case PageControlOperation::Set:
     case PageControlOperation::Unknown:
     case PageControlOperation::Filter: break;
@@ -48,12 +50,18 @@ const ControlDef &PageDispatcher::RequireControl(const PageControlCommand &comma
   if (control == nullptr) { control = Control(declaration_.actions, command.control); }
   if (control == nullptr) { Refuse(command.control, "unknown declared control"); }
   switch (command.operation) {
+    case PageControlOperation::Inspect:
+      if (control->kind != ControlKind::Field && control->kind != ControlKind::Action) {
+        Refuse(command.control, "unsupported discovery kind");
+      }
+      break;
     case PageControlOperation::Action:
       if (control->kind != ControlKind::Action) {
         Refuse(command.control, "unsupported action kind");
       }
       break;
     case PageControlOperation::Read:
+    case PageControlOperation::ReadValue:
     case PageControlOperation::Set:
     case PageControlOperation::Filter:
     case PageControlOperation::Lookup:
@@ -65,6 +73,8 @@ const ControlDef &PageDispatcher::RequireControl(const PageControlCommand &comma
   }
   if (!page_.ControlVisible(control->name)) { Refuse(command.control, "control is hidden"); }
   if (command.operation != PageControlOperation::Read &&
+      command.operation != PageControlOperation::ReadValue &&
+      command.operation != PageControlOperation::Inspect &&
       command.operation != PageControlOperation::Filter && !page_.ControlEnabled(control->name)) {
     Refuse(command.control, "control is disabled");
   }
@@ -77,6 +87,18 @@ const ControlDef &PageDispatcher::RequireControl(const PageControlCommand &comma
 PageControlResult PageDispatcher::Execute(const PageControlCommand &command) {
   const ControlDef &control = RequireControl(command);
   switch (command.operation) {
+    case PageControlOperation::Inspect:
+      return {.caption = page_.ControlCaption(control.name),
+              .enabled = static_cast<bool>(page_.ControlEnabled(control.name)),
+              .editable = control.kind == ControlKind::Field &&
+                          static_cast<bool>(page_.ControlEditable(control.name))};
+    case PageControlOperation::ReadValue:
+      return {.text = page_.ControlText(control.name),
+              .ordinal = page_.ControlOrdinal(control.name),
+              .value = page_.Control_Value(control.name),
+              .caption = page_.ControlCaption(control.name),
+              .enabled = static_cast<bool>(page_.ControlEnabled(control.name)),
+              .editable = static_cast<bool>(page_.ControlEditable(control.name))};
     case PageControlOperation::Read:
       return {.text = page_.ControlText(control.name),
               .ordinal = page_.ControlOrdinal(control.name)};

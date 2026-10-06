@@ -220,8 +220,17 @@ void CurrentStateAndIdentityAreAuthoritative() {
       dispatcher.Execute({.operation = Operation::Set, .control = "Value", .text = "enabled"}));
   static_cast<void>(dispatcher.Execute({.operation = Operation::Action, .control = "Conditional"}));
   CHECK_TEXT("computed state is reevaluated after input", page.ControlText("Hits"), "1");
+  CHECK_TRUE(
+      "disabled actions can be discovered without execution",
+      !dispatcher.Execute({.operation = Operation::Inspect, .control = "DisabledAction"}).enabled);
+  CHECK_TEXT("discovery does not execute an action", page.ControlText("Hits"), "1");
+  Refuses(dispatcher, Operation::ReadValue, "Value", "PageValueUnsupported");
   authority.Revoke();
-  for (const Operation operation : {Operation::Read, Operation::Set, Operation::Filter}) {
+  for (const Operation operation : {Operation::Read,
+                                    Operation::ReadValue,
+                                    Operation::Inspect,
+                                    Operation::Set,
+                                    Operation::Filter}) {
     Refuses(dispatcher, operation, "Value", "PermissionDenied");
   }
   Refuses(dispatcher, Operation::Action, "Run", "PermissionDenied");

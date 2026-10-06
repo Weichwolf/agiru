@@ -21,6 +21,7 @@ export CCACHE_SLOPPINESS
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
+.PHONY: page-profile
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -136,6 +137,10 @@ page-navigation: comments db tc ## execute generated navigation and authorized s
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_PageSourceGate gate_PageDispatcherGate
 	@"$(B)/gate_PageSourceGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/page-navigation.sh"
+
+page-profile: page-navigation ## prove scalar/semantic-HTML production adapters, not complete client parity
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_PageHtmlGate gate_PageValueGate
+	@B="$(B)" bash "$(SELF)/test/ui/page-profile.sh"
 
 text-positions: comments db tc ## execute UTF-16 text positions through generated AL
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_TextGate

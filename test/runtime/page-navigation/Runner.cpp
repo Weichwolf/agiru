@@ -1,9 +1,13 @@
+#include "meta/Ids.h"
 #include "meta/PageDef.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/PageCore.h"
+#include "runtime/PageDispatcher.h"
+#include "runtime/PageHtml.h"
 #include "runtime/PageInstance.h"
 #include "runtime/PageSession.h"
+#include "runtime/PageValue.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Transaction.h"
@@ -36,6 +40,20 @@ constexpr agiru::Integer kSecondValue = 22;
 constexpr agiru::Integer kOverrideIncrement = 100;
 constexpr agiru::Integer kCopiedValue = 55;
 constexpr agiru::Integer kRequestLimit = 7;
+
+class HtmlAuthorization final : public agiru::PageAuthorization {
+public:
+  void Require(agiru::PageId page, const agiru::PageControlCommand &command) override {
+    if (page != agiru::PageTraits<Card>::kId ||
+        (command.operation != agiru::PageControlOperation::ReadValue &&
+         command.operation != agiru::PageControlOperation::Inspect)) {
+      throw agiru::Error("unexpected HTML command", "FixturePermission");
+    }
+    ++calls;
+  }
+
+  int calls = 0;
+};
 
 void Prepare() {
   agiru::DropTable(agiru::Session::Current().Database(), agiru::TableTraits<Row>::kTable);
@@ -79,6 +97,18 @@ void InstalledPageLifecycle() {
              "Yes");
   CHECK_TRUE("the selected identity remains exact after navigation",
              card->CurrentRecord() == selected);
+  HtmlAuthorization authority;
+  const auto html = agiru::RenderPageHtml(
+      card->Declaration(),
+      card->Controls(),
+      authority,
+      {.pageHandle = "card_1", .revision = "1", .commandPrefix = "render_1", .csrf = "fixture"});
+  CHECK_TRUE("generated factory supplies exact record values to semantic HTML",
+             html.html.contains("data-type=\"Integer\" data-value=\"22\""));
+  CHECK_TRUE("semantic HTML keeps unqualified computed values visible as gaps",
+             html.unsupported == 6 && authority.calls == 17);
+  CHECK_TRUE("rendering a generated page preserves its selected record",
+             card->CurrentRecord() == selected);
   bool refused = false;
   try {
     static_cast<void>(list->Move(agiru::PagePosition::Unknown));
@@ -104,6 +134,8 @@ void ListEditOpensSelectedCard() {
   CHECK_TRUE("system Edit opens the declared card on the selected row", card.ID.AsInteger() == 2);
   CHECK_TRUE("the card keeps the selected record value", card.Value.AsInteger() == kSecondValue);
   CHECK_TRUE("OnOpenPage observes editing mode", card.OpeningMode.AsBoolean());
+  CHECK_TRUE("the typed value primitive cannot shadow an AL ControlValue field",
+             card.ControlValue.AsBoolean());
   CHECK_TRUE("card opening executes OnAfterGetRecord",
              card.LoadedValue.AsInteger() == kSecondValue);
   CHECK_TRUE("opening a card does not change the list mode", !list.Editable());

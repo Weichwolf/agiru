@@ -122,6 +122,29 @@ if reject_dependency "$proof/forced-PageSession.h.d" PageSession.h \
   exit 1
 fi
 
+compile_header type/Utf8.h "$proof/Utf8.h.d"
+for forbidden in Encoding.h Regex.h Record.h vector memory; do
+  reject_dependency "$proof/Utf8.h.d" "$forbidden"
+done
+compile_header type/Utf8.h "$proof/forced-Encoding.h.d" -include dotnet/Encoding.h
+if reject_dependency "$proof/forced-Encoding.h.d" Encoding.h \
+  > "$proof/forced-Encoding.h.log" 2>&1; then
+  printf 'header-dependencies: full codec escaped the UTF-8 validator boundary\n' >&2
+  exit 1
+fi
+for header in PageValue.h PageHtml.h; do
+  compile_header "runtime/$header" "$proof/$header.d"
+  for forbidden in Page.h PageSession.h PageCore.h PageDef.h TableDef.h Record.h Variant.h vector mutex; do
+    reject_dependency "$proof/$header.d" "$forbidden"
+  done
+done
+compile_header runtime/PageHtml.h "$proof/forced-PageCore.h.d" -include runtime/PageCore.h
+if reject_dependency "$proof/forced-PageCore.h.d" PageCore.h \
+  > "$proof/forced-PageCore.h.log" 2>&1; then
+  printf 'header-dependencies: page execution escaped the HTML transport boundary\n' >&2
+  exit 1
+fi
+
 for forbidden in filesystem regex; do
   if [ "$forbidden" = filesystem ]; then header=RuntimeSurface.h; else header=dotnet/Regex.h; fi
   compile_header "$header" "$proof/forced-$forbidden.d" -include "$forbidden"
@@ -131,4 +154,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: thirteen standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page controls refused\n'
+printf 'header-dependencies: sixteen standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode controls refused\n'

@@ -7,6 +7,8 @@ CXX=${CXX:-clang++-19}
 dsn=${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}
 proof=$(mktemp -d /tmp/agiru-page-navigation.XXXXXX)
 sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
+  src/rt/PageCore.cpp src/rt/PageValue.cpp include/runtime/PageValue.h \
+  src/rt/PageHtml.cpp include/runtime/PageHtml.h \
   src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
   include/runtime/Page.h src/gen/BodyWriter.cpp \
   include/runtime/PageSession.h include/runtime/test/TestPage.h \

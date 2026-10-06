@@ -2,6 +2,7 @@
 #include "dotnet/Regex.h"
 #include "runtime/ErrorValue.h"
 #include "type/Integer.h"
+#include "type/Utf8.h"
 
 #include "Check.h"
 #include "Reference.h"
@@ -49,7 +50,7 @@ void CodePageZeroIsTheAnsiPage() {
 }
 
 void Utf8Replacement() {
-  constexpr std::array<std::pair<std::string_view, std::string_view>, 13> cases{{
+  constexpr std::array<std::pair<std::string_view, std::string_view>, 14> cases{{
       {"80", "EFBFBD"},
       {"C080", "EFBFBDEFBFBD"},
       {"E08080", "EFBFBDEFBFBDEFBFBD"},
@@ -63,8 +64,12 @@ void Utf8Replacement() {
       {"EFBBBF00", "EFBBBF00"},
       {"F48FBFBF", "F48FBFBF"},
       {"F09F9880", "F09F9880"},
+      {"EFBFBD", "EFBFBD"},
   }};
   for (const auto &[input, expected] : cases) {
+    CHECK_TRUE(
+        "strict UTF-8 validity matches unchanged decoder bytes, including literal replacement",
+        agiru::IsValidUtf8(gate::Unhex(input)) == (input == expected));
     CHECK_TEXT("UTF-8 maximal valid subparts determine replacement count",
                Encoding::UTF8().Decode(gate::Unhex(input)),
                gate::Unhex(expected));

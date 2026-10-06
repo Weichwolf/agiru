@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "runtime/PageValue.h"
 
 #include <cstdint>
 #include <string>
@@ -19,6 +20,8 @@ struct ControlDef;
 enum class PageControlOperation : std::uint8_t {
   Unknown, ///< Unrecognized or unspecified operation; always refused.
   Read,
+  ReadValue, ///< Exact typed scalar plus display text and current field state.
+  Inspect,   ///< Discover field/action state without executing a trigger or changing a row.
   Set,
   Filter,
   Action,
@@ -34,10 +37,14 @@ struct PageControlCommand {
   std::string_view text{};          ///< Input text for Set or an AL expression for Filter.
 };
 
-/// \brief Display text and Option/Enum ordinal, kept distinct; not a general typed wire value.
+/// \brief Owned display, exact scalar and current state; populated according to the operation.
 struct PageControlResult {
   std::string text{};    ///< Formatted display text, including unchanged Unicode content.
   std::string ordinal{}; ///< Exact Option/Enum ordinal text, or empty for other fields.
+  PageValue value{};     ///< ReadValue's exact typed scalar; absent on legacy Read.
+  std::string caption{}; ///< Current field/action caption for ReadValue/Inspect.
+  bool enabled = false;  ///< Current state, not authorization to execute.
+  bool editable = false; ///< Current editing state for field controls only.
 };
 
 /// \brief Mandatory authorization boundary supplied by the server's authenticated session.
@@ -66,9 +73,10 @@ public:
   PageDispatcher(const PageDef &declaration, PageCore &page, PageAuthorization &authorization);
 
   /// \brief Reauthorizes, checks the declared kind and current UI state, then executes once.
-  /// Read returns display/ordinal text; other commands return an empty result. Unknown
-  /// controls, unsupported kinds, hidden/disabled controls and read-only edits refuse.
-  /// Filtering remains available for read-only or disabled fields. AL errors propagate intact.
+  /// Read returns display/ordinal text; ReadValue also returns an exact scalar and state.
+  /// Inspect returns state/caption without reading a source or running a trigger. Unknown
+  /// controls, unsupported kinds and hidden controls refuse. Disabled controls allow only
+  /// reads/discovery/filtering; edits still require Enabled and Editable. AL errors propagate.
   /// \param command An operation using an exact declared control identity.
   /// \return The operation's result; transport adapters must not reinterpret display as numbers.
   /// \throws Error for command refusals or errors from authorization, bindings and AL triggers.
