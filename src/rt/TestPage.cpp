@@ -1,7 +1,8 @@
 #include "runtime/test/TestPage.h"
 
 #include "runtime/ErrorValue.h"
-#include "runtime/test/PageCore.h"
+#include "runtime/PageCore.h"
+#include "runtime/test/PageTraps.h"
 #include "runtime/test/TestAction.h"
 #include "runtime/test/TestField.h"
 #include "type/Boolean.h"

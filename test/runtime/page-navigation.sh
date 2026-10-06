@@ -6,6 +6,8 @@ B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 dsn=${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}
 proof=$(mktemp -d /tmp/agiru-page-navigation.XXXXXX)
+sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
+  test/gate/PageDispatcherGate.cpp test/runtime/page-navigation.sh > "$proof/dispatcher-inputs.sha256"
 mkdir -p "$proof/source"
 cp test/runtime/page-navigation/*.al "$proof/source/"
 cp test/transpiler/native-enums/source/app.json "$proof/source/app.json"
@@ -29,6 +31,36 @@ done
 "$CXX" "${flags[@]}" "$proof/runner.o" "${objects[@]}" "${links[@]}" -o "$proof/runner"
 "$proof/runner" "$dsn" > "$proof/execution.log" 2>&1
 cat "$proof/execution.log"
+"$B/gate_PageDispatcherGate" > "$proof/dispatcher.log" 2>&1
+cat "$proof/dispatcher.log"
+for control in no-authorization no-enabled no-editable no-visible unknown-control; do
+  awk -v control="$control" '
+    control == "no-authorization" && /authorization_\.Require\(declaration_\.id, command\)/ {
+      sub(/authorization_\.Require\(declaration_\.id, command\)/, "static_cast<void>(authorization_)"); changed++
+    }
+    control == "no-enabled" && /!page_\.ControlEnabled\(control->name\)/ {
+      sub(/!page_\.ControlEnabled\(control->name\)/, "false"); changed++
+    }
+    control == "no-editable" && /!page_\.ControlEditable\(control->name\)/ {
+      sub(/!page_\.ControlEditable\(control->name\)/, "false"); changed++
+    }
+    control == "no-visible" && /!page_\.ControlVisible\(control->name\)/ {
+      sub(/!page_\.ControlVisible\(control->name\)/, "false"); changed++
+    }
+    control == "unknown-control" && /if \(control == nullptr\).*unknown declared control/ {
+      $0 = "  if (control == nullptr) { control = &declaration_.layout.front(); }"; changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' src/rt/PageDispatcher.cpp > "$proof/dispatcher-$control.cpp"
+  "$CXX" "${flags[@]}" test/gate/PageDispatcherGate.cpp "$proof/dispatcher-$control.cpp" \
+    "${links[@]}" -o "$proof/dispatcher-$control"
+  status=0
+  "$proof/dispatcher-$control" > "$proof/dispatcher-$control.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  rg -q 'invalid commands refuse with the expected diagnostic' "$proof/dispatcher-$control.log"
+  rm -- "$proof/dispatcher-$control" "$proof/dispatcher-$control.cpp"
+done
 mkdir -p "$B/fixture-commands"
 jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/page-navigation/Runner.cpp" \
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
@@ -80,4 +112,5 @@ fi
 rm -- "$proof/unbound-integer.so" "$proof/runner" "$proof/runner.o"
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
-printf 'page-navigation: generated list/card selection, opening triggers, explicit action, card policy and empty selection execute; four compiled controls reject; %s\n' "$proof"
+sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
+printf 'page-navigation: generated navigation and authorized control dispatch execute; nine compiled controls reject; %s\n' "$proof"

@@ -7,7 +7,7 @@
 #include "runtime/TestRunner.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
-#include "runtime/test/PageCore.h"
+#include "runtime/test/PageTraps.h"
 #include "runtime/test/TestPermissions.h"
 #include "type/TransactionModel.h"
 

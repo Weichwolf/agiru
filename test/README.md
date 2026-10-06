@@ -134,7 +134,12 @@ temporary cursors and compiled no-borrow/no-restore/assignment-alias controls ar
 
 `runtime/page-navigation.sh` executes generated list/card system Edit routing,
 selected-record identity, opening triggers, explicit-action precedence and card
-ModifyAllowed policy. View navigation and general command permissions remain open (0030).
+ModifyAllowed policy. `PageDispatcherGate` drives the shared command primitive over
+existing page bindings: per-command authorization, exact identities, current inherited
+and computed control state, refusal before effects and unchanged AL errors/text.
+Five compiled dispatcher defects and four navigation/unbound controls must fail.
+This is not HTTP/client parity, production permission storage, exact typed wire values
+or complete page lifecycle. View navigation remains open (0720).
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,

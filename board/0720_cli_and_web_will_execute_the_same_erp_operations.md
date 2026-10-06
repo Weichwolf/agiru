@@ -18,6 +18,19 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 - Preserve agiru's generated `PageDef`/control tree, typed bindings, `PageCore`,
   TestPage lifecycle, validated record primitives and regression gates.
   `src/cli/Main.cpp` currently provides the test runner, not an ERP agent client.
+- `runtime/PageCore.h` now owns the presentation-neutral control interface;
+  `runtime/test/PageTraps.h` isolates test trapping. `PageDispatcher` borrows that
+  adapter and its declaration, requires authorization on every operation and rejects
+  wrong identities/kinds and current hidden/disabled/read-only client operations.
+  It reuses existing field/trigger bindings, not separate business rules. Display
+  text/Option ordinals stay separate; general exact typed wire values are still pending.
+  Production lifecycle/factories, SQL-backed authorization, command receipts/revisions,
+  modal suspension, HTML/HTTP and Node CMD/MCP are not implemented by this primitive.
+  Container verification: 64 dispatcher checks, 15 generated navigation checks and
+  17 isolation checks pass; five dispatcher defects and four existing navigation/
+  unbound controls reject. Twelve standalone header probes and forced dependencies pass.
+  Targeted dispatcher-source tidy passes; the gate consumer retains 16 findings in
+  existing Page/TestPage/Table/Codeunit implementations, without suppression changes.
 - Refreshed archive SHA256:
   `f654cb6576768cb90fff2e0fb701043139ab4d36723e7427a498132a2e2ee6a3`.
   Inspect `~/Git/openerp/openerp/web/client/{protocol,screen,page_model,ui,session,cli_api,request_page}.py`
@@ -204,8 +217,19 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 
 ## References and consolidation
 
-agiru: `include/meta/PageDef.h`, `include/runtime/test/PageCore.h`,
+agiru: `include/meta/PageDef.h`, `include/runtime/{PageCore,PageDispatcher}.h`,
 `src/gen/PageWriter.cpp`, `src/rt/{TestPage,Session}.cpp`, `src/cli/Main.cpp`.
+Control-dispatch references: developer revision
+`f928288ee840334be73142e5fc0202c0e19b246d`,
+`properties/devenv-{enabled,editable,visible}-property.md`; BCApps revision
+`d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`,
+`Sales/Document/SalesOrder.Page.al` (`CopyDocument.Enabled`, inherited line state);
+user `business-central/ui-enter-data.md` at
+`bf5ffffa9b026e146d29f13a242daa5334ddf0d8`;
+predecessor `openerp/web/client/protocol.py::{set_field,invoke_action}` and WI 1903.
+Reproduce control dispatch with `make gate GATE=PageDispatcherGate JOBS=2`;
+navigation/compiled refusal controls with `make page-navigation JOBS=2`.
+These authored primitive tests are not live client or ERP parity evidence.
 Local developer: page/control methods, `devenv-testing-pages.md`,
 `properties/devenv-analysismodeenabled-property.md`; user:
 `business-central/analysis-mode.md`. Read current local guarantees before porting.

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "runtime/Error.h"
-#include "runtime/test/PageCore.h"
+#include "runtime/PageCore.h"
 #include "type/Boolean.h"
 
 #include <string_view>

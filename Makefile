@@ -132,8 +132,8 @@ codeunit-record: comments db tc ## execute var-Record globals and Codeunit.Run r
 	@"$(B)/gate_InstanceGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/codeunit-record.sh"
 
-page-navigation: comments db tc ## execute generated list/card system Edit navigation and action precedence
-	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_PageSourceGate
+page-navigation: comments db tc ## execute generated navigation and authorized shared page commands
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_PageSourceGate gate_PageDispatcherGate
 	@"$(B)/gate_PageSourceGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/page-navigation.sh"
 

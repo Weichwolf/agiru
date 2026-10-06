@@ -5,7 +5,7 @@
 #include "runtime/ErrorValue.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
-#include "runtime/test/PageCore.h"
+#include "runtime/test/PageTraps.h"
 #include "type/Integer.h"
 #include "type/JsonObject.h"
 #include "type/Text.h"

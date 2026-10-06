@@ -1,6 +1,5 @@
 #pragma once
 
-#include "meta/TableDef.h"
 #include "type/Boolean.h"
 
 #include <cstdint>
@@ -8,9 +7,11 @@
 #include <string_view>
 
 /// \file
-/// \brief What a control of a headless page reaches into: the page under test, type-erased.
+/// \brief Type-erased control operations shared by production page sessions and AL test adapters.
 
 namespace agiru {
+
+struct TableDef;
 
 /// \brief The triggers a control carries, named the way AL names them.
 enum class ControlTriggerKind : std::uint8_t {
@@ -21,7 +22,7 @@ enum class ControlTriggerKind : std::uint8_t {
   Lookup,     ///< `OnLookup`.
 };
 
-/// \brief The page a `TestField`, `TestAction` or `TestFilter` drives, without its type.
+/// \brief A page's typed control bindings, independent of its presentation adapter.
 ///
 /// \note A CONTROL IS A NAME AND A PAGE IS A TYPE. The generated `Controls` class names every
 ///       control once, as `TestField Name{"Name"}`; what the control does with a `SetValue` is
@@ -89,7 +90,7 @@ public:
   /// \return The control's caption, or the field's.
   [[nodiscard]] virtual std::string ControlCaption(std::string_view control) const = 0;
 
-  /// \brief The running page instance behind a `part` control, for the nested test page.
+  /// \brief The running page instance behind a `part` control.
   /// \param control The part's AL name.
   /// \return The subpage instance, or nothing when the page is not running or has no such part.
   [[nodiscard]] virtual void *PartInstance(std::string_view control) = 0;
@@ -107,42 +108,8 @@ public:
   virtual void RowLeft() = 0;
 
   /// \brief A part attaches to this page, so that leaving the page leaves the part's row too.
-  /// \param part The part's harness, which outlives this page's use of it.
+  /// \param part The part's control adapter, which outlives this page's use of it.
   virtual void AttachPart(PageCore &part) = 0;
 };
-
-namespace detail {
-
-/// \brief AL `TestPage.Trap()`: the next non-modal run of the page lands in this harness.
-/// \param page    The page's number.
-/// \param harness The `TestPage` that trapped it.
-/// \param adopt   Hands the page object to the harness, saying whether the harness owns it now
-///                (a page `Page.Run` made) or only drives it (a page VARIABLE's `Run()`, which
-///                the variable keeps).
-void TrapPage(std::int32_t page,
-              void *harness,
-              void (*adopt)(void *harness, void *page, bool owned));
-
-/// \brief Gives a page just run to the harness that trapped it, if one did.
-/// \param page   The page's number.
-/// \param object The page object.
-/// \param owned  Whether the harness owns it afterwards; false for a page variable's own object.
-/// \return Whether a trap took it.
-[[nodiscard]] bool ReleaseTrap(std::int32_t page, void *object, bool owned);
-
-/// \brief Whether a `Trap` is waiting for the page, so a runner can decide what to hand it.
-/// \param page The page's number.
-/// \return True when the next non-modal run of that page would be taken.
-[[nodiscard]] bool TrapPending(std::int32_t page);
-
-/// \brief Forgets every trap; the runner does this between cases.
-void ClearTraps();
-
-/// \brief Forgets the traps one harness set, which its destructor does: a trap that outlived its
-///        `TestPage` variable adopted a page into freed memory.
-/// \param harness The harness.
-void WithdrawTraps(const void *harness);
-
-}
 
 }

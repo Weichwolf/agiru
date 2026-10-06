@@ -91,6 +91,27 @@ if reject_dependency "$proof/forced-Record.h.d" Record.h \
   exit 1
 fi
 
+compile_header runtime/PageCore.h "$proof/PageCore.h.d"
+for forbidden in PageTraps.h TestPage.h TableDef.h Record.h vector mutex; do
+  reject_dependency "$proof/PageCore.h.d" "$forbidden"
+done
+compile_header runtime/PageCore.h "$proof/forced-PageTraps.h.d" -include runtime/test/PageTraps.h
+if reject_dependency "$proof/forced-PageTraps.h.d" PageTraps.h \
+  > "$proof/forced-PageTraps.h.log" 2>&1; then
+  printf 'header-dependencies: test trapping escaped the production control boundary\n' >&2
+  exit 1
+fi
+compile_header runtime/PageDispatcher.h "$proof/PageDispatcher.h.d"
+for forbidden in Page.h PageDef.h TestPage.h PageTraps.h Record.h vector mutex; do
+  reject_dependency "$proof/PageDispatcher.h.d" "$forbidden"
+done
+compile_header runtime/PageDispatcher.h "$proof/forced-Page.h.d" -include runtime/Page.h
+if reject_dependency "$proof/forced-Page.h.d" Page.h \
+  > "$proof/forced-Page.h.log" 2>&1; then
+  printf 'header-dependencies: typed page machinery escaped the dispatcher boundary\n' >&2
+  exit 1
+fi
+
 for forbidden in filesystem regex; do
   if [ "$forbidden" = filesystem ]; then header=RuntimeSurface.h; else header=dotnet/Regex.h; fi
   compile_header "$header" "$proof/forced-$forbidden.d" -include "$forbidden"
@@ -100,4 +121,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: ten standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table controls refused\n'
+printf 'header-dependencies: twelve standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page controls refused\n'
