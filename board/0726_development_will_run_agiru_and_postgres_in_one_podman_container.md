@@ -29,7 +29,8 @@ Files: `deploy/dev/{Containerfile,entrypoint.sh}`, `scripts/dev_container.sh`,
 - `make dev-image dev-start dev-configure`: Debian trixie, Clang 19/libc++, PostgreSQL 17;
   persistent `agiru-dev-postgres` volume, host HTTP port bound to loopback, no published SQL port.
   Existing agiru-pg and its source/seed databases remain unchanged.
-- Qualified image: `37a531d499da1689c81f3682cc692915b96aaa747ea8e160d45465f1bf5061d0`.
+- Qualified image: `710003f1690b0264f8e1a40a2694cc07e3cc03e5b742034bae3c86e558a1cc6b`.
+  Includes ripgrep, required by repository regression scripts; `make dev-exec COMMAND='rg --version'` passes.
   `make dev-check` passes committed exact SQL persistence across restart, PostgreSQL failure,
   application exit 42, unowned container start/stop refusals and incompatible storage preservation.
 - `make dev-exec COMMAND='make gate GATE=GenXmlPortGate B=/workspace/build/podman JOBS=2'`:

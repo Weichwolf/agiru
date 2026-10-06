@@ -5,7 +5,7 @@ ARG DEV_GID=1001
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates clang-19 clang-format-19 clang-tidy-19 lld-19 \
     libc++-19-dev libc++abi-19-dev libunwind-19-dev libclang-rt-19-dev \
-    cmake ninja-build ccache make python3 git curl unzip jq \
+    cmake ninja-build ccache make python3 git curl unzip jq ripgrep \
     libpq-dev postgresql-17 libxml2-dev libyyjson-dev libssl-dev util-linux tini \
     && apt-get clean
 RUN groupadd --gid "$DEV_GID" agiru \
