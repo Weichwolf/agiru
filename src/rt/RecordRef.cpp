@@ -11,6 +11,7 @@
 #include "runtime/Session.h"
 #include "runtime/Table.h"
 #include "runtime/TablePermissions.h"
+#include "runtime/TemporaryRecord.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Date.h"
@@ -270,12 +271,13 @@ detail::Found RecordRef::Find(std::string_view Which) {
 }
 
 detail::Found RecordRef::Get(::agiru::RecordId RecordID) {
-  if (RecordID.IsEmpty()) { throw Error("RecordRef.Get: the RecordId names no record"); }
-  if (State().table == nullptr || State().table->id.Value() != RecordID.TableNo()) {
-    Open(RecordID.TableNo());
+  const auto identity = std::move(RecordID);
+  if (identity.IsEmpty()) { throw Error("RecordRef.Get: the RecordId names no record"); }
+  if (State().table == nullptr || State().table->id.Value() != identity.TableNo()) {
+    Open(identity.TableNo());
   }
   const TableDef &table = Table();
-  const std::span<const std::string> values = RecordID.KeyValues();
+  const std::span<const std::string> values = identity.KeyValues();
   if (table.keys.empty() || values.size() != table.keys[0].fields.size()) {
     throw Error("RecordRef.Get: the RecordId carries " + std::to_string(values.size()) +
                 " key value(s) and the primary key has " +

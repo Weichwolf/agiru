@@ -5,6 +5,7 @@
 #include "runtime/Error.h"
 #include "runtime/SingleInstance.h"
 #include "runtime/Subscriptions.h"
+#include "runtime/TemporaryRecord.h"
 #include "runtime/Transaction.h"
 #include "type/Integer.h"
 
@@ -18,17 +19,6 @@
 /// \brief The base every generated AL codeunit stands on.
 
 namespace agiru {
-
-namespace detail {
-
-/// \brief Whether a record holds temporary rows of its own.
-/// \param record The record. \return Whether it does.
-[[nodiscard]] bool RuntimeIsTemporary(const void *record);
-
-/// \brief Points a record at another's temporary rows, leaving its filters alone.
-/// \param record The record that borrows. \param from The one whose rows it borrows.
-void RuntimeBorrowTemporary(void *record, const void *from);
-}
 
 /// \brief WHY AN EVENT PUBLISHER'S BODY IS EMPTY, AND WHY ITS PARAMETERS HAVE NO NAMES.
 ///
@@ -259,6 +249,8 @@ public:
   void Forget() { Release(); }
 
 private:
+  static void FreeOwned(void *held) { delete static_cast<T *>(held); }
+
   T *Made() {
     if (held_ == nullptr) {
       if constexpr (SharesASingleInstance()) {
@@ -276,7 +268,7 @@ private:
       if constexpr (std::is_copy_constructible_v<T>) {
         clone_ = [](const void *held) -> void * { return new T(*static_cast<const T *>(held)); };
       }
-      free_ = [](void *held) { delete static_cast<T *>(held); };
+      free_ = &FreeOwned;
     }
     return held_;
   }
@@ -285,7 +277,6 @@ private:
     if (free_ != nullptr) { free_(held_); }
     held_ = nullptr;
     clone_ = nullptr;
-    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): see above.
     free_ = nullptr;
   }
 
@@ -324,7 +315,10 @@ public:
   /// \brief AL `Rec := Other`: the globals stay this variable's own.
   /// \param other The source; its record-variable globals are deliberately not assigned.
   /// \return This handle, unchanged.
-  Globals &operator=([[maybe_unused]] const Globals &other) { return *this; }
+  Globals &operator=(const Globals &other) {
+    if (this == &other) { return *this; }
+    return *this;
+  }
 
   /// \brief Takes the other's, letting go of these.
   /// \return This handle.

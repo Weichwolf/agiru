@@ -6,6 +6,7 @@
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/Table.h"
+#include "runtime/TemporaryRecord.h"
 #include "type/ErrorInfo.h"
 #include "type/FieldClass.h"
 #include "type/Integer.h"

@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -125,10 +126,8 @@ struct QueryDef {
 /// \param def The query.
 /// \return True when one column carries an aggregating method.
 [[nodiscard]] constexpr bool Groups(const QueryDef &def) {
-  for (const QueryColumn &column : def.columns) {
-    if (Aggregates(column.method)) { return true; }
-  }
-  return false;
+  return std::ranges::any_of(def.columns,
+                             [](const QueryColumn &column) { return Aggregates(column.method); });
 }
 
 }

@@ -1,6 +1,7 @@
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Session.h"
+#include "runtime/SingleInstance.h"
 
 #include "BuiltinsWritten.h"
 #include "Check.h"
@@ -234,6 +235,10 @@ void AssigningKeepsTheVariablesOwnGlobals() {
   {
     agiru::Globals<Counted> mine;
     mine->Value(kWritten);
+    const auto &same = mine;
+    mine = same;
+    CHECK_TRUE("self assignment retains this variable's globals", mine->Value() == kWritten);
+    CHECK_TRUE("self assignment does not allocate", Counted::made == 1);
     agiru::Globals<Counted> other;
     mine = other;
     CHECK_TRUE("assigning from an unmade handle keeps mine", mine->Value() == kWritten);

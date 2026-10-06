@@ -6,6 +6,7 @@
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "runtime/TemporaryRecord.h"
 #include "type/BigInteger.h"
 #include "type/Decimal.h"
 #include "type/Duration.h"
@@ -354,55 +355,61 @@ bool TempFindSet(void *record, const TableDef &table) {
   return true;
 }
 
+namespace {
+
+bool FindStep(const Held &held, void *record, const RecordOrder &by, char step) {
+  const std::vector<std::size_t> &view = held.state->view;
+  if (view.empty()) { return false; }
+  const auto rowOf = [&](std::size_t at) { return held.temp->ops->at(held.temp->rows, view[at]); };
+  switch (step) {
+    case '-': Land(held, record, 0); return true;
+    case '+': Land(held, record, view.size() - 1); return true;
+    case '=':
+      for (std::size_t at = 0; at < view.size(); ++at) {
+        if (by.Compare(rowOf(at), record) == 0) {
+          Land(held, record, at);
+          return true;
+        }
+      }
+      break;
+    case '>':
+      for (std::size_t at = 0; at < view.size(); ++at) {
+        if (by.Compare(rowOf(at), record) > 0) {
+          Land(held, record, at);
+          return true;
+        }
+      }
+      break;
+    case '<':
+      for (std::size_t at = view.size(); at > 0; --at) {
+        if (by.Compare(rowOf(at - 1), record) < 0) {
+          Land(held, record, at - 1);
+          return true;
+        }
+      }
+      break;
+    default:
+      throw Error("Record.Find: '" + std::string(1, step) +
+                  "' is not one of the characters record-find-method.md declares");
+  }
+  return false;
+}
+
+}
+
 bool TempFind(void *record, const TableDef &table, std::string_view which) {
   const Held held = Reach(record);
   if (which.empty()) { which = "="; }
   const RecordOrder by(table, held.state->key, held.state->ascending);
-  for (const char step : which) {
+  return std::ranges::any_of(which, [&](const char step) {
     if ((step == '-' || step == '+') && which.size() != 1) {
       throw Error("Record.Find: '-' and '+' can only be used alone, and this one reads \"" +
                   std::string(which) + "\"");
     }
     held.state->positioned = false;
     Snapshot(held, table);
-    const std::vector<std::size_t> &view = held.state->view;
-    if (view.empty()) { continue; }
-    const auto rowOf = [&](std::size_t at) {
-      return held.temp->ops->at(held.temp->rows, view[at]);
-    };
-    switch (step) {
-      case '-': Land(held, record, 0); return true;
-      case '+': Land(held, record, view.size() - 1); return true;
-      case '=':
-        for (std::size_t at = 0; at < view.size(); ++at) {
-          if (by.Compare(rowOf(at), record) == 0) {
-            Land(held, record, at);
-            return true;
-          }
-        }
-        break;
-      case '>':
-        for (std::size_t at = 0; at < view.size(); ++at) {
-          if (by.Compare(rowOf(at), record) > 0) {
-            Land(held, record, at);
-            return true;
-          }
-        }
-        break;
-      case '<':
-        for (std::size_t at = view.size(); at > 0; --at) {
-          if (by.Compare(rowOf(at - 1), record) < 0) {
-            Land(held, record, at - 1);
-            return true;
-          }
-        }
-        break;
-      default:
-        throw Error("Record.Find: '" + std::string(1, step) +
-                    "' is not one of the characters record-find-method.md declares");
-    }
-  }
-  return false;
+    return FindStep(held, record, by, step);
+  });
 }
 
 std::int32_t TempNext(void *record, const TableDef &table, std::int32_t steps) {

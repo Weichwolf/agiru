@@ -3,6 +3,7 @@
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "runtime/TemporaryRecord.h"
 
 #include "Filter.h"
 #include "RelationBranches.h"

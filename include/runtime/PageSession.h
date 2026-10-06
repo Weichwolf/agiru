@@ -11,6 +11,7 @@
 #include "runtime/RecordState.h"
 #include "runtime/Relation.h"
 #include "runtime/Table.h"
+#include "runtime/TemporaryRecord.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/RecordId.h"

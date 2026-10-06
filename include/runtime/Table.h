@@ -9,6 +9,7 @@
 #include "runtime/RecordState.h"
 #include "runtime/TableDefinition.h"
 #include "runtime/TablePermissions.h"
+#include "runtime/TemporaryRecord.h"
 #include "type/Boolean.h"
 #include "type/ErrorInfo.h"
 #include "type/Guid.h"
@@ -548,11 +549,6 @@ void RuntimeTransferFields(void *into,
 /// \param ops    How the runtime reaches rows of its type -- `kTempOps<T>`.
 void RuntimeMakeTemporary(void *record, const TempOps *ops);
 
-/// \brief AL `Record.IsTemporary()`.
-/// \param record The record.
-/// \return Whether its state carries temporary rows.
-[[nodiscard]] bool RuntimeIsTemporary(const void *record);
-
 /// \brief AL `Record.AddLink(URL [, Description])`: a `Record Link` row for the record.
 /// \param to The record's id.
 /// \param url The link.
@@ -594,12 +590,6 @@ void RuntimeShareTemporary(void *record, const void *from);
 /// \param record The reference's record.
 /// \param from The temporary record.
 void RuntimeAdoptTemporary(void *record, const void *from);
-
-/// rief Points a record at another's temporary rows and leaves its FILTERS alone, which is what
-///        a `var` parameter needs: the callee sees the caller's rows through its own view.
-/// \param record The record that borrows.
-/// \param from   The temporary record whose rows it borrows.
-void RuntimeBorrowTemporary(void *record, const void *from);
 
 /// \brief AL `Record.Reset()` on any record: the filters, marks, key and load selection go, and
 ///        a temporary record's ROWS stay.

@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -301,38 +302,36 @@ struct Statement {
   std::vector<std::size_t> returned;
 };
 
-Statement Build(const QueryDef &def, const QueryState &state) {
-  if (def.dataItems.empty()) {
-    throw Error("the query " + std::string(def.name) + " declares no dataitem");
-  }
-  RequireQueryRead(def);
-  Statement made;
+std::string SelectColumns(const QueryDef &def, std::vector<std::size_t> &returned) {
   std::string select;
   for (std::size_t i = 0; i < def.columns.size(); ++i) {
     if (!def.columns[i].returned) { continue; }
     if (!select.empty()) { select += ", "; }
     select += ColumnSql(def, def.columns[i]) + " AS c" + std::to_string(i);
-    made.returned.push_back(i);
+    returned.push_back(i);
   }
   if (select.empty()) { select = "1"; }
+  return select;
+}
 
-  const auto tableFilterOf = [&](std::size_t i, std::string &into) {
-    const QueryDataItem &item = def.dataItems[i];
-    if (item.tableFilter.empty()) { return; }
-    for (const TableTerm &term : TableFilterReader(item.tableFilter).Read()) {
-      const FieldDef &field = FieldNamed(def, item, term.field);
-      And(into,
-          Where(field,
-                ParseFilter(term.filter),
-                made.binds.size() + 1,
-                Alias(i) + "." + SqlColumn(field)),
-          made.binds);
-    }
-  };
+void TableFilterOf(const QueryDef &def,
+                   std::size_t i,
+                   std::string &into,
+                   std::vector<std::optional<std::string>> &binds) {
+  const QueryDataItem &item = def.dataItems[i];
+  if (item.tableFilter.empty()) { return; }
+  for (const TableTerm &term : TableFilterReader(item.tableFilter).Read()) {
+    const FieldDef &field = FieldNamed(def, item, term.field);
+    And(into,
+        Where(field, ParseFilter(term.filter), binds.size() + 1, Alias(i) + "." + SqlColumn(field)),
+        binds);
+  }
+}
 
-  std::string where;
-  std::string having;
-  tableFilterOf(0, where);
+std::string FromTables(const QueryDef &def,
+                       std::string &where,
+                       std::vector<std::optional<std::string>> &binds) {
+  TableFilterOf(def, 0, where, binds);
   std::string from = Name(*def.dataItems[0].table) + " " + Alias(0);
   for (std::size_t i = 1; i < def.dataItems.size(); ++i) {
     const QueryDataItem &item = def.dataItems[i];
@@ -345,29 +344,41 @@ Statement Build(const QueryDef &def, const QueryState &state) {
       on += Alias(i) + "." + SqlColumn(FieldIn(def, item, link.field)) + " = " +
             Alias(link.dataItem) + "." + SqlColumn(FieldIn(def, upper, link.reference));
     }
-    tableFilterOf(i, on);
+    TableFilterOf(def, i, on, binds);
     from += " ON " + (on.empty() ? std::string("TRUE") : on);
   }
+  return from;
+}
+
+void ColumnFilters(const QueryDef &def,
+                   const QueryState &state,
+                   std::string &where,
+                   std::string &having,
+                   std::vector<std::optional<std::string>> &binds) {
   for (std::size_t i = 0; i < def.columns.size(); ++i) {
     const QueryColumn &column = def.columns[i];
     const std::string *set = FilterSet(state, i);
     const std::string_view text = set != nullptr ? std::string_view(*set) : column.columnFilter;
     if (text.empty()) { continue; }
     const FieldDef field = DefOf(def, column);
-    const Clause clause =
-        Where(field, ParseFilter(text), made.binds.size() + 1, ColumnSql(def, column));
-    And(Aggregates(column.method) ? having : where, clause, made.binds);
+    const Clause clause = Where(field, ParseFilter(text), binds.size() + 1, ColumnSql(def, column));
+    And(Aggregates(column.method) ? having : where, clause, binds);
   }
+}
 
+std::string GroupColumns(const QueryDef &def, std::span<const std::size_t> returned) {
   std::string group;
   if (Groups(def)) {
-    for (const std::size_t i : made.returned) {
+    for (const std::size_t i : returned) {
       if (Aggregates(def.columns[i].method)) { continue; }
       if (!group.empty()) { group += ", "; }
       group += ColumnSql(def, def.columns[i]);
     }
   }
+  return group;
+}
 
+std::string OrderColumns(const QueryDef &def) {
   std::string order;
   for (const QueryOrder &by : def.orderBy) {
     std::size_t found = def.columns.size();
@@ -385,7 +396,22 @@ Statement Build(const QueryDef &def, const QueryState &state) {
     order += ColumnSql(def, def.columns[found]);
     if (by.descending) { order += " DESC"; }
   }
+  return order;
+}
 
+Statement Build(const QueryDef &def, const QueryState &state) {
+  if (def.dataItems.empty()) {
+    throw Error("the query " + std::string(def.name) + " declares no dataitem");
+  }
+  RequireQueryRead(def);
+  Statement made;
+  const std::string select = SelectColumns(def, made.returned);
+  std::string where;
+  std::string having;
+  const std::string from = FromTables(def, where, made.binds);
+  ColumnFilters(def, state, where, having, made.binds);
+  const std::string group = GroupColumns(def, made.returned);
+  const std::string order = OrderColumns(def);
   made.sql = "SELECT " + select + " FROM " + from;
   if (!where.empty()) { made.sql += " WHERE " + where; }
   if (!group.empty()) { made.sql += " GROUP BY " + group; }

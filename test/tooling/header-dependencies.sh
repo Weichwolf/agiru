@@ -170,6 +170,16 @@ if reject_dependency "$proof/forced-token-crypto.h.d" rand.h \
   exit 1
 fi
 compile_header runtime/SingleInstance.h "$proof/SingleInstance.h.d"
+compile_header runtime/TemporaryRecord.h "$proof/TemporaryRecord.h.d"
+for forbidden in Table.h Codeunit.h Record.h vector memory mutex; do
+  reject_dependency "$proof/TemporaryRecord.h.d" "$forbidden"
+done
+compile_header runtime/TemporaryRecord.h "$proof/forced-temporary-table.h.d" -include runtime/Table.h
+if reject_dependency "$proof/forced-temporary-table.h.d" Table.h \
+  > "$proof/forced-temporary-table.h.log" 2>&1; then
+  printf 'header-dependencies: typed table escaped the opaque temporary-row boundary\n' >&2
+  exit 1
+fi
 compile_header runtime/PageCommandHost.h "$proof/PageCommandHost.h.d"
 compile_header runtime/TablePermissions.h "$proof/TablePermissions.h.d"
 for forbidden in TableDef.h Session.h Database.h Table.h vector memory mutex; do
@@ -213,4 +223,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: twenty-three standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority controls refused\n'
+printf 'header-dependencies: twenty-four standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority/temporary controls refused\n'
