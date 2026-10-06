@@ -3,15 +3,22 @@
 #include "dotnet/Encoding.h"
 #include "dotnet/XmlDocument.h"
 #include "dotnet/XmlNode.h"
+#include "meta/Ids.h"
 #include "meta/TableDef.h"
-#include "runtime/RecordState.h"
 #include "runtime/Report.h"
+#include "type/Integer.h"
 #include "type/Stream.h"
+#include "type/TextEncoding.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstddef>
+#include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru {
@@ -91,11 +98,19 @@ void XmlPortOutput::Start(const XmlPortDef &def,
                           std::string_view recordSeparator,
                           std::string_view fieldDelimiter,
                           std::string_view tableSeparator) {
+  Start(def,
+        {.field = fieldSeparator,
+         .record = recordSeparator,
+         .delimiter = fieldDelimiter,
+         .table = tableSeparator});
+}
+
+void XmlPortOutput::Start(const XmlPortDef &def, const detail::XmlPortSeparators &separators) {
   def_ = def;
-  fieldSeparator_ = std::string(fieldSeparator);
-  recordSeparator_ = std::string(recordSeparator);
-  fieldDelimiter_ = std::string(fieldDelimiter);
-  tableSeparator_ = std::string(tableSeparator);
+  fieldSeparator_ = std::string(separators.field);
+  recordSeparator_ = std::string(separators.record);
+  fieldDelimiter_ = std::string(separators.delimiter);
+  tableSeparator_ = std::string(separators.table);
   root_ = Node{};
   path_.clear();
   lines_.clear();
@@ -206,7 +221,7 @@ void XmlPortOutput::Serialize(const Node &node, std::string &into, int depth) co
 
 std::string XmlPortOutput::Finish() const {
   if (def_.format != XmlPortFormat::Xml) { return lines_; }
-  std::string out = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>";
+  std::string out = R"(<?xml version="1.0" encoding="utf-8" standalone="yes"?>)";
   bool first = true;
   for (const Node &child : root_.children) {
     if (first && (def_.useDefaultNamespace || !def_.namespaces.empty())) {
@@ -236,6 +251,14 @@ void XmlPortInput::Load(std::string_view bytes,
                         std::string_view fieldSeparator,
                         std::string_view recordSeparator,
                         std::string_view fieldDelimiter) {
+  Load(bytes,
+       def,
+       {.field = fieldSeparator, .record = recordSeparator, .delimiter = fieldDelimiter});
+}
+
+void XmlPortInput::Load(std::string_view bytes,
+                        const XmlPortDef &def,
+                        const detail::XmlPortSeparators &separators) {
   def_ = def;
   root_ = Node{};
   levels_.clear();
@@ -245,51 +268,75 @@ void XmlPortInput::Load(std::string_view bytes,
   depth_ = 0;
   textFormat_ = def.format != XmlPortFormat::Xml;
   if (textFormat_) {
-    const std::string separator = std::string(recordSeparator);
-    const std::string delimiter = std::string(fieldDelimiter);
-    const std::string between = std::string(fieldSeparator);
-    std::string text(bytes);
-    std::size_t at = 0;
-    while (at <= text.size()) {
-      std::size_t end = separator.empty() ? std::string::npos : text.find(separator, at);
-      if (end == std::string::npos) {
-        if (separator == "\r\n") { end = text.find('\n', at); }
-      }
-      std::string line = text.substr(at, end == std::string::npos ? std::string::npos : end - at);
-      if (!line.empty() && line.back() == '\r') { line.pop_back(); }
-      at = end == std::string::npos
-               ? text.size() + 1
-               : end + (text.compare(end, separator.size(), separator) == 0 ? separator.size() : 1);
-      if (line.empty() && at > text.size()) { break; }
-      std::vector<std::string> fields;
-      if (def.format == XmlPortFormat::FixedText || between.empty()) {
-        fields.push_back(line);
-      } else {
-        std::size_t from = 0;
-        while (from <= line.size()) {
-          std::string field;
-          if (!delimiter.empty() && line.compare(from, delimiter.size(), delimiter) == 0) {
-            const std::size_t close = line.find(delimiter, from + delimiter.size());
-            if (close != std::string::npos) {
-              field = line.substr(from + delimiter.size(), close - from - delimiter.size());
-              from = close + delimiter.size();
-              const std::size_t next = line.find(between, from);
-              from = next == std::string::npos ? line.size() + 1 : next + between.size();
-              fields.push_back(field);
-              continue;
-            }
-          }
-          const std::size_t next = line.find(between, from);
-          field = line.substr(from, next == std::string::npos ? std::string::npos : next - from);
-          fields.push_back(field);
-          from = next == std::string::npos ? line.size() + 1 : next + between.size();
-        }
-      }
-      lines_.push_back(std::move(fields));
-    }
+    ParseLines(bytes, separators);
     return;
   }
   ParseXml(bytes);
+}
+
+namespace {
+
+struct TextRecord {
+  std::string text;
+  std::size_t next;
+};
+
+TextRecord ReadTextRecord(std::string_view text, std::size_t at, std::string_view separator) {
+  std::size_t end = separator.empty() ? std::string_view::npos : text.find(separator, at);
+  if (end == std::string_view::npos && separator == "\r\n") { end = text.find('\n', at); }
+  std::string line(text.substr(at, end == std::string_view::npos ? end : end - at));
+  if (!line.empty() && line.back() == '\r') { line.pop_back(); }
+  const std::size_t next =
+      end == std::string_view::npos
+          ? text.size() + 1
+          : end + (text.substr(end, separator.size()) == separator ? separator.size() : 1);
+  return {.text = std::move(line), .next = next};
+}
+
+std::optional<std::string> ReadQuotedField(std::string_view line,
+                                           std::size_t &from,
+                                           const detail::XmlPortSeparators &separators) {
+  const auto delimiter = separators.delimiter;
+  if (delimiter.empty() || line.substr(from, delimiter.size()) != delimiter) { return {}; }
+  const std::size_t close = line.find(delimiter, from + delimiter.size());
+  if (close == std::string_view::npos) { return {}; }
+  std::string field(line.substr(from + delimiter.size(), close - from - delimiter.size()));
+  from = close + delimiter.size();
+  const std::size_t next = line.find(separators.field, from);
+  from = next == std::string_view::npos ? line.size() + 1 : next + separators.field.size();
+  return field;
+}
+
+std::vector<std::string> ReadTextFields(std::string_view line,
+                                        const detail::XmlPortSeparators &separators) {
+  std::vector<std::string> fields;
+  std::size_t from = 0;
+  while (from <= line.size()) {
+    if (auto quoted = ReadQuotedField(line, from, separators)) {
+      fields.push_back(std::move(*quoted));
+      continue;
+    }
+    const std::size_t next = line.find(separators.field, from);
+    fields.emplace_back(line.substr(from, next == std::string_view::npos ? next : next - from));
+    from = next == std::string_view::npos ? line.size() + 1 : next + separators.field.size();
+  }
+  return fields;
+}
+
+}
+
+void XmlPortInput::ParseLines(std::string_view text, const detail::XmlPortSeparators &separators) {
+  std::size_t at = 0;
+  while (at <= text.size()) {
+    TextRecord record = ReadTextRecord(text, at, separators.record);
+    at = record.next;
+    if (record.text.empty() && at > text.size()) { break; }
+    if (def_.format == XmlPortFormat::FixedText || separators.field.empty()) {
+      lines_.push_back({std::move(record.text)});
+    } else {
+      lines_.push_back(ReadTextFields(record.text, separators));
+    }
+  }
 }
 
 void XmlPortInput::ParseXml(std::string_view text) {

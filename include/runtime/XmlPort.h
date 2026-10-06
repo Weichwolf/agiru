@@ -98,6 +98,18 @@ struct XmlPortQuit {};
 /// \brief `currXMLport.BreakUnbound()` in flight: ends an `Unbound` element's loop.
 struct XmlPortBreakUnbound {};
 
+namespace detail {
+
+/// \brief Borrowed, decoded separators for one XMLport text-format operation.
+struct XmlPortSeparators {
+  std::string_view field;     ///< Separator between fields.
+  std::string_view record;    ///< Separator between records.
+  std::string_view delimiter; ///< Optional field quoting delimiter.
+  std::string_view table{};   ///< Separator between tables, used by export.
+};
+
+}
+
 /// \brief What an export writes: the element tree for `Xml`, the lines for the text formats.
 class XmlPortOutput {
 public:
@@ -151,6 +163,7 @@ private:
   };
 
   void Serialize(const Node &node, std::string &into, int depth) const;
+  void Start(const XmlPortDef &def, const detail::XmlPortSeparators &separators);
   Node *Open_();
   XmlPortDef def_{};
   std::string fieldSeparator_;
@@ -207,7 +220,9 @@ private:
   };
 
   void ParseXml(std::string_view text);
-  void ParseLines(std::string_view text);
+  void
+  Load(std::string_view bytes, const XmlPortDef &def, const detail::XmlPortSeparators &separators);
+  void ParseLines(std::string_view text, const detail::XmlPortSeparators &separators);
   XmlPortDef def_{};
   Node root_;
   std::vector<Level> levels_;
@@ -303,43 +318,13 @@ public:
   /// \brief The xmlport's name.
   [[nodiscard]] static constexpr std::string_view Name() { return XmlPortTraits<Derived>::kName; }
 
-  /// \brief `currXMLport.Filename`, which AL assigns (`currXMLport.Filename := 'x.csv'`) and
-  ///        reads. The name the client would download the export under; kept, shown nowhere.
-  class FilenameSlot {
-  public:
-    /// \brief `Filename := Text`. \param text The name. \return This.
-    FilenameSlot &operator=(std::string_view text) {
-      name_ = std::string(text);
-      return *this;
-    }
+  /// \brief Reads this instance's filename; AL property reads bind to this getter.
+  /// \return The owned filename.
+  [[nodiscard]] ::agiru::Text<0> Filename() const { return ::agiru::Text<0>{filename_}; }
 
-    /// \brief `Filename := Text` from an AL text. \tparam N The length. \param text The name.
-    /// \return This.
-    template <std::size_t N> FilenameSlot &operator=(const ::agiru::Text<N> &text) {
-      name_ = std::string(std::string_view(text));
-      return *this;
-    }
-
-    /// \brief `Filename()` called. \return The name.
-    [[nodiscard]] ::agiru::Text<0> operator()() const { return ::agiru::Text<0>{name_}; }
-
-    /// \brief `Filename(Text)` called. \param text The name.
-    void operator()(std::string_view text) { name_ = std::string(text); }
-
-    /// \brief `Filename` read as a text. \return The name.
-    operator ::agiru::Text<0>() const {
-      return ::agiru::Text<0>{name_};
-    } // NOLINT(*-explicit-constructor)
-
-    /// \brief `Filename` read as a string view. \return The name.
-    operator std::string_view() const { return name_; } // NOLINT(*-explicit-constructor)
-
-  private:
-    std::string name_;
-  };
-
-  /// \brief `currXMLport.Filename`.
-  FilenameSlot Filename;
+  /// \brief Sets this instance's filename; AL property writes bind to this setter.
+  /// \param text The new filename, copied before returning.
+  void Filename(std::string_view text) { filename_ = std::string(text); }
 
   /// \brief `currXMLport.Break()`. \throws XmlPortBreak always.
   [[noreturn]] void Break() const { throw XmlPortBreak{}; }
@@ -493,43 +478,20 @@ public:
     return Import();
   }
 
-  /// \brief `currXMLport.ImportFile`, which AL assigns (`ImportFile := false`) and tests (`if
-  ///        currXMLport.ImportFile then`): whether the source is a file the client uploads. It
-  ///        is a flag here -- the stream the caller set is what is read either way.
-  class ImportFileSlot {
-  public:
-    /// \brief `ImportFile := Boolean`. \param on The value. \return This.
-    ImportFileSlot &operator=(Boolean on) {
-      on_ = on;
-      return *this;
-    }
+  /// \brief Reads this instance's import-file flag; AL property reads bind to this getter.
+  /// \return The flag; the caller's source stream remains the implemented input.
+  [[nodiscard]] Boolean ImportFile() const { return importFile_; }
 
-    /// \brief `ImportFile()` read. \return The value.
-    [[nodiscard]] Boolean operator()() const { return on_; }
+  /// \brief Sets this instance's import-file flag; AL property writes bind to this setter.
+  /// \param on The new flag. \return The flag after assignment.
+  Boolean ImportFile(Boolean on) { return importFile_ = on; }
 
-    /// \brief `ImportFile(false)`, the generator's spelling of `ImportFile := false`.
-    /// \param on The value. \return The value.
-    Boolean operator()(Boolean on) {
-      on_ = on;
-      return on_;
-    }
-
-    /// \brief `ImportFile(FileName)`: an import from a file. \param FileName The file.
-    /// \return Never. \throws Error always: a file source waits for `File` (board:0065).
-    Boolean operator()(std::string_view FileName) const {
-      throw Error("XmlPort.ImportFile(" + std::string(FileName) +
-                  "): a file source waits for File (board:0065)");
-    }
-
-    /// \brief `if currXMLport.ImportFile then`. \return The value.
-    operator Boolean() const { return on_; } // NOLINT(*-explicit-constructor)
-
-  private:
-    bool on_ = false;
-  };
-
-  /// \brief `currXMLport.ImportFile`.
-  ImportFileSlot ImportFile;
+  /// \brief Refuses the unimplemented file-source overload.
+  /// \param FileName The requested source. \throws Error always.
+  Boolean ImportFile(std::string_view FileName) const {
+    throw Error("XmlPort.ImportFile(" + std::string(FileName) +
+                "): a file source waits for File (board:0065)");
+  }
 
   /// \brief `Xmlport.CurrentPath()`. \return The path of the element being read, empty here.
   [[nodiscard]] ::agiru::Text<0> CurrentPath() const { return {}; }
@@ -615,6 +577,8 @@ private:
   std::string tableSeparator_;
   OutStream *destination_ = nullptr;
   InStream *source_ = nullptr;
+  std::string filename_;
+  bool importFile_ = false;
   XmlPortOutput output_;
   XmlPortInput input_;
 };

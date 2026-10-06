@@ -71,6 +71,22 @@ xmlport 50264 "Import Validation Consumer"
     begin
         exit(ObservedValue);
     end;
+
+    procedure SetImportProperties(Name: Text; Importing: Boolean)
+    begin
+        CurrXmlPort.Filename := Name;
+        CurrXmlPort.ImportFile := Importing;
+    end;
+
+    procedure PropertyFilename(): Text
+    begin
+        exit(CurrXmlPort.Filename);
+    end;
+
+    procedure PropertyImporting(): Boolean
+    begin
+        exit(CurrXmlPort.ImportFile);
+    end;
     procedure OtherObserved(): Integer
     begin
         exit(ObservedOther);

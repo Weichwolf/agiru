@@ -31,6 +31,19 @@ void Import(Consumer &consumer, std::string_view value) {
 
 void ValuesAndOrder(bool temporary, bool defaults) {
   Consumer consumer{};
+  consumer.SetImportProperties("fixture.xml", true);
+  CHECK_TEXT("AL property syntax sets the owned filename",
+             consumer.PropertyFilename().Value(),
+             "fixture.xml");
+  CHECK_TRUE("AL property syntax sets the owned import flag", consumer.PropertyImporting());
+  Consumer copy = consumer;
+  copy.SetImportProperties("copy.xml", false);
+  CHECK_TEXT("copy property writes do not rebind the original owner",
+             consumer.Filename().Value(),
+             "fixture.xml");
+  CHECK_TRUE("copy property writes retain the original import flag", consumer.ImportFile());
+  CHECK_TEXT("method and property getter forms agree", copy.Filename().Value(), "copy.xml");
+  CHECK_TRUE("method and property flag getter forms agree", !copy.ImportFile());
   Import(consumer, "10");
   CHECK_TRUE("OnAfterAssignField sees the imported element before validation",
              consumer.ValueObserved() == 10);

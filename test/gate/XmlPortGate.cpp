@@ -2,6 +2,7 @@
 #include "runtime/ErrorValue.h"
 #include "runtime/XmlPort.h"
 #include "type/Blob.h"
+#include "type/Integer.h"
 #include "type/Stream.h"
 #include "type/TextEncoding.h"
 
@@ -17,6 +18,9 @@ using agiru::XmlPortDef;
 using agiru::XmlPortFormat;
 using agiru::XmlPortInput;
 using agiru::XmlPortOutput;
+
+constexpr agiru::XmlPortId kDefaultNamespacePort{5};
+constexpr agiru::Integer kUnknownPortNumber = 999999;
 
 /// A SEPARATOR PROPERTY IS SPELLED WITH PLACEHOLDERS -- `<TAB>`, `<NewLine>`, `<None>`, `<,>` --
 /// and `FieldSeparator('')` at run time overrides it (board:0065).
@@ -35,7 +39,7 @@ void SeparatorTextReadsThePlaceholders() {
 /// separator, each wrapped in the delimiter; FIXED TEXT: each value padded to its `Width`;
 /// XML: the element tree with attributes and escaping (`devenv-format-property.md`).
 void TheOutputWritesTheThreeFormats() {
-  XmlPortDef variable{
+  const XmlPortDef variable{
       .id = agiru::XmlPortId{1}, .name = "V", .format = XmlPortFormat::VariableText};
   XmlPortOutput out;
   out.Start(variable, ";", "\r\n", "\"", "\r\n\r\n");
@@ -50,7 +54,8 @@ void TheOutputWritesTheThreeFormats() {
   out.EndGroup("Root");
   CHECK_TEXT("variable text lines", out.Finish(), "\"one\";\"two;three\"\r\n\"four\"\r\n");
 
-  XmlPortDef fixed{.id = agiru::XmlPortId{2}, .name = "F", .format = XmlPortFormat::FixedText};
+  const XmlPortDef fixed{
+      .id = agiru::XmlPortId{2}, .name = "F", .format = XmlPortFormat::FixedText};
   XmlPortOutput fixedOut;
   fixedOut.Start(fixed, "", "\r\n", "", "");
   fixedOut.BeginRecord("Line");
@@ -59,7 +64,7 @@ void TheOutputWritesTheThreeFormats() {
   fixedOut.EndRecord("Line");
   CHECK_TEXT("fixed text pads and cuts to the width", fixedOut.Finish(), "ab  too\r\n");
 
-  XmlPortDef xml{.id = agiru::XmlPortId{3}, .name = "X", .format = XmlPortFormat::Xml};
+  const XmlPortDef xml{.id = agiru::XmlPortId{3}, .name = "X", .format = XmlPortFormat::Xml};
   XmlPortOutput xmlOut;
   xmlOut.Start(xml, "\t", "\r\n", "", "");
   xmlOut.BeginGroup("Root");
@@ -102,7 +107,7 @@ void TheOutputWritesTheThreeFormats() {
 /// THE INPUT IS ONE CURSOR FOR ALL FORMATS: `Enter` the root, `Enter` a record, `Enter` its
 /// fields in order -- a text format serves lines and fields under the same names.
 void TheInputWalksTextAndXmlAlike() {
-  XmlPortDef variable{
+  const XmlPortDef variable{
       .id = agiru::XmlPortId{1}, .name = "V", .format = XmlPortFormat::VariableText};
   XmlPortInput in;
   in.Load("\"one\";\"two;three\"\r\nfour;five\r\n", variable, ";", "\r\n", "\"");
@@ -124,7 +129,7 @@ void TheInputWalksTextAndXmlAlike() {
   CHECK_TRUE("no third line", !in.Enter("Line"));
   in.Leave();
 
-  XmlPortDef xml{.id = agiru::XmlPortId{3}, .name = "X", .format = XmlPortFormat::Xml};
+  const XmlPortDef xml{.id = agiru::XmlPortId{3}, .name = "X", .format = XmlPortFormat::Xml};
   XmlPortInput xmlIn;
   xmlIn.Load("<Root><Line id=\"7\"><Name>A &amp; B</Name></Line><Line><Name>C</Name></Line></Root>",
              xml,
@@ -144,6 +149,48 @@ void TheInputWalksTextAndXmlAlike() {
   CHECK_TRUE("no third", !xmlIn.Enter("Line"));
 }
 
+void TextInputRetainsBoundaryFields() {
+  struct Case {
+    std::string_view source;
+    std::string_view separator;
+    std::string_view delimiter;
+    std::array<std::string_view, 3> fields;
+  };
+
+  constexpr std::array cases{
+      Case{.source = ";tail;", .separator = ";", .delimiter = "", .fields = {"", "tail", ""}},
+      Case{
+          .source = R"("";"a;b";)", .separator = ";", .delimiter = "\"", .fields = {"", "a;b", ""}},
+      Case{.source = "a||b||c", .separator = "||", .delimiter = "", .fields = {"a", "b", "c"}},
+      Case{.source = "\"unclosed;b;c",
+           .separator = ";",
+           .delimiter = "\"",
+           .fields = {"\"unclosed", "b", "c"}}};
+  const XmlPortDef def{
+      .id = agiru::XmlPortId{1}, .name = "Boundaries", .format = XmlPortFormat::VariableText};
+  for (const Case &test : cases) {
+    for (const std::string_view ending :
+         {std::string_view{}, std::string_view{"\n"}, std::string_view{"\r\n"}}) {
+      XmlPortInput input;
+      input.Load(std::string(test.source) + std::string(ending),
+                 def,
+                 test.separator,
+                 "\r\n",
+                 test.delimiter);
+      CHECK_TRUE("boundary input opens its root", input.Enter("Root"));
+      CHECK_TRUE("boundary input has one record", input.Enter("Row"));
+      for (const std::string_view expected : test.fields) {
+        CHECK_TRUE("an empty or quoted field retains its position", input.Enter("Field"));
+        CHECK_TEXT("the field retains exact bytes", input.Text(), expected);
+        input.Leave();
+      }
+      CHECK_TRUE("boundary input has no extra field", !input.Enter("Field"));
+      input.Leave();
+      CHECK_TRUE("terminal newline creates no phantom record", !input.Enter("Row"));
+    }
+  }
+}
+
 /// THE NAMESPACES ARE DECLARED ON THE ROOT AND NOWHERE ELSE. `devenv-namespaces-property.md`: "the
 /// namespaces declarations are only supported in the root element ... `<Root xmlns:mybcprefix=
 /// "mybcnamespace" xmlns="urn:bc:schema:all">`"; an element's `NamespacePrefix` is part of its
@@ -156,11 +203,11 @@ void TheNamespacesAreDeclaredOnTheRoot() {
       agiru::XmlNamespaceDef{.prefix = "", .uri = "urn:bc:schema:all"},
       agiru::XmlNamespaceDef{.prefix = "cbc", .uri = "urn:bc:basic"},
   }};
-  XmlPortDef xml{.id = agiru::XmlPortId{4},
-                 .name = "N",
-                 .format = XmlPortFormat::Xml,
-                 .rootName = "Root",
-                 .namespaces = kSpaces};
+  const XmlPortDef xml{.id = agiru::XmlPortId{4},
+                       .name = "N",
+                       .format = XmlPortFormat::Xml,
+                       .rootName = "Root",
+                       .namespaces = kSpaces};
   XmlPortOutput out;
   out.Start(xml, "\t", "\r\n", "", "");
   out.BeginRecord("Root");
@@ -176,12 +223,12 @@ void TheNamespacesAreDeclaredOnTheRoot() {
              "<Root xmlns=\"urn:bc:schema:all\" xmlns:cbc=\"urn:bc:basic\"><cbc:ID>7</cbc:ID>"
              "<Line><cbc:Name>A</cbc:Name></Line></Root>");
 
-  XmlPortDef plain{.id = agiru::XmlPortId{5},
-                   .name = "D",
-                   .format = XmlPortFormat::Xml,
-                   .rootName = "Root",
-                   .defaultNamespace = "urn:bc:default",
-                   .useDefaultNamespace = true};
+  const XmlPortDef plain{.id = kDefaultNamespacePort,
+                         .name = "D",
+                         .format = XmlPortFormat::Xml,
+                         .rootName = "Root",
+                         .defaultNamespace = "urn:bc:default",
+                         .useDefaultNamespace = true};
   XmlPortOutput defaulted;
   defaulted.Start(plain, "\t", "\r\n", "", "");
   defaulted.BeginRecord("Root");
@@ -205,12 +252,13 @@ void TheNamespacesAreDeclaredOnTheRoot() {
 /// `Xmlport.Export(Number, ...)` resolves through the catalogue; a number this build carries no
 /// xmlport for refuses with the number (board:0034).
 void AnUnknownNumberRefusesByName() {
-  CHECK_TRUE("no xmlport 999999", agiru::FindXmlPort(agiru::XmlPortId{999999}) == nullptr);
+  CHECK_TRUE("no xmlport 999999",
+             agiru::FindXmlPort(agiru::XmlPortId{kUnknownPortNumber}) == nullptr);
   agiru::Blob blob;
   agiru::OutStream out = blob.CreateOutStream();
   std::string message;
   try {
-    static_cast<void>(agiru::XmlPort<>::Export(999999, out));
+    static_cast<void>(agiru::XmlPort<>::Export(kUnknownPortNumber, out));
   } catch (const agiru::Error &e) { message = e.what(); }
   CHECK_TRUE("the refusal names the number",
              message.find("Xmlport.Export(999999)") != std::string::npos);
@@ -228,6 +276,7 @@ int main() {
     SeparatorTextReadsThePlaceholders();
     TheOutputWritesTheThreeFormats();
     TheInputWalksTextAndXmlAlike();
+    TextInputRetainsBoundaryFields();
     TheNamespacesAreDeclaredOnTheRoot();
     AnUnknownNumberRefusesByName();
   });
