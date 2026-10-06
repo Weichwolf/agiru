@@ -1,5 +1,6 @@
 #include "dotnet/NavUserAccountHelper.h"
 
+#include "type/StringValue.h"
 #include "type/Text.h"
 
 namespace agiru::dotnet {

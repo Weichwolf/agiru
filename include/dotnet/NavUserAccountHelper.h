@@ -34,19 +34,20 @@ public:
 
   /// \brief `IsUserSuperInAllCompanies(...)`. \return `true`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean IsUserSuperInAllCompanies(Arguments &&...) {
+  [[nodiscard]] static Boolean
+  IsUserSuperInAllCompanies([[maybe_unused]] Arguments &&...arguments) {
     return true;
   }
 
   /// \brief `IsPermissionSetAssigned(...)`. \return `false`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean IsPermissionSetAssigned(Arguments &&...) {
+  [[nodiscard]] static Boolean IsPermissionSetAssigned([[maybe_unused]] Arguments &&...arguments) {
     return false;
   }
 
   /// \brief `IsPermissionSetValid(RoleId, AppId, Scope, var Errors)`. \return `true`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean IsPermissionSetValid(Arguments &&...) {
+  [[nodiscard]] static Boolean IsPermissionSetValid([[maybe_unused]] Arguments &&...arguments) {
     return true;
   }
 
@@ -60,7 +61,8 @@ public:
   [[nodiscard]] static Boolean IsDelegatedUser() { return false; }
 
   /// \brief `IsPasswordSet(UserSecurityId)`. \return `false`; passwords are not kept here.
-  template <typename... Arguments> [[nodiscard]] static Boolean IsPasswordSet(Arguments &&...) {
+  template <typename... Arguments>
+  [[nodiscard]] static Boolean IsPasswordSet([[maybe_unused]] Arguments &&...arguments) {
     return false;
   }
 
@@ -69,18 +71,23 @@ public:
 
   /// \brief `UserName(Sid)`. \param Sid A Windows security id or Entra object id.
   /// \return Empty: no directory answers here.
-  template <typename Sid> [[nodiscard]] static ::agiru::Text<0> UserName(const Sid &) { return {}; }
+  template <typename Sid>
+  [[nodiscard]] static ::agiru::Text<0> UserName([[maybe_unused]] const Sid &sid) {
+    return {};
+  }
 
   /// \brief `GetAllowedCompanies([UserSecurityId])`. \return None listed: the caller then
   ///        falls back to the companies it can read itself.
   template <typename... Arguments>
-  [[nodiscard]] static std::vector<::agiru::Text<0>> GetAllowedCompanies(Arguments &&...) {
+  [[nodiscard]] static std::vector<::agiru::Text<0>>
+  GetAllowedCompanies([[maybe_unused]] Arguments &&...arguments) {
     return {};
   }
 
   /// \brief `GetAuthenticationStatus(UserSecurityId)`. \return 0, the platform's "none".
   template <typename... Arguments>
-  [[nodiscard]] static ::agiru::Integer GetAuthenticationStatus(Arguments &&...) {
+  [[nodiscard]] static ::agiru::Integer
+  GetAuthenticationStatus([[maybe_unused]] Arguments &&...arguments) {
     return 0;
   }
 
@@ -89,78 +96,85 @@ public:
 
   /// \brief `GetCurrentUserTokenClaim(Claim)`. \return Empty; there is no token.
   template <typename... Arguments>
-  [[nodiscard]] static ::agiru::Text<0> GetCurrentUserTokenClaim(Arguments &&...) {
+  [[nodiscard]] static ::agiru::Text<0>
+  GetCurrentUserTokenClaim([[maybe_unused]] Arguments &&...arguments) {
     return {};
   }
 
   /// \brief `GetEffectivePermissionForObject(User, Company, ObjectType, ObjectId)`.
   /// \return The five permissions as `SelectStr` reads them, all granted.
   template <typename... Arguments>
-  [[nodiscard]] static ::agiru::Text<0> GetEffectivePermissionForObject(Arguments &&...) {
+  [[nodiscard]] static ::agiru::Text<0>
+  GetEffectivePermissionForObject([[maybe_unused]] Arguments &&...arguments) {
     return ::agiru::Text<0>{kAllGranted};
   }
 
   /// \brief `GetEntitlementPermissionForObject(User, ObjectType, ObjectId)`. \return All granted.
   template <typename... Arguments>
-  [[nodiscard]] static ::agiru::Text<0> GetEntitlementPermissionForObject(Arguments &&...) {
+  [[nodiscard]] static ::agiru::Text<0>
+  GetEntitlementPermissionForObject([[maybe_unused]] Arguments &&...arguments) {
     return ::agiru::Text<0>{kAllGranted};
   }
 
   /// \brief `GetEntitlementPermissionForObjectAndPlan(Plan, ObjectType, ObjectId)`.
   /// \return All granted.
   template <typename... Arguments>
-  [[nodiscard]] static ::agiru::Text<0> GetEntitlementPermissionForObjectAndPlan(Arguments &&...) {
+  [[nodiscard]] static ::agiru::Text<0>
+  GetEntitlementPermissionForObjectAndPlan([[maybe_unused]] Arguments &&...arguments) {
     return ::agiru::Text<0>{kAllGranted};
   }
 
   /// \brief `SetAuthenticationObjectId(UserSecurityId, ObjectId)`. Kept nowhere.
-  template <typename... Arguments> static void SetAuthenticationObjectId(Arguments &&...) {}
+  template <typename... Arguments>
+  static void SetAuthenticationObjectId([[maybe_unused]] Arguments &&...arguments) {}
 
   /// \brief `TrySetAuthenticationKey(UserSecurityId, Key)`. \return `true`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean TrySetAuthenticationKey(Arguments &&...) {
+  [[nodiscard]] static Boolean TrySetAuthenticationKey([[maybe_unused]] Arguments &&...arguments) {
     return true;
   }
 
   /// \brief `TrySetAuthenticationEmail(UserSecurityId, Email)`. \return `true`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean TrySetAuthenticationEmail(Arguments &&...) {
+  [[nodiscard]] static Boolean
+  TrySetAuthenticationEmail([[maybe_unused]] Arguments &&...arguments) {
     return true;
   }
 
   /// \brief `TryGetAuthenticationKey(UserSecurityId, var Key)`. \return `false`: none kept.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean TryGetAuthenticationKey(Arguments &&...) {
+  [[nodiscard]] static Boolean TryGetAuthenticationKey([[maybe_unused]] Arguments &&...arguments) {
     return false;
   }
 
   /// \brief `TryGetAuthenticationObjectId(UserSecurityId, var ObjectId)`. \return `false`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean TryGetAuthenticationObjectId(Arguments &&...) {
+  [[nodiscard]] static Boolean
+  TryGetAuthenticationObjectId([[maybe_unused]] Arguments &&...arguments) {
     return false;
   }
 
   /// \brief `TryGetNameIdentifier(UserSecurityId, var NameId)`. \return `false`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean TryGetNameIdentifier(Arguments &&...) {
+  [[nodiscard]] static Boolean TryGetNameIdentifier([[maybe_unused]] Arguments &&...arguments) {
     return false;
   }
 
   /// \brief `TryCreateWebServicesKey(UserSecurityId, Expiry, var Key)`. \return `false`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean TryCreateWebServicesKey(Arguments &&...) {
+  [[nodiscard]] static Boolean TryCreateWebServicesKey([[maybe_unused]] Arguments &&...arguments) {
     return false;
   }
 
   /// \brief `TryClearWebServicesKey(UserSecurityId)`. \return `true`; there was none.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean TryClearWebServicesKey(Arguments &&...) {
+  [[nodiscard]] static Boolean TryClearWebServicesKey([[maybe_unused]] Arguments &&...arguments) {
     return true;
   }
 
   /// \brief `TryGetWebServicesKey(UserSecurityId, var Key, var Expiry)`. \return `false`.
   template <typename... Arguments>
-  [[nodiscard]] static Boolean TryGetWebServicesKey(Arguments &&...) {
+  [[nodiscard]] static Boolean TryGetWebServicesKey([[maybe_unused]] Arguments &&...arguments) {
     return false;
   }
 

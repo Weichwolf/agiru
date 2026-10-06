@@ -1,11 +1,16 @@
 #include "dotnet/File.h"
 
+#include "dotnet/Regex.h"
 #include "runtime/ErrorValue.h"
+#include "type/Boolean.h"
+#include "type/StringValue.h"
 
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <system_error>
 
 namespace agiru::dotnet {
