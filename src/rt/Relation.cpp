@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -143,8 +144,8 @@ std::string FilterTextOf(const Term &term, const void *record, const TableDef &t
 }
 
 bool Satisfies(std::string_view conditions, const void *record, const TableDef &table) {
-  for (const std::string_view clause : SplitTop(conditions, ',')) {
-    if (Trim(clause).empty()) { continue; }
+  return std::ranges::all_of(SplitTop(conditions, ','), [&](const std::string_view clause) {
+    if (Trim(clause).empty()) { return true; }
     const std::optional<Term> term = TermOf(clause);
     if (!term.has_value()) {
       throw Error("TableRelation: the condition `" + std::string(Trim(clause)) + "` has no '='");
@@ -154,11 +155,8 @@ bool Satisfies(std::string_view conditions, const void *record, const TableDef &
       throw Error("TableRelation: `" + std::string(Unquoted(term->field)) + "` is no field of " +
                   std::string(table.name));
     }
-    if (!Matches(ParseFilter(FilterTextOf(*term, record, table)), FieldText(record, *own), *own)) {
-      return false;
-    }
-  }
-  return true;
+    return Matches(ParseFilter(FilterTextOf(*term, record, table)), FieldText(record, *own), *own);
+  });
 }
 
 RelationTerm DeclaredTerm(const Term &term) {
@@ -277,7 +275,7 @@ std::vector<RelationBranch> RelationBranches(const FieldDef &def) {
         throw Error("TableRelation: the condition in `" + std::string(rest) + "` is not closed");
       }
       const std::string_view conditions = rest.substr(open + 1, close - open - 1);
-      std::string_view after = Trim(rest.substr(close + 1));
+      const std::string_view after = Trim(rest.substr(close + 1));
       const std::size_t elseAt = TopLevelWord(after, "else", 0);
       const std::string_view target =
           elseAt == std::string_view::npos ? after : Trim(after.substr(0, elseAt));
@@ -309,7 +307,7 @@ ResolveRelation(const void *record, const TableDef &table, const FieldDef &def) 
         throw Error("TableRelation: the condition in `" + std::string(rest) + "` is not closed");
       }
       const std::string_view conditions = rest.substr(open + 1, close - open - 1);
-      std::string_view after = Trim(rest.substr(close + 1));
+      const std::string_view after = Trim(rest.substr(close + 1));
       const std::size_t elseAt = TopLevelWord(after, "else", 0);
       const std::string_view target =
           elseAt == std::string_view::npos ? after : Trim(after.substr(0, elseAt));

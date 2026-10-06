@@ -4,6 +4,7 @@
 #include "runtime/Session.h"
 #include "runtime/Table.h"
 #include "type/DateTime.h"
+#include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/Variant.h"
 

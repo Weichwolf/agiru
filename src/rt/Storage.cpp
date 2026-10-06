@@ -125,8 +125,8 @@ std::string ColumnType(const FieldDef &def) {
 
 namespace detail {
 
-std::string ColumnZero(const FieldDef &def) {
-  switch (def.type) {
+std::string ColumnZero(const FieldDef &field) {
+  switch (field.type) {
     case FieldType::Boolean: return "false";
     case FieldType::Option:
     case FieldType::Enum:
@@ -456,10 +456,18 @@ std::string_view Required(const std::optional<std::string> &value, const FieldDe
 
 namespace {
 
+constexpr unsigned char kUtf8ContinuationMask = 0xC0U;
+constexpr unsigned char kUtf8ContinuationTag = 0x80U;
+constexpr unsigned kDecember = 12;
+constexpr unsigned kDecemberLastDay = 31;
+
 std::string_view Fitted(std::string_view text, std::size_t length) {
   if (text.size() <= length) { return text; }
   std::size_t end = length;
-  while (end > 0 && (static_cast<unsigned char>(text[end]) & 0xC0U) == 0x80U) { --end; }
+  while (end > 0 &&
+         (static_cast<unsigned char>(text[end]) & kUtf8ContinuationMask) == kUtf8ContinuationTag) {
+    --end;
+  }
   return text.substr(0, end);
 }
 
@@ -653,7 +661,7 @@ void ProvisionDates() {
       if (civil.month == 1) {
         period(platform::PeriodType::Year,
                day,
-               ::agiru::Date::FromYmd(civil.year, 12, 31),
+               ::agiru::Date::FromYmd(civil.year, kDecember, kDecemberLastDay),
                civil.year,
                std::to_string(civil.year));
       }

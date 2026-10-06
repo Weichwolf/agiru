@@ -8,6 +8,7 @@
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/RecordId.h"
+#include "type/StringValue.h"
 #include "type/Verbosity.h"
 
 #include <string>

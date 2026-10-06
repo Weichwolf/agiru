@@ -4,6 +4,7 @@
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/TestRunner.h"
+#include "runtime/test/Handlers.h"
 #include "runtime/test/TestHttpRequestMessage.h"
 #include "runtime/test/TestHttpResponseMessage.h"
 #include "type/BigInteger.h"
@@ -51,7 +52,6 @@
 #include "type/Stream.h"
 #include "type/StringValue.h"
 #include "type/TaskScheduler.h"
-#include "type/TextBuilder.h"
 #include "type/TextConst.h"
 #include "type/TextEncoding.h"
 #include "type/Time.h"
@@ -59,26 +59,11 @@
 #include "type/Verbosity.h"
 #include "type/WebServiceActionContext.h"
 #include "type/WebServiceActionResultCode.h"
-#include "type/XmlAttribute.h"
-#include "type/XmlAttributeCollection.h"
-#include "type/XmlCData.h"
-#include "type/XmlComment.h"
-#include "type/XmlDeclaration.h"
-#include "type/XmlDocument.h"
-#include "type/XmlDocumentType.h"
-#include "type/XmlElement.h"
-#include "type/XmlNameTable.h"
-#include "type/XmlNamespaceManager.h"
-#include "type/XmlNode.h"
-#include "type/XmlNodeList.h"
-#include "type/XmlProcessingInstruction.h"
-#include "type/XmlReadOptions.h"
-#include "type/XmlText.h"
-#include "type/XmlWriteOptions.h"
 
 #include "BuiltinsWritten.h"
 
 #include <cctype>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -158,7 +143,7 @@ void BigText::AddText(std::string_view String, ::agiru::Integer Position) {
 }
 
 std::string CompanyProperty::DisplayName() {
-  const std::string name = std::string(Session::Current().CompanyName());
+  std::string name = std::string(Session::Current().CompanyName());
   platform::Company company;
   if (company.Get(name) && company.DisplayName != "") {
     return std::string(company.DisplayName.Value());

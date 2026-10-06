@@ -16,6 +16,7 @@
 #include "type/Time.h"
 #include "type/Variant.h"
 #include "type/XmlHandle.h"
+#include "type/XmlNode.h"
 
 #include <string>
 #include <string_view>
@@ -26,8 +27,6 @@
 /// \brief AL `XmlNodeList` -- the surface the platform documentation declares.
 
 namespace agiru {
-
-class XmlNode;
 
 /// \brief AL `XmlNodeList`.
 ///

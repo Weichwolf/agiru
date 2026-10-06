@@ -1,19 +1,59 @@
 #include "meta/TableDef.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordState.h"
 #include "runtime/Relation.h"
 
 #include "Check.h"
 #include "RelationBranches.h"
 #include "ResourceCost.h"
+#include "options/Types.h"
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
 using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
+
+void ConditionalConjunctionsShortCircuitInOrder() {
+  ResourceCost record;
+  record.Type = ResourceCostType::Resource;
+  record.Code = "R100";
+  const agiru::FieldDef conjunction{
+      .name = "Code",
+      .relation =
+          "if (Type = const(Resource), Code = const(R100)) Resource else \"Resource Group\""};
+  auto found = agiru::detail::ResolveRelation(
+      &record, agiru::Projects::Resources::Pricing::kResourceCostTable, conjunction);
+  CHECK_TRUE("every matching condition selects the first branch",
+             found.has_value() && found->table == "Resource");
+  record.Code = "R200";
+  found = agiru::detail::ResolveRelation(
+      &record, agiru::Projects::Resources::Pricing::kResourceCostTable, conjunction);
+  CHECK_TRUE("a later failed condition selects the fallback",
+             found.has_value() && found->table == "Resource Group");
+  const agiru::FieldDef invalidLater{
+      .name = "Code",
+      .relation =
+          "if (Type = const(Resource), MissingField = const(X)) Resource else \"Resource Group\""};
+  record.Type = ResourceCostType::GroupResource;
+  found = agiru::detail::ResolveRelation(
+      &record, agiru::Projects::Resources::Pricing::kResourceCostTable, invalidLater);
+  CHECK_TRUE("a failed first condition does not evaluate a later invalid field",
+             found.has_value() && found->table == "Resource Group");
+  record.Type = ResourceCostType::Resource;
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::detail::ResolveRelation(
+        &record, agiru::Projects::Resources::Pricing::kResourceCostTable, invalidLater));
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()).contains("MissingField");
+  }
+  CHECK_TRUE("an evaluated invalid condition still refuses explicitly", refused);
+}
 
 /// A CONDITIONAL `TableRelation` IS READ AGAINST THE RECORD: `Resource Cost.Code` declares
 /// `if (Type = const(Resource)) Resource else if (Type = const("Group(Resource)")) "Resource
@@ -115,6 +155,7 @@ void TheSpacedDotSeparatesTableAndField() {
 
 int main() {
   return gate::Run("Relation", [] {
+    ConditionalConjunctionsShortCircuitInOrder();
     AConditionalRelationFollowsTheRecordsType();
     AWhereClauseReadsTheRecordsFields();
     TheSpacedDotSeparatesTableAndField();
