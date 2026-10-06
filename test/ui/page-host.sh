@@ -5,6 +5,7 @@ proof=$(mktemp -d /tmp/agiru-page-host.XXXXXX)
 git rev-parse HEAD > "$proof/head.txt"
 sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSession,SessionCommand}.h \
   src/rt/{PageCommandHost,PageHtml,PageInstance,SessionCommand,HtmlText}.cpp src/rt/HtmlText.h \
+  include/runtime/TablePermissions.h src/rt/{TablePermissions,Session,Table,Navigate,Query,RecordRef}.cpp \
   test/ui/page-host.{sh,mjs} test/ui/page-host/Runner.cpp test/runtime/page-navigation.sh \
   test/runtime/page-navigation/*.al test/gate/PrivateAuthFile.h \
   src/client/*.{mts,json} > "$proof/inputs.sha256"

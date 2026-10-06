@@ -44,6 +44,8 @@ if ! B="$B" bash test/ui/page-profile.sh; then red=$((red + 1)); fi
 n=$((n + 1))
 if ! B="$B" bash test/runtime/session-identity.sh; then red=$((red + 1)); fi
 n=$((n + 1))
+if ! B="$B" bash test/runtime/table-permissions.sh; then red=$((red + 1)); fi
+n=$((n + 1))
 if ! B="$B" python3 test/tooling/toolchain.py; then red=$((red + 1)); fi
 printf '\ntest: %s case(s), %s red\n' "$n" "$red"
 [ "$red" -eq 0 ]

@@ -9,6 +9,7 @@
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
+#include "runtime/TablePermissions.h"
 
 #include "Cursor.h"
 #include "Filter.h"
@@ -288,6 +289,12 @@ const std::string *FilterSet(const QueryState &state, std::size_t column) {
   return nullptr;
 }
 
+void RequireQueryRead(const QueryDef &def) {
+  for (const auto &item : def.dataItems) {
+    RequireTablePermission(*item.table, TableOperation::Read);
+  }
+}
+
 struct Statement {
   std::string sql;
   std::vector<std::optional<std::string>> binds;
@@ -298,6 +305,7 @@ Statement Build(const QueryDef &def, const QueryState &state) {
   if (def.dataItems.empty()) {
     throw Error("the query " + std::string(def.name) + " declares no dataitem");
   }
+  RequireQueryRead(def);
   Statement made;
   std::string select;
   for (std::size_t i = 0; i < def.columns.size(); ++i) {
@@ -404,6 +412,7 @@ bool QueryRead(QueryState &state, const QueryDef &def, void *self) {
   if (state.cursor == nullptr) {
     throw Error("Query.Read: the query " + std::string(def.name) + " is not open");
   }
+  RequireQueryRead(def);
   if (!state.cursor->Step()) {
     QueryClose(state);
     return false;

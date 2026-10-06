@@ -10,6 +10,7 @@
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
+#include "runtime/TablePermissions.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Date.h"
@@ -41,6 +42,14 @@
 #include <vector>
 
 namespace agiru {
+
+Boolean RecordRef::ReadPermission() {
+  return HasTablePermission(Table(), TableOperation::Read);
+}
+
+Boolean RecordRef::WritePermission() {
+  return HasTableWritePermission(Table());
+}
 
 FieldRef::FieldRef(detail::RecordRefState &state, const TableDef &table, const FieldDef &def)
     : state_(&state), table_(&table), def_(&def) {

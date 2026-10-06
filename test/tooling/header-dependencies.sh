@@ -171,6 +171,16 @@ if reject_dependency "$proof/forced-token-crypto.h.d" rand.h \
 fi
 compile_header runtime/SingleInstance.h "$proof/SingleInstance.h.d"
 compile_header runtime/PageCommandHost.h "$proof/PageCommandHost.h.d"
+compile_header runtime/TablePermissions.h "$proof/TablePermissions.h.d"
+for forbidden in TableDef.h Session.h Database.h Table.h vector memory mutex; do
+  reject_dependency "$proof/TablePermissions.h.d" "$forbidden"
+done
+compile_header runtime/TablePermissions.h "$proof/forced-authority-session.h.d" -include runtime/Session.h
+if reject_dependency "$proof/forced-authority-session.h.d" Session.h \
+  > "$proof/forced-authority-session.h.log" 2>&1; then
+  printf 'header-dependencies: session implementation escaped the table authority boundary\n' >&2
+  exit 1
+fi
 for forbidden in PageDef.h PageSession.h PageCore.h Database.h HttpServer.h Session.h microhttpd.h evp.h mutex; do
   reject_dependency "$proof/PageCommandHost.h.d" "$forbidden"
 done
@@ -203,4 +213,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: twenty-two standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential controls refused\n'
+printf 'header-dependencies: twenty-three standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority controls refused\n'

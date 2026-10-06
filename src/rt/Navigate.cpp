@@ -6,6 +6,7 @@
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
+#include "runtime/TablePermissions.h"
 
 #include "Cursor.h"
 #include "FieldMetadata.h"
@@ -177,6 +178,7 @@ bool ReadOne(void *record, const TableDef &table, const Selection &made, const s
 }
 
 bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
+  if (TempOf(record) == nullptr) { RequireTablePermission(table, TableOperation::Read); }
   if (TempOf(record) != nullptr) { return TempFind(record, table, which); }
   if (const auto found = FindInstalledFields(record, table, which); found.has_value()) {
     return *found;
@@ -220,6 +222,7 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
 }
 
 bool RuntimeFindSet(void *record, const TableDef &table) {
+  if (TempOf(record) == nullptr) { RequireTablePermission(table, TableOperation::Read); }
   if (TempOf(record) != nullptr) { return TempFindSet(record, table); }
   if (const auto found = FindInstalledFields(record, table, "-"); found.has_value()) {
     return *found;
@@ -249,6 +252,7 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
 
 std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps) {
   if (steps == 0) { return 0; }
+  if (TempOf(record) == nullptr) { RequireTablePermission(table, TableOperation::Read); }
   if (TempOf(record) != nullptr) { return TempNext(record, table, steps); }
   if (const auto moved = NextInstalledField(record, table, steps); moved.has_value()) {
     return *moved;
@@ -287,6 +291,7 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
 }
 
 std::int32_t RuntimeCount(const void *record, const TableDef &table) {
+  if (TempOf(record) == nullptr) { RequireTablePermission(table, TableOperation::Read); }
   if (TempOf(record) != nullptr) { return TempCount(const_cast<void *>(record), table); }
   if (const auto count = CountInstalledFields(record, table); count.has_value()) { return *count; }
   if (const auto count = CountInstalledTableMetadata(record, table); count.has_value()) {
@@ -306,6 +311,7 @@ std::int32_t RuntimeCount(const void *record, const TableDef &table) {
 }
 
 bool RuntimeIsEmpty(const void *record, const TableDef &table) {
+  if (TempOf(record) == nullptr) { RequireTablePermission(table, TableOperation::Read); }
   if (TempOf(record) != nullptr) { return TempIsEmpty(const_cast<void *>(record), table); }
   if (const auto count = CountInstalledFields(record, table, true); count.has_value()) {
     return *count == 0;
@@ -325,6 +331,7 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table) {
 }
 
 std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table) {
+  if (TempOf(record) == nullptr) { RequireTablePermission(table, TableOperation::Delete); }
   if (TempOf(record) != nullptr) { return TempDeleteAll(const_cast<void *>(record), table); }
 
   const Selection made = Select(PeekOf(record), table);

@@ -27,6 +27,7 @@ sha256sum src/rt/Session.cpp include/runtime/Session.h include/platform/User.h \
   include/runtime/SingleInstance.h src/rt/SingleInstance.cpp src/rt/SessionState.h \
   test/gate/SessionCommandGate.cpp \
   test/gate/SessionIdentityGate.cpp test/gate/OwnedDatabase.h test/gate/PrivateAuthFile.h test/runtime/session-identity.sh \
+  test/gate/AccountFixturePermissions.h include/runtime/TablePermissions.h src/rt/TablePermissions.cpp \
   include/runtime/{SecureToken,ClientCredentials}.h src/net/SecureToken.cpp src/rt/ClientCredentials.cpp \
   test/gate/ClientCredentialsGate.cpp test/runtime/client-credentials/ProviderFailure.cpp \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" "$B/libagiru_db.so" > "$proof/inputs.sha256"

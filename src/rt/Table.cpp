@@ -13,6 +13,7 @@
 #include "runtime/Relation.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
+#include "runtime/TablePermissions.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
@@ -649,6 +650,7 @@ bool RuntimeInsert(void *record, const TableDef &table, bool withSystemId) {
     return TempInsert(record, table);
   }
 
+  RequireTablePermission(table, TableOperation::Insert);
   RequireTableProvider(table);
   StampInserted(record, table, withSystemId);
   AutoIncrement(record, table);
@@ -678,6 +680,7 @@ bool TakePlatformOwned(void *record,
 
 bool RuntimeModify(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempModify(record, table); }
+  RequireTablePermission(table, TableOperation::Modify);
   RequireTableProvider(table);
 
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
@@ -694,6 +697,7 @@ bool RuntimeRename(void *record, const void *before, const TableDef &table) {
     if (!TempDelete(const_cast<void *>(before), table)) { return false; }
     return TempInsert(record, table);
   }
+  RequireTablePermission(table, TableOperation::Modify);
   RequireTableProvider(table);
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
@@ -708,6 +712,7 @@ bool RuntimeRename(void *record, const void *before, const TableDef &table) {
 
 bool RuntimeDelete(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempDelete(const_cast<void *>(record), table); }
+  RequireTablePermission(table, TableOperation::Delete);
   RequireTableProvider(table);
 
   const FieldValues key = KeyOf(record, table);
@@ -744,6 +749,7 @@ std::string RecordKeyText(const void *record, const TableDef &table) {
 
 bool RuntimeGet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempGet(record, table); }
+  RequireTablePermission(table, TableOperation::Read);
   if (const auto found = GetInstalledFieldMetadata(record, table); found.has_value()) {
     return *found;
   }
@@ -776,6 +782,7 @@ bool RuntimeGetBySystemId(void *record, const TableDef &table, const Guid &syste
   if (TempOf(record) != nullptr) {
     throw Error("GetBySystemId on a temporary record is not written yet (board:0035)");
   }
+  RequireTablePermission(table, TableOperation::Read);
   RequireTableProvider(table);
   const std::optional<FieldValues> row =
       GetRowWhere(Session::Current().Database(), table, *column, systemId.ToText());
@@ -896,6 +903,7 @@ void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
   if (column == nullptr) { return; }
   bool found = false;
   if (resolved->filters.empty()) {
+    RequireTablePermission(other, TableOperation::Read);
     found = GetRowWhere(Session::Current().Database(), other, *column, StorageText(record, *def))
                 .has_value();
   } else {
@@ -1429,6 +1437,7 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
   if (def->fieldClass != FieldClass::FlowField) { return; }
   const FlowFormula formula = FormulaReader(def->calcFormula, *def).Read();
   const TableDef &target = TableNamed(formula.table, *def);
+  RequireTablePermission(target, TableOperation::Read);
   if (IsCatalogueFlowFieldTarget(target)) {
     std::vector<ColumnPredicate> filters;
     VisitFlowFilters(formula,
@@ -1525,6 +1534,7 @@ Clause FlowFieldColumn(const TableDef &table,
   if (def.fieldClass != FieldClass::FlowField || def.calcFormula.empty()) { return {}; }
   const FlowFormula formula = FormulaReader(def.calcFormula, def).Read();
   const TableDef &target = TableNamed(formula.table, def);
+  RequireTablePermission(target, TableOperation::Read);
   std::string column;
   if (formula.kind != FlowFormula::Kind::Count && formula.kind != FlowFormula::Kind::Exist) {
     const FieldDef *of = FieldNamed(target, formula.field);
@@ -1660,6 +1670,7 @@ void CalcSum(void *record, const TableDef &table, const RecordState *state, Fiel
     TempCalcSum(record, table, *def);
     return;
   }
+  RequireTablePermission(table, TableOperation::Read);
   const Selection selection = Select(state, table);
   const std::string sql = "SELECT COALESCE(SUM(" + SqlColumn(*def) + "), 0) FROM " + Name(table) +
                           (selection.where.empty() ? std::string{} : " WHERE " + selection.where);

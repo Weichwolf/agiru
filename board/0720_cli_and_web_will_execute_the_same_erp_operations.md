@@ -99,7 +99,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Navigation/Save and AL fields/actions share the same semantic HTML forms and unchanged
   CMD/MCP adapters. Anonymous AL area/actions containers receive presentation-only IDs,
   not invented AL control names; host/AL action collisions explicitly refuse.
-  `make page-host-test JOBS=2`: eleven actual nginx/C++/PostgreSQL cases with external
+  `make page-host-test JOBS=2`: twelve actual nginx/C++/PostgreSQL cases with external
   shell CMD and official SDK MCP. Independent SQL checks exact values, modifier GUID,
   update-trigger counts, receipt/revision ownership, revocation, rollback and Commit followed
   by an error. Three compiled ownership/revision/replay defects fail their named HTTP checks.
@@ -113,8 +113,27 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Authorization is mandatory; the qualifier supplies SQL-backed fixture grants, not a
   full BC permission-set/security-filter/indirect-access provider. Only one explicitly
   configured company/database is accepted; its imported-schema binding remains unqualified.
-  Record.ReadPermission/WritePermission still do not enforce real user rights; do not expose
-  this as a fully authorized ERP server. Native entrypoint/provisioning, browser login/assets,
+  Session-owned TableData checks now cover typed/reflected reads/writes, buffered record/query
+  reads, relations and FlowFields. ReadPermission/WritePermission use the same authority;
+  WritePermission requires every Insert/Modify/Delete right. Authenticated sessions without
+  a provider refuse; trusted account resolution uses the original User declaration below
+  the AL access boundary, not a system-table exemption. Actual temporary buffers retain
+  their documented no-SQL-rights policy. The host requires both page and table authorities;
+  authorized fixture actions cannot read/insert a denied second table or expose its values.
+  `make table-permissions JOBS=2`: 29 checks and two compiled permission-bypass/partial-write
+  defects; independent SQL verifies refusal effects and exact user/company grant ownership.
+  Eleven affected runtime gates retain 8,862 checks; identity/command/credentials retain
+  75/49/32 checks and twelve compiled defects. Twenty-three standalone-header/dependency
+  controls pass, including the forced-session authority control. Targeted tidy passes for
+  the authority, Session, host, navigation, identity and HTTP qualifiers. RecordRef retains
+  four existing findings; Table retains thirteen; Query retains its two existing findings
+  (Build complexity 55 and QueryDef::Groups). The new permission gate inherits the latter
+  header finding. No baseline/suppression was raised; full lint/apps/UT remain pending.
+  These fixture providers are not native BC role composition: indirect/inherent rights,
+  object Execute and security
+  predicates remain unimplemented; filtered policies must refuse rather than grant all rows.
+  Do not expose this as a fully authorized ERP server. Native entrypoint/provisioning,
+  browser login/assets,
   full URLs/bookmarks/filters/parts/dialogs, typed errors/messages, reconciliation endpoints
   and multi-context record concurrency remain pending. Context/navigation/lifetime and
   receipt count/bytes have explicit initial bounds, not production scale guarantees.
@@ -420,6 +439,22 @@ OpenSSL private randomness/provider checks: [RAND_priv_bytes](https://docs.opens
 was unavailable. Source/test paths: `include/runtime/{SecureToken,ClientCredentials}.h`,
 `src/net/SecureToken.cpp`, `src/rt/ClientCredentials.cpp`, `test/gate/ClientCredentialsGate.cpp`,
 `test/runtime/client-credentials/ProviderFailure.cpp`, `test/ui/client-authentication.mjs`.
+TableData boundary: developer `methods-auto/{record,recordref}/*-{readpermission,
+writepermission}-method.md`, `devenv-permissions-on-database-objects.md`,
+`properties/devenv-permissions-property.md`, `devenv-temporary-tables.md`; user
+`business-central/ui-define-granular-permissions.md`, at the revisions above.
+Original BC 29.0.54011.55407 System package SHA256
+`f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`:
+`Tenant Database Tables/{AccessControl,TenantPermission}.Table.al` and
+`Virtual Tables/AggregatePermissionSet.Table.al` establish identities/signatures,
+not implemented providers. Inventory system/tenant compositions before installing one;
+set exclusions are scoped to the expanded set, never a global grant deletion.
+Predecessor WI 1700 and `openerp/runtime/permissions.py` informed transitive checks;
+reject their broad system-table exemption, implicit SUPER/test grants, global exclusions
+and Python context/thread machinery. Implementation: `include/runtime/TablePermissions.h`,
+`src/rt/{TablePermissions,Table,Navigate,Query,RecordRef,Session}.cpp`;
+proof: `test/gate/TablePermissionsGate.cpp`, `test/runtime/table-permissions.sh` and
+`test/runtime/page-navigation/RestrictedRow.Table.al` through `test/ui/page-host.mjs`.
 Persistent commands: developer `properties/devenv-singleinstance-property.md` and
 `methods-auto/database/database-commit-method.md`; user
 `business-central/ui-change-basic-settings.md`, at the revisions above. Predecessor

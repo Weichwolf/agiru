@@ -8,6 +8,7 @@
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/TableDefinition.h"
+#include "runtime/TablePermissions.h"
 #include "type/Boolean.h"
 #include "type/ErrorInfo.h"
 #include "type/Guid.h"
@@ -808,6 +809,7 @@ private:
   Boolean Insert_(Boolean RunTrigger) { return Insert_(RunTrigger, false); }
 
   Boolean Insert_(Boolean RunTrigger, Boolean InsertWithSystemId) {
+    detail::RequireRecordPermission(Self(), TableDefinition<Derived>(), TableOperation::Insert);
     TableEvent("OnBeforeInsertEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnInsert(); }) {
@@ -845,6 +847,7 @@ public:
   /// \throws Error when no row carries this primary key, and whatever the trigger raises.
   /// \see Insert(Boolean) for why the trigger runs first and how it is found.
   Boolean Modify(Boolean RunTrigger) {
+    detail::RequireRecordPermission(Self(), TableDefinition<Derived>(), TableOperation::Modify);
     Derived before = StoredImage();
     TableEvent("OnBeforeModifyEvent", RunTrigger, before);
     if (RunTrigger) {
@@ -874,6 +877,7 @@ public:
   /// \note NOT `const`, although the delete is: `OnDelete` is AL code that may write into the
   ///       record it is about to remove, and a great many of them do.
   Boolean Delete(Boolean RunTrigger) {
+    detail::RequireRecordPermission(Self(), TableDefinition<Derived>(), TableOperation::Delete);
     TableEvent("OnBeforeDeleteEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnDelete(); }) {
@@ -1567,6 +1571,7 @@ public:
   /// \param RunTrigger Whether each row's `OnDelete` runs.
   /// \throws Error if the native provider is read-only, even when no row matches.
   void DeleteAll(Boolean RunTrigger) {
+    detail::RequireRecordPermission(Self(), TableDefinition<Derived>(), TableOperation::Delete);
     if (!RunTrigger) {
       DeleteAll();
       return;
@@ -1854,6 +1859,7 @@ public:
   ///          (`record-modifyall-method.md`).
   template <typename Field, typename Value>
   void ModifyAll(Field &member, const Value &value, Boolean RunTrigger = false) {
+    detail::RequireRecordPermission(Self(), TableDefinition<Derived>(), TableOperation::Modify);
     detail::RuntimeRequireWritableProvider(Self(), TableDefinition<Derived>());
     const FieldDef *field = ::agiru::Field(TableDefinition<Derived>(), NumberOf(&member));
     Field replacement{};
@@ -1900,18 +1906,11 @@ public:
   /// \brief AL `Record.ReadPermission(...)`. Determines whether a user is granted read permission
   /// to the table that contains a record. This method can test for both full read permission and
   /// partial read permission that has been granted with a security filter.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  ///
-  /// \note EVERY SESSION IS SUPER UNTIL THERE IS A PERMISSION SYSTEM, so this is `true` and says
-  ///       so rather than refusing. A refusal here stops 125 UT procedures that only ask the
-  ///       question before doing the work (measured 2026-09-08); an answer of `false` would send
-  ///       them down the branch AL takes when a user may not write, which is the wrong branch for
-  ///       a runtime that enforces nothing. When permissions arrive this reads the user's, and
-  ///       board:0030's family is where that lives.
-  [[nodiscard]] Boolean ReadPermission() const { return true; }
+  /// \return The active session authority's Read answer for this exact table.
+  /// \throws Error when an authenticated session has no provider or a policy is unsupported.
+  [[nodiscard]] Boolean ReadPermission() const {
+    return HasTablePermission(TableDefinition<Derived>(), TableOperation::Read);
+  }
 
   /// \brief AL `Record.RecordId(...)`. Gets the RecordId of the record that is currently selected
   /// in the table. If no table is selected, an error is generated.
@@ -1995,6 +1994,7 @@ public:
   /// \return True.
   /// \throws Error when no row carries the old key; the record is as it was then.
   Boolean RenameFrom(const Derived &before) {
+    detail::RequireRecordPermission(Self(), TableDefinition<Derived>(), TableOperation::Modify);
     Derived was = before;
     TableEvent("OnBeforeRenameEvent", true, was);
     {
@@ -2413,18 +2413,11 @@ public:
   /// method can test for both full write permission and partial write permission that has been
   /// granted with a security filter. A write permission consists of Insert, Delete, and Modify
   /// permissions.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  ///
-  /// \note EVERY SESSION IS SUPER UNTIL THERE IS A PERMISSION SYSTEM, so this is `true` and says
-  ///       so rather than refusing. A refusal here stops 125 UT procedures that only ask the
-  ///       question before doing the work (measured 2026-09-08); an answer of `false` would send
-  ///       them down the branch AL takes when a user may not write, which is the wrong branch for
-  ///       a runtime that enforces nothing. When permissions arrive this reads the user's, and
-  ///       board:0030's family is where that lives.
-  [[nodiscard]] Boolean WritePermission() const { return true; }
+  /// \return True only when Insert, Modify and Delete are all permitted for this table.
+  /// \throws Error when an authenticated session has no provider or a policy is unsupported.
+  [[nodiscard]] Boolean WritePermission() const {
+    return HasTableWritePermission(TableDefinition<Derived>());
+  }
 
 private:
   friend Derived;

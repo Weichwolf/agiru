@@ -13,6 +13,7 @@
 #include "type/Option.h"
 #include "type/Time.h"
 
+#include "AccountFixturePermissions.h"
 #include "Check.h"
 #include "OwnedDatabase.h"
 
@@ -87,6 +88,7 @@ void CheckAudit(const agiru::Connection &observer,
 void ResolvedIdentitiesOwnAuditValues(const std::string &dsn) {
   const agiru::Connection observer(dsn);
   agiru::Session alice(dsn, Identity(1));
+  gate::AccountFixturePermissions(alice);
   alice.Language(kPolishLanguage);
   CHECK_TEXT("UserId comes from the Code-typed database field", alice.UserId(), "ALICE NÄME");
   CHECK_TRUE("UserSecurityId remains a Guid", alice.UserSecurityId() == Identity(1));
@@ -105,7 +107,8 @@ void ResolvedIdentitiesOwnAuditValues(const std::string &dsn) {
   agiru::Commit();
   CheckAudit(observer, Identity(1), Identity(1));
   {
-    const agiru::Session bob(dsn, Identity(2));
+    agiru::Session bob(dsn, Identity(2));
+    gate::AccountFixturePermissions(bob);
     CHECK_TEXT("a nested user resolves its own name", bob.UserId(), "USER 2");
     CHECK_TRUE("a nested user has its own security ID", bob.UserSecurityId() == Identity(2));
     agiru::platform::User changed;

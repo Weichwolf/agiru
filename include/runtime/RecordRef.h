@@ -1231,10 +1231,8 @@ public:
 
   /// \brief AL `RecordRef.ReadPermission()`. Determines if you can read from a table.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean ReadPermission() {
-    throw Error("RecordRef.ReadPermission() is declared and not implemented yet (board:0035)");
-  }
+  /// \throws Error for an unopened record, missing authority or unsupported policy.
+  ::agiru::Boolean ReadPermission();
 
   /// \brief AL `RecordRef.RecordId()`. Gets the RecordID of the record that is currently selected
   /// in the table. If no table is selected, an error is generated.
@@ -1453,10 +1451,8 @@ public:
 
   /// \brief AL `RecordRef.WritePermission()`. Determines if you can write to a table.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WritePermission() {
-    throw Error("RecordRef.WritePermission() is declared and not implemented yet (board:0035)");
-  }
+  /// \throws Error for an unopened record, missing authority or unsupported policy.
+  ::agiru::Boolean WritePermission();
 
   /// \brief AL `RecordRef.Close()` -- lets go of the record it was opened on.
   ///

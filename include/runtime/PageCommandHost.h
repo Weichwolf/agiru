@@ -17,6 +17,7 @@ struct PageDef;
 struct PageControlCommand;
 struct ServerHttpRequest;
 struct ServerHttpResponse;
+class TablePermissionAuthority;
 
 /// \brief Authorization vocabulary for lifecycle operations, separate from AL controls.
 enum class PageHostOperation : std::uint8_t {
@@ -69,8 +70,11 @@ public:
   /// \brief Starts a host; does not create schema or grant permissions.
   /// \param options Trusted deployment configuration.
   /// \param authorization Mandatory thread-safe runtime permission authority.
+  /// \param tableAuthorization Mandatory authority for every transitive AL record access.
   /// \throws Error for missing/invalid configuration or missing authorization.
-  PageCommandHost(PageHostOptions options, PageHostAuthorization authorization);
+  PageCommandHost(PageHostOptions options,
+                  PageHostAuthorization authorization,
+                  std::shared_ptr<const TablePermissionAuthority> tableAuthorization);
   /// \brief Releases private pages without implicit saves/close-trigger execution.
   ~PageCommandHost();
   PageCommandHost(const PageCommandHost &) = delete;

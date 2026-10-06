@@ -200,6 +200,19 @@ test("PostgreSQL owns revision fencing and expiry; idle windows retain no databa
   }
 });
 
+test("authorized page actions cannot bypass denied transitive table reads or inserts", async () => {
+  for (const name of ["ReadOtherTable", "WriteOtherTable"]) {
+    const fresh = await client.read("/?page=50347&mode=Edit");
+    const failed = await post(fresh, name);
+    assert.equal(failed.response.status, 403);
+    assert.ok(failed.html.includes("TableData 50348 Restricted Row"));
+    assert.ok(!failed.html.includes('data-value="999"'));
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1'), "11");
+    assert.equal(await sql('SELECT count(*) FROM "Restricted Row"'), "1");
+    assert.equal((await fetch(origin + path(fresh), { headers: first })).status, 410);
+  }
+});
+
 test("a noncommitted AL action rolls back; production Commit survives a later error without a successful receipt", async () => {
   for (const [name, expected] of [["WriteAndFail", "11"], ["CommitAndFail", "111"]]) {
     const fresh = await client.read("/?page=50347&mode=Edit");

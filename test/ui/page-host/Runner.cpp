@@ -9,16 +9,19 @@
 #include "runtime/PageDispatcher.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
+#include "runtime/TablePermissions.h"
 #include "type/Guid.h"
 
 #include "Check.h"
 #include "OwnedDatabase.h"
 #include "PrivateAuthFile.h"
 #include "fixture/table/NavigationRow.h"
+#include "fixture/table/RestrictedRow.h"
 
 #include <array>
 #include <chrono>
 #include <cstdio>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -27,16 +30,23 @@
 namespace {
 
 using Row = agiru::Fixture::NavigationRow_Table;
+using Restricted = agiru::Fixture::RestrictedRow_Table;
 constexpr std::string_view kUser = "00000000-0000-0000-0000-000000000001";
 constexpr std::string_view kOtherUser = "00000000-0000-0000-0000-000000000002";
 constexpr std::string_view kCompany = "Fixture + Company";
 constexpr int kInitialValueStep = 11;
+constexpr int kRestrictedValue = 999;
 
 void Seed(const std::string &dsn, const std::string &authPath) {
   const agiru::Session seed(dsn);
   const auto &connection = seed.Database();
   agiru::CreateTable(connection, agiru::TableTraits<agiru::platform::User>::kTable);
   agiru::CreateTable(connection, agiru::TableTraits<Row>::kTable);
+  agiru::CreateTable(connection, agiru::TableTraits<Restricted>::kTable);
+  Restricted restricted;
+  restricted.ID = 1;
+  restricted.Value = kRestrictedValue;
+  restricted.Insert();
   for (const auto identity : {kUser, kOtherUser}) {
     agiru::platform::User user;
     user.UserSecurityID = agiru::Guid(identity);
@@ -101,11 +111,29 @@ void Authorize(const agiru::PageDef &page,
   }
 }
 
+class TableAuthority final : public agiru::TablePermissionAuthority {
+public:
+  bool Allows(const agiru::TableDef &table, agiru::TableOperation operation) const override {
+    if (table.id != agiru::TableTraits<Row>::kTable.id) { return false; }
+    const auto &session = agiru::Session::Current();
+    const std::array<std::optional<std::string>, 2> binds{session.UserSecurityId().ToStorageText(),
+                                                          std::string(session.CompanyName())};
+    const auto rows = session.Database().Execute(
+        "SELECT readable,writable FROM ui_grants WHERE user_security_id = $1::uuid "
+        "AND company = $2",
+        binds);
+    return rows.Rows() == 1 && rows.Value(0, 0) == "t" &&
+           (operation == agiru::TableOperation::Read || rows.Value(0, 1) == "t");
+  }
+};
+
 void Serve(const std::string &authPath, const std::string &origin) {
   const gate::OwnedDatabase database("page_host");
   Seed(database.Dsn(), authPath);
   agiru::PageCommandHost host(
-      {.database = database.Dsn(), .company = std::string(kCompany), .origin = origin}, Authorize);
+      {.database = database.Dsn(), .company = std::string(kCompany), .origin = origin},
+      Authorize,
+      std::make_shared<TableAuthority>());
   const agiru::HttpServer server([&](const auto &request) { return host.Handle(request); });
   std::fputs("READY\n", stdout);
   std::fflush(stdout);

@@ -10,6 +10,7 @@
 #include "type/Integer.h"
 #include "type/Language.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -19,6 +20,9 @@
 namespace agiru {
 
 class SessionCommand;
+class TablePermissionAuthority;
+struct TableDef;
+enum class TableOperation : std::uint8_t;
 
 namespace detail {
 /// \brief Session-owned runtime storage, defined privately by the runtime.
@@ -95,6 +99,18 @@ public:
   ///
   /// \note The Guid from the system User row, or blank in the unaccounted harness constructor.
   [[nodiscard]] const Guid &UserSecurityId() const { return userSecurityId_; }
+
+  /// \brief Installs the trusted host's table authority before a command starts.
+  /// \param authority Shared immutable/thread-safe provider with session-aware SQL resolution.
+  /// \throws SessionError for a null provider or an active transaction boundary.
+  /// \note Authentication alone is not a grant. Authenticated sessions without this provider
+  ///       refuse AL table access; the unaccounted SYSTEM harness retains its separate policy.
+  void TablePermissions(std::shared_ptr<const TablePermissionAuthority> authority);
+
+  /// \brief Tests the currently installed table authority, without modifying permissions.
+  /// \param table Original declaration. \param operation Actual TableData access.
+  /// \return The active provider's answer. \throws Error for unavailable/unsupported authority.
+  [[nodiscard]] bool AllowsTable(const TableDef &table, TableOperation operation) const;
 
   /// \brief AL `GlobalLanguage()` -- the language this session runs in.
   /// \return The Windows language id.
@@ -194,6 +210,7 @@ private:
   void Detach() noexcept;
   void RestoreCurrent() noexcept;
   mutable std::unique_ptr<detail::SessionState> state_;
+  std::shared_ptr<const TablePermissionAuthority> tableAuthority_;
   std::unique_ptr<Connection> ownedConnection_;
   const Connection *connection_ = nullptr;
   Boundaries boundaries_;

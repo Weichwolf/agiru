@@ -27,6 +27,13 @@ random/digest provider failures explicitly refuse. The provider fixture has a su
 compile receipt before lint. This is not browser/password sign-in, a connection pool or page/table authorization;
 container qualifiers need `AGIRU_TEST_DSN` pointing at container-local PostgreSQL.
 
+`make table-permissions JOBS=2` checks the session-owned TableData boundary for typed
+and reflected records, buffered record/query reads, individual write kinds, temporary
+buffers and company isolation. Independent SQL verifies denied writes; two compiled
+permission-bypass/partial-write defects must fail. The SQL grant table is an authored
+fixture, not native BC permission-set composition, indirect rights or security filters.
+Authenticated sessions without an authority refuse instead of becoming SUPER.
+
 `make http-test JOBS=2` runs transport and native credential tests through actual nginx,
 C++ and PostgreSQL in `agiru-dev`, with CMD/MCP outside. Authentication uses disposable
 users/databases/private auth files and independent SQL checks; these authored static HTML
@@ -35,6 +42,8 @@ fixtures do not qualify production ERP pages, permission sets or posting parity.
 `make page-host-test JOBS=2` runs generated List → Card → Validate/Save over nginx,
 C++ and PostgreSQL with external CMD/MCP. Independent SQL checks typed values,
 modifier identity, write counts, command replay/revisions, rollback and durable AL Commit.
+Generated actions also attempt denied reads/inserts on a second table; HTTP must refuse
+without disclosing its values or changing either table.
 Three compiled ownership/revision/replay defects must fail named HTTP cases. The fixture
 has real generated pages and SQL grants, not a full BC permission provider or browser
 acceptance. It reuses the page-navigation compilation pipeline and private auth-file helper.

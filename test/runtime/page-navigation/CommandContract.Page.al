@@ -16,6 +16,28 @@ page 50347 "Command Contract Card"
     {
         area(Processing)
         {
+            action(ReadOtherTable)
+            {
+                trigger OnAction()
+                var
+                    Restricted: Record "Restricted Row";
+                begin
+                    Restricted.Get(1);
+                    Rec.Value := Restricted.Value;
+                    Rec.Modify();
+                end;
+            }
+            action(WriteOtherTable)
+            {
+                trigger OnAction()
+                var
+                    Restricted: Record "Restricted Row";
+                begin
+                    Restricted.ID := 2;
+                    Restricted.Value := 999;
+                    Restricted.Insert();
+                end;
+            }
             action(WriteAndFail)
             {
                 trigger OnAction()

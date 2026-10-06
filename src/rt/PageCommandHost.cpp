@@ -13,6 +13,7 @@
 #include "runtime/SecureToken.h"
 #include "runtime/Session.h"
 #include "runtime/SessionCommand.h"
+#include "runtime/TablePermissions.h"
 #include "type/Guid.h"
 #include "type/RecordId.h"
 #include "type/Utf8.h"
@@ -243,10 +244,14 @@ void InstallPageCommandHost(const Connection &connection) {
 }
 
 struct PageCommandHost::Impl {
-  Impl(PageHostOptions configuration, PageHostAuthorization authority)
-      : options(std::move(configuration)), authorize(std::move(authority)) {
+  Impl(PageHostOptions configuration,
+       PageHostAuthorization authority,
+       std::shared_ptr<const TablePermissionAuthority> tableAuthorization)
+      : options(std::move(configuration)),
+        authorize(std::move(authority)),
+        tableAuthority(std::move(tableAuthorization)) {
     if (options.database.empty() || options.company.empty() || options.origin.empty() ||
-        !authorize || options.contexts == 0 || options.navigationDepth == 0 ||
+        !authorize || !tableAuthority || options.contexts == 0 || options.navigationDepth == 0 ||
         options.commands == 0 || options.receiptBytes == 0 || options.lifetime.count() <= 0 ||
         options.lifetime > kMaximumContextLifetime) {
       Refuse("PageHostConfiguration");
@@ -262,6 +267,7 @@ struct PageCommandHost::Impl {
     });
     if (contexts.size() >= options.contexts) { Refuse("PageHostCapacity"); }
     auto context = std::make_shared<Context>(user, options);
+    context->session.TablePermissions(tableAuthority);
     contexts.emplace(context->handle, context);
     return context;
   }
@@ -609,13 +615,17 @@ struct PageCommandHost::Impl {
 
   PageHostOptions options;
   PageHostAuthorization authorize;
+  std::shared_ptr<const TablePermissionAuthority> tableAuthority;
   std::string host = GenerateSecureToken();
   std::mutex mutex;
   std::map<std::string, std::shared_ptr<Context>, std::less<>> contexts;
 };
 
-PageCommandHost::PageCommandHost(PageHostOptions options, PageHostAuthorization authorization)
-    : impl_(std::make_unique<Impl>(std::move(options), std::move(authorization))) {}
+PageCommandHost::PageCommandHost(PageHostOptions options,
+                                 PageHostAuthorization authorization,
+                                 std::shared_ptr<const TablePermissionAuthority> tableAuthorization)
+    : impl_(std::make_unique<Impl>(
+          std::move(options), std::move(authorization), std::move(tableAuthorization))) {}
 
 PageCommandHost::~PageCommandHost() = default;
 
@@ -629,11 +639,14 @@ ServerHttpResponse PageCommandHost::Handle(const ServerHttpRequest &request) {
   } catch (const Error &error) {
     if (error.Code() == "PageHostCleanup" ||
         (!error.Code().starts_with("PageHost") && error.Code() != "SessionIdentity" &&
-         error.Code() != "PageValidation" && error.Code() != "PageCommand")) {
+         error.Code() != "PageValidation" && error.Code() != "PageCommand" &&
+         error.Code() != "Permission")) {
       throw;
     }
-    ServerHttpResponse response{
-        .status = Status(error.Code()), .body = DiagnosticHtml(error.what()), .headers = {}};
+    ServerHttpResponse response{.status = error.Code() == "Permission" ? kForbidden
+                                                                       : Status(error.Code()),
+                                .body = DiagnosticHtml(error.what()),
+                                .headers = {}};
     if (response.status == kUnauthorized) {
       response.headers.push_back({.name = "WWW-Authenticate", .value = "Bearer realm=\"agiru\""});
     }

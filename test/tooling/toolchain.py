@@ -3296,7 +3296,8 @@ class DiscoveryGate(unittest.TestCase):
                        'runtime/boolean-expressions.sh', 'runtime/for-loops.sh', 'runtime/variant-text.sh', 'transpiler/control-extensions.sh',
                        'transpiler/native-table-ids.sh', 'transpiler/native-codeunits.sh',
                        'runtime/base64.sh', 'runtime/encoding.sh', 'runtime/hashing.sh', 'runtime/conversion.sh', 'runtime/record-order.sh',
-                       'runtime/streams.sh', 'transpiler/system-profile.sh', 'runtime/xmlport-import.sh')
+                       'runtime/streams.sh', 'transpiler/system-profile.sh', 'runtime/xmlport-import.sh',
+                       'ui/page-profile.sh', 'runtime/session-identity.sh', 'runtime/table-permissions.sh')
             for name in scripts:
                 script = root / 'test' / name
                 script.parent.mkdir(parents=True, exist_ok=True)

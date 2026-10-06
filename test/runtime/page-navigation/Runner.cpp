@@ -13,6 +13,7 @@
 #include "runtime/Session.h"
 #include "runtime/SessionCommand.h"
 #include "runtime/Storage.h"
+#include "runtime/TablePermissions.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/TestPage.h"
 #include "runtime/test/TestRequestPage.h"
@@ -72,6 +73,14 @@ public:
          command.operation != agiru::PageControlOperation::Set)) {
       throw agiru::Error("unexpected authenticated fixture command", "FixturePermission");
     }
+  }
+};
+
+class NavigationTableAuthority final : public agiru::TablePermissionAuthority {
+public:
+  bool Allows(const agiru::TableDef &table,
+              [[maybe_unused]] agiru::TableOperation operation) const override {
+    return table.id == agiru::TableTraits<Row>::kTable.id;
   }
 };
 
@@ -359,6 +368,7 @@ void PagesSurviveSeparateClientCommands() {
     agiru::Commit();
   }
   agiru::Session persistent(principal);
+  persistent.TablePermissions(std::make_shared<NavigationTableAuthority>());
   auto list = agiru::MakeInstalledPage(agiru::PageTraits<List>::kId);
   auto card = agiru::MakeInstalledPage(agiru::PageTraits<Card>::kId);
   CommandAuthorization authorization;

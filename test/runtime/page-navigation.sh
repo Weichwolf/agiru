@@ -14,6 +14,7 @@ sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/run
   include/runtime/PageSession.h include/runtime/test/TestPage.h \
   include/runtime/Session.h include/runtime/SessionCommand.h src/rt/Session.cpp \
   src/rt/SessionCommand.cpp src/rt/Cursor.cpp src/rt/Transaction.cpp \
+  include/runtime/TablePermissions.h src/rt/TablePermissions.cpp src/rt/{Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/PageCommandHost.h src/rt/PageCommandHost.cpp test/ui/page-host/Runner.cpp \
   test/gate/PrivateAuthFile.h \
   test/gate/PageDispatcherGate.cpp test/runtime/page-navigation/Runner.cpp \
