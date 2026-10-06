@@ -25,6 +25,8 @@ using agiru::ProvisionRowVersions;
 
 using gate::OwnedDatabase;
 
+constexpr auto kDisconnectTimeout = std::chrono::seconds(5);
+
 std::int64_t Scalar(const Connection &connection,
                     std::string_view sql,
                     std::span<const std::optional<std::string>> parameters = {}) {
@@ -60,6 +62,44 @@ std::int64_t OwnFences(const Connection &connection) {
                 "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'advisory' "
                 "AND objsubid = 1 AND granted AND classid::bigint >= 2147483648 "
                 "AND pid = pg_catalog.pg_backend_pid()");
+}
+
+void WaitForBackendExit(const Connection &observer,
+                        std::int64_t backend,
+                        std::chrono::milliseconds timeout = kDisconnectTimeout) {
+  constexpr auto pollInterval = std::chrono::milliseconds(5);
+  const auto deadline = std::chrono::steady_clock::now() + timeout;
+  const std::array<std::optional<std::string>, 1> parameters{std::to_string(backend)};
+  while (Scalar(observer,
+                "SELECT count(*) FROM pg_catalog.pg_stat_activity "
+                "WHERE pid = $1::integer AND datname = pg_catalog.current_database()",
+                parameters) != 0) {
+    if (std::chrono::steady_clock::now() >= deadline) {
+      throw DatabaseError("RowVersion gate: disconnected backend did not terminate");
+    }
+    std::this_thread::sleep_for(pollInterval);
+  }
+}
+
+void AnActiveBackendCannotSatisfyDisconnect() {
+  constexpr auto timeout = std::chrono::milliseconds(25);
+  const OwnedDatabase database("disconnect_timeout");
+  const Connection observer(database.Dsn());
+  const Connection writer(database.Dsn());
+  ProvisionRowVersions(observer);
+  writer.Run("BEGIN");
+  const auto pending = Allocate(writer);
+  bool refused = false;
+  try {
+    WaitForBackendExit(observer, Scalar(writer, "SELECT pg_catalog.pg_backend_pid()"), timeout);
+  } catch (const DatabaseError &error) {
+    refused =
+        std::string_view(error.what()) == "RowVersion gate: disconnected backend did not terminate";
+  }
+  CHECK_TRUE("a live backend cannot satisfy the disconnect observation", refused);
+  CHECK_TRUE("observation timeout preserves the active transaction", writer.InTransaction());
+  CHECK_TRUE("observation timeout cannot hide the active rowversion", Minimum(observer) == pending);
+  writer.Run("ROLLBACK");
 }
 
 void InitialStateAndReprovisioning() {
@@ -176,8 +216,10 @@ void StatementFailureAndDisconnect() {
   const OwnedDatabase database("failure");
   const Connection observer(database.Dsn());
   ProvisionRowVersions(observer);
+  std::int64_t writerBackend = 0;
   {
     const Connection writer(database.Dsn());
+    writerBackend = Scalar(writer, "SELECT pg_catalog.pg_backend_pid()");
     writer.Run("BEGIN");
     writer.Run("SAVEPOINT child");
     bool refused = false;
@@ -195,6 +237,7 @@ void StatementFailureAndDisconnect() {
     CHECK_TRUE("the next write after a caught error publishes a new fence",
                Minimum(observer) == pending);
   }
+  WaitForBackendExit(observer, writerBackend);
   CHECK_TRUE("disconnect removes an uncommitted writer", Minimum(observer) == Last(observer) + 1);
   const Connection reconnected(database.Dsn());
   const auto before = Last(observer);
@@ -474,6 +517,11 @@ void MinimumCancellationReleasesPublicationLock() {
 
 int main(int argc, char **argv) {
   return gate::Run("RowVersion", [&] {
+    if (argc == 2 && std::string_view(argv[1]) == "--disconnect") {
+      AnActiveBackendCannotSatisfyDisconnect();
+      StatementFailureAndDisconnect();
+      return;
+    }
     if (argc == 2 && std::string_view(argv[1]) == "--publication") {
       PublicationIntervalIsProtected();
       return;
@@ -490,6 +538,7 @@ int main(int argc, char **argv) {
     InitialStateAndReprovisioning();
     SqlWritesAcrossTablesAndCommitOrder();
     SavepointsAndBoundedFences();
+    AnActiveBackendCannotSatisfyDisconnect();
     StatementFailureAndDisconnect();
     DatabaseIsolation();
     ConcurrentWritersOwnDistinctVersions();

@@ -41,6 +41,12 @@ Unicode. Three compiled caption/blank/conversion defects must fail both consumer
 strict typed Get and numeric Format 2/9 remain distinct. Session-language caption
 selection and broader native conversion/culture guarantees remain open.
 
+`make rowversions JOBS=2` qualifies allocator fences and SQL record/SystemId paths.
+The disconnect gate observes the specific backend's termination before asserting
+the unchanged active minimum; a live backend must time out without hiding its fence.
+A compiled delayed-close adapter must pass, while removing the observation must fail.
+This is a test synchronization contract, not a blocking production destructor.
+
 `transpiler/control-extensions.sh` executes page/report-request-page control order,
 forward anchors and property overrides across separate declaring/extension apps.
 Application identity, raw AL namespace and MultipleNewLines survive composition;

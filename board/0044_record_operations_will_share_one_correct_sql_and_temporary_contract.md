@@ -62,6 +62,25 @@ seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Useful implementation details
 
+- RowVersion disconnect observation: frozen b2a8131's C++ integration has one red
+  (`disconnect removes an uncommitted writer`). PQfinish closes the frontend without
+  waiting for backend rollback; delaying the original Connection destructor with
+  an asynchronous SELECT pg_sleep reproduces this assertion and the subsequent stale-
+  setting failure. `test/gate/RowVersionGate.cpp` now observes the captured backend
+  PID in the same database, with a five-second deadline and bounded polling, before
+  the unchanged exact Minimum == Last + 1 assertion. A connected allocator must time
+  out without losing its transaction/fence. Production Connection/RowVersionStorage
+  are unchanged; no destructor wait, counter reset, relaxed minimum or retry-to-green.
+  `make rowversions JOBS=2`: 117 allocator / 123 SQL-record checks; all seventeen
+  prior compiled controls plus removal of the disconnect observation reject.
+  The delayed-close adapter passes all eleven focused checks; the removed observation
+  reproduces both original failures. Source/binary integrity is checked at the end.
+  Focused RowVersionGate clang-tidy passes; temporary adapters/binaries are removed.
+  Developer `f928288ee840`: database-{minimumactive,lastused}rowversion-method.md;
+  BCApps `d99152ee35f0` has no calls; predecessor's XID/error-zero approach remains rejected.
+  PostgreSQL 17.11 evidence: [termination protocol](https://www.postgresql.org/docs/17/protocol-flow.html#PROTOCOL-FLOW-TERMINATION),
+  [pg_stat_activity](https://www.postgresql.org/docs/17/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW)
+  and upstream libpq fe-connect.c PQfinish/pqClosePGconn. Full integration replay remains required.
 - Ordinal Variant → Text: `WorkflowTableRelationValue.Table.al::CreateNew` assigns
   FieldRef.Value to Text[250]; UpdateRelationValue compares that value with Format.
   The frozen b2a8131 Workflow Engine UT failure reaches Variant::Rendered, refusing

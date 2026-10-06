@@ -9,10 +9,11 @@ record_gate="$B/gate_SqlRowVersionGate"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -fPIC -shared -Iinclude
   --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_db)
-trap 'find "$proof" -maxdepth 1 -type f \( -name "*.cpp" -o -name "*.so" \) -delete' EXIT
+trap 'find "$proof" -maxdepth 1 -type f \( -name "*.cpp" -o -name "*.so" -o -name "unchecked-disconnect" \) -delete' EXIT
 sha256sum src/rt/RowVersionStorage.cpp src/rt/{Storage,SqlColumn,Table,Query,Where,Selection,Navigate}.cpp \
+  src/db/Connection.cpp \
   src/rt/SqlColumn.h src/rt/Selection.h src/rt/Rows.h include/runtime/{Storage,Table,RecordRef}.h test/gate/{RowVersionGate,SqlRowVersionGate}.cpp \
-  test/gate/OwnedDatabase.h "$gate" "$record_gate" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
+  test/gate/OwnedDatabase.h test/runtime/rowversions.sh "$gate" "$record_gate" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 "$CXX" --version > "$proof/compiler.txt"
 
 build_overlay() {
@@ -32,6 +33,43 @@ expect_red() {
 }
 
 "$gate" > "$proof/baseline.log" 2>&1
+
+awk '
+  /^Connection::~Connection\(\) \{/ {
+    print
+    print "  if (handle_ != nullptr && PQtransactionStatus(Conn(handle_)) == PQTRANS_INTRANS) {"
+    print "    if (PQsendQuery(Conn(handle_), \"SELECT pg_catalog.pg_sleep(0.5)\") != 1) { std::abort(); }"
+    print "  }"
+    matches++; next
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/db/Connection.cpp > "$proof/delayed-disconnect.cpp"
+"$CXX" "$proof/delayed-disconnect.cpp" "${flags[@]}" -I/usr/include/postgresql \
+  -lpq -o "$proof/delayed-disconnect.so"
+LD_PRELOAD="$proof/delayed-disconnect.so" "$gate" --disconnect \
+  > "$proof/delayed-disconnect.log" 2>&1
+awk '
+  /^  WaitForBackendExit\(observer, writerBackend\);$/ {
+    print "  (void)writerBackend;"; matches++; next
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' test/gate/RowVersionGate.cpp > "$proof/unchecked-disconnect.cpp"
+"$CXX" -O2 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+  --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+  "-DAGIRU_TEST_DSN=\"${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}\"" \
+  -Iinclude -Itest/gate "$proof/unchecked-disconnect.cpp" \
+  "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db \
+  -o "$proof/unchecked-disconnect"
+status=0
+LD_PRELOAD="$proof/delayed-disconnect.so" "$proof/unchecked-disconnect" --disconnect \
+  > "$proof/unchecked-disconnect.log" 2>&1 || status=$?
+[ "$status" -eq 1 ]
+rg -q 'FAIL .*disconnect removes an uncommitted writer' "$proof/unchecked-disconnect.log"
+sha256sum "$proof"/{delayed,unchecked}-disconnect.cpp \
+  "$proof/delayed-disconnect.so" "$proof/unchecked-disconnect" > "$proof/disconnect.sha256"
+rm -- "$proof/unchecked-disconnect"
 
 awk '
   /PERFORM pg_catalog.pg_advisory_xact_lock\(-value\);/ { matches++; next }
@@ -236,4 +274,4 @@ rg -q "FAIL .*discarding a reflected missing SystemId result" "$proof/unchecked-
 find "$proof/unchecked-system-id" -depth -delete
 
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'rowversions: allocator fences, SQL record/alias/SystemId paths and seventeen compiled negative controls proved; %s\n' "$proof"
+printf 'rowversions: allocator fences, observed disconnect, SQL record/alias/SystemId paths and eighteen compiled negative controls proved; %s\n' "$proof"
