@@ -3,20 +3,20 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay shared positions, XML diagnostics, ordinal Variant conversion and 0073's loop-bound repair with
+Next: replay XML diagnostics, ordinal Variant conversion, the RowVersion gate and 0073's loop-bound repair with
 0013/0058 on every UT identity; investigate remaining failures in source order,
 including physical-inventory siblings and Incoming Documents conversions.
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
 Complete Field classification, SQLDataType, package provenance and permissions;
 qualify calculated catalogue predicates.
-Replay the shared Record/RecordRef position repair; qualify regional scalar formatting,
+Qualify regional scalar formatting,
 StoredImage, virtual SystemId and diagnostic/localization contracts.
-Latest completed AL replay (`51831ed`, content `f026b8fc8be6`) is 2218/2314:
-six gains and no losses/added/missing/duplicate identities versus `feff11f`, zero
-incomplete codeunits. Build and 154 C++/specialist checks pass. Scalar catalogue
-CalcFields and Unicode caption fallback are included; the position repair is not.
-The previous Incoming Documents mapping regression is recovered. The unsealed/null
+Latest completed AL replay (`b2a8131`, content `3ab8c23d656f`) is 2218/2314:
+all identities/statuses/errors match `51831ed`, zero incomplete/duplicate identities.
+Build passes; C++/specialist test is 154/155 with the disconnect observation repaired
+in `0cf1488`. Scalar catalogue CalcFields, Unicode caption fallback and the shared
+position repair are included. Later XML/loop/Variant/gate repairs need replay. The unsealed/null
 seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Implementation

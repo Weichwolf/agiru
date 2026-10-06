@@ -8,25 +8,25 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Latest completed integration: `51831ed` / content `f026b8fc8be6`:
-  slice-check/all/test pass; 154/154 C++/specialist cases.
+- Latest completed integration: `b2a8131` / content `3ab8c23d656f`:
+  slice-check/all pass; C++/specialist test is 154/155, one red RowVersion disconnect
+  observation. `0cf1488` repairs and qualifies that gate without changing production
+  rowversion or connection semantics; its full integration replay is pending.
   AL: 2218/2314 passed, 96 failed, eighty codeunits, zero incomplete/duplicate
-  identities; six workers, 1475 seconds. Target exits: 0/0/0/2; G1 remains open.
-  Compared with `feff11f`'s 2212/2314: six gains, no losses or added/missing
-  identities, one changed failed error. All gains belong to Incoming Doc. To
-  Data Exch.UT (139154): PEPPOL no-mapping, single/multiple import failure,
-  invalid namespace, without mapping and successful processing cases. The earlier
-  TestProcessWithDataExchWithoutMappingFails regression is recovered. Invalid-content
-  processing now reaches an error-message assertion instead of a Field storage refusal.
+  identities; six workers, 1516 seconds. Target exits: 0/0/2/2; G1 remains open.
+  Compared with `51831ed`: no gains, losses, added/missing identities or changed errors.
+  The complete normalized result digest is unchanged.
   Original BCApps/System pins and all source/input hashes remain unchanged.
   Seed identity is null/unsealed: diagnostic comparison, not causal A/B or G1.
   Result digest from `jq -sc 'sort_by(.codeunit_id,.method)|map({codeunit_id,method,status,error})'
   followed by `sha256sum`: `f036244cb3acdb0e0a31a520bc773497b3a91cdc4f12efc64a87501262097ab1`.
 - This completed snapshot includes native Table/Page Metadata navigation,
   source-owned page IDs, RecordRef.Get consumption/diagnostics, scalar catalogue
-  CalcFields (`b221e0d`) and Unicode caption fallback (`48fcd03`). It excludes the
-  shared position repair (`65d3ade`), whose AL replay is next. Runtime contract
-  evidence belongs in 0013/0044; superseded results are recoverable at `65d3ade`.
+  CalcFields (`b221e0d`), Unicode caption fallback (`48fcd03`) and shared positions
+  (`65d3ade`). It excludes Evaluate dispatch (`6f8c9ce`), XML diagnostics (`4dda6f5`),
+  captured loop bounds (`30293c8`), ordinal Variant text (`9985dc7`) and the RowVersion
+  gate repair (`0cf1488`); replay these together. Runtime contract evidence belongs
+  in 0013/0044/0073; superseded results are recoverable at `0cf1488`.
 - Latest AL failure concentrations: thirteen incoming-document conversion failures,
   seven Nothing-to-handle paths,
   four Inventory Profile missing temporary rows and four WorkbookWriter.Create refusals.
