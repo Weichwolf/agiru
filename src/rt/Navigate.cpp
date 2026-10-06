@@ -13,6 +13,7 @@
 #include "RecordOrder.h"
 #include "Selection.h"
 #include "SqlColumn.h"
+#include "TableMetadata.h"
 #include "Temporary.h"
 
 #include <algorithm>
@@ -179,6 +180,9 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
   if (const auto found = FindInstalledFields(record, table, which); found.has_value()) {
     return *found;
   }
+  if (const auto found = FindInstalledTableMetadata(record, table, which); found.has_value()) {
+    return *found;
+  }
   RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
@@ -216,6 +220,9 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
   if (const auto found = FindInstalledFields(record, table, "-"); found.has_value()) {
     return *found;
   }
+  if (const auto found = FindInstalledTableMetadata(record, table, "-"); found.has_value()) {
+    return *found;
+  }
   RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
@@ -237,6 +244,9 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
   if (steps == 0) { return 0; }
   if (TempOf(record) != nullptr) { return TempNext(record, table, steps); }
   if (const auto moved = NextInstalledField(record, table, steps); moved.has_value()) {
+    return *moved;
+  }
+  if (const auto moved = NextInstalledTableMetadata(record, table, steps); moved.has_value()) {
     return *moved;
   }
   RequireTableProvider(table);
@@ -269,6 +279,9 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
 std::int32_t RuntimeCount(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempCount(const_cast<void *>(record), table); }
   if (const auto count = CountInstalledFields(record, table); count.has_value()) { return *count; }
+  if (const auto count = CountInstalledTableMetadata(record, table); count.has_value()) {
+    return *count;
+  }
 
   const Selection made = Select(PeekOf(record), table);
   std::string sql = "SELECT count(*) FROM " + made.from;
@@ -282,6 +295,9 @@ std::int32_t RuntimeCount(const void *record, const TableDef &table) {
 bool RuntimeIsEmpty(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempIsEmpty(const_cast<void *>(record), table); }
   if (const auto count = CountInstalledFields(record, table, true); count.has_value()) {
+    return *count == 0;
+  }
+  if (const auto count = CountInstalledTableMetadata(record, table, true); count.has_value()) {
     return *count == 0;
   }
 

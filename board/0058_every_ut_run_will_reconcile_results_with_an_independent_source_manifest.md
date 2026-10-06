@@ -34,11 +34,15 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   with unchanged golden files and four rejected compiled mutants. GenTableGate still
   reports the existing BodyWriter.h adjacent-parameter finding. These are local receipts,
   not current-tree full build/lint or AL execution proof.
-- Shared native Table Metadata.Get now passes 294 reflection checks, 115 generated
-  checks and 43 compiled reflection controls plus the header control (0044).
+- Shared native Table Metadata.Get retains 294 reflection checks and 115 generated
+  checks; live navigation now adds 48 TableMetadataCatalogue checks (0044).
   Typed/RecordRef agreement covers all 29 stored fields; missing results, projection
   errors, unchanged filters and writable temporary isolation are qualified.
-  Navigation remains refused. TableMetadata.cpp/generated Runner focused tidy pass;
+  Field/Table Metadata share one filter/order/bookmark kernel, with 53 compiled
+  reflection controls plus the header control. Shared filter/bookmark mutants fail
+  both gates; key-hole/Get-position controls fail the new gate. This increment is
+  not in the running `a554715` snapshot and still needs full AL replay.
+  Kernel/adapters/TableMetadata.cpp/new gate/generated Runner focused tidy pass;
   Table.cpp has sixteen diagnostics and the expanded gate exposes an uninitialized-ID
   StoredImage diagnostic absent from the previous gate. No full tidy/UT gain claim.
 - Shared SQL GetBySystemId passes 114 record checks and all seventeen compiled

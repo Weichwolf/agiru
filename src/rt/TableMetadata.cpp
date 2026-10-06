@@ -102,12 +102,17 @@ std::optional<platform::TableMetadata_Table> InstalledTableMetadata(TableId id) 
   return ProjectTableMetadata(*entry->table);
 }
 
-std::optional<bool> GetInstalledTableMetadata(void *record, const TableDef &table) {
-  if (table.id != platform::TableMetadata_Table::kId) { return std::nullopt; }
+bool IsInstalledTableMetadataProvider(const TableDef &table) {
+  if (table.id != platform::TableMetadata_Table::kId) { return false; }
   if (table.fields.data() != platform::kTableMetadataFields.data() ||
       table.fields.size() != platform::kTableMetadataFields.size()) {
     throw Error("Table Metadata.Get requires the qualified native field binding");
   }
+  return true;
+}
+
+std::optional<bool> GetInstalledTableMetadata(void *record, const TableDef &table) {
+  if (!IsInstalledTableMetadataProvider(table)) { return std::nullopt; }
   const auto &buffer = *static_cast<platform::TableMetadata_Table *>(record);
   const auto row = InstalledTableMetadata(TableId{buffer.ID});
   if (!row.has_value()) { return false; }
@@ -118,6 +123,7 @@ std::optional<bool> GetInstalledTableMetadata(void *record, const TableDef &tabl
   RecordState &state = reinterpret_cast<StateHandle *>(record)->Ensure();
   state.open.Forget();
   state.positioned = true;
+  state.viewDirty = true;
   return true;
 }
 

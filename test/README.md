@@ -100,16 +100,21 @@ ModifyAllowed policy. View navigation and general command permissions remain ope
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,
-cross-column OR, FlowFilters and owned expression snapshots. Fifty-one compiled
+cross-column OR, FlowFilters and owned expression snapshots. Fifty-three compiled
 controls and the narrow system-field header dependency control must reject.
 Installed Table Metadata.Get and positive-key Field.Get share typed/RecordRef readers;
 timestamp zero remains addressable through FieldRef, and temporary zero keys remain valid.
-The Field reader checks the native ABI before accessing its buffer. Typed missing reads
+Both readers check the native ABI before accessing their buffers. Typed missing reads
 retain optional-result semantics; ordinary filters stay unchanged. Native Field
-Find/FindSet/Next/Count/IsEmpty use a shared immutable positive-key index, never a SQL
-copy or per-session row catalogue. `FieldCatalogueGate` checks independent bookmarks,
+Find/FindSet/Next/Count/IsEmpty borrow a shared immutable positive-key index;
+Table Metadata borrows InstalledTables directly. One catalogue filter/order/navigation
+kernel uses call-scoped scratch rows, never SQL copies or per-session populations.
+`FieldCatalogueGate` checks independent bookmarks,
 filters/marks/signed navigation, the real name-derived FieldRef caller and exact metadata
-identity/version. Native writes, including empty ModifyAll/DeleteAll(true), refuse; temporary rows
+identity/version. `TableMetadataCatalogueGate` adds raw-identity counts, sparse filters,
+native option/mixed ordering, Get/Next anchoring, RecordRef parity and ownership/binding
+refusals; shared bookmark/filter mutants fail both gates. Native writes, including
+empty ModifyAll/DeleteAll(true), refuse; temporary rows
 remain independently writable. Four unprojected attributes refuse filtering/ordering.
 Complete metadata providers, authorization and secondary-order performance remain gaps (0044).
 

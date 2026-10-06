@@ -12,6 +12,8 @@ field_gate="$B/gate_PlatformFieldGate"
 "$field_gate" > "$proof/field-names.log" 2>&1
 catalogue_gate="$B/gate_FieldCatalogueGate"
 "$catalogue_gate" > "$proof/field-catalogue.log" 2>&1
+metadata_gate="$B/gate_TableMetadataCatalogueGate"
+"$metadata_gate" > "$proof/table-metadata-catalogue.log" 2>&1
 "$B/gate_PlatformSystemFieldsGate" > "$proof/system-profiles.log" 2>&1
 "$B/gate_GenSourceBindingGate" > "$proof/source-binding.log" 2>&1
 if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
@@ -157,18 +159,28 @@ for control in field-catalogue-zero field-get-binding; do
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
 
-for control in catalogue-population catalogue-bookmark catalogue-filter catalogue-version catalogue-identity; do
+for control in catalogue-population catalogue-bookmark catalogue-filter catalogue-version catalogue-identity catalogue-key-filter metadata-get-position; do
   unit=src/rt/FieldNavigation.cpp
-  case "$control" in catalogue-version|catalogue-identity) unit=src/rt/written/PlatformField.cpp;; esac
+  case "$control" in
+    catalogue-version|catalogue-identity) unit=src/rt/written/PlatformField.cpp;;
+    catalogue-bookmark|catalogue-filter|catalogue-key-filter) unit=src/rt/CatalogueNavigation.cpp;;
+    metadata-get-position) unit=src/rt/TableMetadata.cpp;;
+  esac
   awk -v control="$control" '
     control == "catalogue-population" && /if \(field.no.Value\(\) <= 0\) \{ continue; \}/ {
       changed++; next
     }
-    control == "catalogue-bookmark" && /if \(!state.viewDirty && state.at < InstalledFields\(\).size\(\)\)/ {
+    control == "catalogue-bookmark" && /if \(!state.viewDirty && state.at < reader.size\)/ {
       print "  if (false) {"; changed++; next
     }
-    control == "catalogue-filter" && /return filters_.Matches\(&row\);/ {
+    control == "catalogue-filter" && /return filters_.Matches\(reader_.candidate\);/ {
       print "    return true;"; changed++; next
+    }
+    control == "catalogue-key-filter" && /if \(!keys_.Matches\(reader_.candidate\)\) \{ return false; \}/ {
+      changed++; next
+    }
+    control == "metadata-get-position" && /state.viewDirty = true;/ {
+      changed++; next
     }
     control == "catalogue-version" && /constexpr auto kFrozenCatalogueRowVersion = 1;/ {
       print "constexpr auto kFrozenCatalogueRowVersion = 0;"; changed++; next
@@ -180,7 +192,9 @@ for control in catalogue-population catalogue-bookmark catalogue-filter catalogu
   ' "$unit" > "$proof/$control.cpp"
   "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
     -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
-  if LD_PRELOAD="$proof/$control.so" "$catalogue_gate" > "$proof/$control.log" 2>&1; then
+  consumer="$catalogue_gate"
+  case "$control" in catalogue-key-filter|metadata-get-position) consumer="$metadata_gate";; esac
+  if LD_PRELOAD="$proof/$control.so" "$consumer" > "$proof/$control.log" 2>&1; then
     printf 'reflection-metadata: %s escaped the live Field catalogue contract\n' "$control" >&2
     exit 1
   fi
@@ -190,8 +204,20 @@ for control in catalogue-population catalogue-bookmark catalogue-filter catalogu
     catalogue-filter) claim='native name lookup preserves the reserved identity number';;
     catalogue-version) claim='native catalogue version is the original frozen value';;
     catalogue-identity) claim='native catalogue identity follows the original key encoding';;
+    catalogue-key-filter) claim='metadata key filters retain holes in a narrowed interval';;
+    metadata-get-position) claim='metadata Next after Get anchors the actual read key';;
   esac
   rg -q "FAIL .*${claim}" "$proof/$control.log"
+  case "$control" in
+    catalogue-bookmark|catalogue-filter)
+      if LD_PRELOAD="$proof/$control.so" "$metadata_gate" > "$proof/$control.metadata.log" 2>&1; then
+        printf 'reflection-metadata: %s escaped shared Table Metadata navigation\n' "$control" >&2
+        exit 1
+      fi
+      claim='metadata buffer edits preserve an unchanged cursor bookmark'
+      if [ "$control" = catalogue-filter ]; then claim='metadata property filtering preserves native option members'; fi
+      rg -q "FAIL .*${claim}" "$proof/$control.metadata.log";;
+  esac
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/catalogue-controls.sha256"
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
@@ -582,4 +608,4 @@ fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -exec sha256sum {} + > "$proof/disposable.sha256"
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -delete
-printf 'reflection-metadata: installed Table Metadata.Get and live positive-key Field Get/Find/Next/Count through typed/RecordRef paths, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; fifty-one compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: shared live Table Metadata and positive-key Field Get/Find/Next/Count through typed/RecordRef paths, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; fifty-three compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

@@ -167,7 +167,7 @@ table-keys: comments db tc ## prove implicit primary keys before extension mergi
 	@B="$(B)" bash "$(SELF)/test/transpiler/table-keys.sh"
 
 reflection-metadata: comments db ## prove original metadata vocabulary, refusal and temporary records
-	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ReflectionMetadataGate gate_PlatformSourceGate gate_RecordRefGate gate_PlatformFieldGate gate_FieldCatalogueGate gate_PlatformSystemFieldsGate gate_GenSourceBindingGate
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ReflectionMetadataGate gate_PlatformSourceGate gate_RecordRefGate gate_PlatformFieldGate gate_FieldCatalogueGate gate_TableMetadataCatalogueGate gate_PlatformSystemFieldsGate gate_GenSourceBindingGate
 	@"$(B)/gate_PlatformSourceGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/reflection-metadata.sh"
 

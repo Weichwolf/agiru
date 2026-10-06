@@ -3,14 +3,14 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay qualified Integer and live Field repairs with 0013/0058 on every UT
-identity; implement installed Table Metadata filters/order/navigation through shared
-primitives. Complete Field classification, SQLDataType, package provenance, permissions
+Next: replay qualified Integer, Field and Table Metadata repairs with 0013/0058 on every UT
+identity. Complete Field classification, SQLDataType, package provenance, permissions
 and RecordRef.Get result consumption. Investigate StoredImage.
 Latest completed AL replay (`61344f7`) is 2171/2314 with 36 gains and zero losses
 against `00c187c`; two Table Metadata navigation refusals remain in Incoming Doc.
 To Data Exch.UT. Integer/live Field repairs are included only in the running `a554715`
-replay; do not attribute unmeasured gains to them.
+replay; the new shared Table Metadata navigation is not in that snapshot.
+Do not attribute unmeasured gains to either increment.
 
 ## Implementation
 
@@ -127,19 +127,40 @@ replay; do not attribute unmeasured gains to them.
   errors, projects before changing attributes and refuses unqualified field bindings.
   No SQL snapshot or per-session catalogue; temporary reads still use their own store.
   Frozen provider version 1 and blank audit fields follow the sampled BC 28.5 viewer,
-  not Integer or PostgreSQL rowversion. Find/Next/Count/GetBySystemId and live writes
-  remain explicitly refused; this is not complete provider or security-filter acceptance.
+  not Integer or PostgreSQL rowversion. GetBySystemId and live writes remain refused;
+  this is not complete provider or security-filter acceptance.
   ReflectionMetadataGate passes 294 checks, including exact typed/RecordRef agreement
   on all 29 stored fields. Generated source execution passes 115 checks.
-  `make reflection-metadata JOBS=2` rejects all 43 compiled controls plus the header
-  control, adding false-missing, zero-version and stored-FlowField mutants.
+  `make reflection-metadata JOBS=2` retains false-missing, zero-version and
+  stored-FlowField controls within the current 53 compiled controls plus header control.
   TableMetadata.cpp and generated Runner focused tidy pass. Table.cpp still reports
   sixteen diagnostics; the expanded gate exposes a StoredImage uninitialized-ID
   diagnostic not reported by the previous gate. No suppression or baseline increase.
   Developer `f928288ee840`: devenv-virtual-tables.md and record-get-method.md;
   BCApps `d99152ee35f0`: System/Workflow/WorkflowEvent.Table.al uses optional Get.
   Predecessor 1229 distinguishes filter-blind Get from filter-aware Find.
-  Current-tree AL replay is still required; no UT gains are claimed.
+  Native Find/FindSet/Next/Count/IsEmpty now borrow `InstalledTables()` directly through
+  `TableMetadataNavigation.cpp` and the shared `CatalogueNavigation.{h,cpp}` kernel.
+  No new registry, SQL copy or per-session population; three typed scratch rows are
+  call-scoped. Primary ID ranges narrow by binary search, other valid orders use
+  bounded-memory selection scans. Key-only counts retain unqualified identities;
+  projected reads refuse missing original module ownership before changing the caller.
+  `TableMetadataCatalogueGate`: 48 checks for sparse keys, exact options, mixed sorts,
+  marks/group -1, signed/extreme Next, independent bookmarks, filter-blind Get followed
+  by Next, typed/RecordRef parity, malformed bindings and live/temporary write separation.
+  Existing ReflectionMetadataGate retains all 294 checks. Shared bookmark/full-filter
+  mutants fail both catalogue gates; two new controls detect ignored key-filter holes
+  and stale positioning after Get. Kernel, both adapters, mapper and new gate pass
+  focused tidy. No suppression or wider public dependency.
+  Developer `f928288ee840`: devenv-virtual-tables.md, methods-auto/{record,recordref}/
+  {find,next,count}-method.md and record-setcurrentkey-method.md (valid nonindexed sorts).
+  BCApps `d99152ee35f0`: System/RapidStart/ConfigPackageManagement.Codeunit.al,
+  RemoveRecordsWithObsoleteTableID; Tests/ERM/ERMTableFieldsUT.Codeunit.al.
+  User docs `bf5ffffa9b02`: across-import-data-configuration-packages.md.
+  Predecessor 1080/1417: preserve native options and Name versus Caption;
+  runtime/base/virtual_metadata.py materializes scan populations and lacks indexed
+  filtering; reject that mechanism, reuse the caller contract only.
+  Authorization, secondary-order performance and current-tree AL replay remain open.
 - Native `Field.Get` uses `RuntimeGet` / `GetInstalledFieldMetadata` for typed and
   RecordRef reads, with the original positive-key catalogue domain and checked native
   field-span ABI. It never reads a SQL copy. Native zero/negative keys miss; omitted
@@ -151,16 +172,16 @@ replay; do not attribute unmeasured gains to them.
   `PlatformFieldGate`: 418 checks, including stored-value parity and qualified binding
   refusal. Runtime mapper and gate focused tidy pass after adding the named Record.h
   dependency; Table.cpp retains sixteen findings, without suppressions/baseline increases.
-  Reflection qualifier retains its 43 compiled controls and adds catalogue-zero and
-  unchecked-binding controls (four/two failed checks). Field Access/search/customization
+  Reflection qualifier retains catalogue-zero and unchecked-binding controls
+  (four/two failed checks). Field Access/search/customization
   policies, unknown-value refusal and owned moved-error keys remain qualified.
   Original BC29 authority: FieldDataProvider iterator RVA `2e888c`, source/hash in 0013.
   Developer `f928288ee840`: record-get, recordref-get/field and devenv-virtual-tables;
   BCApps `d99152ee35f0`: ConfigPackageField uses consumed/discarded typed reads,
   DataTypeManagement.FindFieldByName uses FieldName → Field.FindFirst → FieldRef.Value.
   Predecessor 1114 requires that actual name-derived caller; 1136 rejects hidden misses.
-  Native Find/FindSet/Next/Count/IsEmpty now use `src/rt/FieldNavigation.cpp`: one
-  shared immutable locator index, table-range narrowing and indexed primary navigation;
+  Native Find/FindSet/Next/Count/IsEmpty use the `FieldNavigation.cpp` adapter and shared
+  `CatalogueNavigation.cpp`: one immutable locator index, table-range narrowing and indexed primary navigation;
   other valid orders use bounded-memory selection scans, not per-session row copies.
   Existing RecordFilter/RecordOrder preserve groups, marks, mixed order and exact values.
   Handles retain independent bookmarks even after buffer edits; changed views re-anchor.
@@ -168,8 +189,8 @@ replay; do not attribute unmeasured gains to them.
   FieldRef.Value caller, source-declared/positive implicit counts, typed/RecordRef parity,
   signed/extreme Next and temporary zero-key independence. Live DML, empty ModifyAll
   and empty DeleteAll(true) refuse; temporary bulk writes remain valid. A pre-fix
-  replay fails exactly the new empty triggered-delete claim. The qualifier rejects 51 compiled
-  controls plus the header control; six new controls detect timestamp population, lost
+  replay fails exactly the new empty triggered-delete claim. The qualifier rejects 53 compiled
+  controls plus the header control; Field controls detect timestamp population, lost
   bookmarks, ignored filters, zero version/identity and both empty-write guards.
   Original BC29 FieldDataProvider.GetFieldRecordBuffer RVA `a4330` supplies metadata
   identity from `{2000000041, TableNo, No, 0}` and frozen version 1 through

@@ -749,21 +749,34 @@ template <typename Row> void MissingProviderIsNotAnEmptySnapshot() {
       operation();
     } catch (const agiru::Error &error) {
       const std::string message = error.what();
-      refused = message.contains(Row::kName) && message.contains("live ") &&
-                message.contains("schema identity");
+      if constexpr (Row::kId == agiru::platform::TableMetadata::kId) {
+        refused = message.contains(Row::kName) && message.contains("read-only live catalogue");
+      } else {
+        refused = message.contains(Row::kName) && message.contains("live ") &&
+                  message.contains("schema identity");
+      }
     }
     CHECK_TRUE("unqualified live metadata refuses before SQL or invented emptiness", refused);
   };
   refuses([&] { agiru::RequireTableProvider(agiru::TableTraits<Row>::kTable); });
-  refuses([&] { static_cast<void>(row.FindFirst()); });
-  refuses([&] { static_cast<void>(row.FindSet()); });
   if constexpr (Row::kId == agiru::platform::TableMetadata::kId) {
+    row.SetRange(row.ID, kTemporaryId);
+    CHECK_TRUE("qualified metadata Find distinguishes a missing installed table", !row.FindFirst());
+    CHECK_TRUE("qualified metadata FindSet distinguishes a missing installed table",
+               !row.FindSet());
     CHECK_TRUE("qualified metadata Get distinguishes a missing installed table",
                !row.Get(kTemporaryId));
   } else {
+    refuses([&] { static_cast<void>(row.FindFirst()); });
+    refuses([&] { static_cast<void>(row.FindSet()); });
     refuses([&] { static_cast<void>(row.Get(kTemporaryId)); });
   }
-  refuses([&] { static_cast<void>(row.Count()); });
+  if constexpr (Row::kId == agiru::platform::TableMetadata::kId) {
+    CHECK_TRUE("qualified metadata Count distinguishes a missing installed table",
+               row.Count() == 0);
+  } else {
+    refuses([&] { static_cast<void>(row.Count()); });
+  }
   refuses([&] { static_cast<void>(row.Insert()); });
   refuses([&] { static_cast<void>(row.Modify()); });
   refuses([&] { static_cast<void>(row.Delete()); });

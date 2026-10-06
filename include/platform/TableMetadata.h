@@ -275,8 +275,7 @@ inline constexpr TableDef kTableMetadataTable{
     .keys = kTableMetadataKeys,
     .dataPerCompany = false,
     .inherentPermissions = "rX",
-    .providerRefusal =
-        "live table metadata projection and schema identity are unavailable (board:0034/0044/0013)",
+    .providerRefusal = "read-only live catalogue, not SQL storage",
 };
 
 static_assert(FieldsAreSorted(kTableMetadataTable),
