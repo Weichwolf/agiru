@@ -137,7 +137,12 @@ selected-record identity, opening triggers, explicit-action precedence and card
 ModifyAllowed policy. `PageDispatcherGate` drives the shared command primitive over
 existing page bindings: per-command authorization, exact identities, current inherited
 and computed control state, refusal before effects and unchanged AL errors/text.
-Five compiled dispatcher defects and four navigation/unbound controls must fail.
+The production `PageSession` and AL `TestPage` adapter share validation/save/trigger
+execution. Generated delayed insertion and edit cases reconcile direct SQL results;
+production save errors propagate while AL test error collection remains explicit.
+Generated TestPage copy/move rebinding and request-page fields/filter accept/cancel
+paths retain adapter behaviour. Five compiled dispatcher defects and five
+navigation/error-policy/unbound controls must fail.
 This is not HTTP/client parity, production permission storage, exact typed wire values
 or complete page lifecycle. View navigation remains open (0720).
 

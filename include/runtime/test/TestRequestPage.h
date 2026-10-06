@@ -50,7 +50,7 @@ public:
   void Adopt(void *page) {
     TestPage<R>::Adopt(page);
     if constexpr (requires(R &report) { this->GiveRequestFilters_(report); }) {
-      this->GiveRequestFilters_(this->Page_());
+      this->GiveRequestFilters_(this->Instance());
     }
   }
 
@@ -59,7 +59,7 @@ public:
   /// \param ParameterFileName Where the request-page parameters go.
   /// \param DataSetFileName   Where the dataset goes.
   void SaveAsXml(std::string_view ParameterFileName, std::string_view DataSetFileName) {
-    this->Page_().SaveAsXmlFromRequestPage_(DataSetFileName, ParameterFileName);
+    this->Instance().SaveAsXmlFromRequestPage_(DataSetFileName, ParameterFileName);
   }
 
   /// \brief `TestRequestPage.SaveAsPdf(FileName)`. \param FileName The file.
@@ -87,8 +87,8 @@ public:
 private:
   void TakeBack_() {
     if constexpr (requires(R &report) { this->TakeRequestFilters_(report); }) {
-      if (this->page_ != nullptr && this->Page_().ClosedWith() == ::agiru::Action::OK) {
-        this->TakeRequestFilters_(this->Page_());
+      if (this->IsOpen() && this->Instance().ClosedWith() == ::agiru::Action::OK) {
+        this->TakeRequestFilters_(this->Instance());
       }
     }
   }

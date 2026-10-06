@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: extract the production page dispatcher and deliver one real
+Next: bind generated production page factories, exact typed values and one
 list → card → validate → save slice through HTTP, Node CMD and MCP.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
@@ -24,13 +24,20 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   wrong identities/kinds and current hidden/disabled/read-only client operations.
   It reuses existing field/trigger bindings, not separate business rules. Display
   text/Option ordinals stay separate; general exact typed wire values are still pending.
-  Production lifecycle/factories, SQL-backed authorization, command receipts/revisions,
-  modal suspension, HTML/HTTP and Node CMD/MCP are not implemented by this primitive.
-  Container verification: 64 dispatcher checks, 15 generated navigation checks and
-  17 isolation checks pass; five dispatcher defects and four existing navigation/
-  unbound controls reject. Twelve standalone header probes and forced dependencies pass.
-  Targeted dispatcher-source tidy passes; the gate consumer retains 16 findings in
-  existing Page/TestPage/Table/Codeunit implementations, without suppression changes.
+  `PageSession<P>` now owns the common lifecycle/validation/save/trigger/part kernel;
+  `TestPage<P>` adds generated test controls, traps and explicit row-error collection.
+  Production row-save errors propagate; production handles are not publicly copyable.
+  Factories, SQL-backed authorization, command receipts/revisions, modal suspension,
+  HTML/HTTP and Node CMD/MCP remain pending. Failed-new-row retry recovery, non-delayed
+  primary-key insertion and complete lifecycle semantics are not qualified by extraction.
+  Container verification: 81 dispatcher checks and 48 generated navigation/lifecycle/
+  handle/request-page checks pass. Direct SQL confirms saved identity/value and missing
+  refused inserts. Five dispatcher defects and five navigation/error-policy/unbound
+  controls reject; 17 isolation checks pass. Twelve standalone header probes and
+  forced dependencies pass. Targeted dispatcher-source and generated-fixture runner
+  tidy pass; the gate consumer retains 16 findings in existing Page/PageSession/
+  Table/Codeunit implementations, without suppression changes. Full integration/UT
+  on this extraction remains pending; 0058 keeps the previous counted result.
 - Refreshed archive SHA256:
   `f654cb6576768cb90fff2e0fb701043139ab4d36723e7427a498132a2e2ee6a3`.
   Inspect `~/Git/openerp/openerp/web/client/{protocol,screen,page_model,ui,session,cli_api,request_page}.py`
@@ -217,7 +224,7 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 
 ## References and consolidation
 
-agiru: `include/meta/PageDef.h`, `include/runtime/{PageCore,PageDispatcher}.h`,
+agiru: `include/meta/PageDef.h`, `include/runtime/{PageCore,PageDispatcher,PageSession}.h`,
 `src/gen/PageWriter.cpp`, `src/rt/{TestPage,Session}.cpp`, `src/cli/Main.cpp`.
 Control-dispatch references: developer revision
 `f928288ee840334be73142e5fc0202c0e19b246d`,
@@ -227,6 +234,13 @@ Control-dispatch references: developer revision
 user `business-central/ui-enter-data.md` at
 `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`;
 predecessor `openerp/web/client/protocol.py::{set_field,invoke_action}` and WI 1903.
+Shared-kernel extraction: developer `triggers-auto/page/devenv-onopenpage-page-trigger.md`,
+`properties/devenv-delayedinsert-property.md`,
+`methods-auto/testpage/testpage-getvalidationerror-method.md` and
+`devenv-report-triggers.md` at the developer revision above; predecessor WI 1113
+retains reread/part-refresh findings. `test/runtime/page-navigation/{Delayed.Page.al,
+Request.Report.al,Runner.cpp}` qualifies authored page/AL-test adapter behaviour,
+not report rendering, full BC lifecycle or a live HTTP session.
 Reproduce control dispatch with `make gate GATE=PageDispatcherGate JOBS=2`;
 navigation/compiled refusal controls with `make page-navigation JOBS=2`.
 These authored primitive tests are not live client or ERP parity evidence.

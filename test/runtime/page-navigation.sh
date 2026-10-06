@@ -7,7 +7,9 @@ CXX=${CXX:-clang++-19}
 dsn=${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}
 proof=$(mktemp -d /tmp/agiru-page-navigation.XXXXXX)
 sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
-  test/gate/PageDispatcherGate.cpp test/runtime/page-navigation.sh > "$proof/dispatcher-inputs.sha256"
+  include/runtime/PageSession.h include/runtime/test/TestPage.h \
+  test/gate/PageDispatcherGate.cpp test/runtime/page-navigation/Runner.cpp \
+  test/runtime/page-navigation/*.al test/runtime/page-navigation.sh > "$proof/dispatcher-inputs.sha256"
 mkdir -p "$proof/source"
 cp test/runtime/page-navigation/*.al "$proof/source/"
 cp test/transpiler/native-enums/source/app.json "$proof/source/app.json"
@@ -68,7 +70,7 @@ jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/page-navigation/Runne
   > "$B/fixture-commands/page-navigation.json"
 mkdir -p "$proof/mutant"
 cp -a include "$proof/mutant/"
-for control in no-card wrong-row no-policy; do
+for control in no-card wrong-row no-policy collect-production-errors; do
   awk -v control="$control" '
     control == "no-card" && /if \(edit && EditCard_\(\)\)/ {
       sub(/edit && EditCard_\(\)/, "false"); changed++
@@ -79,9 +81,12 @@ for control in no-card wrong-row no-policy; do
     control == "no-policy" && /if \(detail::SaysFalse\(entry->page->modifyAllowed\)\)/ {
       sub(/detail::SaysFalse\(entry->page->modifyAllowed\)/, "false"); changed++
     }
+    control == "collect-production-errors" && /static constexpr bool kCollectSaveErrors = false/ {
+      sub(/kCollectSaveErrors = false/, "kCollectSaveErrors = true"); changed++
+    }
     { print }
     END { if (changed != 1) exit 2 }
-  ' include/runtime/test/TestPage.h > "$proof/mutant/include/runtime/test/TestPage.h"
+  ' include/runtime/PageSession.h > "$proof/mutant/include/runtime/PageSession.h"
   "$CXX" "-I$proof/mutant/include" "${flags[@]}" test/runtime/page-navigation/Runner.cpp \
     "${objects[@]}" "${links[@]}" -o "$proof/$control"
   if "$proof/$control" "$dsn" > "$proof/$control-execution.log" 2>&1; then
@@ -92,6 +97,7 @@ for control in no-card wrong-row no-policy; do
     no-card) rg -q 'not on a running page' "$proof/$control-execution.log" ;;
     wrong-row) rg -q 'system Edit opens the declared card on the selected row' "$proof/$control-execution.log" ;;
     no-policy) rg -q 'system Edit honors the card.s ModifyAllowed policy' "$proof/$control-execution.log" ;;
+    collect-production-errors) rg -q 'production row-save errors propagate instead of successful collection' "$proof/$control-execution.log" ;;
   esac
   rm -- "$proof/$control"
 done
@@ -113,4 +119,4 @@ rm -- "$proof/unbound-integer.so" "$proof/runner" "$proof/runner.o"
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation and authorized control dispatch execute; nine compiled controls reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, production lifecycle and authorized control dispatch execute; ten compiled controls reject; %s\n' "$proof"

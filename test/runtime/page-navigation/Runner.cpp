@@ -1,20 +1,27 @@
 #include "meta/PageDef.h"
+#include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/PageSession.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/TestPage.h"
+#include "runtime/test/TestRequestPage.h"
+#include "type/Action.h"
 #include "type/Integer.h"
 
 #include "Check.h"
 #include "fixture/page/NavigationBlockedList.h"
 #include "fixture/page/NavigationCard.h"
+#include "fixture/page/NavigationDelayed.h"
 #include "fixture/page/NavigationList.h"
 #include "fixture/page/NavigationOverride.h"
+#include "fixture/report/NavigationReport.h"
 #include "fixture/table/NavigationRow.h"
 
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 namespace {
 
@@ -24,6 +31,8 @@ using List = agiru::Fixture::NavigationList_Page;
 constexpr agiru::Integer kFirstValue = 11;
 constexpr agiru::Integer kSecondValue = 22;
 constexpr agiru::Integer kOverrideIncrement = 100;
+constexpr agiru::Integer kCopiedValue = 55;
+constexpr agiru::Integer kRequestLimit = 7;
 
 void Prepare() {
   agiru::DropTable(agiru::Session::Current().Database(), agiru::TableTraits<Row>::kTable);
@@ -112,6 +121,132 @@ void EmptyListDoesNotCreateACard() {
   list.Close();
 }
 
+void ProductionLifecycleAndTestErrorPolicy() {
+  using Delayed = agiru::Fixture::NavigationDelayed_Page;
+  agiru::PageSession<Delayed> page;
+  page.OpenNew();
+  page.SetControlText("ID", "3");
+  page.SetControlText("Value", "33");
+  Row row;
+  CHECK_TRUE("production delayed input does not insert before row leave", !row.Get(3));
+  page.RowLeft();
+  CHECK_TRUE("production row leave inserts through the AL page", row.Get(3));
+  CHECK_TRUE("SQL row has the validated input", row.Value == 33);
+  page.Close();
+
+  agiru::PageSession<Card> card;
+  card.OpenEdit();
+  CHECK_TEXT(
+      "production opening runs the generated page trigger", card.ControlText("OpeningMode"), "Yes");
+  CHECK_TRUE("production positioning uses the typed record kernel", card.GoToKey(3));
+  CHECK_TEXT(
+      "positioning runs the generated after-get trigger", card.ControlText("LoadedValue"), "33");
+  card.SetControlText("Value", "44");
+  CHECK_TRUE("production edit keeps the same SQL identity", row.Get(3));
+  CHECK_TRUE("production edit uses the existing page save path", row.Value == 44);
+  bool refused = false;
+  try {
+    card.SetControlText("Value", "not an integer");
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageValidation"; }
+  CHECK_TRUE("invalid production input retains its validation classification", refused);
+  CHECK_TEXT("invalid input restores the accepted record value", card.ControlText("Value"), "44");
+  card.Close();
+
+  page.OpenNew();
+  page.SetControlText("ID", "4");
+  page.SetControlText("Value", "-1");
+  refused = false;
+  try {
+    page.RowLeft();
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()) == "negative row value";
+  }
+  CHECK_TRUE("production row-save errors propagate instead of successful collection", refused);
+  CHECK_TRUE("production does not use the AL test error list", page.ValidationErrorCount() == 0);
+  CHECK_TRUE("failed production insertion has no SQL row", !row.Get(4));
+  page.Close();
+
+  agiru::TestPage<Delayed> test;
+  test.OpenNew();
+  test.ID.SetValue(4);
+  test.Value.SetValue(-1);
+  test.RowLeft();
+  CHECK_TRUE("AL test adapter retains its explicit collection policy",
+             test.ValidationErrorCount() == 1);
+  CHECK_TEXT("AL test row-save error retains the original text",
+             test.GetValidationError(),
+             "negative row value");
+  CHECK_TRUE("test error collection does not create a SQL row", !row.Get(4));
+  test.Close();
+  const agiru::Result stored = agiru::Session::Current().Database().Execute(
+      R"(SELECT "ID", "Value" FROM "Navigation Row" ORDER BY "ID")");
+  CHECK_TRUE("independent SQL retains only the successful insertion", stored.Rows() == 1);
+  CHECK_TEXT("independent SQL confirms the saved identity", stored.Value(0, 0).value_or(""), "3");
+  CHECK_TEXT("independent SQL confirms the validated edit", stored.Value(0, 1).value_or(""), "44");
+}
+
+void TestHandlesRebindTheirGeneratedControls() {
+  agiru::TestPage<Card> owner;
+  owner.OpenEdit();
+  CHECK_TRUE("test handle positions before copying", owner.GoToKey(3));
+  {
+    agiru::TestPage<Card> copied(owner);
+    copied.Value.SetValue(kCopiedValue);
+    CHECK_TRUE("copy construction retains a handle on the same page",
+               owner.Value.AsInteger() == 55);
+    agiru::TestPage<Card> assigned;
+    assigned = copied;
+    CHECK_TRUE("copy assignment rebinds generated controls", assigned.Value.AsInteger() == 55);
+    CHECK_TEXT("copy construction binds the filter adapter", copied.Filter.GetFilter("ID"), "");
+  }
+  agiru::TestPage<Card> moved(std::move(owner));
+  CHECK_TRUE("move construction transfers the owning page", moved.IsOpen());
+  CHECK_TRUE("move construction rebinds generated fields", moved.Value.AsInteger() == 55);
+  agiru::TestPage<Card> assigned;
+  assigned = std::move(moved);
+  CHECK_TRUE("move assignment transfers the owning page", assigned.IsOpen());
+  CHECK_TRUE("move assignment rebinds generated fields", assigned.Value.AsInteger() == 55);
+  assigned.Close();
+}
+
+void RequestPageAdaptersRetainFieldsAndFilters() {
+  using Report = agiru::Fixture::NavigationReport_Report;
+  Report report;
+  Row view;
+  view.SetRange(view.ID, 3);
+  report.SetTableView(view);
+  {
+    agiru::TestRequestPage<Report> request;
+    request.Adopt(&report);
+    CHECK_TEXT("request adoption retains the report dataitem view",
+               request.Rows.GetFilter(request.Rows.ID).Value(),
+               "3");
+    request.Limit.SetValue(kRequestLimit);
+    CHECK_TRUE("request fields retain their generated bindings", request.Limit.AsInteger() == 7);
+    request.Rows.SetRange(request.Rows.ID, 4);
+    request.SaveAsXml("", "");
+    CHECK_TRUE("request XML action delegates to the live report",
+               report.ClosedWith() == agiru::Action::OK);
+  }
+  {
+    agiru::TestRequestPage<Report> request;
+    request.Adopt(&report);
+    CHECK_TEXT("accepted request filters return to the report",
+               request.Rows.GetFilter(request.Rows.ID).Value(),
+               "4");
+    CHECK_TRUE("adoption reuses the same report globals", request.Limit.AsInteger() == 7);
+    request.Rows.SetRange(request.Rows.ID, 3);
+    report.CloseWith(agiru::Action::Cancel);
+  }
+  {
+    agiru::TestRequestPage<Report> request;
+    request.Adopt(&report);
+    CHECK_TEXT("cancelled request filters do not replace the accepted view",
+               request.Rows.GetFilter(request.Rows.ID).Value(),
+               "4");
+  }
+}
+
 }
 
 int main(int argc, char **argv) {
@@ -124,5 +259,8 @@ int main(int argc, char **argv) {
     ExplicitEditAndStandaloneModes();
     CardModificationPolicy();
     EmptyListDoesNotCreateACard();
+    ProductionLifecycleAndTestErrorPolicy();
+    TestHandlesRebindTheirGeneratedControls();
+    RequestPageAdaptersRetainFieldsAndFilters();
   });
 }

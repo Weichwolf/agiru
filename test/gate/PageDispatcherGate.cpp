@@ -3,6 +3,7 @@
 #include "runtime/ErrorValue.h"
 #include "runtime/Page.h"
 #include "runtime/PageDispatcher.h"
+#include "runtime/PageSession.h"
 #include "runtime/test/TestPage.h"
 #include "type/Boolean.h"
 #include "type/StringValue.h"
@@ -12,6 +13,7 @@
 #include <array>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace {
 
@@ -121,6 +123,14 @@ namespace {
 
 using Operation = agiru::PageControlOperation;
 
+template <typename T>
+concept HasTestTrap = requires(T &page) { page.Trap(); };
+
+static_assert(!std::is_copy_constructible_v<agiru::PageSession<CommandPage>>);
+static_assert(!std::is_move_constructible_v<agiru::PageSession<CommandPage>>);
+static_assert(!HasTestTrap<agiru::PageSession<CommandPage>>);
+static_assert(HasTestTrap<agiru::TestPage<CommandPage>>);
+
 void Refuses(agiru::PageDispatcher &dispatcher,
              Operation operation,
              std::string_view control,
@@ -205,11 +215,52 @@ void CurrentStateAndIdentityAreAuthoritative() {
   page.Close();
 }
 
+void ProductionSessionsUseTheSharedKernel() {
+  agiru::PageSession<CommandPage> first;
+  agiru::PageSession<CommandPage> second;
+  CHECK_TRUE("production session starts closed", !first.IsOpen());
+  bool refused = false;
+  try {
+    first.SetControlText("Value", "before open");
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageNotOpen"; }
+  CHECK_TRUE("production lifecycle has its own not-open diagnostic", refused);
+  first.OpenEdit();
+  second.OpenEdit();
+  Authorization firstAuthority;
+  Authorization secondAuthority;
+  agiru::PageDispatcher dispatcher(kPage, first, firstAuthority);
+  agiru::PageDispatcher other(kPage, second, secondAuthority);
+  static_cast<void>(
+      dispatcher.Execute({.operation = Operation::Set, .control = "Value", .text = "enabled"}));
+  static_cast<void>(dispatcher.Execute({.operation = Operation::Action, .control = "Conditional"}));
+  CHECK_TEXT("production dispatcher reaches the same typed trigger path",
+             dispatcher.Execute({.operation = Operation::Read, .control = "Hits"}).text,
+             "1");
+  Refuses(other, Operation::Action, "Conditional");
+  CHECK_TEXT("production page instances do not share mutable state",
+             other.Execute({.operation = Operation::Read, .control = "Value"}).text,
+             "before");
+  Refuses(dispatcher, Operation::Read, "Fail", "OriginalCode", "original AL failure");
+  refused = false;
+  try {
+    first.OpenNew();
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageAlreadyOpen"; }
+  CHECK_TRUE("production double-open is an explicit refusal", refused);
+  first.Close();
+  CHECK_TRUE("production close releases the owned page", !first.IsOpen());
+  first.OpenView();
+  Refuses(dispatcher, Operation::Set, "Value");
+  CHECK_TEXT("production reopen resets page-local state", first.ControlText("Value"), "before");
+  first.Close();
+  second.Close();
+}
+
 }
 
 int main() {
   return gate::Run("PageDispatcher", [] {
     DispatchUsesExistingBindings();
     CurrentStateAndIdentityAreAuthoritative();
+    ProductionSessionsUseTheSharedKernel();
   });
 }
