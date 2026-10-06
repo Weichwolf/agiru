@@ -14,6 +14,9 @@
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
     agiru::Fixture::StreamAliasConsumer_Codeunit consumer;
+    CHECK_TEXT("generated URI factories and read/write properties retain AL names",
+               consumer.ClrUri("HTTPS://Example.COM:443/path?old=1#fragment").Value(),
+               "https://example.com/path?new=2#fragment");
     agiru::Blob lines;
     static_cast<void>(lines.CreateOutStream().WriteBytes("hällo\r\nworld\n"));
     CHECK_TEXT("generated CLR reader factory and end property retain AL spelling",

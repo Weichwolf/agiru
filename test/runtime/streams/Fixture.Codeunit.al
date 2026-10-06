@@ -2,6 +2,18 @@ namespace Microsoft.Fixture;
 
 codeunit 50261 "Stream Alias Consumer"
 {
+    procedure ClrUri(Value: Text): Text
+    var
+        Address: DotNet Uri;
+        Builder: DotNet UriBuilder;
+    begin
+        Address := Address.Uri(Value);
+        Builder := Builder.UriBuilder(Address);
+        Builder.Query := '?new=2';
+        Address := Builder.Uri;
+        exit(Address.AbsoluteUri);
+    end;
+
     procedure ReadDecodedLines(var Store: Blob): Text
     var
         Input: InStream;

@@ -1,7 +1,12 @@
 #include "dotnet/Uri.h"
 
+#include "dotnet/Refused.h"
 #include "runtime/ErrorValue.h"
+#include "type/Boolean.h"
+#include "type/Integer.h"
+#include "type/StringValue.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
@@ -82,31 +87,7 @@ std::size_t SchemeLength(std::string_view text) {
 
 }
 
-bool Uri::Parse_(std::string_view uriString, const UriKind &uriKind) {
-  const class Uri empty;
-  *this = empty;
-  const std::size_t schemeLength = SchemeLength(uriString);
-  const bool absolute = schemeLength > 0;
-  if (uriKind.Number() == UriKind::Absolute().Number() && !absolute) { return false; }
-  if (uriKind.Number() == UriKind::Relative().Number() && absolute) { return false; }
-  if (!absolute) {
-    if (uriString.empty()) { return false; }
-    original_ = std::string(uriString);
-    std::string_view rest = uriString;
-    if (const std::size_t hash = rest.find('#'); hash != std::string_view::npos) {
-      fragment_ = std::string(rest.substr(hash + 1));
-      rest = rest.substr(0, hash);
-    }
-    if (const std::size_t question = rest.find('?'); question != std::string_view::npos) {
-      query_ = std::string(rest.substr(question + 1));
-      rest = rest.substr(0, question);
-    }
-    path_ = std::string(rest);
-    return true;
-  }
-  original_ = std::string(uriString);
-  scheme_ = Lowered(uriString.substr(0, schemeLength));
-  std::string_view rest = uriString.substr(schemeLength + 1);
+void UriValue::TakeFragmentAndQuery_(std::string_view &rest) {
   if (const std::size_t hash = rest.find('#'); hash != std::string_view::npos) {
     fragment_ = std::string(rest.substr(hash + 1));
     rest = rest.substr(0, hash);
@@ -115,58 +96,80 @@ bool Uri::Parse_(std::string_view uriString, const UriKind &uriKind) {
     query_ = std::string(rest.substr(question + 1));
     rest = rest.substr(0, question);
   }
-  if (rest.starts_with("//")) {
-    rest.remove_prefix(2);
-    const std::size_t slash = rest.find('/');
-    std::string_view authority = slash == std::string_view::npos ? rest : rest.substr(0, slash);
-    rest = slash == std::string_view::npos ? std::string_view{} : rest.substr(slash);
-    if (const std::size_t at = authority.rfind('@'); at != std::string_view::npos) {
-      userInfo_ = std::string(authority.substr(0, at));
-      authority = authority.substr(at + 1);
-    }
-    std::size_t colon = authority.rfind(':');
-    if (authority.starts_with('[')) {
-      const std::size_t close = authority.find(']');
-      colon = close == std::string_view::npos || close + 1 >= authority.size() ||
-                      authority[close + 1] != ':'
-                  ? std::string_view::npos
-                  : close + 1;
-    }
-    if (colon != std::string_view::npos) {
-      const std::string_view digits = authority.substr(colon + 1);
-      std::int32_t port = 0;
-      for (const char c : digits) {
-        if (std::isdigit(static_cast<unsigned char>(c)) == 0) { return false; }
-        port = port * kDecimal + (c - '0');
-        if (port > kMaxPort) { return false; }
-      }
-      if (!digits.empty()) { port_ = port == DefaultPort(scheme_) ? -1 : port; }
-      authority = authority.substr(0, colon);
-    }
-    host_ = Lowered(authority);
-    const bool hostNeeded = scheme_ == "http" || scheme_ == "https" || scheme_ == "ftp" ||
-                            scheme_ == "ws" || scheme_ == "wss";
-    if (hostNeeded && host_.empty()) { return false; }
-    for (const char c : host_) {
-      const auto u = static_cast<unsigned char>(c);
-      if (u >= kAscii || std::isspace(u) != 0 || c == '/' || c == '?' || c == '#') { return false; }
-    }
+}
+
+bool UriValue::ParsePort_(std::string_view &authority, std::size_t colon) {
+  const std::string_view digits = authority.substr(colon + 1);
+  std::int32_t port = 0;
+  for (const char c : digits) {
+    if (std::isdigit(static_cast<unsigned char>(c)) == 0) { return false; }
+    port = port * kDecimal + (c - '0');
+    if (port > kMaxPort) { return false; }
   }
+  if (!digits.empty()) { port_ = port == DefaultPort(scheme_) ? -1 : port; }
+  authority = authority.substr(0, colon);
+  return true;
+}
+
+bool UriValue::ParseAuthority_(std::string_view &rest) {
+  rest.remove_prefix(2);
+  const std::size_t slash = rest.find('/');
+  std::string_view authority = slash == std::string_view::npos ? rest : rest.substr(0, slash);
+  rest = slash == std::string_view::npos ? std::string_view{} : rest.substr(slash);
+  if (const std::size_t at = authority.rfind('@'); at != std::string_view::npos) {
+    userInfo_ = std::string(authority.substr(0, at));
+    authority = authority.substr(at + 1);
+  }
+  std::size_t colon = authority.rfind(':');
+  if (authority.starts_with('[')) {
+    const std::size_t close = authority.find(']');
+    colon = close == std::string_view::npos || close + 1 >= authority.size() ||
+                    authority[close + 1] != ':'
+                ? std::string_view::npos
+                : close + 1;
+  }
+  if (colon != std::string_view::npos && !ParsePort_(authority, colon)) { return false; }
+  host_ = Lowered(authority);
+  const bool hostNeeded = scheme_ == "http" || scheme_ == "https" || scheme_ == "ftp" ||
+                          scheme_ == "ws" || scheme_ == "wss";
+  if (hostNeeded && host_.empty()) { return false; }
+  return std::ranges::all_of(host_, [](char c) {
+    const auto u = static_cast<unsigned char>(c);
+    return u < kAscii && std::isspace(u) == 0 && c != '/' && c != '?' && c != '#';
+  });
+}
+
+bool UriValue::Parse_(std::string_view uriString, const UriKind &uriKind) {
+  const UriValue empty;
+  *this = empty;
+  const std::size_t schemeLength = SchemeLength(uriString);
+  const bool absolute = schemeLength > 0;
+  if (uriKind.Number() == UriKind::Absolute().Number() && !absolute) { return false; }
+  if (uriKind.Number() == UriKind::Relative().Number() && absolute) { return false; }
+  if (!absolute && uriString.empty()) { return false; }
+  original_ = std::string(uriString);
+  std::string_view rest = uriString;
+  if (absolute) {
+    scheme_ = Lowered(uriString.substr(0, schemeLength));
+    rest.remove_prefix(schemeLength + 1);
+  }
+  TakeFragmentAndQuery_(rest);
+  if (absolute && rest.starts_with("//") && !ParseAuthority_(rest)) { return false; }
   path_ = std::string(rest);
   return true;
 }
 
-class Uri Uri::Binder::operator()(std::string_view uriString) const {
+UriValue UriValue::Binder::operator()(std::string_view uriString) const {
   return (*this)(uriString, UriKind::Absolute());
 }
 
-class Uri Uri::Binder::operator()(std::string_view uriString, const UriKind &uriKind) const {
-  class Uri made;
+UriValue UriValue::Binder::operator()(std::string_view uriString, const UriKind &uriKind) const {
+  UriValue made;
   if (!made.Parse_(uriString, uriKind)) { throw ::agiru::Error(std::string(kInvalidUri)); }
   return made;
 }
 
-class Uri Uri::Binder::operator()(const class Uri &baseUri, std::string_view relativeUri) const {
+UriValue UriValue::Binder::operator()(const UriValue &baseUri, std::string_view relativeUri) const {
   const std::size_t schemeLength = SchemeLength(relativeUri);
   if (schemeLength > 0) { return (*this)(relativeUri, UriKind::Absolute()); }
   std::string base = std::string(std::string_view(baseUri.AbsoluteUri()));
@@ -193,25 +196,25 @@ class Uri Uri::Binder::operator()(const class Uri &baseUri, std::string_view rel
   return (*this)(base + std::string(relativeUri), UriKind::Absolute());
 }
 
-class Uri Uri::Binder::operator()(const Refused &refused) const {
+UriValue UriValue::Binder::operator()(const Refused &refused) const {
   static_cast<void>(refused());
   throw ::agiru::Error(std::string(kInvalidUri));
 }
 
-Boolean Uri::IsWellFormedUriString(std::string_view uriString, const UriKind &uriKind) {
+Boolean UriValue::IsWellFormedUriString(std::string_view uriString, const UriKind &uriKind) {
   if (!WellFormedText(uriString)) { return false; }
-  class Uri made;
+  UriValue made;
   return made.Parse_(uriString, uriKind);
 }
 
-Boolean Uri::TryCreate(std::string_view uriString, const UriKind &uriKind, class Uri &result) {
-  class Uri made;
+Boolean UriValue::TryCreate(std::string_view uriString, const UriKind &uriKind, UriValue &result) {
+  UriValue made;
   if (!made.Parse_(uriString, uriKind)) { return false; }
   result = made;
   return true;
 }
 
-::agiru::Text<0> Uri::EscapeDataString(std::string_view stringToEscape) {
+::agiru::Text<0> UriValue::EscapeDataString(std::string_view stringToEscape) {
   static constexpr std::string_view kHex = "0123456789ABCDEF";
   std::string out;
   for (const char c : stringToEscape) {
@@ -227,7 +230,7 @@ Boolean Uri::TryCreate(std::string_view uriString, const UriKind &uriKind, class
   return out;
 }
 
-::agiru::Text<0> Uri::UnescapeDataString(std::string_view stringToUnescape) {
+::agiru::Text<0> UriValue::UnescapeDataString(std::string_view stringToUnescape) {
   std::string out;
   for (std::size_t i = 0; i < stringToUnescape.size(); ++i) {
     const char c = stringToUnescape[i];
@@ -243,7 +246,7 @@ Boolean Uri::TryCreate(std::string_view uriString, const UriKind &uriKind, class
   return out;
 }
 
-::agiru::Text<0> Uri::EscapeUriString(std::string_view stringToEscape) {
+::agiru::Text<0> UriValue::EscapeUriString(std::string_view stringToEscape) {
   static constexpr std::string_view kHex = "0123456789ABCDEF";
   std::string out;
   for (const char c : stringToEscape) {
@@ -259,7 +262,7 @@ Boolean Uri::TryCreate(std::string_view uriString, const UriKind &uriKind, class
   return out;
 }
 
-::agiru::Text<0> Uri::GetLeftPart(const UriPartial &part) const {
+::agiru::Text<0> UriValue::GetLeftPart(const UriPartial &part) const {
   if (scheme_.empty()) { return std::string{}; }
   std::string out = scheme_ + ":";
   if (part.Number() == UriPartial::Scheme().Number()) { return out; }
@@ -275,21 +278,21 @@ Boolean Uri::TryCreate(std::string_view uriString, const UriKind &uriKind, class
   return out;
 }
 
-Integer Uri::Port() const {
+Integer UriValue::Port() const {
   return port_ >= 0 ? port_ : DefaultPort(scheme_);
 }
 
-::agiru::Text<0> Uri::AbsolutePath() const {
+::agiru::Text<0> UriValue::AbsolutePath() const {
   if (path_.empty() && !host_.empty()) { return std::string("/"); }
   return path_;
 }
 
-::agiru::Text<0> Uri::Authority() const {
+::agiru::Text<0> UriValue::Authority() const {
   if (port_ < 0) { return host_; }
   return host_ + ":" + std::to_string(port_);
 }
 
-::agiru::Text<0> Uri::AbsoluteUri() const {
+::agiru::Text<0> UriValue::AbsoluteUri() const {
   if (scheme_.empty()) { return original_; }
   std::string out = scheme_ + ":";
   if (!host_.empty() || original_.find("//") == scheme_.size() + 1) {
@@ -303,7 +306,7 @@ Integer Uri::Port() const {
   return out;
 }
 
-Boolean Uri::IsBaseOf(const class Uri &uri) const {
+Boolean UriValue::IsBaseOf(const UriValue &uri) const {
   if (scheme_ != uri.scheme_ || host_ != uri.host_ || Port() != uri.Port()) { return false; }
   const std::string mine = std::string(std::string_view(AbsolutePath()));
   const std::string other = std::string(std::string_view(uri.AbsolutePath()));
@@ -313,19 +316,19 @@ Boolean Uri::IsBaseOf(const class Uri &uri) const {
   return other.starts_with(directory);
 }
 
-::agiru::Text<0> Uri::ToString() const {
+::agiru::Text<0> UriValue::ToString() const {
   return scheme_.empty() ? ::agiru::Text<0>{original_}
                          : ::agiru::Text<0>{std::string(std::string_view(
                                UnescapeDataString(std::string_view(AbsoluteUri()))))};
 }
 
-class UriBuilder UriBuilder::Binder::operator()() const {
-  const class UriBuilder made;
+UriParts UriParts::Binder::operator()() const {
+  const UriParts made;
   return made;
 }
 
-class UriBuilder UriBuilder::Binder::operator()(std::string_view uri) const {
-  class Uri parsed;
+UriParts UriParts::Binder::operator()(std::string_view uri) const {
+  UriValue parsed;
   if (!parsed.Parse_(uri, UriKind::Absolute())) {
     if (!parsed.Parse_("http://" + std::string(uri), UriKind::Absolute())) {
       throw ::agiru::Error(std::string(kInvalidUri));
@@ -334,13 +337,13 @@ class UriBuilder UriBuilder::Binder::operator()(std::string_view uri) const {
   return (*this)(parsed);
 }
 
-class UriBuilder UriBuilder::Binder::operator()(const Refused &refused) const {
+UriParts UriParts::Binder::operator()(const Refused &refused) const {
   static_cast<void>(refused());
   throw ::agiru::Error(std::string(kInvalidUri));
 }
 
-class UriBuilder UriBuilder::Binder::operator()(const class Uri &uri) const {
-  class UriBuilder made;
+UriParts UriParts::Binder::operator()(const UriValue &uri) const {
+  UriParts made;
   static_cast<void>(made.Scheme(std::string_view(uri.Scheme())));
   static_cast<void>(made.Host(std::string_view(uri.Host())));
   static_cast<void>(made.Port(uri.IsDefaultPort() ? Integer{-1} : uri.Port()));
@@ -350,7 +353,7 @@ class UriBuilder UriBuilder::Binder::operator()(const class Uri &uri) const {
   return made;
 }
 
-::agiru::Text<0> UriBuilder::Scheme(std::string_view value) {
+::agiru::Text<0> UriParts::Scheme(std::string_view value) {
   scheme_ = Lowered(value);
   if (const std::size_t colon = scheme_.find(':'); colon != std::string::npos) {
     scheme_.resize(colon);
@@ -358,23 +361,23 @@ class UriBuilder UriBuilder::Binder::operator()(const class Uri &uri) const {
   return scheme_;
 }
 
-::agiru::Text<0> UriBuilder::Path(std::string_view value) {
+::agiru::Text<0> UriParts::Path(std::string_view value) {
   path_ = value.empty() ? std::string("/") : std::string(value);
   if (!path_.starts_with('/')) { path_.insert(0, "/"); }
   return path_;
 }
 
-::agiru::Text<0> UriBuilder::Query(std::string_view value) {
+::agiru::Text<0> UriParts::Query(std::string_view value) {
   query_ = std::string(value.starts_with('?') ? value.substr(1) : value);
   return Query();
 }
 
-::agiru::Text<0> UriBuilder::Fragment(std::string_view value) {
+::agiru::Text<0> UriParts::Fragment(std::string_view value) {
   fragment_ = std::string(value.starts_with('#') ? value.substr(1) : value);
   return Fragment();
 }
 
-::agiru::Text<0> UriBuilder::ToString() const {
+::agiru::Text<0> UriParts::ToString() const {
   std::string out = scheme_ + "://" + host_;
   if (port_ >= 0 && port_ != DefaultPort(scheme_)) { out += ":" + std::to_string(port_); }
   out += path_.empty() ? std::string("/") : path_;
@@ -383,8 +386,8 @@ class UriBuilder UriBuilder::Binder::operator()(const class Uri &uri) const {
   return out;
 }
 
-class Uri UriBuilder::Uri() const {
-  class Uri made;
+UriValue UriParts::Uri() const {
+  UriValue made;
   if (!made.Parse_(std::string_view(ToString()), UriKind::Absolute())) {
     throw ::agiru::Error(std::string(kInvalidUri));
   }

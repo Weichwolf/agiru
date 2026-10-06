@@ -6,6 +6,7 @@
 #include "type/Integer.h"
 #include "type/Text.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -76,7 +77,7 @@ private:
 /// \note `Segments` IS NOT REBUILT: it answers a .NET string array, and the AL that walks it
 ///       holds each element in a `DotNet String` this runtime does not carry either; it stays a
 ///       refusal by name (board:0035).
-class Uri {
+class UriValue {
 public:
   /// \brief The binder behind `Uri := Uri.Uri(...)`, the constructor as AL spells it.
   struct Binder {
@@ -84,28 +85,27 @@ public:
     /// \param uriString The text.
     /// \return The URI.
     /// \throws Error when the text is not an absolute URI, with .NET's `UriFormatException` text.
-    [[nodiscard]] class Uri operator()(std::string_view uriString) const;
+    [[nodiscard]] UriValue operator()(std::string_view uriString) const;
 
     /// \brief `new Uri(uriString, uriKind)`.
     /// \param uriString The text. \param uriKind What the text may be.
     /// \return The URI.
     /// \throws Error when the text is not a URI of that kind.
-    [[nodiscard]] class Uri operator()(std::string_view uriString, const UriKind &uriKind) const;
+    [[nodiscard]] UriValue operator()(std::string_view uriString, const UriKind &uriKind) const;
 
     /// \brief `new Uri(baseUri, relativeUri)`: the relative text resolved against the base.
     /// \param baseUri The base. \param relativeUri The relative text.
     /// \return The combined URI.
-    [[nodiscard]] class Uri operator()(const class Uri &baseUri,
-                                       std::string_view relativeUri) const;
+    [[nodiscard]] UriValue operator()(const UriValue &baseUri, std::string_view relativeUri) const;
 
     /// \brief `new Uri(x)` over a value this runtime does not carry -- a field of an absent
     ///        table, say. \param refused The value. \return Never.
     /// \throws Error naming the refused member, which is what the value does when used.
-    [[nodiscard]] class Uri operator()(const Refused &refused) const;
+    [[nodiscard]] UriValue operator()(const Refused &refused) const;
   };
 
   /// \brief `Uri.Uri(...)`, the constructor as AL calls it.
-  Binder Uri;
+  static constexpr Binder Uri{};
 
   /// \brief `Uri.IsWellFormedUriString(uriString, uriKind)`: whether the text is a URI of that
   ///        kind with nothing left to escape.
@@ -118,7 +118,7 @@ public:
   /// \param uriString The text. \param uriKind What it must be. \param result Where it lands.
   /// \return Whether the text was a URI of that kind.
   [[nodiscard]] static Boolean
-  TryCreate(std::string_view uriString, const UriKind &uriKind, class Uri &result);
+  TryCreate(std::string_view uriString, const UriKind &uriKind, UriValue &result);
 
   /// \brief `Uri.EscapeDataString(text)`: every character outside RFC 3986's unreserved set as
   ///        percent-encoded UTF-8.
@@ -186,13 +186,13 @@ public:
 
   /// \brief `Uri.IsBaseOf(uri)`: whether this URI's scheme, authority and directory contain the
   ///        other's. \param uri The other. \return Whether it does.
-  [[nodiscard]] Boolean IsBaseOf(const class Uri &uri) const;
+  [[nodiscard]] Boolean IsBaseOf(const UriValue &uri) const;
 
   /// \brief `Uri.ToString()`. \return The canonical text, `AbsoluteUri` for an absolute URI.
   [[nodiscard]] ::agiru::Text<0> ToString() const;
 
   /// \brief `Uri.Equals(other)`. \param other The other. \return Whether the same URI.
-  [[nodiscard]] Boolean Equals(const class Uri &other) const {
+  [[nodiscard]] Boolean Equals(const UriValue &other) const {
     return std::string_view(AbsoluteUri()) == std::string_view(other.AbsoluteUri());
   }
 
@@ -208,6 +208,10 @@ public:
   bool Parse_(std::string_view uriString, const UriKind &uriKind);
 
 private:
+  void TakeFragmentAndQuery_(std::string_view &rest);
+  bool ParseAuthority_(std::string_view &rest);
+  bool ParsePort_(std::string_view &authority, std::size_t colon);
+
   std::string original_;
   std::string scheme_;
   std::string userInfo_;
@@ -218,29 +222,32 @@ private:
   std::string fragment_;
 };
 
+/// \brief The AL name of the native URI value.
+using Uri = UriValue;
+
 /// \brief .NET `System.UriBuilder`: the parts of a URI as read-and-write properties, and `Uri`
 ///        assembling them.
-class UriBuilder {
+class UriParts {
 public:
   /// \brief The binder behind `UriBuilder := UriBuilder.UriBuilder(...)`.
   struct Binder {
     /// \brief `new UriBuilder()`: `http://localhost/`. \return The builder.
-    [[nodiscard]] class UriBuilder operator()() const;
+    [[nodiscard]] UriParts operator()() const;
 
     /// \brief `new UriBuilder(uri)`. \param uri The text, parsed into the parts.
     /// \return The builder.
-    [[nodiscard]] class UriBuilder operator()(std::string_view uri) const;
+    [[nodiscard]] UriParts operator()(std::string_view uri) const;
 
     /// \brief `new UriBuilder(uri)` over a built URI. \param uri The URI. \return The builder.
-    [[nodiscard]] class UriBuilder operator()(const class Uri &uri) const;
+    [[nodiscard]] UriParts operator()(const UriValue &uri) const;
 
     /// \brief `new UriBuilder(x)` over a value this runtime does not carry. \param refused The
     ///        value. \return Never. \throws Error naming the refused member.
-    [[nodiscard]] class UriBuilder operator()(const Refused &refused) const;
+    [[nodiscard]] UriParts operator()(const Refused &refused) const;
   };
 
   /// \brief `UriBuilder.UriBuilder(...)`, the constructor as AL calls it.
-  Binder UriBuilder;
+  static constexpr Binder UriBuilder{};
 
   /// \brief `UriBuilder.Scheme` read. \return The scheme.
   [[nodiscard]] ::agiru::Text<0> Scheme() const { return scheme_; }
@@ -291,7 +298,7 @@ public:
   ::agiru::Text<0> Fragment(std::string_view value);
 
   /// \brief `UriBuilder.Uri`: the parts assembled. \return The URI.
-  [[nodiscard]] class Uri Uri() const;
+  [[nodiscard]] UriValue Uri() const;
 
   /// \brief `UriBuilder.ToString()`. \return The assembled text.
   [[nodiscard]] ::agiru::Text<0> ToString() const;
@@ -304,5 +311,8 @@ private:
   std::string query_;
   std::string fragment_;
 };
+
+/// \brief The AL name of the native URI builder.
+using UriBuilder = UriParts;
 
 }
