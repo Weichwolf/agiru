@@ -464,30 +464,89 @@ std::string PageNumber(const TableIndex &pages, std::string text) {
   return std::to_string(found->second.id);
 }
 
+void DeclaredMember(std::string &out, std::string_view member, std::string_view value) {
+  if (!out.empty()) { out += ", "; }
+  out += '.';
+  out += member;
+  out += " = ";
+  out += value;
+}
+
+void DeclaredText(std::string &out, std::string_view member, const std::string &value) {
+  if (!value.empty()) { DeclaredMember(out, member, Literal(value)); }
+}
+
+void DeclaredNumber(std::string &out,
+                    std::string_view member,
+                    const std::string &value,
+                    std::string_view cast) {
+  if (value.empty() || value.find_first_not_of("0123456789") != std::string::npos || value == "0") {
+    return;
+  }
+  DeclaredMember(out, member, cast.empty() ? value : std::string(cast) + "{" + value + "}");
+}
+
+void DeclaredFlag(std::string &out, std::string_view member, bool value, bool absent) {
+  if (value != absent) { DeclaredMember(out, member, value ? "true" : "false"); }
+}
+
+std::string UnquotedRelationName(std::string one) {
+  while (!one.empty() && (one.front() == '"' || one.front() == ' ')) { one.erase(0, 1); }
+  while (!one.empty() && (one.back() == '"' || one.back() == ' ' || one.back() == ';')) {
+    one.pop_back();
+  }
+  return one;
+}
+
+std::string CollapsedRelation(std::string_view text) {
+  std::string collapsed;
+  bool space = false;
+  for (const char c : text) {
+    if (std::isspace(static_cast<unsigned char>(c)) != 0) {
+      space = true;
+      continue;
+    }
+    if (space && !collapsed.empty()) { collapsed += ' '; }
+    space = false;
+    collapsed += c;
+  }
+  while (!collapsed.empty() && (collapsed.back() == ';' || collapsed.back() == ' ')) {
+    collapsed.pop_back();
+  }
+  return collapsed;
+}
+
+void DeclaredRelation(std::string &out, const al::FieldDecl &field) {
+  const std::string relation = PropertyText(field, "TableRelation");
+  const std::string lowered = LowerKey(relation);
+  const bool simple = !relation.empty() && lowered.find("where") == std::string::npos &&
+                      lowered.find("if") == std::string::npos &&
+                      lowered.find("else") == std::string::npos;
+  if (simple) {
+    std::string target = relation;
+    std::string named;
+    const std::size_t dot = target.find("\".\"");
+    if (dot != std::string::npos) {
+      named = target.substr(dot + 2);
+      target = target.substr(0, dot + 1);
+    } else if (const std::size_t bare = target.find('.');
+               bare != std::string::npos && target.front() != '"') {
+      named = target.substr(bare + 1);
+      target = target.substr(0, bare);
+    }
+    DeclaredText(out, "relationTable", UnquotedRelationName(target));
+    DeclaredText(out, "relationField", UnquotedRelationName(named));
+  }
+  if (const al::Property *whole = Find(field.properties, "TableRelation"); whole != nullptr) {
+    DeclaredText(out, "relation", CollapsedRelation(whole->text));
+  }
+}
+
 std::string DeclaredBlock(const al::FieldDecl &field,
                           const OptionField *option,
                           const EnumIndex &enums,
                           const TableIndex &pages) {
   std::string out;
-  const auto text = [&out](std::string_view member, const std::string &value) {
-    if (value.empty()) { return; }
-    if (!out.empty()) { out += ", "; }
-    out += "." + std::string(member) + " = " + Literal(value);
-  };
-  const auto number =
-      [&out](std::string_view member, const std::string &value, std::string_view cast) {
-        if (value.empty()) { return; }
-        if (value.find_first_not_of("0123456789") != std::string::npos) { return; }
-        if (value == "0") { return; }
-        if (!out.empty()) { out += ", "; }
-        out += "." + std::string(member) + " = ";
-        out += cast.empty() ? value : std::string(cast) + "{" + value + "}";
-      };
-  const auto flag = [&out](std::string_view member, bool value, bool absent) {
-    if (value == absent) { return; }
-    if (!out.empty()) { out += ", "; }
-    out += "." + std::string(member) + " = " + (value ? "true" : "false");
-  };
   const std::optional<std::string> initial = InitValue(field, option, enums);
   if (initial.has_value()) { out += ".initValue = " + Literal(*initial); }
   const std::string kind = LowerKey(PropertyText(field, "FieldClass"));
@@ -496,94 +555,56 @@ std::string DeclaredBlock(const al::FieldDecl &field,
     out += ".fieldClass = ::agiru::FieldClass::";
     out += kind == "flowfield" ? "FlowField" : "FlowFilter";
   }
-  text("calcFormula", FormulaText(field));
-  flag("notBlank", PropertyIs(field, "NotBlank", false), false);
-  flag("autoIncrement", PropertyIs(field, "AutoIncrement", false), false);
-  flag("editable", PropertyIs(field, "Editable", true), true);
-  flag("validateTableRelation", PropertyIs(field, "ValidateTableRelation", true), true);
-  {
-    const std::string relation = PropertyText(field, "TableRelation");
-    const std::string lowered = LowerKey(relation);
-    const bool simple = !relation.empty() && lowered.find("where") == std::string::npos &&
-                        lowered.find("if") == std::string::npos &&
-                        lowered.find("else") == std::string::npos;
-    if (simple) {
-      const auto unquote = [](std::string one) {
-        while (!one.empty() && (one.front() == '"' || one.front() == ' ')) { one.erase(0, 1); }
-        while (!one.empty() && (one.back() == '"' || one.back() == ' ' || one.back() == ';')) {
-          one.pop_back();
-        }
-        return one;
-      };
-      std::string target = relation;
-      std::string named;
-      const std::size_t dot = target.find("\".\"");
-      if (dot != std::string::npos) {
-        named = target.substr(dot + 2);
-        target = target.substr(0, dot + 1);
-      } else if (const std::size_t bare = target.find('.');
-                 bare != std::string::npos && target.front() != '"') {
-        named = target.substr(bare + 1);
-        target = target.substr(0, bare);
-      }
-      text("relationTable", unquote(target));
-      text("relationField", unquote(named));
-    }
-    if (const al::Property *whole = Find(field.properties, "TableRelation"); whole != nullptr) {
-      std::string collapsed;
-      bool space = false;
-      for (const char c : whole->text) {
-        if (std::isspace(static_cast<unsigned char>(c)) != 0) {
-          space = true;
-          continue;
-        }
-        if (space && !collapsed.empty()) { collapsed += ' '; }
-        space = false;
-        collapsed += c;
-      }
-      while (!collapsed.empty() && (collapsed.back() == ';' || collapsed.back() == ' ')) {
-        collapsed.pop_back();
-      }
-      text("relation", collapsed);
-    }
-  }
-  flag("blankZero", PropertyIs(field, "BlankZero", false), false);
-  text("minValue", PropertyText(field, "MinValue"));
-  text("maxValue", PropertyText(field, "MaxValue"));
-  text("decimalPlaces", PropertyText(field, "DecimalPlaces"));
-  text("blankNumbers", PropertyText(field, "BlankNumbers"));
-  flag("compressed", PropertyIs(field, "Compressed", true), true);
-  flag("numeric", PropertyIs(field, "Numeric", false), false);
-  text("charAllowed", PropertyText(field, "CharAllowed"));
-  text("valuesAllowed", PropertyText(field, "ValuesAllowed"));
-  flag("closingDates", PropertyIs(field, "ClosingDates", false), false);
-  text("extendedDataType", PropertyText(field, "ExtendedDataType"));
-  text("maskType", PropertyText(field, "MaskType"));
-  text("toolTip", PropertyText(field, "ToolTip"));
-  text("accessByPermission", PropertyText(field, "AccessByPermission"));
-  number("lookupPageId", PageNumber(pages, PropertyText(field, "LookupPageId")), "::agiru::PageId");
-  number("drillDownPageId",
-         PageNumber(pages, PropertyText(field, "DrillDownPageId")),
-         "::agiru::PageId");
-  flag("optimizeForTextSearch", PropertyIs(field, "OptimizeForTextSearch", false), false);
-  text("captionClass", PropertyText(field, "CaptionClass"));
-  number("width", PropertyText(field, "Width"), "");
-  text("autoFormatType", PropertyText(field, "AutoFormatType"));
-  text("autoFormatExpression", PropertyText(field, "AutoFormatExpression"));
-  text("allowInCustomizations",
-       PropertyText(field, "AllowInCustomizations", field.allowInCustomizationsDefault));
-  text("access", PropertyText(field, "Access"));
-  text("subtype", PropertyText(field, "Subtype"));
-  flag("enabled", PropertyIs(field, "Enabled", true), true);
-  text("movedFrom", PropertyText(field, "MovedFrom"));
-  text("movedTo", PropertyText(field, "MovedTo"));
-  text("description", PropertyText(field, "Description"));
-  text("obsoleteState", PropertyText(field, "ObsoleteState"));
-  text("obsoleteReason", PropertyText(field, "ObsoleteReason"));
-  text("obsoleteTag", PropertyText(field, "ObsoleteTag"));
-  text("externalName", PropertyText(field, "ExternalName"));
-  text("optionOrdinalValues", PropertyText(field, "OptionOrdinalValues"));
-  flag("sqlTimestamp", SqlTimestamp(field), false);
+  DeclaredText(out, "calcFormula", FormulaText(field));
+  DeclaredFlag(out, "notBlank", PropertyIs(field, "NotBlank", false), false);
+  DeclaredFlag(out, "autoIncrement", PropertyIs(field, "AutoIncrement", false), false);
+  DeclaredFlag(out, "editable", PropertyIs(field, "Editable", true), true);
+  DeclaredFlag(
+      out, "validateTableRelation", PropertyIs(field, "ValidateTableRelation", true), true);
+  DeclaredRelation(out, field);
+  DeclaredFlag(out, "blankZero", PropertyIs(field, "BlankZero", false), false);
+  DeclaredText(out, "minValue", PropertyText(field, "MinValue"));
+  DeclaredText(out, "maxValue", PropertyText(field, "MaxValue"));
+  DeclaredText(out, "decimalPlaces", PropertyText(field, "DecimalPlaces"));
+  DeclaredText(out, "blankNumbers", PropertyText(field, "BlankNumbers"));
+  DeclaredFlag(out, "compressed", PropertyIs(field, "Compressed", true), true);
+  DeclaredFlag(out, "numeric", PropertyIs(field, "Numeric", false), false);
+  DeclaredText(out, "charAllowed", PropertyText(field, "CharAllowed"));
+  DeclaredText(out, "valuesAllowed", PropertyText(field, "ValuesAllowed"));
+  DeclaredFlag(out, "closingDates", PropertyIs(field, "ClosingDates", false), false);
+  DeclaredText(out, "extendedDataType", PropertyText(field, "ExtendedDataType"));
+  DeclaredText(out, "maskType", PropertyText(field, "MaskType"));
+  DeclaredText(out, "toolTip", PropertyText(field, "ToolTip"));
+  DeclaredText(out, "accessByPermission", PropertyText(field, "AccessByPermission"));
+  DeclaredNumber(out,
+                 "lookupPageId",
+                 PageNumber(pages, PropertyText(field, "LookupPageId")),
+                 "::agiru::PageId");
+  DeclaredNumber(out,
+                 "drillDownPageId",
+                 PageNumber(pages, PropertyText(field, "DrillDownPageId")),
+                 "::agiru::PageId");
+  DeclaredFlag(
+      out, "optimizeForTextSearch", PropertyIs(field, "OptimizeForTextSearch", false), false);
+  DeclaredText(out, "captionClass", PropertyText(field, "CaptionClass"));
+  DeclaredNumber(out, "width", PropertyText(field, "Width"), "");
+  DeclaredText(out, "autoFormatType", PropertyText(field, "AutoFormatType"));
+  DeclaredText(out, "autoFormatExpression", PropertyText(field, "AutoFormatExpression"));
+  DeclaredText(out,
+               "allowInCustomizations",
+               PropertyText(field, "AllowInCustomizations", field.allowInCustomizationsDefault));
+  DeclaredText(out, "access", PropertyText(field, "Access"));
+  DeclaredText(out, "subtype", PropertyText(field, "Subtype"));
+  DeclaredFlag(out, "enabled", PropertyIs(field, "Enabled", true), true);
+  DeclaredText(out, "movedFrom", PropertyText(field, "MovedFrom"));
+  DeclaredText(out, "movedTo", PropertyText(field, "MovedTo"));
+  DeclaredText(out, "description", PropertyText(field, "Description"));
+  DeclaredText(out, "obsoleteState", PropertyText(field, "ObsoleteState"));
+  DeclaredText(out, "obsoleteReason", PropertyText(field, "ObsoleteReason"));
+  DeclaredText(out, "obsoleteTag", PropertyText(field, "ObsoleteTag"));
+  DeclaredText(out, "externalName", PropertyText(field, "ExternalName"));
+  DeclaredText(out, "optionOrdinalValues", PropertyText(field, "OptionOrdinalValues"));
+  DeclaredFlag(out, "sqlTimestamp", SqlTimestamp(field), false);
   return out;
 }
 
@@ -1086,11 +1107,22 @@ void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects)
       colons == std::string::npos ? reachable : reachable.substr(colons + 2));
 }
 
-std::string Declarations(const al::TableObject &table, const Objects &objects) {
+std::string ReachedDeclarations(const Reached &reached) {
   std::string out;
+  for (const std::string &header : reached.headers) { out += "#include \"" + header + "\"\n"; }
+  if (!reached.headers.empty()) { out += "\n"; }
+  for (const auto &[space, objectNames] : reached.ahead) {
+    const std::string named = space.empty() ? "agiru" : "agiru::" + space;
+    out += "namespace " + named + " {\n";
+    for (const std::string &one : objectNames) { out += "class " + one + ";\n"; }
+    out += "} // namespace " + named + "\n";
+  }
+  if (!reached.ahead.empty()) { out += "\n"; }
+  return out;
+}
+
+std::string Declarations(const al::TableObject &table, const Objects &objects) {
   Reached reached;
-  const std::map<std::string, std::set<std::string>> &ahead = reached.ahead;
-  std::set<std::string> &memberHeaders = reached.headers;
   const auto named = [&](const al::VarDecl &declared) { Name(reached, declared, objects); };
   for (const al::VarDecl &declared : table.variables) {
     if (DeclaresAnObject(declared)) {
@@ -1098,7 +1130,7 @@ std::string Declarations(const al::TableObject &table, const Objects &objects) {
       continue;
     }
     const TableRef *ref = ReachObject(declared, objects);
-    if (ref != nullptr && !ref->header.empty()) { memberHeaders.insert(ref->header); }
+    if (ref != nullptr && !ref->header.empty()) { reached.headers.insert(ref->header); }
     named(declared);
   }
   for (const al::ProcedureDecl &procedure : table.procedures) {
@@ -1109,20 +1141,11 @@ std::string Declarations(const al::TableObject &table, const Objects &objects) {
         LowerKey(procedure.returned.subtype) != LowerKey(table.name)) {
       const TableRef *returned = ReachObject(procedure.returned, objects);
       if (returned != nullptr && !returned->header.empty()) {
-        memberHeaders.insert(returned->header);
+        reached.headers.insert(returned->header);
       }
     }
   }
-  for (const std::string &header : memberHeaders) { out += "#include \"" + header + "\"\n"; }
-  if (!memberHeaders.empty()) { out += "\n"; }
-  for (const auto &[space, objectNames] : ahead) {
-    const std::string named = space.empty() ? "agiru" : "agiru::" + space;
-    out += "namespace " + named + " {\n";
-    for (const std::string &one : objectNames) { out += "class " + one + ";\n"; }
-    out += "} // namespace " + named + "\n";
-  }
-  if (!ahead.empty()) { out += "\n"; }
-  return out;
+  return ReachedDeclarations(reached);
 }
 
 std::string ClassConstants(const al::TableObject &table) {
@@ -1191,7 +1214,11 @@ std::string ClassBody(const al::TableObject &table,
     for (const al::ProcedureDecl &procedure : table.procedures) {
       const std::string named = ProcedureIdentifier(table, procedure.name);
       if (!DeclaredByBase("Table.h", named) || !unhidden.insert(named).second) { continue; }
-      out += "  using Table<" + tableClass + ">::" + named + ";\n";
+      out += "  using Table<";
+      out += tableClass;
+      out += ">::";
+      out += named;
+      out += ";\n";
     }
     if (!unhidden.empty()) { out += "\n"; }
   }
@@ -1590,8 +1617,15 @@ TableHeader WriteHeader(const al::TableObject &declared,
     for (const al::Trigger &trigger : field.triggers) {
       if (LowerKey(trigger.name) != "onlookup") { continue; }
       const std::string member = FieldIdentifier(table, field.name);
-      lookups += "      {.field = " + qualified + "::Field_No::" + member + ",\n       .run = [](" +
-                 qualified + " &record) { record.OnLookup" + member + "(); }},\n";
+      lookups += "      {.field = ";
+      lookups += qualified;
+      lookups += "::Field_No::";
+      lookups += member;
+      lookups += ",\n       .run = [](";
+      lookups += qualified;
+      lookups += " &record) { record.OnLookup";
+      lookups += member;
+      lookups += "(); }},\n";
       ++lookedUp;
     }
   }

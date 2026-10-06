@@ -399,6 +399,101 @@ void ACollidingNameCarriesASeam() {
              generated.find("SystemId_3{};") != std::string::npos);
 }
 
+void FieldDeclarationsKeepValuesAndRelationForms() {
+  const auto table = agiru::al::ParseTable(R"(table 60005 "Declaration Forms" {
+    fields {
+      field(1; Value; Code[20]) {
+        InitValue = '';
+        NotBlank = true;
+        Editable = false;
+        ValidateTableRelation = false;
+        LookupPageId = 50176;
+        DrillDownPageId = 50177;
+        Width = 17;
+      }
+      field(2; Defaults; Integer) { Width = 0; }
+      field(3; Total; Decimal) {
+        FieldClass = FlowField;
+        CalcFormula = sum(Customer.Balance);
+      }
+      field(4; Narrow; Code[20]) { FieldClass = FlowFilter; }
+    }
+  })");
+  const std::string definitions = agiru::gen::WriteDefinitions(table, "declarations.al", {});
+  CHECK_TRUE("declaration order retains empty initial values, flags and typed numeric IDs",
+             definitions.contains("{.initValue = \"\", .notBlank = true, .editable = false, "
+                                  ".validateTableRelation = false, "
+                                  ".lookupPageId = ::agiru::PageId{50176}, "
+                                  ".drillDownPageId = ::agiru::PageId{50177}, .width = 17}"));
+  CHECK_TRUE("default declarations omit their empty initializer block",
+             definitions.contains("offsetof(DeclarationForms_Table, Defaults)),"));
+  CHECK_TRUE("zero numeric declarations are omitted", !definitions.contains(".width = 0"));
+  CHECK_TRUE("computed fields retain their class before their formula",
+             definitions.contains("{.fieldClass = ::agiru::FieldClass::FlowField, "
+                                  ".calcFormula = \"sum ( Customer . Balance )\"}"));
+  CHECK_TRUE("filter fields retain their declared class",
+             definitions.contains("{.fieldClass = ::agiru::FieldClass::FlowFilter}"));
+
+  struct RelationCase {
+    std::string_view source;
+    std::string_view declaration;
+  };
+
+  for (const RelationCase &one :
+       {RelationCase{.source = "Customer",
+                     .declaration = R"(.relationTable = "Customer", .relation = "Customer")"},
+        RelationCase{.source = "Customer.Code",
+                     .declaration = ".relationTable = \"Customer\", .relationField = \"Code\", "
+                                    ".relation = \"Customer.Code\""},
+        RelationCase{.source = R"("Target Table"."No.")",
+                     .declaration = ".relationTable = \"Target Table\", .relationField = \"No.\", "
+                                    ".relation = \"\\\"Target Table\\\".\\\"No.\\\"\""},
+        RelationCase{.source = "  Customer  where (Code = field(Value)); \n",
+                     .declaration = ".relation = \"Customer where (Code = field(Value))\""},
+        RelationCase{.source = "if (Value = const(A)) Customer else Vendor;",
+                     .declaration =
+                         ".relation = \"if (Value = const(A)) Customer else Vendor\""}}) {
+    auto changed = table;
+    changed.fields.front().properties.push_back(
+        {.name = "TableRelation", .value = {}, .text = std::string(one.source)});
+    const std::string output = agiru::gen::WriteDefinitions(changed, "declarations.al", {});
+    CHECK_TRUE("relation declarations preserve simple names or the whole conditional/filter form",
+               output.contains(one.declaration));
+    CHECK_TRUE("compound relations never gain a guessed simple target",
+               (!one.source.contains("where") && !one.source.contains("else")) ||
+                   !output.contains(".relationTable ="));
+  }
+}
+
+void TableDeclarationsSeparateDefinitionsFromForwardNames() {
+  const auto table = agiru::al::ParseTable(R"(table 60006 "Dependency Forms" {
+    fields { field(1; ID; Integer) {} }
+    var Stored: Record "Stored Row";
+    procedure Borrow(var Value: Record "Borrowed Row") begin end;
+    procedure ReturnOther(): Record "Returned Row" begin end;
+  })");
+  const auto referenced =
+      agiru::al::ParseTable("table 60007 Reference { fields { field(1; ID; Integer) {} } }");
+  agiru::gen::Objects objects;
+  objects.tables["stored row"] =
+      agiru::gen::BindTable(referenced, "::agiru::Fixture::StoredRow", "fixture/StoredRow.h");
+  objects.tables["borrowed row"] =
+      agiru::gen::BindTable(referenced, "::agiru::Fixture::BorrowedRow", "fixture/BorrowedRow.h");
+  objects.tables["returned row"] =
+      agiru::gen::BindTable(referenced, "::agiru::Fixture::ReturnedRow", "fixture/ReturnedRow.h");
+  const auto header = agiru::gen::WriteHeader(table, "dependencies.al", {}, objects).text;
+  CHECK_TRUE("owned record handles retain their forward declaration",
+             header.contains("class StoredRow;"));
+  CHECK_TRUE("owned record handles do not add an unnecessary definition include",
+             !header.contains("#include \"fixture/StoredRow.h\""));
+  CHECK_TRUE("value-returned records retain their required definition header",
+             header.contains("#include \"fixture/ReturnedRow.h\""));
+  CHECK_TRUE("borrowed parameters retain their forward declaration",
+             header.contains("class BorrowedRow;"));
+  CHECK_TRUE("borrowed parameters do not add an unnecessary definition include",
+             !header.contains("#include \"fixture/BorrowedRow.h\""));
+}
+
 void ReflectionDeclarationsRetainSourceAuthority() {
   const auto table = agiru::al::ParseTable(R"(namespace Microsoft.Fixture;
 table 60003 "Reflection Source"
@@ -539,6 +634,8 @@ int main() {
     ATableDeclaredTemporaryConstructsItsStore();
     AFieldWithAnOnLookupTriggerIsInTheLookupMap();
     ACollidingNameCarriesASeam();
+    FieldDeclarationsKeepValuesAndRelationForms();
+    TableDeclarationsSeparateDefinitionsFromForwardNames();
     ReflectionDeclarationsRetainSourceAuthority();
     AppIdentityComesFromTheRootManifest();
   });

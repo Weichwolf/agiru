@@ -114,12 +114,18 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   mutants fail two checks, while existing controls remain. The two new runtime mutants
   reject always-available and Editable-derived flags. This qualifies declared policy,
   not customization editability, implicit-field flags or actual client behavior.
-  Parser/GenTable/source-binding gates pass 159/85/271 checks; GenCodeunit passes 49.
+  Parser/GenTable/source-binding gates pass 159/105/271 checks; GenCodeunit passes 49.
   Runtime mapper, Field gate, generated fixture, Parser.cpp and AlParserGate.cpp pass
   focused tidy. Separate label reading from variable-block traversal and argument scanning
   from attribute lookup; retain grouped declarations, quote/comma/empty argument handling
   and procedure boundaries. The report fixture remains unchanged outside its assertion
-  function. Six existing TableWriter complexity/concatenation findings remain.
+  function. TableWriter.cpp focused tidy now passes: separate declared-member formatting,
+  relation handling and dependency emission; six complexity/concatenation findings removed.
+  Twenty added GenTable checks preserve empty InitValue, numeric IDs, flags, relation forms
+  and narrow header/forward declarations. The previous emitter also passes; four compiled
+  mutants lose empty initializers, typed IDs, compound relations or forward declarations
+  and are rejected. Golden specifications are unchanged. GenTableGate's focused tidy retains
+  the existing BodyWriter.h PartControlSpelling adjacent-parameter finding, not a new test finding.
   The new pointer-conversion and fixture-number findings were repaired, not suppressed.
   Verified-package regeneration still refuses 5683 properties (exit 1); this is not G1.
   Developer `f928288ee840`: `properties/devenv-allowincustomizations-property.md`;
@@ -128,9 +134,11 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   treats this as UI-only; do not discard the required native metadata flag.
   Predecessor 1310 records lost extension modifications; modification precedence
   remains a separate merger qualification. DataClassification's linked AL property page
-  is absent locally and redirects online: retain the onprem/classifying-data.md and
-  analyzers/appsourcecop-as0016.md guarantees for new/Flow fields, but do not invent
-  table/extension or implicit defaults. Four declared Field attributes remain unprojected:
+  is absent at developer HEAD and redirects online. Git `8789c061b446` retains that page,
+  but describes both ToBeClassified as initial and CustomerContent as default, without
+  table inheritance guarantees. Current onprem/classifying-data.md and AS0016 establish
+  new-field/Flow classification; qualify table/extension and implicit defaults separately.
+  Four declared Field attributes remain unprojected:
   DataClassification, SQLDataType, AppPackageID and AppRuntimePackageID.
 - Temporary record arrays now share one row store across dimensions, not their
   field buffers or filters; distinct arrays and ordinary/scalar elements stay
