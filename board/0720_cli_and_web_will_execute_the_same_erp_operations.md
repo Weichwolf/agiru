@@ -4,10 +4,10 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: wire one list → card → validate → save slice through the shared C++ page runtime
-and qualified private HTTP transport behind nginx,
-including PostgreSQL authorization/session/revision/receipt ownership; use the
-external Node CMD/MCP client and representative real-browser/independent SQL checks.
+Next: install the native BC permission authority and an `agiru serve` entrypoint against
+a validated company seed; execute Customer List → Card → Validate → Save using external
+CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
+HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -30,8 +30,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   MCP, original encoded BC URI, exact Unicode/form/binary bytes, independent SQL
   transport records, static assets, forged headers, ambiguous framing, error/limit
   refusals, body release and bounded admission while workers block.
-  `HttpServerGate`: eleven checks; existing `PageHtmlGate`: 157, zero red.
-  Twenty-one standalone-header/forced-dependency controls pass; HTTP source and gate
+  `HttpServerGate`: eleven checks; existing `PageHtmlGate`: 164, zero red.
+  Twenty-two standalone-header/forced-dependency controls pass; HTTP source and gate
   targeted tidy pass without new suppressions. Public transport header has no native
   backend/DB/session/thread includes; measured frontend cost is 764.9 ms over three
   no-PCH rounds, not a build-performance improvement or generated-app requirement.
@@ -71,8 +71,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `SecureToken` uses the existing private system OpenSSL dependency, never UUID/MT
   randomness or password-style fast hashing. Issuance is trusted-operator-only, not an
   anonymous endpoint. Credential lookup must precede SessionCommand's account-state
-  check; neither grants page/table/company permission. Client handles/revisions and
-  durable reconciliation still need the production command host.
+  check; neither grants page/table/company permission. The command host below supplies
+  page handles/revisions; independent durable reconciliation remains pending.
   `make http-test` passes eleven transport and nine authentication cases through
   actual nginx/private C++/PostgreSQL, with external CMD and official SDK MCP.
   Independent SQL checks two identities, accepted-call receipts, disable/expiry/
@@ -86,6 +86,40 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   still inherits Guid's existing StringValue/vector dependency. No suppression was widened.
   Standalone three-round no-PCH frontend cost: credentials 1,230.8 ms, token 356.0 ms;
   measured during qualification, not a build/runtime performance improvement.
+
+- Shared native command host: `PageCommandHost` executes installed production page
+  factories over authenticated HTTP, not authored static HTML. PostgreSQL owns exact
+  user/company/host identity, expiry, revisions and started/complete/failed command
+  receipts. Bounded private AL state and list/card stacks survive request-local
+  connections; think time retains neither a worker nor a connection. Identical completed
+  bodies replay after snapshot reauthorization; changed bodies, stale revisions, forged
+  CSRF/Origin and foreign handles refuse. Failed writes invalidate private pages; a failed
+  receipt never implies rollback of explicit AL Commit. Back rereads the selected list row.
+  Restarted hosts refuse stale handles instead of guessing recovered AL state.
+  Navigation/Save and AL fields/actions share the same semantic HTML forms and unchanged
+  CMD/MCP adapters. Anonymous AL area/actions containers receive presentation-only IDs,
+  not invented AL control names; host/AL action collisions explicitly refuse.
+  `make page-host-test JOBS=2`: eleven actual nginx/C++/PostgreSQL cases with external
+  shell CMD and official SDK MCP. Independent SQL checks exact values, modifier GUID,
+  update-trigger counts, receipt/revision ownership, revocation, rollback and Commit followed
+  by an error. Three compiled ownership/revision/replay defects fail their named HTTP checks.
+  Generated navigation retains 82 checks, dispatcher 105 and source 15; prior eleven
+  execution/control-name counterprobes remain active. HTML retains 164 checks.
+  Host, HTML producer/private escaping and changed C++ qualifier/gates pass targeted
+  tidy without added suppressions; the host header compiles without runtime/SQL/native
+  transport implementation dependencies. Shared escaping/button generation avoids
+  separate web/agent markup paths. Complete generated apps must rebuild for PageInstance's
+  new Save operation; this fixture qualification is not a full-app or UT result.
+  Authorization is mandatory; the qualifier supplies SQL-backed fixture grants, not a
+  full BC permission-set/security-filter/indirect-access provider. Only one explicitly
+  configured company/database is accepted; its imported-schema binding remains unqualified.
+  Record.ReadPermission/WritePermission still do not enforce real user rights; do not expose
+  this as a fully authorized ERP server. Native entrypoint/provisioning, browser login/assets,
+  full URLs/bookmarks/filters/parts/dialogs, typed errors/messages, reconciliation endpoints
+  and multi-context record concurrency remain pending. Context/navigation/lifetime and
+  receipt count/bytes have explicit initial bounds, not production scale guarantees.
+  Full page property/mode policy, retention/cleanup and read-side AL error-state recovery
+  remain unqualified.
 
 - Preserve agiru's generated `PageDef`/control tree, typed bindings, `PageCore`,
   TestPage lifecycle, validated record primitives and regression gates.
@@ -111,8 +145,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Only registration definitions include the typed factory. All 2,836 generated page
   definitions now emit it; complete compilation/linking remains unproven.
   `make transpile` still exits 1: 21 unresolved extension operations and 5,683 refused properties
-  remain counted, not a green-subset claim. SQL-backed authorization, command receipts/
-  revisions, modal suspension and production HTTP remain pending. The external
+  remain counted, not a green-subset claim. Full SQL-backed authorization, modal
+  suspension and complete production HTTP remain pending. The external
   Node CMD/MCP adapters now share one bounded semantic-HTML/HTTP agent library;
   fixture transport qualification does not establish ERP parity.
   `RenderPageHtml` renders one current row through ReadValue/Inspect, not a second
@@ -134,7 +168,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   later list navigation reopens the committed cursor safely. This authored fixture's
   allowlist is not SQL-backed authorization or actual HTTP/client ERP parity.
   Direct SQL also confirms missing refused inserts. Eleven execution mutants and the
-  AL-control shadowing compile control reject. Scalar 34, semantic HTML 157 and codec 102 checks pass; nine additional
+  AL-control shadowing compile control reject. Scalar 34, semantic HTML 164 and codec 102 checks pass; nine additional
   scalar/HTML execution mutants reject. Generated controls also retain ControlValue
   without colliding with the new typed-value primitive. Generator page 42/report 27,
   catalogue 54 and isolation 17 checks passed on the preceding factory increment.
@@ -157,7 +191,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   write identity without retries. Oversized ASCII explicitly refuses its presentation
   while JSON/MCP retains full structured values. Four executable scalar-rounding,
   disabled-fence, stale-revision and duplicate-POST mutants reject. C++ HTML still
-  passes 157 checks; its changed producer's targeted tidy passes. Fixtures make no
+  passes 164 checks; its changed producer's targeted tidy passes. Fixtures make no
   SQL/browser/production-authentication claim.
   parse5 8.0.1 supplies HTML tree/entity semantics; official MCP SDK 1.32.1 and
   zod 3.25.76 supply protocol/strict shared schemas, not another ERP implementation.
@@ -355,6 +389,12 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 agiru: `include/meta/PageDef.h`, `include/runtime/{PageCore,PageDispatcher,PageInstance,PageSession,PageValue,PageHtml}.h`,
 `include/type/Utf8.h`, `src/gen/{BodyWriter,PageWriter}.cpp`,
 `src/rt/{PageInstance,PageValue,PageHtml,TestPage,Session}.cpp`, `src/net/Encoding.cpp`, `src/cli/Main.cpp`.
+Command host: `include/runtime/PageCommandHost.h`, `src/rt/PageCommandHost.cpp`,
+shared private escaping `src/rt/HtmlText.{h,cpp}`, `test/ui/page-host.{sh,mjs}` and
+`test/ui/page-host/Runner.cpp`; generated AL input:
+`test/runtime/page-navigation/{List,Card,CommandContract}.Page.al`.
+URL subset follows developer `devenv-web-client-urls.md`; commits follow
+`methods-auto/database/database-commit-method.md`, at the pinned revisions below.
 Control-dispatch references: developer revision
 `f928288ee840334be73142e5fc0202c0e19b246d`,
 `properties/devenv-{enabled,editable,visible}-property.md`; BCApps revision

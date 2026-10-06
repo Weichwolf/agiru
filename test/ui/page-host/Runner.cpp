@@ -1,0 +1,125 @@
+#include "meta/PageDef.h"
+#include "platform/User.h"
+#include "runtime/ClientCredentials.h"
+#include "runtime/Database.h"
+#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
+#include "runtime/HttpServer.h"
+#include "runtime/PageCommandHost.h"
+#include "runtime/PageDispatcher.h"
+#include "runtime/Session.h"
+#include "runtime/Storage.h"
+#include "type/Guid.h"
+
+#include "Check.h"
+#include "OwnedDatabase.h"
+#include "PrivateAuthFile.h"
+#include "fixture/table/NavigationRow.h"
+
+#include <array>
+#include <chrono>
+#include <cstdio>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
+namespace {
+
+using Row = agiru::Fixture::NavigationRow_Table;
+constexpr std::string_view kUser = "00000000-0000-0000-0000-000000000001";
+constexpr std::string_view kOtherUser = "00000000-0000-0000-0000-000000000002";
+constexpr std::string_view kCompany = "Fixture + Company";
+constexpr int kInitialValueStep = 11;
+
+void Seed(const std::string &dsn, const std::string &authPath) {
+  const agiru::Session seed(dsn);
+  const auto &connection = seed.Database();
+  agiru::CreateTable(connection, agiru::TableTraits<agiru::platform::User>::kTable);
+  agiru::CreateTable(connection, agiru::TableTraits<Row>::kTable);
+  for (const auto identity : {kUser, kOtherUser}) {
+    agiru::platform::User user;
+    user.UserSecurityID = agiru::Guid(identity);
+    user.UserName = identity == kUser ? "FIRST USER" : "SECOND USER";
+    user.Insert();
+  }
+  for (int identity = 1; identity <= 2; ++identity) {
+    Row row;
+    row.ID = identity;
+    row.Value = identity * kInitialValueStep;
+    row.Insert();
+  }
+  connection.Run("CREATE TABLE ui_grants(user_security_id uuid,company text,readable boolean,"
+                 "writable boolean)");
+  connection.Run("INSERT INTO ui_grants VALUES "
+                 "('00000000-0000-0000-0000-000000000001','Fixture + Company',true,true),"
+                 "('00000000-0000-0000-0000-000000000002','Fixture + Company',true,false)");
+  connection.Run("CREATE TABLE ui_writes(value integer,user_security_id uuid)");
+  connection.Run(R"(CREATE FUNCTION ui_write_audit() RETURNS trigger LANGUAGE plpgsql AS $body$
+    BEGIN INSERT INTO ui_writes VALUES(NEW."Value",NEW."SystemModifiedBy"); RETURN NEW; END
+    $body$)");
+  connection.Run(R"(CREATE TRIGGER ui_write_audit AFTER UPDATE ON "Navigation Row"
+                    FOR EACH ROW EXECUTE FUNCTION ui_write_audit())");
+  agiru::InstallClientCredentials(connection);
+  agiru::InstallPageCommandHost(connection);
+  gate::PrivateAuthFile(
+      authPath,
+      agiru::IssueClientCredential(connection, agiru::Guid(kUser), std::chrono::hours(1)));
+  gate::PrivateAuthFile(
+      authPath + ".second",
+      agiru::IssueClientCredential(connection, agiru::Guid(kOtherUser), std::chrono::hours(1)));
+  agiru::Commit();
+  const auto name = connection.Execute("SELECT current_database()");
+  const auto value = name.Value(0, 0);
+  if (!value) { throw std::runtime_error("owned database did not return its identity"); }
+  std::fputs("DATABASE ", stdout);
+  std::fputs(std::string(*value).c_str(), stdout);
+  std::fputc('\n', stdout);
+}
+
+void Authorize(const agiru::PageDef &page,
+               agiru::PageHostOperation operation,
+               const agiru::PageControlCommand &command) {
+  if (page.source != agiru::TableTraits<Row>::kTable.id) {
+    throw agiru::Error("fixture source access denied", "PageHostPermission");
+  }
+  const auto &session = agiru::Session::Current();
+  const std::array<std::optional<std::string>, 2> binds{session.UserSecurityId().ToStorageText(),
+                                                        std::string(session.CompanyName())};
+  const auto rows = session.Database().Execute(
+      "SELECT readable,writable FROM ui_grants WHERE user_security_id = $1::uuid "
+      "AND company = $2",
+      binds);
+  const bool writes = operation == agiru::PageHostOperation::OpenEdit ||
+                      operation == agiru::PageHostOperation::OpenNew ||
+                      operation == agiru::PageHostOperation::Save ||
+                      operation == agiru::PageHostOperation::Close ||
+                      command.operation == agiru::PageControlOperation::Set ||
+                      command.operation == agiru::PageControlOperation::Action;
+  if (rows.Rows() != 1 || rows.Value(0, 0) != "t" || (writes && rows.Value(0, 1) != "t")) {
+    throw agiru::Error("fixture SQL grant revoked", "PageHostPermission");
+  }
+}
+
+void Serve(const std::string &authPath, const std::string &origin) {
+  const gate::OwnedDatabase database("page_host");
+  Seed(database.Dsn(), authPath);
+  agiru::PageCommandHost host(
+      {.database = database.Dsn(), .company = std::string(kCompany), .origin = origin}, Authorize);
+  const agiru::HttpServer server([&](const auto &request) { return host.Handle(request); });
+  std::fputs("READY\n", stdout);
+  std::fflush(stdout);
+  while (true) {
+    const int command = std::getchar();
+    if (command == 'Q' || command == EOF) { break; }
+  }
+}
+
+}
+
+int main(int argc, char **argv) {
+  return gate::Run("Generated Page HTTP Host", [=] {
+    if (argc != 3) { throw std::runtime_error("expected private auth path and external origin"); }
+    Serve(argv[1], argv[2]);
+  });
+}

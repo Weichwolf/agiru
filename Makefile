@@ -21,7 +21,7 @@ export CCACHE_SLOPPINESS
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
-.PHONY: page-profile client client-test http-test session-identity
+.PHONY: page-profile client client-test http-test page-host-test session-identity
 
 client: ## build the external Node agent CMD/MCP client from locked dependencies
 	@npm ci --prefix "$(SELF)/src/client" --ignore-scripts --no-fund --no-audit
@@ -33,6 +33,9 @@ client-test: client ## qualify CMD/MCP transports against a declared HTML/HTTP f
 
 http-test: comments client ## qualify external CMD/MCP over nginx/private C++ HTTP and PostgreSQL, not ERP parity
 	@bash "$(SELF)/test/ui/http-server.sh"
+
+page-host-test: comments client ## execute generated list/card edits over shared native HTTP with external agents
+	@bash "$(SELF)/test/ui/page-host.sh"
 
 session-identity: comments db ## qualify SQL identity, persistent command leases and compiled refusal controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_SessionIdentityGate gate_SessionCommandGate gate_ClientCredentialsGate

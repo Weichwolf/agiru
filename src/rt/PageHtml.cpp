@@ -6,7 +6,8 @@
 #include "runtime/PageCore.h"
 #include "runtime/PageDispatcher.h"
 #include "runtime/PageValue.h"
-#include "type/Utf8.h"
+
+#include "HtmlText.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -56,31 +57,7 @@ public:
     output_ += text;
   }
 
-  void Text(std::string_view text) {
-    if (text.size() > limits_.bytes) {
-      throw Error("Page HTML text budget exceeded", "PageHtmlLimit");
-    }
-    if (!IsValidUtf8(text)) { throw Error("Page HTML requires valid UTF-8", "PageHtmlText"); }
-    for (const unsigned char c : text) {
-      switch (c) {
-        case '&': Raw("&amp;"); break;
-        case '<': Raw("&lt;"); break;
-        case '>': Raw("&gt;"); break;
-        case '"': Raw("&quot;"); break;
-        case '\'': Raw("&#39;"); break;
-        case '\r': Raw("&#13;"); break;
-        case '\n': Raw("&#10;"); break;
-        case '\t': Raw("&#9;"); break;
-        default:
-          constexpr unsigned char kAsciiDelete = 127;
-          if (c < ' ' || c == kAsciiDelete) {
-            throw Error("Control character cannot round-trip through HTML", "PageHtmlText");
-          }
-          Raw(std::string_view(reinterpret_cast<const char *>(&c), 1));
-          break;
-      }
-    }
-  }
+  void Text(std::string_view text) { detail::AppendHtmlText(output_, text, limits_.bytes); }
 
   void Attribute(std::string_view name, std::string_view value) {
     Raw(" ");
@@ -94,6 +71,11 @@ public:
     if (++controls_ > limits_.controls || depth > limits_.depth) {
       throw Error("Page HTML declaration budget exceeded", "PageHtmlLimit");
     }
+  }
+
+  std::string ContainerIdentity(const ControlDef &control) const {
+    return control.name.empty() ? "$agiru.container." + std::to_string(controls_)
+                                : std::string(control.name);
   }
 
   void Input(std::string_view name, std::string_view value) {
@@ -114,6 +96,18 @@ public:
     Input("csrf", context_.csrf);
     Input("operation", operation);
     Input("control", control);
+  }
+
+  void Action(std::string_view identity, std::string_view caption, bool enabled) {
+    Raw("<section data-kind=\"action\"");
+    Attribute("data-control", identity);
+    Raw(">");
+    Form("action", identity);
+    Raw("<button type=\"submit\"");
+    if (!enabled) { Raw(" disabled"); }
+    Raw(">");
+    Text(caption);
+    Raw("</button></form></section>");
   }
 
   void Unsupported(std::string_view control, std::string_view reason) {
@@ -185,15 +179,20 @@ void FieldHtml(Writer &out, PageDispatcher &dispatcher, const ControlDef &contro
 void ActionHtml(Writer &out, PageDispatcher &dispatcher, const ControlDef &control) {
   const auto action =
       dispatcher.Execute({.operation = PageControlOperation::Inspect, .control = control.name});
-  out.Raw("<section data-kind=\"action\"");
-  out.Attribute("data-control", control.name);
-  out.Raw(">");
-  out.Form("action", control.name);
-  out.Raw("<button type=\"submit\"");
-  if (!action.enabled) { out.Raw(" disabled"); }
-  out.Raw(">");
-  out.Text(action.caption);
-  out.Raw("</button></form></section>");
+  out.Action(control.name, action.caption, action.enabled);
+}
+
+void HostActions(Writer &out, const PageDef &declaration, const PageHtmlContext &context) {
+  for (const auto &action : context.actions) {
+    if (action.identity.empty() ||
+        std::ranges::count(context.actions, action.identity, &PageHtmlAction::identity) != 1 ||
+        Control(declaration.layout, action.identity) != nullptr ||
+        Control(declaration.actions, action.identity) != nullptr) {
+      throw Error("Host action collides with an AL control", "PageHtmlContext");
+    }
+    out.Visit(0);
+    out.Action(action.identity, action.caption, action.enabled);
+  }
 }
 
 void Tree(Writer &out,
@@ -211,7 +210,7 @@ void Tree(Writer &out,
     if (!page.ControlVisible(control.name)) { continue; }
     if (Container(control.kind)) {
       out.Raw("<section data-kind=\"group\"");
-      out.Attribute("data-control", control.name);
+      out.Attribute("data-control", out.ContainerIdentity(control));
       out.Raw(">");
       out.Raw("<h2>");
       out.Text(control.caption);
@@ -255,6 +254,7 @@ PageHtmlResult RenderPageHtml(const PageDef &declaration,
   out.Raw("</h1>");
   Tree(out, declaration, page, authorization, dispatcher, declaration.layout, 0);
   Tree(out, declaration, page, authorization, dispatcher, declaration.actions, 0);
+  HostActions(out, declaration, context);
   out.Raw("<output");
   out.Attribute("data-unsupported-count", std::to_string(out.UnsupportedCount()));
   out.Raw("></output>");

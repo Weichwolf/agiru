@@ -4,9 +4,9 @@ cd "$(dirname "$0")/../.."
 proof=$(mktemp -d /tmp/agiru-http-server.XXXXXX)
 git rev-parse HEAD > "$proof/head.txt"
 sha256sum CMakeLists.txt Makefile include/runtime/{HttpServer.h,PageHtml.h,PageCore.h} \
-  src/net/{HttpServer,SecureToken}.cpp src/rt/{PageHtml,ClientCredentials,Session,SessionCommand}.cpp \
+  src/net/{HttpServer,SecureToken}.cpp src/rt/{PageHtml,HtmlText,ClientCredentials,Session,SessionCommand}.cpp src/rt/HtmlText.h \
   include/runtime/{SecureToken,ClientCredentials,Session,SessionCommand}.h \
-  test/gate/{HttpServerGate,PageHtmlGate,ClientCredentialsGate}.cpp \
+  test/gate/{HttpServerGate,PageHtmlGate,ClientCredentialsGate}.cpp test/gate/PrivateAuthFile.h \
   test/ui/http-server.{sh,mjs} test/ui/client-authentication.mjs \
   src/client/*.{mts,json} deploy/dev/{Containerfile,nginx.conf,entrypoint.sh} \
   scripts/dev_container.sh > "$proof/inputs.sha256"

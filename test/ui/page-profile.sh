@@ -5,10 +5,10 @@ B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-page-profile.XXXXXX)
 sha256sum include/runtime/{PageCore,PageDispatcher,PageSession,PageHtml,PageValue}.h \
-  src/rt/{PageCore,PageDispatcher,PageHtml,PageValue}.cpp \
+  src/rt/{PageCore,PageDispatcher,PageHtml,PageValue,HtmlText}.cpp src/rt/HtmlText.h \
   include/type/Utf8.h src/net/Encoding.cpp \
   test/gate/{PageHtmlGate,PageValueGate}.cpp test/ui/page-profile.sh > "$proof/inputs.sha256"
-flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate)
+flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate -Isrc/rt)
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 for gate in PageHtmlGate PageValueGate; do
@@ -19,15 +19,16 @@ for control in no-escape display-as-value no-disabled no-byte-budget no-scale no
   source=src/rt/PageHtml.cpp
   gate=PageHtmlGate
   case "$control" in no-scale|no-closing|display-enum|no-flowfilter-refusal) source=src/rt/PageValue.cpp; gate=PageValueGate;; esac
+  if [[ "$control" == no-escape ]]; then source=src/rt/HtmlText.cpp; fi
   awk -v control="$control" '
-    control == "no-escape" && /Raw\("&lt;"\)/ {
-      sub(/Raw\("&lt;"\)/, "Raw(\"<\")"); changed++
+    control == "no-escape" && /append\("&lt;"\)/ {
+      sub(/append\("&lt;"\)/, "append(\"<\")"); changed++
     }
     control == "display-as-value" && /out.Attribute\("data-value", value.value\)/ {
       sub(/out.Attribute\("data-value", value.value\)/, "out.Attribute(\"data-value\", \"1.23\")"); changed++
     }
-    control == "no-disabled" && /if \(!action.enabled\)/ {
-      sub(/!action.enabled/, "false"); changed++
+    control == "no-disabled" && /if \(!enabled\)/ {
+      sub(/!enabled/, "(static_cast<void>(enabled), false)"); changed++
     }
     control == "no-byte-budget" && /if \(text.size\(\) > limits_.bytes - output_.size\(\)\)/ {
       sub(/text.size\(\) > limits_.bytes - output_.size\(\)/, "false"); changed++

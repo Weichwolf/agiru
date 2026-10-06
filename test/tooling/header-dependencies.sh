@@ -170,6 +170,10 @@ if reject_dependency "$proof/forced-token-crypto.h.d" rand.h \
   exit 1
 fi
 compile_header runtime/SingleInstance.h "$proof/SingleInstance.h.d"
+compile_header runtime/PageCommandHost.h "$proof/PageCommandHost.h.d"
+for forbidden in PageDef.h PageSession.h PageCore.h Database.h HttpServer.h Session.h microhttpd.h evp.h mutex; do
+  reject_dependency "$proof/PageCommandHost.h.d" "$forbidden"
+done
 for forbidden in Codeunit.h Table.h Record.h vector memory mutex; do
   reject_dependency "$proof/SingleInstance.h.d" "$forbidden"
 done
@@ -199,4 +203,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: twenty-one standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential controls refused\n'
+printf 'header-dependencies: twenty-two standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential controls refused\n'

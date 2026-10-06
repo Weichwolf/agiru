@@ -1343,6 +1343,8 @@ template <typename P> PageInstance *MakePageSession() {
 
     void Close() override { session_.Close(); }
 
+    void Save() override { session_.RowLeft(); }
+
     [[nodiscard]] bool IsOpen() const override { return session_.IsOpen(); }
 
     [[nodiscard]] bool Move(PagePosition position) override {

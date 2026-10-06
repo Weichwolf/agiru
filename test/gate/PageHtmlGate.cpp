@@ -173,6 +173,56 @@ void Semantics() {
   CHECK_TRUE("one missing output byte refuses instead of overflowing the envelope", refused);
 }
 
+void LifecycleActions() {
+  Page page;
+  Authorization auth;
+  auth.verify = false;
+  constexpr std::array actions{
+      agiru::PageHtmlAction{.identity = "$agiru.next", .caption = "Next"},
+      agiru::PageHtmlAction{.identity = "$agiru.save", .caption = "Save", .enabled = false}};
+  auto context = kContext;
+  context.actions = actions;
+  const auto result = agiru::RenderPageHtml(kPage, page, auth, context);
+  CHECK_TRUE("lifecycle actions share the existing action/form profile",
+             result.html.contains("name=\"control\" value=\"$agiru.next\"") &&
+                 result.html.contains("<button type=\"submit\" disabled>Save"));
+  CHECK_TRUE("rendered lifecycle discovery cannot execute a row save", page.writes == 0);
+  for (const auto identity : {std::string_view("Post"), std::string_view("Amount")}) {
+    const std::array collision{agiru::PageHtmlAction{.identity = identity, .caption = "Collision"}};
+    context.actions = collision;
+    bool refused = false;
+    try {
+      static_cast<void>(agiru::RenderPageHtml(kPage, page, auth, context));
+    } catch (const agiru::Error &error) { refused = error.Code() == "PageHtmlContext"; }
+    CHECK_TRUE("host operations cannot shadow actual AL actions or fields", refused);
+  }
+  const std::array duplicate{actions[0], actions[0]};
+  context.actions = duplicate;
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::RenderPageHtml(kPage, page, auth, context));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageHtmlContext"; }
+  CHECK_TRUE("duplicate host operation identities refuse before returning HTML", refused);
+}
+
+void AnonymousContainers() {
+  Page page;
+  Authorization auth;
+  auth.verify = false;
+  constexpr std::array areas{agiru::ControlDef{.kind = agiru::ControlKind::Area,
+                                               .area = agiru::AreaKind::Content,
+                                               .children = kChildren},
+                             agiru::ControlDef{.kind = agiru::ControlKind::Actions}};
+  auto declaration = kPage;
+  declaration.layout = areas;
+  const auto html = agiru::RenderPageHtml(declaration, page, auth, kContext).html;
+  CHECK_TRUE("unnamed AL area and nested-actions containers receive distinct presentation IDs",
+             html.contains("data-control=\"$agiru.container.1\"") &&
+                 html.contains("data-control=\"$agiru.container.7\""));
+  CHECK_TRUE("anonymous containers cannot emit empty agent identities",
+             !html.contains("data-control=\"\""));
+}
+
 void Refusals() {
   Page page;
   Authorization auth;
@@ -244,6 +294,8 @@ int main(int argc, char **argv) {
   if (argc != 1) { return 2; }
   return gate::Run("PageHtml", [] {
     Semantics();
+    LifecycleActions();
+    AnonymousContainers();
     Refusals();
   });
 }

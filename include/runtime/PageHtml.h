@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -13,6 +14,15 @@ class PageCore;
 class PageAuthorization;
 struct PageDef;
 
+/// \brief One server-declared lifecycle action rendered through the same action/form profile.
+/// The host must authorize/discover these separately from AL control triggers and refuse
+/// identities colliding with actual AL controls. They are not client-side business rules.
+struct PageHtmlAction {
+  std::string_view identity{}; ///< Exact host-owned operation identity.
+  std::string_view caption{};  ///< Presentation text, not the operation selector.
+  bool enabled = true;         ///< Discovery state; the receiver must recheck authorization/state.
+};
+
 /// \brief Server-owned command envelope, not authorization or a session implementation.
 /// Handles/revisions/IDs must be checked by the HTTP command receiver. Commands are
 /// emitted as forms so browsers and agents discover the same operation contract.
@@ -23,6 +33,7 @@ struct PageHtmlContext {
   std::string_view commandPrefix{}; ///< Unique receipt-ID prefix for this rendered response.
   std::string_view csrf{};          ///< Server-issued CSRF token; never an implicit confirmation.
   std::string_view commandPath = "/commands"; ///< Same-origin root-relative ASCII endpoint.
+  std::span<const PageHtmlAction> actions{};  ///< Borrowed, authorized lifecycle discovery.
 };
 
 /// \brief Explicit version-one transport budgets, not BC control-count guarantees.
@@ -45,6 +56,7 @@ struct PageHtmlResult {
 /// Fields read through ReadValue; action discovery uses Inspect, both reauthorized.
 /// Every visited node is authorized before evaluating its dynamic visibility.
 /// Containers retain declared order; unsupported kinds/bindings remain visible alerts.
+/// Anonymous declaration containers receive structural presentation IDs, never AL selectors.
 /// \param declaration Immutable declaration matching the supplied live page.
 /// \param page The shared page control adapter, not a presentation-specific runtime.
 /// \param authorization Mandatory user/company authorization for every visible leaf.

@@ -32,6 +32,13 @@ C++ and PostgreSQL in `agiru-dev`, with CMD/MCP outside. Authentication uses dis
 users/databases/private auth files and independent SQL checks; these authored static HTML
 fixtures do not qualify production ERP pages, permission sets or posting parity.
 
+`make page-host-test JOBS=2` runs generated List → Card → Validate/Save over nginx,
+C++ and PostgreSQL with external CMD/MCP. Independent SQL checks typed values,
+modifier identity, write counts, command replay/revisions, rollback and durable AL Commit.
+Three compiled ownership/revision/replay defects must fail named HTTP cases. The fixture
+has real generated pages and SQL grants, not a full BC permission provider or browser
+acceptance. It reuses the page-navigation compilation pipeline and private auth-file helper.
+
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.
 `make verify-check` checks build tooling without rebuilding C++.

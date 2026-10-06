@@ -8,12 +8,14 @@ dsn=${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}
 proof=$(mktemp -d /tmp/agiru-page-navigation.XXXXXX)
 sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
   src/rt/PageCore.cpp src/rt/PageValue.cpp include/runtime/PageValue.h \
-  src/rt/PageHtml.cpp include/runtime/PageHtml.h \
+  src/rt/PageHtml.cpp src/rt/HtmlText.{h,cpp} include/runtime/PageHtml.h \
   src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
   include/runtime/Page.h src/gen/BodyWriter.cpp \
   include/runtime/PageSession.h include/runtime/test/TestPage.h \
   include/runtime/Session.h include/runtime/SessionCommand.h src/rt/Session.cpp \
   src/rt/SessionCommand.cpp src/rt/Cursor.cpp src/rt/Transaction.cpp \
+  include/runtime/PageCommandHost.h src/rt/PageCommandHost.cpp test/ui/page-host/Runner.cpp \
+  test/gate/PrivateAuthFile.h \
   test/gate/PageDispatcherGate.cpp test/runtime/page-navigation/Runner.cpp \
   test/runtime/page-navigation/*.al test/runtime/page-navigation.sh > "$proof/dispatcher-inputs.sha256"
 mkdir -p "$proof/source"
@@ -42,6 +44,19 @@ done
 cat "$proof/execution.log"
 "$B/gate_PageDispatcherGate" > "$proof/dispatcher.log" 2>&1
 cat "$proof/dispatcher.log"
+host_target=${AGIRU_PAGE_HOST_BUILD:-$proof}
+if [[ -n ${AGIRU_PAGE_HOST_BUILD:-} ]]; then
+  [[ "$AGIRU_PAGE_HOST_BUILD" =~ ^/tmp/agiru-native-page-host\.[A-Za-z0-9]+$ ]]
+  [[ -d "$AGIRU_PAGE_HOST_BUILD" ]]
+fi
+"$CXX" "${flags[@]}" -c test/ui/page-host/Runner.cpp -o "$host_target/host.o"
+"$CXX" "$host_target/host.o" "${objects[@]}" "${links[@]}" -o "$host_target/host"
+mkdir -p "$B/fixture-commands"
+jq -n --arg directory "$PWD" --arg file "$PWD/test/ui/page-host/Runner.cpp" \
+    --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
+    "$CXX" "${flags[@]}" -c test/ui/page-host/Runner.cpp -o "$host_target/host.o" \
+    > "$B/fixture-commands/page-host.json"
+unlink "$host_target/host.o"
 for control in no-authorization no-enabled no-editable no-visible unknown-control; do
   awk -v control="$control" '
     control == "no-authorization" && /authorization_\.Require\(declaration_\.id, command\)/ {
@@ -150,6 +165,7 @@ if LD_PRELOAD="$proof/unbound-integer.so" "$B/gate_PageSourceGate" \
   exit 1
 fi
 rm -- "$proof/unbound-integer.so" "$proof/runner" "$proof/runner.o"
+if [[ -z ${AGIRU_PAGE_HOST_BUILD:-} ]]; then unlink "$host_target/host"; fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"

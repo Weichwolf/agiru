@@ -12,6 +12,7 @@
 
 #include "Check.h"
 #include "OwnedDatabase.h"
+#include "PrivateAuthFile.h"
 
 #include <array>
 #include <chrono>
@@ -24,9 +25,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-
-#include <fcntl.h>
-#include <unistd.h>
 
 namespace {
 
@@ -159,17 +157,6 @@ void ProviderFailure(std::string_view provider) {
   CHECK_TRUE("provider failure explicitly refuses without fallback", refused);
 }
 
-void PrivateAuthFile(const std::string &path, const std::string &secret) {
-  const std::string body = std::string(R"({"authorization":"Bearer )") + secret + "\"}\n";
-  const int file = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
-  if (file < 0) { throw std::runtime_error("cannot exclusively create private fixture auth file"); }
-  const auto written = write(file, body.data(), body.size());
-  const int closed = close(file);
-  if (written != static_cast<ssize_t>(body.size()) || closed != 0) {
-    throw std::runtime_error("cannot write private fixture auth file");
-  }
-}
-
 class AuthenticationFixture {
 public:
   AuthenticationFixture(std::string html, const std::string &authPath)
@@ -177,10 +164,10 @@ public:
     Seed(database_.Dsn());
     const agiru::Connection connection(database_.Dsn());
     connection.Run("CREATE TABLE authenticated_receipts(user_security_id uuid, method text)");
-    PrivateAuthFile(
+    gate::PrivateAuthFile(
         authPath,
         agiru::IssueClientCredential(connection, agiru::Guid(kUser), std::chrono::hours(1)));
-    PrivateAuthFile(
+    gate::PrivateAuthFile(
         authPath + ".second",
         agiru::IssueClientCredential(connection, agiru::Guid(kOtherUser), std::chrono::hours(1)));
     const auto name = connection.Execute("SELECT current_database()");

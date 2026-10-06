@@ -56,6 +56,10 @@ public:
   /// \throws Error from save or close triggers; failures must not be reported as success.
   virtual void Close() = 0;
 
+  /// \brief Saves the pending source row through the existing row-leave kernel.
+  /// \throws Error from validation/insertion/modification; never collects test errors.
+  virtual void Save() = 0;
+
   /// \brief Whether this handle currently owns or borrows an open typed page.
   [[nodiscard]] virtual bool IsOpen() const = 0;
 

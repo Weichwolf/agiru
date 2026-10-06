@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 proof=$(mktemp -d /tmp/agiru-agent-client.XXXXXX)
 sha256sum src/client/*.{mts,json} test/ui/agent-client.{sh,mjs} \
-  include/runtime/PageHtml.h src/rt/PageHtml.cpp test/gate/PageHtmlGate.cpp > "$proof/inputs.sha256"
+  include/runtime/PageHtml.h src/rt/PageHtml.cpp src/rt/HtmlText.{h,cpp} test/gate/PageHtmlGate.cpp > "$proof/inputs.sha256"
 if [[ -n ${AGIRU_PAGE_HTML_GATE:-} ]]; then
   "$AGIRU_PAGE_HTML_GATE" > "$proof/cpp-gate.log"
   "$AGIRU_PAGE_HTML_GATE" --html > "$proof/page.html"
