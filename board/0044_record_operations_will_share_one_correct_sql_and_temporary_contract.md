@@ -61,6 +61,24 @@ seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Useful implementation details
 
+- Position protocol gap: developer `f928288ee840`, record/recordref
+  `*-getposition-method.md` / `*-setposition-method.md`; BC29 NCL hash `277e35cbdfb8`.
+  NavRecord.ALGetPosition RVA `47bdf` defaults to captions. RecordImplementation
+  GetPosition/SetPosition `8de84`/`8ded8` serializes the declared primary key and
+  validates complete ordered CONST-only inputs before invalidating the enumerator;
+  SetPosition does not fetch a SQL row. Helper `923f4`/`924c4`/`92520` emits
+  caption=CONST(value) or FieldN=0(value); option names versus integer ordinals.
+  Context `be3b0`/`be4c4` double-quotes boundary whitespace or closing parentheses
+  and doubles embedded quotes; empty values stay empty. Table.cpp currently emits
+  legacy single-quoted pairs and accepts arbitrary/incomplete field assignments;
+  Table.h/RecordRef.h incorrectly default UseNames to false. Replace the shared
+  codec and prove independent literal expectations, untouched nonkeys/filters,
+  exact typed values and cursor invalidation, not only an own-code roundtrip.
+  BCApps `d99152ee35f0` DeltaAssert.Codeunit.al consumes SetPosition without Get;
+  user docs `bf5ffffa9b026` ui-enter-criteria-filters.md distinguish literals from
+  filter operators. Predecessor 1229/1609 motivates filter-preserving key-relative
+  navigation; _table.py's position syntax/default and implicit Get are not authority.
+  This is source/SDK evidence, not yet an implemented or executed position repair.
 - Direct sandbox metadata (2026-10-05, CH BC 28.5/platform 28.0.54688.0;
   not the frozen SDK/demo version): table viewer 2000000041 exposes
   `FieldName=$systemId`, but `FieldName=SystemCreatedAt`; the missing-index page's
