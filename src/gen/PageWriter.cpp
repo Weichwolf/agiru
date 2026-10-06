@@ -6,6 +6,7 @@
 #include "EnumWriter.h"
 #include "Lexer.h"
 #include "Names.h"
+#include "ObjectKind.h"
 #include "ReportLayoutsWriter.h"
 #include "RuntimeSurface.h"
 #include "Scope.h"
@@ -17,6 +18,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <map>
 #include <optional>
 #include <set>
@@ -297,16 +299,22 @@ std::string TriggerTable(const al::PageObject &page,
   for (const TriggerRow &row : rows) {
     out += first ? "\n" : ",\n";
     first = false;
-    out += "      {.control = " + Literal(row.control) + ", .validate = " + member(row.validate) +
+    out += "      {.control = ";
+    out += Literal(row.control) + ", .validate = " + member(row.validate) +
            ", .action = " + member(row.action) + ", .drillDown = " + member(row.drillDown) +
            ", .assistEdit = " + member(row.assistEdit) + ", .lookup = " + member(row.lookup) +
            ", .visible = " + member(row.visible) + ", .enabled = " + member(row.enabled) +
            ", .editable = " + member(row.editable);
     if (!row.variable.empty()) {
-      out += ", .set = [](" + pageClass +
-             " &page, std::string_view text) { static_cast<void>(::agiru::Evaluate(page." +
-             row.variable + ", text)); }, .text = [](const " + pageClass +
-             " &page) { return std::string(::agiru::AsText(page." + row.variable + ")); }";
+      out += ", .set = [](";
+      out += pageClass;
+      out += " &page, std::string_view text) { static_cast<void>(::agiru::Evaluate(page.";
+      out += row.variable;
+      out += ", text)); }, .text = [](const ";
+      out += pageClass;
+      out += " &page) { return std::string(::agiru::AsText(page.";
+      out += row.variable;
+      out += ")); }";
     }
     if (!row.sourceText.empty()) { out += ", .sourceText = " + member(row.sourceText); }
     out += "}";
@@ -360,6 +368,19 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
   Ahead(reached, ref->identifier);
 }
 
+void ReachControlTriggers(Reached &reached, const Controls &all, const Objects &objects) {
+  for (const auto *group : {&all.parts, &all.fields, &all.actions}) {
+    for (const al::PageControl *control : *group) {
+      for (const al::ProcedureDecl &trigger : control->triggers) {
+        for (const al::VarDecl &declared : trigger.parameters) {
+          Named(reached, declared, objects, false);
+        }
+        Named(reached, trigger.returned, objects, false);
+      }
+    }
+  }
+}
+
 std::string Includes(const al::PageObject &object, const Objects &objects) {
   Reached reached;
   std::set<std::string> &headers = reached.headers;
@@ -370,31 +391,14 @@ std::string Includes(const al::PageObject &object, const Objects &objects) {
     }
     Named(reached, procedure.returned, objects, false);
   }
-  {
-    Controls all;
-    Flatten(object.layout, all);
-    Flatten(object.actions, all);
-    std::vector<const al::PageControl *> everywhere = all.parts;
-    everywhere.insert(everywhere.end(), all.fields.begin(), all.fields.end());
-    everywhere.insert(everywhere.end(), all.actions.begin(), all.actions.end());
-    for (const al::PageControl *control : everywhere) {
-      for (const al::ProcedureDecl &trigger : control->triggers) {
-        for (const al::VarDecl &declared : trigger.parameters) {
-          Named(reached, declared, objects, false);
-        }
-        Named(reached, trigger.returned, objects, false);
-      }
-    }
-  }
-  {
-    Controls all;
-    Flatten(object.layout, all);
-    Flatten(object.actions, all);
-    for (const al::PageControl *control : all.parts) {
-      const auto found = objects.pages.find(LowerKey(PartSource(*control)));
-      if (found != objects.pages.end() && !found->second.header.empty()) {
-        headers.insert(found->second.header);
-      }
+  Controls all;
+  Flatten(object.layout, all);
+  Flatten(object.actions, all);
+  ReachControlTriggers(reached, all, objects);
+  for (const al::PageControl *control : all.parts) {
+    const auto found = objects.pages.find(LowerKey(PartSource(*control)));
+    if (found != objects.pages.end() && !found->second.header.empty()) {
+      headers.insert(found->second.header);
     }
   }
   const al::Property *source = al::Find(object.properties, "SourceTable");
@@ -599,6 +603,132 @@ std::string ControlSource(const al::PageControl &control) {
   return named;
 }
 
+class ControlProperties {
+public:
+  ControlProperties(std::string &out, const al::PageControl &control, const Objects &objects)
+      : out_(out), control_(control), objects_(objects) {}
+
+  void Text(std::string_view member, std::string_view property) {
+    const std::string said = ControlText(control_, property);
+    if (!said.empty()) { out_ += ", ." + std::string(member) + " = " + Literal(said); }
+  }
+
+  void Appearance() {
+    Text("toolTip", "ToolTip");
+    Text("applicationArea", "ApplicationArea");
+    Text("visible", "Visible");
+    Text("enabled", "Enabled");
+    Text("editable", "Editable");
+    Text("importance", "Importance");
+    Text("style", "Style");
+    Text("styleExpr", "StyleExpr");
+    Text("image", "Image");
+    Text("shortcutKey", "ShortcutKey");
+    Text("runObject", "RunObject");
+    Text("runPageLink", "RunPageLink");
+    Text("runPageView", "RunPageView");
+    Text("runPageMode", "RunPageMode");
+    Text("subPageLink", "SubPageLink");
+    Text("subPageView", "SubPageView");
+    Flag("showCaption", "ShowCaption", true);
+    Flag("ellipsis", "Ellipsis", false);
+    Flag("multiLine", "MultiLine", false);
+    Flag("quickEntry", "QuickEntry", true);
+    Flag("showMandatory", "ShowMandatory", false);
+    Text("hideValue", "HideValue");
+    Number("width", "Width");
+    Text("freezeColumn", "FreezeColumn");
+    Text("lookup", "Lookup");
+    Text("drillDown", "DrillDown");
+    Text("assistEdit", "AssistEdit");
+    Text("extendedDataType", "ExtendedDataType");
+    Text("multiplicity", "Multiplicity");
+    Text("filters", "Filters");
+    Text("orderBy", "OrderBy");
+    Text("odataEdmType", "ODataEDMType");
+    Text("instructionalText", "InstructionalText");
+  }
+
+  void Navigation() {
+    PageId("lookupPageId", "LookupPageId");
+    PageId("drillDownPageId", "DrillDownPageId");
+    Text("updatePropagation", "UpdatePropagation");
+    Text("optionCaption", "OptionCaption");
+    Text("aboutTitle", "AboutTitle");
+    Text("aboutText", "AboutText");
+    Text("indentationColumn", "IndentationColumn");
+    Text("indentationControls", "IndentationControls");
+    Text("showAs", "ShowAs");
+    Flag("inFooterBar", "InFooterBar", false);
+    Flag("runPageOnRec", "RunPageOnRec", false);
+    Flag("showFilter", "ShowFilter", true);
+    Flag("notBlank", "NotBlank", false);
+    Flag("showAsTree", "ShowAsTree", false);
+    Flag("isHeader", "IsHeader", false);
+    Text("provider", "Provider");
+    Text("minValue", "MinValue");
+    Text("maxValue", "MaxValue");
+    Text("blankNumbers", "BlankNumbers");
+    Text("maskType", "MaskType");
+    Number("columnSpan", "ColumnSpan");
+    Number("rowSpan", "RowSpan");
+  }
+
+  void Formatting() {
+    Flag("closingDates", "ClosingDates", false);
+    Flag("numeric", "Numeric", false);
+    Text("valuesAllowed", "ValuesAllowed");
+    Text("treeInitialState", "TreeInitialState");
+    Text("cueGroupLayout", "CueGroupLayout");
+    Flag("allowMultipleFiles", "AllowMultipleFiles", false);
+    Text("allowedFileExtensions", "AllowedFileExtensions");
+    Text("entityName", "EntityName");
+    Text("entitySetName", "EntitySetName");
+    Text("description", "Description");
+    Text("gridLayout", "GridLayout");
+    Text("gesture", "Gesture");
+    Text("flowTemplateCategoryName", "FlowTemplateCategoryName");
+    Text("autoFormatType", "AutoFormatType");
+    Text("autoFormatExpression", "AutoFormatExpression");
+    Text("captionClass", "CaptionClass");
+    Text("decimalPlaces", "DecimalPlaces");
+    Text("tableRelation", "TableRelation");
+    Flag("blankZero", "BlankZero", false);
+    Text("scope", "Scope");
+    Text("accessByPermission", "AccessByPermission");
+    Text("obsoleteState", "ObsoleteState");
+  }
+
+private:
+  void Flag(std::string_view member, std::string_view property, bool absent) {
+    const bool said = ControlIs(control_, property, absent);
+    if (said != absent) { out_ += ", ." + std::string(member) + " = " + (said ? "true" : "false"); }
+  }
+
+  void Number(std::string_view member, std::string_view property) {
+    const std::string said = ControlText(control_, property);
+    if (!said.empty() && said.find_first_not_of("0123456789") == std::string::npos && said != "0") {
+      out_ += ", ." + std::string(member) + " = " + said;
+    }
+  }
+
+  void PageId(std::string_view member, std::string_view property) {
+    const std::string said = ControlText(control_, property);
+    if (said.empty()) { return; }
+    std::string number = said;
+    if (said.find_first_not_of("0123456789") != std::string::npos) {
+      const auto found = objects_.pages.find(LowerKey(said));
+      if (found == objects_.pages.end() || found->second.id == 0) { return; }
+      number = std::to_string(found->second.id);
+    }
+    out_ += ", ." + std::string(member) + " = ::agiru::PageId{" + number + "}";
+  }
+
+  std::string &out_;
+  const al::PageControl &control_;
+  const Objects &objects_;
+};
+
 std::string DeclaredControl(const al::PageControl &control,
                             const Objects &objects,
                             const al::TableObject *source,
@@ -613,18 +743,8 @@ std::string DeclaredControl(const al::PageControl &control,
     const std::string_view named = AreaOf(Lowered(control.name));
     out += ", .area = AreaKind::" + std::string(named.empty() ? "None" : named);
   }
-  const auto text = [&out, &control](std::string_view member, std::string_view property) {
-    const std::string said = ControlText(control, property);
-    if (said.empty()) { return; }
-    out += ", ." + std::string(member) + " = " + Literal(said);
-  };
-  const auto flag = [&out,
-                     &control](std::string_view member, std::string_view property, bool absent) {
-    const bool said = ControlIs(control, property, absent);
-    if (said == absent) { return; }
-    out += ", ." + std::string(member) + " = " + (said ? "true" : "false");
-  };
-  text("caption", "Caption");
+  ControlProperties properties(out, control, objects);
+  properties.Text("caption", "Caption");
   if (known.empty()) { out += ", .source = " + Literal(control.kind); }
   const std::string expression = ControlSource(control);
   if (!expression.empty() && !known.empty() && kind != "part" && kind != "systempart") {
@@ -647,111 +767,9 @@ std::string DeclaredControl(const al::PageControl &control,
       out += ", .page = ::agiru::PageId{" + std::to_string(found->second.id) + "}";
     }
   }
-  text("toolTip", "ToolTip");
-  text("applicationArea", "ApplicationArea");
-  text("visible", "Visible");
-  text("enabled", "Enabled");
-  text("editable", "Editable");
-  text("importance", "Importance");
-  text("style", "Style");
-  text("styleExpr", "StyleExpr");
-  text("image", "Image");
-  text("shortcutKey", "ShortcutKey");
-  text("runObject", "RunObject");
-  text("runPageLink", "RunPageLink");
-  text("runPageView", "RunPageView");
-  text("runPageMode", "RunPageMode");
-  text("subPageLink", "SubPageLink");
-  text("subPageView", "SubPageView");
-  flag("showCaption", "ShowCaption", true);
-  flag("ellipsis", "Ellipsis", false);
-  flag("multiLine", "MultiLine", false);
-  flag("quickEntry", "QuickEntry", true);
-  flag("showMandatory", "ShowMandatory", false);
-  text("hideValue", "HideValue");
-  const std::string width = ControlText(control, "Width");
-  if (!width.empty() && width.find_first_not_of("0123456789") == std::string::npos &&
-      width != "0") {
-    out += ", .width = " + width;
-  }
-  text("freezeColumn", "FreezeColumn");
-  text("lookup", "Lookup");
-  text("drillDown", "DrillDown");
-  text("assistEdit", "AssistEdit");
-  text("extendedDataType", "ExtendedDataType");
-  text("multiplicity", "Multiplicity");
-  text("filters", "Filters");
-  text("orderBy", "OrderBy");
-  text("odataEdmType", "ODataEDMType");
-  text("instructionalText", "InstructionalText");
-  {
-    const std::string lookup = ControlText(control, "LookupPageId");
-    const std::string drill = ControlText(control, "DrillDownPageId");
-    const auto page = [&objects](const std::string &said) {
-      if (said.empty()) { return std::string{}; }
-      if (said.find_first_not_of("0123456789") == std::string::npos) { return said; }
-      const auto found = objects.pages.find(LowerKey(said));
-      return found == objects.pages.end() || found->second.id == 0
-                 ? std::string{}
-                 : std::to_string(found->second.id);
-    };
-    const std::string lookupNo = page(lookup);
-    const std::string drillNo = page(drill);
-    if (!lookupNo.empty()) { out += ", .lookupPageId = ::agiru::PageId{" + lookupNo + "}"; }
-    if (!drillNo.empty()) { out += ", .drillDownPageId = ::agiru::PageId{" + drillNo + "}"; }
-  }
-  text("updatePropagation", "UpdatePropagation");
-  text("optionCaption", "OptionCaption");
-  text("aboutTitle", "AboutTitle");
-  text("aboutText", "AboutText");
-  text("indentationColumn", "IndentationColumn");
-  text("indentationControls", "IndentationControls");
-  text("showAs", "ShowAs");
-  flag("inFooterBar", "InFooterBar", false);
-  flag("runPageOnRec", "RunPageOnRec", false);
-  flag("showFilter", "ShowFilter", true);
-  flag("notBlank", "NotBlank", false);
-  flag("showAsTree", "ShowAsTree", false);
-  flag("isHeader", "IsHeader", false);
-  text("provider", "Provider");
-  text("minValue", "MinValue");
-  text("maxValue", "MaxValue");
-  text("blankNumbers", "BlankNumbers");
-  text("maskType", "MaskType");
-  {
-    const auto span = [&out, &control](std::string_view member, std::string_view property) {
-      const std::string said = ControlText(control, property);
-      if (said.empty() || said.find_first_not_of("0123456789") != std::string::npos ||
-          said == "0") {
-        return;
-      }
-      out += ", ." + std::string(member) + " = " + said;
-    };
-    span("columnSpan", "ColumnSpan");
-    span("rowSpan", "RowSpan");
-  }
-  flag("closingDates", "ClosingDates", false);
-  flag("numeric", "Numeric", false);
-  text("valuesAllowed", "ValuesAllowed");
-  text("treeInitialState", "TreeInitialState");
-  text("cueGroupLayout", "CueGroupLayout");
-  flag("allowMultipleFiles", "AllowMultipleFiles", false);
-  text("allowedFileExtensions", "AllowedFileExtensions");
-  text("entityName", "EntityName");
-  text("entitySetName", "EntitySetName");
-  text("description", "Description");
-  text("gridLayout", "GridLayout");
-  text("gesture", "Gesture");
-  text("flowTemplateCategoryName", "FlowTemplateCategoryName");
-  text("autoFormatType", "AutoFormatType");
-  text("autoFormatExpression", "AutoFormatExpression");
-  text("captionClass", "CaptionClass");
-  text("decimalPlaces", "DecimalPlaces");
-  text("tableRelation", "TableRelation");
-  flag("blankZero", "BlankZero", false);
-  text("scope", "Scope");
-  text("accessByPermission", "AccessByPermission");
-  text("obsoleteState", "ObsoleteState");
+  properties.Appearance();
+  properties.Navigation();
+  properties.Formatting();
   if (!children.empty()) { out += ", .children = " + children; }
   return out;
 }
@@ -851,6 +869,24 @@ PageSourceId(const al::PageObject &page, const Objects &objects, const al::Table
   return binding->second.id;
 }
 
+void AppendCardPage(std::string &out, const al::PageObject &page, const Objects &objects) {
+  const auto *property = Find(page.properties, "CardPageId");
+  if (property == nullptr || property->text.empty()) { return; }
+  const auto found = objects.pages.find(LowerKey(property->text));
+  if (found != objects.pages.end() && found->second.id != 0) {
+    out += "    .cardPageId = ::agiru::PageId{" + std::to_string(found->second.id) + "},\n";
+  }
+}
+
+void AppendDepthAssertion(std::string &out,
+                          const std::string &named,
+                          const std::vector<al::PageControl> &controls) {
+  if (named.empty()) { return; }
+  out += "static_assert(Depth(" + named + ") == " + std::to_string(DepthOf(controls)) +
+         ",\n              \"a page's layout is a TREE and the generator keeps it -- a "
+         "flattened one is one level deep (board:0553)\");\n";
+}
+
 }
 
 std::string
@@ -916,13 +952,7 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
   flag("refreshOnActivate", "RefreshOnActivate", false);
   flag("saveValues", "SaveValues", false);
   flag("analysisModeEnabled", "AnalysisModeEnabled", true);
-  const std::string card = said("CardPageId");
-  if (!card.empty()) {
-    const auto found = objects.pages.find(LowerKey(card));
-    if (found != objects.pages.end() && found->second.id != 0) {
-      out += "    .cardPageId = ::agiru::PageId{" + std::to_string(found->second.id) + "},\n";
-    }
-  }
+  AppendCardPage(out, page, objects);
   text("dataCaptionExpression", "DataCaptionExpression");
   text("dataCaptionFields", "DataCaptionFields");
   text("applicationArea", "ApplicationArea");
@@ -959,16 +989,13 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
   text("obsoleteState", "ObsoleteState");
   out += PageReflectionProperties(page, objects);
   out += "};\n\n";
-  for (const auto &[named, controls] :
-       {std::pair{layout, &page.layout}, std::pair{actions, &page.actions}}) {
-    if (named.empty()) { continue; }
-    out += "static_assert(Depth(" + named + ") == " + std::to_string(DepthOf(*controls)) +
-           ",\n              \"a page's layout is a TREE and the generator keeps it -- a "
-           "flattened one is one level deep (board:0553)\");\n";
-  }
+  AppendDepthAssertion(out, layout, page.layout);
+  AppendDepthAssertion(out, actions, page.actions);
   out += "\n} // namespace " + space + "\n";
   return out;
 }
+
+namespace {
 
 std::string SourceTableNameOf(const al::PageObject &object) {
   const al::Property *source = al::Find(object.properties, "SourceTable");
@@ -980,6 +1007,8 @@ std::string SourceTableNameOf(const al::PageObject &object) {
     }
   }
   return named;
+}
+
 }
 
 std::optional<al::ProcedureDecl> SourceReadGetter(const al::PageControl &control,
@@ -1019,6 +1048,8 @@ std::optional<al::ProcedureDecl> SourceReadGetter(const al::PageControl &control
   return getter;
 }
 
+namespace {
+
 std::string WithoutTheNamespace(const std::string &table) {
   std::string bare = table;
   for (std::size_t dot = bare.find('.'); dot != std::string::npos; dot = bare.find('.')) {
@@ -1028,6 +1059,8 @@ std::string WithoutTheNamespace(const std::string &table) {
     bare = bare.substr(dot + 1);
   }
   return bare;
+}
+
 }
 
 std::string PageVariableIdentifier(const al::PageObject &page, std::string_view name) {
@@ -1063,13 +1096,13 @@ ObjectKind PageKind(const al::PageObject &object) {
   return object.report ? ObjectKind::Report : ObjectKind::Page;
 }
 
+namespace {
+
 bool IsElementKind(const std::string &kind) {
   const std::string lowered = LowerKey(kind);
   return lowered == "textelement" || lowered == "tableelement" || lowered == "fieldelement" ||
          lowered == "textattribute" || lowered == "fieldattribute";
 }
-
-namespace {
 
 bool WordLikeToken(const al::Token &token) {
   return token.kind == al::TokenKind::Identifier || token.kind == al::TokenKind::QuotedIdentifier ||
@@ -1109,6 +1142,18 @@ void GatherDataItems(const std::vector<al::PageControl> &controls,
   }
 }
 
+void PrepareTextElement(const al::PageControl &control, al::PageObject &port) {
+  const bool known = std::ranges::any_of(port.variables, [&control](const al::VarDecl &one) {
+    return LowerKey(one.name) == LowerKey(control.name);
+  });
+  if (known) { return; }
+  al::VarDecl declared;
+  declared.name = control.name;
+  const al::Property *textType = al::Find(control.properties, "TextType");
+  declared.type = textType != nullptr && LowerKey(textType->text) == "bigtext" ? "BigText" : "Text";
+  port.variables.push_back(std::move(declared));
+}
+
 void PrepareElements(std::vector<al::PageControl> &controls, al::PageObject &port) {
   for (al::PageControl &control : controls) {
     const std::string kind = LowerKey(control.kind);
@@ -1127,18 +1172,7 @@ void PrepareElements(std::vector<al::PageControl> &controls, al::PageObject &por
         port.variables.push_back(std::move(declared));
       }
     } else if ((kind == "textelement" || kind == "textattribute") && !control.name.empty()) {
-      const bool known = std::ranges::any_of(port.variables, [&control](const al::VarDecl &one) {
-        return LowerKey(one.name) == LowerKey(control.name);
-      });
-      const bool container = false;
-      if (!known && !container) {
-        al::VarDecl declared;
-        declared.name = control.name;
-        const al::Property *textType = al::Find(control.properties, "TextType");
-        declared.type =
-            textType != nullptr && LowerKey(textType->text) == "bigtext" ? "BigText" : "Text";
-        port.variables.push_back(std::move(declared));
-      }
+      PrepareTextElement(control, port);
     }
     PrepareElements(control.children, port);
   }
@@ -1209,6 +1243,8 @@ void PrepareReport(al::PageObject &report) {
   PrepareDataItems(report.dataset, report);
 }
 
+namespace {
+
 void DistinguishFieldElements(std::vector<al::PageControl> &controls, std::set<std::string> &seen) {
   for (al::PageControl &control : controls) {
     const std::string kind = LowerKey(control.kind);
@@ -1232,6 +1268,8 @@ void DistinguishFieldElements(std::vector<al::PageControl> &controls, std::set<s
     }
     DistinguishFieldElements(control.children, seen);
   }
+}
+
 }
 
 void PrepareXmlPort(al::PageObject &port) {
@@ -1290,92 +1328,137 @@ bool DeclaresTrigger(const al::PageControl &control, std::string_view name) {
   });
 }
 
+const TableRef *RunObjectPage(const al::Property &run, const Objects &objects) {
+  if (run.value.size() < 2 || LowerKey(run.value.front().text) != "page") { return nullptr; }
+  const al::Token &named = run.value[1];
+  const auto page =
+      named.kind == al::TokenKind::Integer
+          ? std::ranges::find_if(
+                objects.pages,
+                [&](const auto &entry) { return std::to_string(entry.second.id) == named.text; })
+          : objects.pages.find(LowerKey(named.text));
+  if (page == objects.pages.end() || page->second.name.empty()) { return nullptr; }
+  const auto table = objects.tables.find(LowerKey(page->second.name));
+  if (table == objects.tables.end() ||
+      table->second.identifier.starts_with("::agiru::platform::") ||
+      table->second.identifier.starts_with("absent::")) {
+    return nullptr;
+  }
+  return &page->second;
+}
+
+constexpr std::size_t kLinkFieldArgumentOffset = 4;
+constexpr std::size_t kLinkFilterArgumentOffset = 6;
+
+std::size_t RunPageLinkClose(std::span<const al::Token> value, std::size_t at) {
+  std::size_t close = at + kLinkFieldArgumentOffset;
+  int depth = 0;
+  while (close < value.size() && (depth != 0 || value[close].text != ")")) {
+    if (value[close].text == "(") { ++depth; }
+    if (value[close].text == ")") { --depth; }
+    ++close;
+  }
+  return close;
+}
+
+void AppendRunPageLink(std::vector<al::Token> &tokens,
+                       std::span<const al::Token> value,
+                       std::size_t at,
+                       std::size_t close) {
+  const bool copiesAFilter = close > at + kLinkFilterArgumentOffset &&
+                             LowerKey(value[at + kLinkFieldArgumentOffset].text) == "filter" &&
+                             value[at + kLinkFilterArgumentOffset - 1].text == "(" &&
+                             value[close - 1].text == ")";
+  tokens.push_back(Word(al::TokenKind::Identifier, "RunObjectRec"));
+  tokens.push_back(Mark("."));
+  tokens.push_back(Word(al::TokenKind::Identifier, copiesAFilter ? "SetFilter" : "SetRange"));
+  tokens.push_back(Mark("("));
+  tokens.push_back(value[at]);
+  tokens.push_back(Mark(","));
+  tokens.push_back(Word(al::TokenKind::Identifier, "Rec"));
+  tokens.push_back(Mark("."));
+  if (copiesAFilter) {
+    tokens.push_back(Word(al::TokenKind::Identifier, "GetFilter"));
+    tokens.push_back(Mark("("));
+    for (std::size_t i = at + kLinkFilterArgumentOffset; i + 1 < close; ++i) {
+      tokens.push_back(value[i]);
+    }
+    tokens.push_back(Mark(")"));
+  } else {
+    for (std::size_t i = at + kLinkFieldArgumentOffset; i < close; ++i) {
+      tokens.push_back(value[i]);
+    }
+  }
+  tokens.push_back(Mark(")"));
+  tokens.push_back(Mark(";"));
+}
+
+bool LinkRunObjectRecord(al::ProcedureDecl &action,
+                         const al::Property *link,
+                         const TableRef &page) {
+  if (link == nullptr) { return false; }
+  al::VarDecl target;
+  target.name = "RunObjectRec";
+  target.type = "Record";
+  target.subtype = page.name;
+  action.variables.push_back(target);
+  const std::vector<al::Token> &value = link->value;
+  std::size_t at = 0;
+  bool linked = false;
+  while (at + kLinkFieldArgumentOffset < value.size()) {
+    if (value[at + 1].text != "=" || LowerKey(value[at + 2].text) != "field" ||
+        value[at + 3].text != "(") {
+      linked = false;
+      break;
+    }
+    const std::size_t close = RunPageLinkClose(value, at);
+    if (close >= value.size()) {
+      linked = false;
+      break;
+    }
+    AppendRunPageLink(action.tokens, value, at, close);
+    linked = true;
+    at = close + 1;
+    if (at < value.size() && value[at].text == ",") { ++at; }
+    if (at >= value.size()) { break; }
+  }
+  if (!linked) {
+    action.tokens.clear();
+    action.variables.clear();
+  }
+  return linked;
+}
+
+void ParseRunObjectAction(al::ProcedureDecl &action,
+                          const al::PageControl &control,
+                          const al::Property &run,
+                          const al::Property *link) {
+  try {
+    action.body = al::ParseStatements(action.tokens);
+  } catch (const std::exception &e) {
+    std::string spelled;
+    for (const al::Token &token : action.tokens) { spelled += token.text + " "; }
+    throw std::runtime_error("the OnAction synthesised for " + control.name + " (RunObject " +
+                             run.text + ", RunPageLink " +
+                             (link == nullptr ? std::string{} : link->text) + ") reads `" +
+                             spelled + "` and does not parse: " + e.what());
+  }
+}
+
 void SynthesizeRunObjectActions(std::vector<al::PageControl> &controls, const Objects &objects) {
   for (al::PageControl &control : controls) {
     SynthesizeRunObjectActions(control.children, objects);
     if (!IsAction(control.kind) || DeclaresTrigger(control, "OnAction")) { continue; }
     const al::Property *run = al::Find(control.properties, "RunObject");
-    if (run == nullptr || run->value.size() < 2 || LowerKey(run->value.front().text) != "page") {
-      continue;
-    }
-    const al::Token &named = run->value[1];
-    const auto page =
-        named.kind == al::TokenKind::Integer
-            ? std::ranges::find_if(
-                  objects.pages,
-                  [&](const auto &entry) { return std::to_string(entry.second.id) == named.text; })
-            : objects.pages.find(LowerKey(named.text));
-    if (page == objects.pages.end()) { continue; }
-    if (page->second.name.empty() ||
-        objects.tables.find(LowerKey(page->second.name)) == objects.tables.end() ||
-        objects.tables.find(LowerKey(page->second.name))
-            ->second.identifier.starts_with("::agiru::platform::") ||
-        objects.tables.find(LowerKey(page->second.name))
-            ->second.identifier.starts_with("absent::")) {
-      continue;
-    }
+    if (run == nullptr) { continue; }
+    const TableRef *page = RunObjectPage(*run, objects);
+    if (page == nullptr) { continue; }
     const al::Property *link = al::Find(control.properties, "RunPageLink");
     al::ProcedureDecl action;
     action.isTrigger = true;
     action.name = "OnAction";
     std::vector<al::Token> &tokens = action.tokens;
-    bool linked = false;
-    if (link != nullptr && !page->second.name.empty()) {
-      al::VarDecl target;
-      target.name = "RunObjectRec";
-      target.type = "Record";
-      target.subtype = page->second.name;
-      action.variables.push_back(target);
-      const std::vector<al::Token> &value = link->value;
-      std::size_t at = 0;
-      while (at + 4 < value.size()) {
-        const al::Token &field = value[at];
-        if (value[at + 1].text != "=" || LowerKey(value[at + 2].text) != "field" ||
-            value[at + 3].text != "(") {
-          linked = false;
-          break;
-        }
-        std::size_t close = at + 4;
-        int depth = 0;
-        while (close < value.size() && !(depth == 0 && value[close].text == ")")) {
-          if (value[close].text == "(") { ++depth; }
-          if (value[close].text == ")") { --depth; }
-          ++close;
-        }
-        if (close >= value.size()) {
-          linked = false;
-          break;
-        }
-        const bool copiesAFilter = close > at + 6 && LowerKey(value[at + 4].text) == "filter" &&
-                                   value[at + 5].text == "(" && value[close - 1].text == ")";
-        tokens.push_back(Word(al::TokenKind::Identifier, "RunObjectRec"));
-        tokens.push_back(Mark("."));
-        tokens.push_back(Word(al::TokenKind::Identifier, copiesAFilter ? "SetFilter" : "SetRange"));
-        tokens.push_back(Mark("("));
-        tokens.push_back(field);
-        tokens.push_back(Mark(","));
-        tokens.push_back(Word(al::TokenKind::Identifier, "Rec"));
-        tokens.push_back(Mark("."));
-        if (copiesAFilter) {
-          tokens.push_back(Word(al::TokenKind::Identifier, "GetFilter"));
-          tokens.push_back(Mark("("));
-          for (std::size_t i = at + 6; i + 1 < close; ++i) { tokens.push_back(value[i]); }
-          tokens.push_back(Mark(")"));
-        } else {
-          for (std::size_t i = at + 4; i < close; ++i) { tokens.push_back(value[i]); }
-        }
-        tokens.push_back(Mark(")"));
-        tokens.push_back(Mark(";"));
-        linked = true;
-        at = close + 1;
-        if (at < value.size() && value[at].text == ",") { ++at; }
-        if (at >= value.size()) { break; }
-      }
-      if (!linked) {
-        tokens.clear();
-        action.variables.clear();
-      }
-    }
+    const bool linked = LinkRunObjectRecord(action, link, *page);
     if (!linked && link != nullptr) { continue; }
     const al::Property *onRec = al::Find(control.properties, "RunPageOnRec");
     const bool runsOnRec = onRec != nullptr && LowerKey(onRec->text) == "true";
@@ -1391,7 +1474,7 @@ void SynthesizeRunObjectActions(std::vector<al::PageControl> &controls, const Ob
     tokens.push_back(Mark("."));
     tokens.push_back(Word(al::TokenKind::Identifier, "Run"));
     tokens.push_back(Mark("("));
-    tokens.push_back(Word(al::TokenKind::Integer, std::to_string(page->second.id)));
+    tokens.push_back(Word(al::TokenKind::Integer, std::to_string(page->id)));
     if (linked) {
       tokens.push_back(Mark(","));
       tokens.push_back(Word(al::TokenKind::Identifier, "RunObjectRec"));
@@ -1401,16 +1484,7 @@ void SynthesizeRunObjectActions(std::vector<al::PageControl> &controls, const Ob
     }
     tokens.push_back(Mark(")"));
     tokens.push_back(Mark(";"));
-    try {
-      action.body = al::ParseStatements(tokens);
-    } catch (const std::exception &e) {
-      std::string spelled;
-      for (const al::Token &token : tokens) { spelled += token.text + " "; }
-      throw std::runtime_error("the OnAction synthesised for " + control.name + " (RunObject " +
-                               run->text + ", RunPageLink " +
-                               (link == nullptr ? std::string{} : link->text) + ") reads `" +
-                               spelled + "` and does not parse: " + e.what());
-    }
+    ParseRunObjectAction(action, control, *run, link);
     control.triggers.push_back(std::move(action));
   }
 }
@@ -1471,278 +1545,365 @@ std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page,
 }
 }
 
-PageHeader
-WritePage(const al::PageObject &object, const std::string &source, const Objects &objects) {
-  const std::string identifier = Identifier(object.name);
-  const std::vector<al::ProcedureDecl> bodies = WithControlTriggers(object, objects);
-  const std::string pageClass = ClassName(identifier, PageKind(object));
-  const std::string controlsClass = identifier + (object.xmlport  ? "_XmlPort_Controls"
-                                                  : object.report ? "_Report_Controls"
-                                                                  : "_Controls");
-  const std::vector<const al::PageControl *> dataItems = DataItemsOf(object);
+namespace {
 
-  std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
-  out += kRuntimeIncludeMarker;
-  out += ReportLayoutsIncludes(object);
-  Controls sourceControls;
-  Flatten(object.layout, sourceControls);
-  const bool hasUserControl = std::ranges::any_of(
-      sourceControls.fields, [](const auto *control) { return IsUserControl(*control); });
-  if (NamesAbsentIn(object.variables, bodies, objects) ||
-      SourceTable(object, objects).starts_with("absent::") || hasUserControl) {
-    out += "#include \"absent/Types.h\"\n";
+class PageHeaderWriter {
+public:
+  PageHeaderWriter(const al::PageObject &object, const Objects &objects)
+      : object_(object),
+        objects_(objects),
+        identifier_(Identifier(object.name)),
+        bodies_(WithControlTriggers(object, objects)),
+        pageClass_(ClassName(identifier_, PageKind(object))),
+        controlsClass_(identifier_ + (object.xmlport  ? "_XmlPort_Controls"
+                                      : object.report ? "_Report_Controls"
+                                                      : "_Controls")),
+        dataItems_(DataItemsOf(object)),
+        space_(NamespaceOf(object.nameSpace)) {}
+
+  PageHeader Write(const std::string &source) {
+    WritePreamble_(source);
+    WriteControlsClass_();
+    WriteClassDeclaration_();
+    WriteInstanceMembers_();
+    WriteTraits_();
+    return BoundHeader_();
   }
-  std::string includes = Includes(object, objects);
-  {
+
+private:
+  void CompleteSourceIncludes_(std::string &includes) const {
     Controls sourced;
-    Flatten(object.layout, sourced);
+    Flatten(object_.layout, sourced);
     for (const al::PageControl *control : sourced.fields) {
-      if (VariableSource(*control, object, objects).find("->") == std::string::npos) { continue; }
-      for (const al::VarDecl &declared : object.variables) {
+      if (VariableSource(*control, object_, objects_).find("->") == std::string::npos) { continue; }
+      for (const al::VarDecl &declared : object_.variables) {
         if (LowerKey(declared.name) != LowerKey(control->source.front().text)) { continue; }
-        const auto table = objects.tables.find(LowerKey(declared.subtype));
-        if (table == objects.tables.end() || table->second.header.empty()) { continue; }
+        const auto table = objects_.tables.find(LowerKey(declared.subtype));
+        if (table == objects_.tables.end() || table->second.header.empty()) { continue; }
         const std::string line = "#include \"" + table->second.header + "\"\n";
         if (includes.find(line) == std::string::npos) { includes += line; }
       }
     }
   }
-  for (const al::PageControl *item : dataItems) {
-    const al::VarDecl *declared = DataItemVariable(object, item->name);
-    const auto table = declared == nullptr ? objects.tables.end()
-                                           : objects.tables.find(LowerKey(declared->subtype));
-    if (table == objects.tables.end() || table->second.header.empty()) { continue; }
-    const std::string line = "#include \"" + table->second.header + "\"\n";
-    if (includes.find(line) == std::string::npos) { includes += line; }
-  }
-  if (!includes.empty()) { out += "\n" + includes; }
-  out += "\n#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
-  out += InlineOptionsOf(object.name, "pages", object.variables, bodies);
 
-  Controls all;
-  Flatten(object.layout, all);
-  Flatten(object.actions, all);
-
-  const std::string space = NamespaceOf(object.nameSpace);
-  out += "namespace " + space + " {\n\n";
-  out +=
-      "template <typename Field_Kind, typename Action_Kind, template <typename> class Part_Kind>\n"
-      "class " +
-      controlsClass + " {\npublic:\n";
-  std::set<std::string> taken{"OpenNew", "OpenEdit", "OpenView", "Close", "First", "Next", "New"};
-  const std::map<std::string, std::string> named = ControlIdentifiers(object, objects);
-  std::vector<std::string> bound;
-  WriteControls(out, all.fields, "Field_Kind", named, taken, &bound);
-  if (!all.fields.empty() && !all.actions.empty()) { out += "\n"; }
-  WriteControls(out, all.actions, "Action_Kind", named, taken, &bound);
-  std::vector<std::pair<std::string, std::string>> boundParts;
-  WriteParts(out, all.parts, objects, named, taken, &boundParts);
-  for (const auto &[field, identifier] : named) {
-    if (!taken.insert(identifier).second) { continue; }
-    out += "  Field_Kind " + identifier + "{" + Literal(field) + "};\n";
-    bound.push_back(identifier);
+  void CompleteDataItemIncludes_(std::string &includes) const {
+    for (const al::PageControl *item : dataItems_) {
+      const al::VarDecl *declared = DataItemVariable(object_, item->name);
+      const auto table = declared == nullptr ? objects_.tables.end()
+                                             : objects_.tables.find(LowerKey(declared->subtype));
+      if (table == objects_.tables.end() || table->second.header.empty()) { continue; }
+      const std::string line = "#include \"" + table->second.header + "\"\n";
+      if (includes.find(line) == std::string::npos) { includes += line; }
+    }
   }
-  if (!dataItems.empty() && object.report) {
+
+  void WritePreamble_(const std::string &source) {
+    out_ = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
+    out_ += kRuntimeIncludeMarker;
+    out_ += ReportLayoutsIncludes(object_);
+    Flatten(object_.layout, sourceControls_);
+    hasUserControl_ = std::ranges::any_of(
+        sourceControls_.fields, [](const auto *control) { return IsUserControl(*control); });
+    if (NamesAbsentIn(object_.variables, bodies_, objects_) ||
+        SourceTable(object_, objects_).starts_with("absent::") || hasUserControl_) {
+      out_ += "#include \"absent/Types.h\"\n";
+    }
+    std::string includes = Includes(object_, objects_);
+    CompleteSourceIncludes_(includes);
+    CompleteDataItemIncludes_(includes);
+    if (!includes.empty()) { out_ += "\n" + includes; }
+    out_ += "\n#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
+    out_ += InlineOptionsOf(object_.name, "pages", object_.variables, bodies_);
+  }
+
+  void WriteRequestFilters_(std::set<std::string> &taken) {
+    if (dataItems_.empty() || !object_.report) { return; }
     std::string give;
     std::string take;
-    for (const al::PageControl *item : dataItems) {
-      const al::VarDecl *declared = DataItemVariable(object, item->name);
+    for (const al::PageControl *item : dataItems_) {
+      const al::VarDecl *declared = DataItemVariable(object_, item->name);
       if (declared == nullptr) { continue; }
-      const auto table = objects.tables.find(LowerKey(declared->subtype));
-      if (table == objects.tables.end() || table->second.header.empty()) { continue; }
+      const auto table = objects_.tables.find(LowerKey(declared->subtype));
+      if (table == objects_.tables.end() || table->second.header.empty()) { continue; }
       const std::string member = Identifier(item->name);
       if (!taken.insert(member).second) { continue; }
-      const std::string variable = PageVariableIdentifier(object, declared->name);
-      out += "  " + table->second.identifier + " " + member + "{};\n";
-      give += "    ::agiru::detail::GiveRequestFilters(&" + member + ", report." + variable +
-              ".operator->());\n";
-      take += "    ::agiru::detail::TakeRequestFilters(report." + variable + ".operator->(), &" +
-              member + ");\n";
+      const std::string variable = PageVariableIdentifier(object_, declared->name);
+      out_ += "  " + table->second.identifier + " " + member + "{};\n";
+      give += "    ::agiru::detail::GiveRequestFilters(&";
+      give += member;
+      give += ", report.";
+      give += variable;
+      give += ".operator->());\n";
+      take += "    ::agiru::detail::TakeRequestFilters(report.";
+      take += variable;
+      take += ".operator->(), &";
+      take += member;
+      take += ");\n";
     }
     if (!give.empty()) {
-      out +=
-          "\n  template <typename Report_Kind> void GiveRequestFilters_(Report_Kind &report) {\n" +
-          give + "  }\n\n";
-      out += "  template <typename Report_Kind> void TakeRequestFilters_(Report_Kind &report) "
-             "const {\n" +
-             take + "  }\n";
+      out_ +=
+          "\n  template <typename Report_Kind> void GiveRequestFilters_(Report_Kind &report) {\n";
+      out_ += give;
+      out_ += "  }\n\n";
+      out_ += "  template <typename Report_Kind> void TakeRequestFilters_(Report_Kind &report) "
+              "const {\n";
+      out_ += take;
+      out_ += "  }\n";
     }
   }
-  out += "\n  template <typename Core> void BindControls(Core &core) {\n";
-  for (const std::string &identifier : bound) { out += "    " + identifier + ".Bind(core);\n"; }
-  for (const auto &[identifier, name] : boundParts) {
-    out += "    " + identifier + ".BindPart(core, " + Literal(name) + ");\n";
-  }
-  if (bound.empty() && boundParts.empty()) { out += "    static_cast<void>(core);\n"; }
-  out += "  }\n";
-  out += "};\n\n";
-  out += "class " + pageClass + ";\n\n";
-  out += "class " + pageClass + " : public " +
-         (object.xmlport  ? "XmlPort<"
-          : object.report ? "Report<"
-                          : "Page<") +
-         pageClass + "> {\npublic:\n";
-  if (!object.report && !object.xmlport) { out += "  " + pageClass + "() = default;\n\n"; }
-  {
-    const std::string base = object.xmlport ? "XmlPort<" : object.report ? "Report<" : "Page<";
-    const std::string header = object.xmlport ? "XmlPort.h" : object.report ? "Report.h" : "Page.h";
-    std::set<std::string> unhidden;
-    for (const al::ProcedureDecl &procedure : object.procedures) {
-      const std::string named = Identifier(procedure.name);
-      if (!DeclaredByBase(header, named) || !unhidden.insert(named).second) { continue; }
-      out += "  using " + base + pageClass + ">::" + named + ";\n";
-    }
-    if (!unhidden.empty()) { out += "\n"; }
-  }
-  out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
-  out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n\n";
 
-  const std::string table = SourceTable(object, objects);
-  if (!table.empty()) {
-    const al::Property *temporary = al::Find(object.properties, "SourceTableTemporary");
-    const bool held = temporary != nullptr && !temporary->value.empty() &&
-                      LowerKey(temporary->value.front().text) == "true";
-    out += "  ";
-    out += held && !table.starts_with("absent::") ? "Temporary<" + table + ">" : table;
-    out += " Rec;\n\n";
-  }
-
-  {
+  void WriteControlsClass_() {
     Controls all;
-    Flatten(object.layout, all);
-    Flatten(object.actions, all);
+    Flatten(object_.layout, all);
+    Flatten(object_.actions, all);
+
+    out_ += "namespace " + space_ + " {\n\n";
+    out_ += "template <typename Field_Kind, typename Action_Kind, template <typename> class "
+            "Part_Kind>\n"
+            "class " +
+            controlsClass_ + " {\npublic:\n";
+    std::set<std::string> taken{"OpenNew", "OpenEdit", "OpenView", "Close", "First", "Next", "New"};
+    named_ = ControlIdentifiers(object_, objects_);
+    std::vector<std::string> bound;
+    WriteControls(out_, all.fields, "Field_Kind", named_, taken, &bound);
+    if (!all.fields.empty() && !all.actions.empty()) { out_ += "\n"; }
+    WriteControls(out_, all.actions, "Action_Kind", named_, taken, &bound);
+    std::vector<std::pair<std::string, std::string>> boundParts;
+    WriteParts(out_, all.parts, objects_, named_, taken, &boundParts);
+    for (const auto &[field, identifier] : named_) {
+      if (!taken.insert(identifier).second) { continue; }
+      out_ += "  Field_Kind " + identifier + "{" + Literal(field) + "};\n";
+      bound.push_back(identifier);
+    }
+    WriteRequestFilters_(taken);
+    out_ += "\n  template <typename Core> void BindControls(Core &core) {\n";
+    for (const std::string &identifier : bound) { out_ += "    " + identifier + ".Bind(core);\n"; }
+    for (const auto &[identifier, name] : boundParts) {
+      out_ += "    " + identifier + ".BindPart(core, " + Literal(name) + ");\n";
+    }
+    if (bound.empty() && boundParts.empty()) { out_ += "    static_cast<void>(core);\n"; }
+    out_ += "  }\n";
+    out_ += "};\n\n";
+  }
+
+  void UnhideBaseMethods_() {
+    const std::string base = object_.xmlport ? "XmlPort<" : object_.report ? "Report<" : "Page<";
+    const std::string header = object_.xmlport  ? "XmlPort.h"
+                               : object_.report ? "Report.h"
+                                                : "Page.h";
+    std::set<std::string> unhidden;
+    for (const al::ProcedureDecl &procedure : object_.procedures) {
+      const std::string method = Identifier(procedure.name);
+      if (!DeclaredByBase(header, method) || !unhidden.insert(method).second) { continue; }
+      out_ += "  using ";
+      out_ += base;
+      out_ += pageClass_;
+      out_ += ">::";
+      out_ += method;
+      out_ += ";\n";
+    }
+    if (!unhidden.empty()) { out_ += "\n"; }
+  }
+
+  void WriteSourceRecord_() {
+    const std::string table = SourceTable(object_, objects_);
+    if (!table.empty()) {
+      const al::Property *temporary = al::Find(object_.properties, "SourceTableTemporary");
+      const bool held = temporary != nullptr && !temporary->value.empty() &&
+                        LowerKey(temporary->value.front().text) == "true";
+      out_ += "  ";
+      out_ += held && !table.starts_with("absent::") ? "Temporary<" + table + ">" : table;
+      out_ += " Rec;\n\n";
+    }
+  }
+
+  void WritePartInstances_() {
+    Controls all;
+    Flatten(object_.layout, all);
+    Flatten(object_.actions, all);
     std::set<std::string> written;
     std::string instances;
     for (const al::PageControl *control : all.parts) {
-      const std::string member = ControlIdentifier(named, control->name);
+      const std::string member = ControlIdentifier(named_, control->name);
       if (member.empty() || !written.insert(member).second) { continue; }
-      const auto found = objects.pages.find(LowerKey(PartSource(*control)));
+      const auto found = objects_.pages.find(LowerKey(PartSource(*control)));
       const std::string sub =
-          found == objects.pages.end() ? std::string{"::agiru::Page<>"} : found->second.identifier;
-      out += "  ::agiru::PartRef<";
-      out += sub;
-      out += "> ";
-      out += member;
-      out += ";\n";
+          found == objects_.pages.end() ? std::string{"::agiru::Page<>"} : found->second.identifier;
+      out_ += "  ::agiru::PartRef<";
+      out_ += sub;
+      out_ += "> ";
+      out_ += member;
+      out_ += ";\n";
       instances +=
           "    if (name == " + Literal(control->name) + ") { return &" + member + ".Held(); }\n";
     }
-    if (!written.empty()) { out += "\n"; }
+    if (!written.empty()) { out_ += "\n"; }
     if (!instances.empty()) {
-      out += "  void *PartInstance(std::string_view name) {\n" + instances +
-             "    return nullptr;\n  }\n\n";
+      out_ += "  void *PartInstance(std::string_view name) {\n" + instances +
+              "    return nullptr;\n  }\n\n";
     }
   }
 
-  for (const al::PageControl *control : sourceControls.fields) {
-    if (!IsUserControl(*control)) { continue; }
-    const std::string sourceType = PartSource(*control);
-    const std::string member = ControlIdentifier(named, control->name);
-    if (sourceType.empty() || member.empty()) { continue; }
-    out += "  absent::" + Identifier(sourceType) + " " + member + ";\n";
+  void WriteClassDeclaration_() {
+    out_ += "class " + pageClass_ + ";\n\n";
+    out_ += "class " + pageClass_ + " : public " +
+            (object_.xmlport  ? "XmlPort<"
+             : object_.report ? "Report<"
+                              : "Page<") +
+            pageClass_ + "> {\npublic:\n";
+    if (!object_.report && !object_.xmlport) { out_ += "  " + pageClass_ + "() = default;\n\n"; }
+    UnhideBaseMethods_();
+    out_ += "  static constexpr PageId kId{" + std::to_string(object_.id) + "};\n";
+    out_ += "  static constexpr std::string_view kName{" + Literal(object_.name) + "};\n\n";
+
+    WriteSourceRecord_();
+    WritePartInstances_();
   }
-  if (hasUserControl) { out += "\n"; }
 
-  const std::set<std::string> shadowed =
-      Shadowing(object.variables, object.procedures, object.labels);
-  const std::string members = MemberDeclarations(
-      object.name, VariablesAside(object), object.labels, object.procedures, objects);
-  if (!members.empty()) { out += members + "\n"; }
-
-  std::string triggers;
-  ControlTriggerDeclarations(triggers, object.layout, named, object, objects);
-  ControlTriggerDeclarations(triggers, object.actions, named, object, objects);
-  if (object.report) {
-    if (const al::Property *use = al::Find(object.properties, "UseRequestPage");
-        use != nullptr && LowerKey(use->text) == "false") {
-      triggers += "  static constexpr bool kUseRequestPage = false;\n";
+  void WriteTriggerDeclarations_() {
+    std::string triggers;
+    ControlTriggerDeclarations(triggers, object_.layout, named_, object_, objects_);
+    ControlTriggerDeclarations(triggers, object_.actions, named_, object_, objects_);
+    if (object_.report) {
+      if (const al::Property *use = al::Find(object_.properties, "UseRequestPage");
+          use != nullptr && LowerKey(use->text) == "false") {
+        triggers += "  static constexpr bool kUseRequestPage = false;\n";
+      }
+      const std::map<std::string, std::string> items = WithDataItems(named_, object_);
+      ControlTriggerDeclarations(triggers, object_.dataset, items, object_, objects_);
+      triggers += "  void Walk_();\n";
+      triggers += "  bool AdoptView_(const ::agiru::TableDef *table, const void *record);\n";
+      for (const al::PageControl *item : dataItems_) {
+        triggers += "  bool Walk_" + ControlIdentifier(items, item->name) + "_();\n";
+      }
     }
-    const std::map<std::string, std::string> items = WithDataItems(named, object);
-    ControlTriggerDeclarations(triggers, object.dataset, items, object, objects);
-    triggers += "  void Walk_();\n";
-    triggers += "  bool AdoptView_(const ::agiru::TableDef *table, const void *record);\n";
-    for (const al::PageControl *item : dataItems) {
-      triggers += "  bool Walk_" + ControlIdentifier(items, item->name) + "_();\n";
+    if (object_.xmlport) {
+      const std::map<std::string, std::string> items = WithElements(named_, object_);
+      ControlTriggerDeclarations(triggers, object_.dataset, items, object_, objects_);
+      triggers += "  void Export_();\n";
+      triggers += "  void Import_();\n";
+      triggers += "  bool AdoptView_(const ::agiru::TableDef *table, const void *record);\n";
+    }
+    if (!triggers.empty()) { out_ += "\n" + triggers; }
+  }
+
+  void WriteProcedures_(const std::set<std::string> &shadowed) {
+    std::string publics;
+    std::string locals;
+    for (const al::ProcedureDecl &procedure : object_.procedures) {
+      (procedure.isLocal ? locals : publics) +=
+          ProcedureDeclaration(procedure, objects_, object_.name, shadowed, object_.procedures);
+    }
+    if (!publics.empty()) { out_ += "\n" + publics; }
+    if (!std::ranges::any_of(object_.procedures, [](const al::ProcedureDecl &procedure) {
+          return Identifier(procedure.name) == "ClearAll";
+        })) {
+      out_ += "\n  void ClearAll();\n";
+    }
+    if (!locals.empty()) { out_ += "\nprivate:\n" + locals; }
+  }
+
+  void WriteInstanceMembers_() {
+    for (const al::PageControl *control : sourceControls_.fields) {
+      if (!IsUserControl(*control)) { continue; }
+      const std::string sourceType = PartSource(*control);
+      const std::string member = ControlIdentifier(named_, control->name);
+      if (sourceType.empty() || member.empty()) { continue; }
+      out_ += "  absent::" + Identifier(sourceType) + " " + member + ";\n";
+    }
+    if (hasUserControl_) { out_ += "\n"; }
+
+    const std::set<std::string> shadowed =
+        Shadowing(object_.variables, object_.procedures, object_.labels);
+    const std::string members = MemberDeclarations(
+        object_.name, VariablesAside(object_), object_.labels, object_.procedures, objects_);
+    if (!members.empty()) { out_ += members + "\n"; }
+
+    WriteTriggerDeclarations_();
+    WriteProcedures_(shadowed);
+  }
+
+  void WriteTraits_() {
+    const std::string &identifier = identifier_;
+    out_ += "};\n\n";
+    out_ += "extern const PageDef k" + identifier +
+            (object_.xmlport  ? "XmlPortPage;\n"
+             : object_.report ? "ReportPage;\n"
+                              : "Page;\n");
+    if (object_.xmlport) { out_ += "extern const XmlPortDef k" + identifier + "XmlPort;\n"; }
+    out_ += ReportLayoutsDeclaration(object_);
+    out_ += "\n";
+    out_ += "} // namespace " + space_ + "\n\n";
+    out_ += "template <> struct agiru::PageTraits<" + space_ + "::" + pageClass_ + "> {\n";
+    out_ += "  static constexpr PageId kId{" + std::to_string(object_.id) + "};\n";
+    out_ += "  static constexpr std::string_view kName{" + Literal(object_.name) + "};\n";
+    out_ += "  static constexpr const PageDef &kPage = " + space_ + "::k" + identifier +
+            (object_.xmlport  ? "XmlPortPage;\n"
+             : object_.report ? "ReportPage;\n"
+                              : "Page;\n");
+    out_ += "  template <typename Field_Kind, typename Action_Kind, template <typename> class "
+            "Part_Kind>\n"
+            "  using Controls = " +
+            space_ + "::" + controlsClass_ + "<Field_Kind, Action_Kind, Part_Kind>;\n";
+    out_ += TriggerTable(object_, named_, space_ + "::" + pageClass_, objects_);
+    out_ += "};\n";
+    if (object_.report) {
+      out_ += "\ntemplate <> struct agiru::ReportTraits<" + space_ + "::" + pageClass_ + "> {\n";
+      out_ += "  static constexpr ReportId kId{" + std::to_string(object_.id) + "};\n";
+      out_ += "  static constexpr std::string_view kName{" + Literal(object_.name) + "};\n";
+      out_ += ReportLayoutsTrait(object_);
+      out_ += "};\n";
+    }
+    if (object_.xmlport) {
+      out_ += "\ntemplate <> struct agiru::XmlPortTraits<" + space_ + "::" + pageClass_ + "> {\n";
+      out_ += "  static constexpr XmlPortId kId{" + std::to_string(object_.id) + "};\n";
+      out_ += "  static constexpr std::string_view kName{" + Literal(object_.name) + "};\n";
+      out_ += "  static constexpr const XmlPortDef &kPort = " + space_ + "::k" + identifier +
+              "XmlPort;\n";
+      out_ += "};\n";
     }
   }
-  if (object.xmlport) {
-    const std::map<std::string, std::string> items = WithElements(named, object);
-    ControlTriggerDeclarations(triggers, object.dataset, items, object, objects);
-    triggers += "  void Export_();\n";
-    triggers += "  void Import_();\n";
-    triggers += "  bool AdoptView_(const ::agiru::TableDef *table, const void *record);\n";
-  }
-  if (!triggers.empty()) { out += "\n" + triggers; }
 
-  std::string publics;
-  std::string locals;
-  for (const al::ProcedureDecl &procedure : object.procedures) {
-    (procedure.isLocal ? locals : publics) +=
-        ProcedureDeclaration(procedure, objects, object.name, shadowed, object.procedures);
+  PageHeader BoundHeader_() const {
+    DotNetUse dotnet;
+    DotNetUse absent;
+    std::vector<al::VarDecl> withRec = object_.variables;
+    if (SourceTable(object_, objects_).starts_with("absent::")) {
+      al::VarDecl rec;
+      rec.name = "Rec";
+      rec.type = "Record";
+      rec.subtype = SourceTableNameOf(object_);
+      withRec.push_back(std::move(rec));
+    }
+    GatherAbsentIn(withRec, bodies_, objects_, dotnet, absent);
+    for (const al::PageControl *control : sourceControls_.fields) {
+      if (!IsUserControl(*control)) { continue; }
+      const std::string sourceType = PartSource(*control);
+      if (!sourceType.empty()) { absent[Identifier(sourceType)]; }
+    }
+    return PageHeader{
+        .text = WithRuntimeIncludes(out_, PageKind(object_)), .dotnet = dotnet, .absent = absent};
   }
-  if (!publics.empty()) { out += "\n" + publics; }
-  if (!std::ranges::any_of(object.procedures, [](const al::ProcedureDecl &procedure) {
-        return Identifier(procedure.name) == "ClearAll";
-      })) {
-    out += "\n  void ClearAll();\n";
-  }
-  if (!locals.empty()) { out += "\nprivate:\n" + locals; }
 
-  out += "};\n\n";
-  out += "extern const PageDef k" + identifier +
-         (object.xmlport  ? "XmlPortPage;\n"
-          : object.report ? "ReportPage;\n"
-                          : "Page;\n");
-  if (object.xmlport) { out += "extern const XmlPortDef k" + identifier + "XmlPort;\n"; }
-  out += ReportLayoutsDeclaration(object);
-  out += "\n";
-  out += "} // namespace " + space + "\n\n";
-  out += "template <> struct agiru::PageTraits<" + space + "::" + pageClass + "> {\n";
-  out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
-  out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
-  out += "  static constexpr const PageDef &kPage = " + space + "::k" + identifier +
-         (object.xmlport  ? "XmlPortPage;\n"
-          : object.report ? "ReportPage;\n"
-                          : "Page;\n");
-  out += "  template <typename Field_Kind, typename Action_Kind, template <typename> class "
-         "Part_Kind>\n"
-         "  using Controls = " +
-         space + "::" + controlsClass + "<Field_Kind, Action_Kind, Part_Kind>;\n";
-  out += TriggerTable(object, named, space + "::" + pageClass, objects);
-  out += "};\n";
-  if (object.report) {
-    out += "\ntemplate <> struct agiru::ReportTraits<" + space + "::" + pageClass + "> {\n";
-    out += "  static constexpr ReportId kId{" + std::to_string(object.id) + "};\n";
-    out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
-    out += ReportLayoutsTrait(object);
-    out += "};\n";
-  }
-  if (object.xmlport) {
-    out += "\ntemplate <> struct agiru::XmlPortTraits<" + space + "::" + pageClass + "> {\n";
-    out += "  static constexpr XmlPortId kId{" + std::to_string(object.id) + "};\n";
-    out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
-    out +=
-        "  static constexpr const XmlPortDef &kPort = " + space + "::k" + identifier + "XmlPort;\n";
-    out += "};\n";
-  }
-  DotNetUse dotnet;
-  DotNetUse absent;
-  std::vector<al::VarDecl> withRec = object.variables;
-  if (SourceTable(object, objects).starts_with("absent::")) {
-    al::VarDecl rec;
-    rec.name = "Rec";
-    rec.type = "Record";
-    rec.subtype = SourceTableNameOf(object);
-    withRec.push_back(std::move(rec));
-  }
-  GatherAbsentIn(withRec, bodies, objects, dotnet, absent);
-  for (const al::PageControl *control : sourceControls.fields) {
-    if (!IsUserControl(*control)) { continue; }
-    const std::string sourceType = PartSource(*control);
-    if (!sourceType.empty()) { absent[Identifier(sourceType)]; }
-  }
-  return PageHeader{
-      .text = WithRuntimeIncludes(out, PageKind(object)), .dotnet = dotnet, .absent = absent};
+  const al::PageObject &object_;
+  const Objects &objects_;
+  std::string identifier_;
+  std::vector<al::ProcedureDecl> bodies_;
+  std::string pageClass_;
+  std::string controlsClass_;
+  std::vector<const al::PageControl *> dataItems_;
+  std::string space_;
+  std::string out_;
+  Controls sourceControls_;
+  bool hasUserControl_ = false;
+  std::map<std::string, std::string> named_;
+};
+
+}
+
+PageHeader
+WritePage(const al::PageObject &object, const std::string &source, const Objects &objects) {
+  return PageHeaderWriter(object, objects).Write(source);
 }
 
 }

@@ -247,6 +247,80 @@ void NativePageSourcesDoNotNeedCopiedDeclarations() {
   CHECK_TRUE("a bound source without a valid ID is not emitted as source zero", refused);
 }
 
+void ControlPropertiesKeepTheirOrderedTypedDeclarations() {
+  const auto page = agiru::al::ParsePage(R"(page 50109 "Property Host"
+{
+    SourceTable = "Property Row";
+    CardPageId = "Target Page";
+    layout
+    {
+        area(content)
+        {
+            field(Value; Rec.Value)
+            {
+                Caption = 'Value caption';
+                ToolTip = 'Value help';
+                Visible = ShowValue;
+                ShowCaption = false;
+                Width = 12;
+                LookupPageId = "Target Page";
+                DrillDownPageId = 50110;
+                ColumnSpan = 2;
+                RowSpan = 3;
+                ClosingDates = true;
+                DecimalPlaces = 0:2;
+                BlankZero = true;
+            }
+            field(InvalidWidth; Rec.Value)
+            {
+                Width = Wide;
+                ColumnSpan = 0;
+                LookupPageId = "Missing Page";
+            }
+            part(Child; "Target Page") { }
+        }
+    }
+})");
+  const auto table = agiru::al::ParseTable(R"(table 50111 "Property Row"
+{
+    fields { field(1; Value; Integer) { } }
+    keys { key(PK; Value) { } }
+})");
+  constexpr int kTargetPage = 50110;
+  agiru::gen::Objects objects;
+  objects.pages["target page"].id = kTargetPage;
+  const auto definition = agiru::gen::PageDefinition(page, objects, &table);
+  CHECK_TRUE("a source expression remains bound to its declared field number",
+             definition.contains(".field = ::agiru::FieldNo{1}"));
+  CHECK_TRUE("an expression remains text rather than a guessed Boolean",
+             definition.contains(".visible = \"ShowValue\""));
+  CHECK_TRUE("an explicit nondefault flag remains present",
+             definition.contains(".showCaption = false"));
+  CHECK_TRUE("a positive numeric width remains typed", definition.contains(".width = 12"));
+  CHECK_TRUE("a named lookup resolves its declared page identity",
+             definition.contains(".lookupPageId = ::agiru::PageId{50110}"));
+  CHECK_TRUE("a numeric drilldown keeps its original identity",
+             definition.contains(".drillDownPageId = ::agiru::PageId{50110}"));
+  CHECK_TRUE("a named card page uses the same declared identity",
+             definition.contains(".cardPageId = ::agiru::PageId{50110}"));
+  CHECK_TRUE("a part keeps its page identity",
+             definition.contains(".page = ::agiru::PageId{50110}"));
+  CHECK_TRUE("positive spans remain numeric",
+             definition.contains(".columnSpan = 2") && definition.contains(".rowSpan = 3"));
+  CHECK_TRUE("invalid widths and zero spans are not emitted",
+             !definition.contains(".width = Wide") && !definition.contains(".columnSpan = 0"));
+  CHECK_TRUE("unresolved lookups do not acquire invented identities",
+             !definition.contains(".lookupPageId = ::agiru::PageId{0}"));
+  CHECK_TRUE("appearance precedes navigation in designated member order",
+             definition.find(".toolTip =") < definition.find(".lookupPageId ="));
+  CHECK_TRUE("navigation precedes span and formatting declarations",
+             definition.find(".lookupPageId =") < definition.find(".columnSpan =") &&
+                 definition.find(".rowSpan =") < definition.find(".closingDates ="));
+  CHECK_TRUE("formatting retains exact decimal-place text and its final flag",
+             definition.contains(".decimalPlaces = \"0 : 2\"") &&
+                 definition.contains(".blankZero = true"));
+}
+
 }
 
 int main() {
@@ -257,5 +331,6 @@ int main() {
     PageDeclarationsRetainSourceIdentity();
     MultipleNewLinesHasNoGuessedValues();
     NativePageSourcesDoNotNeedCopiedDeclarations();
+    ControlPropertiesKeepTheirOrderedTypedDeclarations();
   });
 }
