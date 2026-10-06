@@ -69,12 +69,17 @@ void EveryOriginalPhaseKeepsItsOwnIdentityAndAuthority() {
                std::string_view(context.TestCaseName()),
                dataCase ? "first" : "");
     CHECK_TRUE("before phases cannot claim success", context.Success() == after);
-    const agiru::TestHandlerContext copied(context);
+    agiru::TestHandlerContext copied(context);
     copied.Skip("owned reason");
     CHECK_TRUE("only permitted before phases change skip state", scope.Skipped() == canSkip);
     CHECK_TEXT("AL value copies share the live skip reason",
                scope.SkipReason(),
                canSkip ? "owned reason" : "");
+    copied = {};
+    CHECK_TRUE("rebinding a copied context leaves the original identity intact",
+               context.CodeunitId() == kTest.Value());
+    CHECK_TRUE("a rebound empty context cannot invent its old identity",
+               Refuses([&] { static_cast<void>(copied.CodeunitId()); }));
   }
 }
 
@@ -135,12 +140,11 @@ void InvalidAndUnboundContextsRefuseInsteadOfInventingMetadata() {
                    {.codeunit = kTest, .qualifiedName = kName, .procedure = "Run"},
                    TestContextPhase::BeforeCodeunit);
              }));
-  CHECK_TRUE(
-      "invalid phases never acquire authority", Refuses([] {
-        const TestContextScope invalid(
-            {.codeunit = kTest, .qualifiedName = kName, .procedure = "Run"},
-            static_cast<TestContextPhase>(std::to_underlying(TestContextPhase::AfterCase) + 1));
-      }));
+  CHECK_TRUE("invalid phases never acquire authority", Refuses([] {
+               const TestContextScope invalid(
+                   {.codeunit = kTest, .qualifiedName = kName, .procedure = "Run"},
+                   TestContextPhase::Invalid);
+             }));
 }
 
 }

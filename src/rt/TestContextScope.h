@@ -14,7 +14,8 @@ enum class TestContextPhase {
   BeforeProcedure,
   AfterProcedure,
   BeforeCase,
-  AfterCase
+  AfterCase,
+  Invalid
 };
 
 struct TestContextIdentity {

@@ -38,6 +38,7 @@ bool isAfter(TestContextPhase phase) {
     case TestContextPhase::AfterCodeunit:
     case TestContextPhase::AfterProcedure:
     case TestContextPhase::AfterCase: return true;
+    case TestContextPhase::Invalid: break;
   }
   throw Error("Invalid TestHandlerContext phase");
 }
