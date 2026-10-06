@@ -43,7 +43,8 @@ const std::set<std::string> &BaseMembers() {
       if (entry.path().extension() == ".h") { whole += TextOf(entry.path()); }
     }
     std::set<std::string> found;
-    static const std::regex declared(R"([\w>&*:\s]\s([A-Z][A-Za-z0-9]*)\s*\()");
+    static const std::regex declared(
+        R"([\w>&*:\s]\s(?:::)?(?:[A-Za-z_][A-Za-z0-9_]*::)*([A-Z][A-Za-z0-9]*)\s*\()");
     for (std::sregex_iterator at(whole.begin(), whole.end(), declared), end; at != end; ++at) {
       found.insert((*at)[1].str());
     }

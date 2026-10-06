@@ -336,35 +336,13 @@ public:
   /// \throws ReportQuit always.
   [[noreturn]] void Quit() const { throw ReportQuit{}; }
 
-  /// \brief `Report.UseRequestPage`, which AL calls as a method (`UseRequestPage(false)`,
-  ///        `if UseRequestPage then`) AND assigns as a property (`UseRequestPage := false`, 69
-  ///        BaseApp sites) -- so it is one member that answers both spellings.
-  class RequestPageSwitch {
-  public:
-    /// \brief Starts as the report declares. \param on The `UseRequestPage` property's value.
-    explicit RequestPageSwitch(bool on) : on_(on) {}
+  /// \brief Reads the owned request-page flag; AL property reads bind to this getter.
+  /// \return Whether Run presents the request page.
+  [[nodiscard]] Boolean UseRequestPage() const { return useRequestPage_; }
 
-    /// \brief `UseRequestPage()`. \return Whether `Run` shows the request page.
-    [[nodiscard]] Boolean operator()() const { return on_; }
-
-    /// \brief `UseRequestPage(Boolean)`. \param on Whether `Run` shows the request page.
-    void operator()(Boolean on) { on_ = on; }
-
-    /// \brief `UseRequestPage := Boolean`. \param on The value. \return This.
-    RequestPageSwitch &operator=(Boolean on) {
-      on_ = on;
-      return *this;
-    }
-
-    /// \brief `if UseRequestPage then`. \return The value.
-    operator Boolean() const { return on_; } // NOLINT(*-explicit-constructor)
-
-  private:
-    bool on_;
-  };
-
-  /// \brief Whether `Run` shows the request page; the `UseRequestPage` property's value first.
-  RequestPageSwitch UseRequestPage{DefaultsToRequestPage_()};
+  /// \brief Sets the owned request-page flag; AL property writes bind to this setter.
+  /// \param on Whether Run presents the request page.
+  void UseRequestPage(Boolean on) { useRequestPage_ = on; }
 
   /// \brief `Report.SetTableView(Record)`: the record's filters and sort order become the view of
   ///        the dataitem on that table (`reportinstance-settableview-method.md`).
@@ -736,6 +714,7 @@ private:
     }
   }
 
+  bool useRequestPage_ = DefaultsToRequestPage_();
   std::string datasetFile_;
   std::string parametersFile_;
   ReportDataset dataset_;
@@ -777,10 +756,9 @@ public:
                   Boolean RequestWindow = true,
                   Boolean SystemPrinter = {},
                   const Arguments &...arguments) {
-    static_cast<void>(SystemPrinter);
-    ReportRequest request{.modal = false, .requestPage = RequestWindow};
-    (detail::TakeReportArgument(request, arguments), ...);
-    detail::RunReportByNumber("Run", Number, request);
+    RunSelected("Run",
+                {.number = Number, .requestWindow = RequestWindow, .systemPrinter = SystemPrinter},
+                arguments...);
   }
 
   /// \brief `Report.RunModal(Number [, RequestWindow] [, SystemPrinter] [, var Record])`.
@@ -791,10 +769,9 @@ public:
                        Boolean RequestWindow = true,
                        Boolean SystemPrinter = {},
                        const Arguments &...arguments) {
-    static_cast<void>(SystemPrinter);
-    ReportRequest request{.modal = true, .requestPage = RequestWindow};
-    (detail::TakeReportArgument(request, arguments), ...);
-    detail::RunReportByNumber("RunModal", Number, request);
+    RunSelected("RunModal",
+                {.number = Number, .requestWindow = RequestWindow, .systemPrinter = SystemPrinter},
+                arguments...);
   }
 
   /// \brief `Report.Execute(Number, Parameters [, RecordRef])`: the walk without a request page.
@@ -984,6 +961,22 @@ public:
   }
 
 private:
+  struct RunSelection {
+    Integer number;
+    Boolean requestWindow;
+    Boolean systemPrinter;
+  };
+
+  template <typename... Arguments>
+  static void RunSelected(std::string_view method,
+                          const RunSelection &selection,
+                          const Arguments &...arguments) {
+    static_cast<void>(selection.systemPrinter);
+    ReportRequest request{.modal = method == "RunModal", .requestPage = selection.requestWindow};
+    (detail::TakeReportArgument(request, arguments), ...);
+    detail::RunReportByNumber(method, selection.number, request);
+  }
+
   static constexpr std::int32_t kEnglish = 1033; ///< [SET] the LCID of en-US.
 };
 

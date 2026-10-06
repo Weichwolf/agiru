@@ -206,6 +206,47 @@ void ARunByUnknownNumberRefusesWithTheNumber() {
   }());
 }
 
+void StaticRunModesRetainRequestFlagsAndRecordBinding() {
+  constexpr agiru::ReportId kRunFixture{950002};
+  constexpr agiru::ReportId kModalFixture{950003};
+  static constexpr std::array entries{
+      agiru::ReportEntry{
+          .id = kRunFixture,
+          .name = "Run flag fixture",
+          .run =
+              [](const agiru::ReportRequest &request) {
+                CHECK_TRUE("Run retains nonmodal execution", !request.modal);
+                CHECK_TRUE("Run retains the disabled request window", !request.requestPage);
+                CHECK_TRUE("Run retains the exact record and declaration",
+                           request.record != nullptr && request.table == &kLinkedTable);
+                if (request.record != nullptr) {
+                  CHECK_TEXT("Run retains record field values",
+                             std::string_view(static_cast<const Linked *>(request.record)->Code),
+                             "RUN");
+                }
+              }},
+      agiru::ReportEntry{
+          .id = kModalFixture,
+          .name = "Modal flag fixture",
+          .run = [](const agiru::ReportRequest &request) {
+            CHECK_TRUE("RunModal retains modal execution", request.modal);
+            CHECK_TRUE("RunModal retains the enabled request window", request.requestPage);
+            CHECK_TRUE("RunModal retains the exact record and declaration",
+                       request.record != nullptr && request.table == &kLinkedTable);
+            if (request.record != nullptr) {
+              CHECK_TEXT("RunModal retains record field values",
+                         std::string_view(static_cast<const Linked *>(request.record)->Code),
+                         "MODAL");
+            }
+          }}};
+  for (const agiru::ReportEntry &entry : entries) { agiru::RegisterReportEntry(&entry); }
+  Linked row;
+  row.Code = "RUN";
+  agiru::Report<>::Run(kRunFixture.Value(), false, true, row);
+  row.Code = "MODAL";
+  agiru::Report<>::RunModal(kModalFixture.Value(), true, false, row);
+}
+
 /// The parameters XML a request page answers with names the report and carries empty options and
 /// dataitems, which is what an unchanged request page yields.
 void TheParametersXmlNamesTheReport() {
@@ -223,6 +264,7 @@ int main() {
   return gate::Run("Report", [] {
     TheDatasetWritesRowsAndASchema();
     OrdinalColumnsKeepDisplayTextWithoutChangingXmlScalars();
+    StaticRunModesRetainRequestFlagsAndRecordBinding();
     ARunByUnknownNumberRefusesWithTheNumber();
     TheParametersXmlNamesTheReport();
     AFlowFilterLinkCopiesTheFilterAndAValueLinkTheValue();

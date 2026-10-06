@@ -361,6 +361,15 @@ void TestHandlesRebindTheirGeneratedControls() {
 void RequestPageAdaptersRetainFieldsAndFilters() {
   using Report = agiru::Fixture::NavigationReport_Report;
   Report report;
+  CHECK_TRUE("request page defaults to enabled", report.RequestPageEnabled());
+  report.SetRequestPageEnabled(false);
+  CHECK_TRUE("AL property setter and native getter share the flag", !report.UseRequestPage());
+  Report copy = report;
+  copy.SetRequestPageEnabled(true);
+  CHECK_TRUE("copied request flag has independent ownership", !report.RequestPageEnabled());
+  CHECK_TRUE("copied request flag is enabled", copy.UseRequestPage());
+  report.UseRequestPage(true);
+  CHECK_TRUE("native setter and AL property getter share the flag", report.RequestPageEnabled());
   Row view;
   view.SetRange(view.ID, 3);
   report.SetTableView(view);

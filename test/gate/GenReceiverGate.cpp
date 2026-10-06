@@ -129,6 +129,13 @@ void ConversionResultNamesItsArrayDependency() {
              !unrelated.contains("#include \"dotnet/Regex.h\""));
 }
 
+void QualifiedConversionNamesRemainHiddenByRuntimeMembers() {
+  CHECK_TRUE("namespace-qualified Boolean conversion still hides the AL type name",
+             agiru::gen::HiddenByABaseMember("Boolean"));
+  CHECK_TRUE("an unrelated name does not gain qualification",
+             !agiru::gen::HiddenByABaseMember("NoRuntimeMemberFixture"));
+}
+
 }
 
 int main() {
@@ -137,5 +144,6 @@ int main() {
     DeclarationsTakePrecedenceOverGetterNames();
     HeadersAreNotInsertedTwice();
     ConversionResultNamesItsArrayDependency();
+    QualifiedConversionNamesRemainHiddenByRuntimeMembers();
   });
 }

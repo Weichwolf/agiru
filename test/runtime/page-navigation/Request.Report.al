@@ -23,4 +23,14 @@ report 50340 "Navigation Report"
     }
     var
         Limit: Integer;
+
+    procedure SetRequestPageEnabled(Enabled: Boolean)
+    begin
+        CurrReport.UseRequestPage := Enabled;
+    end;
+
+    procedure RequestPageEnabled(): Boolean
+    begin
+        exit(CurrReport.UseRequestPage);
+    end;
 }
