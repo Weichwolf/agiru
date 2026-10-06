@@ -31,11 +31,11 @@ client: ## build the external Node agent CMD/MCP client from locked dependencies
 client-test: client ## qualify CMD/MCP transports against a declared HTML/HTTP fixture, not ERP parity
 	@bash "$(SELF)/test/ui/agent-client.sh"
 
-http-test: client ## qualify external CMD/MCP over nginx/private C++ HTTP and PostgreSQL, not ERP parity
+http-test: comments client ## qualify external CMD/MCP over nginx/private C++ HTTP and PostgreSQL, not ERP parity
 	@bash "$(SELF)/test/ui/http-server.sh"
 
 session-identity: comments db ## qualify SQL identity, persistent command leases and compiled refusal controls
-	@cmake --build "$(B)" -j "$(JOBS)" --target gate_SessionIdentityGate gate_SessionCommandGate
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_SessionIdentityGate gate_SessionCommandGate gate_ClientCredentialsGate
 	@B="$(B)" bash "$(SELF)/test/runtime/session-identity.sh"
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is

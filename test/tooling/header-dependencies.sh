@@ -155,6 +155,20 @@ if reject_dependency "$proof/forced-Session.h.d" Session.h \
   printf 'header-dependencies: ambient session state escaped the command boundary\n' >&2
   exit 1
 fi
+compile_header runtime/SecureToken.h "$proof/SecureToken.h.d"
+compile_header runtime/ClientCredentials.h "$proof/ClientCredentials.h.d"
+for header in SecureToken.h ClientCredentials.h; do
+  for forbidden in evp.h rand.h Table.h Session.h Database.h HttpServer.h mutex; do
+    reject_dependency "$proof/$header.d" "$forbidden"
+  done
+done
+reject_dependency "$proof/SecureToken.h.d" vector
+compile_header runtime/SecureToken.h "$proof/forced-token-crypto.h.d" -include openssl/rand.h
+if reject_dependency "$proof/forced-token-crypto.h.d" rand.h \
+  > "$proof/forced-token-crypto.h.log" 2>&1; then
+  printf 'header-dependencies: private token crypto escaped its public boundary\n' >&2
+  exit 1
+fi
 compile_header runtime/SingleInstance.h "$proof/SingleInstance.h.d"
 for forbidden in Codeunit.h Table.h Record.h vector memory mutex; do
   reject_dependency "$proof/SingleInstance.h.d" "$forbidden"
@@ -185,4 +199,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: nineteen standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session controls refused\n'
+printf 'header-dependencies: twenty-one standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential controls refused\n'

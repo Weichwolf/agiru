@@ -31,7 +31,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   transport records, static assets, forged headers, ambiguous framing, error/limit
   refusals, body release and bounded admission while workers block.
   `HttpServerGate`: eleven checks; existing `PageHtmlGate`: 157, zero red.
-  Nineteen standalone-header/forced-dependency controls pass; HTTP source and gate
+  Twenty-one standalone-header/forced-dependency controls pass; HTTP source and gate
   targeted tidy pass without new suppressions. Public transport header has no native
   backend/DB/session/thread includes; measured frontend cost is 764.9 ms over three
   no-PCH rounds, not a build-performance improvement or generated-app requirement.
@@ -40,8 +40,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   the typed GUID/name from PostgreSQL's system User table and refuses blank/missing,
   unnamed, disabled/unknown-state or expired users, without a license gate. The host
   must authenticate first; this constructor does not verify credentials or permissions.
-  `make session-identity`: 75 identity and 49 command checks; seven compiled
-  status/GUID/name/rollback/commit/epoch/cursor-owner defects reject;
+  `make session-identity`: 75 identity, 49 command and 32 native credential checks;
+  twelve compiled identity/command/credential/provider defects reject;
   independent SQL verifies committed creator/modifier ownership. Nested failures and
   worker reuse restore private identity/language; the SYSTEM/blank harness stays compatible.
   Detached `Session(Guid)` retains private AL state without a DB connection or worker;
@@ -52,7 +52,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Session/epoch-bound cursors cannot poison another user's reused connection. Closed
   connections and nested-scope cleanup preserve the original AL error; normal cleanup
   failure propagates instead of terminating the process. DSN constructors remain harness
-  adapters. Pool/admission/settings reset, credential verification, in-flight revocation,
+  adapters. Pool/admission/settings reset, operator provisioning, browser/password sign-in, in-flight revocation,
   company-close invalidation and page/table authorization remain pending.
   Eleven existing session/transaction/cursor gates retain 1,107 passing checks.
   Session/command/cursor/SingleInstance and new fixture targeted tidy pass. Connection
@@ -63,6 +63,29 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Unicode data is preserved; existing Code uppercasing is ASCII-only and remains a gap.
   Blocking-handler cancellation, durable command reconciliation and WASM transport
   remain unqualified. Preserve these limits in the next real page/SQL increment.
+
+- Native agent authentication: `ClientCredentials` stores random bearer verifiers in
+  PostgreSQL, bound by cascading foreign key to the original system User GUID; account
+  deletion removes credentials instead of blocking the core user lifecycle. Only SHA-256
+  verifiers reach SQL; expiry uses database time and revocation retains an audit row.
+  `SecureToken` uses the existing private system OpenSSL dependency, never UUID/MT
+  randomness or password-style fast hashing. Issuance is trusted-operator-only, not an
+  anonymous endpoint. Credential lookup must precede SessionCommand's account-state
+  check; neither grants page/table/company permission. Client handles/revisions and
+  durable reconciliation still need the production command host.
+  `make http-test` passes eleven transport and nine authentication cases through
+  actual nginx/private C++/PostgreSQL, with external CMD and official SDK MCP.
+  Independent SQL checks two identities, accepted-call receipts, disable/expiry/
+  revocation refusals and no idle DB connection; private fixture credentials are removed.
+  Entropy/digest provider failures refuse; compiled counterprobes bypassing expiry,
+  revocation, GUID ownership and crypto-failure guards fail their named checks.
+  This fixture authenticates static semantic HTML, not production page authorization,
+  AL saves/posting, browser login or complete ERP parity. Imported-seed/auth-schema
+  migration, TLS deployment and concurrent revocation fencing remain unqualified.
+  Public headers exclude SQL/session/page/native crypto implementations; ClientCredentials
+  still inherits Guid's existing StringValue/vector dependency. No suppression was widened.
+  Standalone three-round no-PCH frontend cost: credentials 1,230.8 ms, token 356.0 ms;
+  measured during qualification, not a build/runtime performance improvement.
 
 - Preserve agiru's generated `PageDef`/control tree, typed bindings, `PageCore`,
   TestPage lifecycle, validated record primitives and regression gates.
@@ -347,6 +370,16 @@ user `business-central/ui-how-users-permissions.md` (disable/revoke); predecesso
 1449/1792 retain typed-ID/sign-in findings, not its deferred-authentication policy.
 Revisions are those above. Implementation: `src/rt/Session.cpp`, `include/runtime/Session.h`;
 proof: `test/gate/{SessionIdentity,SessionCommand}Gate.cpp`, `test/runtime/session-identity.sh`.
+Native credentials: local developer `administration/users-credential-types.md` and
+`administration/authenticating-users-with-navuserpassword.md` distinguish authentication
+from Windows/cloud providers; agiru's agent credential is a native host contract, not
+BC password-blob compatibility. Original `Tenant Database Tables/User.Table.al` owns the
+foreign-key identity. Predecessor WI 1792's deferred authentication policy is not adopted.
+OpenSSL private randomness/provider checks: [RAND_priv_bytes](https://docs.openssl.org/3.0/man3/RAND_bytes/),
+[EVP_Digest](https://docs.openssl.org/3.0/man3/EVP_DigestInit/); local provider documentation
+was unavailable. Source/test paths: `include/runtime/{SecureToken,ClientCredentials}.h`,
+`src/net/SecureToken.cpp`, `src/rt/ClientCredentials.cpp`, `test/gate/ClientCredentialsGate.cpp`,
+`test/runtime/client-credentials/ProviderFailure.cpp`, `test/ui/client-authentication.mjs`.
 Persistent commands: developer `properties/devenv-singleinstance-property.md` and
 `methods-auto/database/database-commit-method.md`; user
 `business-central/ui-change-basic-settings.md`, at the revisions above. Predecessor

@@ -19,11 +19,18 @@ integration slice, not the AL test denominator.
 
 `make session-identity JOBS=2` qualifies host-supplied user GUIDs against the system
 User table, committed audit ownership and persistent AL state across exclusive
-per-command SQL leases. Seven compiled defects test identity, rollback, durable
-completion and cursor ownership/invalidation. Disposable databases also check idle
-contexts, worker reuse, revocation, deferred failures and broken-connection cleanup.
-This is not credential authentication, a connection pool or page/table authorization;
+per-command SQL leases. Twelve compiled defects test identity, rollback, durable
+completion, cursor ownership, credential expiry/revocation/ownership and crypto failure.
+Disposable databases also check idle contexts, worker reuse, revocation, deferred failures
+and broken-connection cleanup. Native agent bearer credentials store only verifiers;
+random/digest provider failures explicitly refuse. The provider fixture has a successful
+compile receipt before lint. This is not browser/password sign-in, a connection pool or page/table authorization;
 container qualifiers need `AGIRU_TEST_DSN` pointing at container-local PostgreSQL.
+
+`make http-test JOBS=2` runs transport and native credential tests through actual nginx,
+C++ and PostgreSQL in `agiru-dev`, with CMD/MCP outside. Authentication uses disposable
+users/databases/private auth files and independent SQL checks; these authored static HTML
+fixtures do not qualify production ERP pages, permission sets or posting parity.
 
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.
