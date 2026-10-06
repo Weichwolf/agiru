@@ -18,7 +18,7 @@
 
 namespace agiru::dotnet {
 
-class DataTable;
+class TabularData;
 
 namespace detail {
 /// \brief Whether two column names are one, the way .NET compares them: without regard to case.
@@ -28,19 +28,21 @@ namespace detail {
 
 /// \brief .NET `System.Data.DataColumn`: a name, a caption and a type. A REFERENCE, the way .NET
 ///        hands one out: `Columns.Item(0).Caption('x')` changes the table's column.
-class DataColumn {
+class ColumnDescriptor {
 public:
   /// \brief The binder behind `C := C.DataColumn(name)`.
   struct Binder {
     /// \brief `new DataColumn()`. \return An unnamed column.
-    [[nodiscard]] class DataColumn operator()() const { return Made(""); }
+    [[nodiscard]] class ColumnDescriptor operator()() const { return Made(""); }
 
     /// \brief `new DataColumn(name)`. \param name The column name. \return The column.
-    [[nodiscard]] class DataColumn operator()(std::string_view name) const { return Made(name); }
+    [[nodiscard]] class ColumnDescriptor operator()(std::string_view name) const {
+      return Made(name);
+    }
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder DataColumn; // NOLINT(misc-non-private-member-variables-in-classes)
+  static constexpr Binder DataColumn{};
 
   /// \brief `DataColumn.ColumnName` read. \return The name.
   [[nodiscard]] ::agiru::Text<0> ColumnName() const { return Held_().name; }
@@ -87,13 +89,13 @@ public:
   /// \tparam R The refusal. \param refused It. \return This.
   template <typename R>
     requires requires { typename R::IsAlRefusal; }
-  class DataColumn &operator=(const R &refused) {
+  class ColumnDescriptor &operator=(const R &refused) {
     static_cast<void>(refused);
     return *this;
   }
 
 private:
-  friend class DataTable;
+  friend class TabularData;
   friend class DataColumnCollection;
   friend class DataRow;
 
@@ -104,8 +106,8 @@ private:
     Boolean allowNull = true;
   };
 
-  static class DataColumn Made(std::string_view name) {
-    class DataColumn made;
+  static class ColumnDescriptor Made(std::string_view name) {
+    class ColumnDescriptor made;
     made.held_ = std::make_shared<Held>();
     made.held_->name = std::string(name);
     return made;
@@ -126,7 +128,7 @@ public:
   struct Binder {};
 
   /// \brief `Columns.Add(column)`. \param column The column. \return It.
-  class DataColumn Add(const class DataColumn &column) {
+  class ColumnDescriptor Add(const class ColumnDescriptor &column) {
     if (column.IsNull()) { throw Error("DataTable.Columns.Add: the column was never made"); }
     columns_->push_back(column);
     return column;
@@ -134,12 +136,12 @@ public:
 
   /// \brief `Columns.Add(name)`: a column of that name, of type `System.String`.
   /// \param name The name. \return The column.
-  class DataColumn Add(std::string_view name) { return Add(DataColumn::Made(name)); }
+  class ColumnDescriptor Add(std::string_view name) { return Add(ColumnDescriptor::Made(name)); }
 
   /// \brief `Columns.Add(name, type)`. \param name The name. \param type The column's type.
   /// \return The column.
-  class DataColumn Add(std::string_view name, const class Type &type) {
-    class DataColumn column = DataColumn::Made(name);
+  class ColumnDescriptor Add(std::string_view name, const class Type &type) {
+    class ColumnDescriptor column = ColumnDescriptor::Made(name);
     column.DataType(type);
     return Add(column);
   }
@@ -150,7 +152,7 @@ public:
   /// \throws Error always, the refusal's own.
   template <typename R, typename... Rest>
     requires requires { typename R::IsAlRefusal; }
-  class DataColumn Add(const R &refused, Rest &&...rest) {
+  class ColumnDescriptor Add(const R &refused, Rest &&...rest) {
     (static_cast<void>(rest), ...);
     static_cast<void>(refused());
     throw Error("a refused member reached a rebuilt class");
@@ -158,7 +160,7 @@ public:
 
   /// \brief `Columns.Item(index)`. \param index The position, from 0. \return The column.
   /// \throws Error when the index is outside the collection.
-  [[nodiscard]] class DataColumn Item(Integer index) const {
+  [[nodiscard]] class ColumnDescriptor Item(Integer index) const {
     const auto at = static_cast<std::size_t>(index);
     if (index < 0 || at >= columns_->size()) {
       throw Error("DataTable.Columns: there is no column " + std::to_string(index));
@@ -169,7 +171,7 @@ public:
   /// \brief `Columns.Item(name)`. \param name The column name, compared without regard to case.
   /// \return The column.
   /// \throws Error when no column carries the name.
-  [[nodiscard]] class DataColumn Item(std::string_view name) const {
+  [[nodiscard]] class ColumnDescriptor Item(std::string_view name) const {
     const std::size_t at = IndexOf(name);
     if (at == columns_->size()) {
       throw Error("DataTable.Columns: there is no column '" + std::string(name) + "'");
@@ -197,12 +199,12 @@ public:
   }
 
 private:
-  friend class DataTable;
+  friend class TabularData;
   friend class DataRow;
 
-  explicit DataColumnCollection(std::shared_ptr<std::vector<class DataColumn>> columns)
+  explicit DataColumnCollection(std::shared_ptr<std::vector<class ColumnDescriptor>> columns)
       : columns_(std::move(columns)) {}
-  std::shared_ptr<std::vector<class DataColumn>> columns_;
+  std::shared_ptr<std::vector<class ColumnDescriptor>> columns_;
 };
 
 /// \brief .NET `System.Data.DataRow`: the values of one row, by column. A REFERENCE: a row
@@ -259,11 +261,11 @@ public:
   }
 
 private:
-  friend class DataTable;
+  friend class TabularData;
   friend class DataRowCollection;
 
   struct Columns {
-    std::shared_ptr<std::vector<class DataColumn>> columns;
+    std::shared_ptr<std::vector<class ColumnDescriptor>> columns;
     [[nodiscard]] std::size_t IndexOfOrRefuse(std::string_view name) const;
   };
 
@@ -323,7 +325,7 @@ public:
   [[nodiscard]] std::vector<class DataRow>::const_iterator end() const { return rows_->end(); }
 
 private:
-  friend class DataTable;
+  friend class TabularData;
 
   explicit DataRowCollection(std::shared_ptr<std::vector<class DataRow>> rows)
       : rows_(std::move(rows)) {}
@@ -334,19 +336,19 @@ private:
 ///        Chart` fills and reads back (board:0035; Service Time Sheets UT, 5 cases, 2026-09-12),
 ///        and what a layout's `NewExtensionLayout` and the Excel copy walk.
 /// \warning A REFERENCE, like every .NET class: two variables assigned from one table share it.
-class DataTable {
+class TabularData {
 public:
   /// \brief The binder behind `T := T.DataTable()` and `T := T.DataTable(name)`.
   struct Binder {
     /// \brief `new DataTable()`. \return An unnamed, empty table.
-    [[nodiscard]] class DataTable operator()() const { return Made(""); }
+    [[nodiscard]] class TabularData operator()() const { return Made(""); }
 
     /// \brief `new DataTable(name)`. \param name The table name. \return An empty table.
-    [[nodiscard]] class DataTable operator()(std::string_view name) const { return Made(name); }
+    [[nodiscard]] class TabularData operator()(std::string_view name) const { return Made(name); }
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder DataTable; // NOLINT(misc-non-private-member-variables-in-classes)
+  static constexpr Binder DataTable{};
 
   /// \brief `DataTable.TableName`. \return The name it was made with.
   [[nodiscard]] ::agiru::Text<0> TableName() const { return Held_().name; }
@@ -397,7 +399,7 @@ public:
   /// \tparam R The refusal. \param refused It. \return This.
   template <typename R>
     requires requires { typename R::IsAlRefusal; }
-  class DataTable &operator=(const R &refused) {
+  class TabularData &operator=(const R &refused) {
     static_cast<void>(refused);
     return *this;
   }
@@ -405,15 +407,15 @@ public:
 private:
   struct Held {
     std::string name;
-    std::shared_ptr<std::vector<class DataColumn>> columns =
-        std::make_shared<std::vector<class DataColumn>>();
+    std::shared_ptr<std::vector<class ColumnDescriptor>> columns =
+        std::make_shared<std::vector<class ColumnDescriptor>>();
     std::shared_ptr<std::vector<class DataRow>> rows =
         std::make_shared<std::vector<class DataRow>>();
     CultureInfo locale = CultureInfo::InvariantCulture();
   };
 
-  static class DataTable Made(std::string_view name) {
-    class DataTable made;
+  static class TabularData Made(std::string_view name) {
+    class TabularData made;
     made.held_ = std::make_shared<Held>();
     made.held_->name = std::string(name);
     return made;
@@ -426,5 +428,11 @@ private:
 
   std::shared_ptr<Held> held_;
 };
+
+/// \brief The AL name of the native column descriptor.
+using DataColumn = ColumnDescriptor;
+
+/// \brief The AL name of the native table data.
+using DataTable = TabularData;
 
 }

@@ -30,6 +30,9 @@ namespace {
 constexpr Integer kWindowsEnglishUnitedStatesLcid = 1033;
 constexpr Integer kStepLineOrdinal = 5;
 static_assert(std::is_const_v<decltype(CultureInfo::CultureInfo)>);
+static_assert(std::is_const_v<decltype(DataColumn::DataColumn)>);
+static_assert(std::is_const_v<decltype(DataTable::DataTable)>);
+static_assert(std::is_const_v<decltype(BusinessChartData::BusinessChartData)>);
 
 std::string T(const agiru::Text<0> &text) {
   return std::string(std::string_view(text));
@@ -101,10 +104,10 @@ void CultureIdentityOwnsItsNames() {
 /// through `Item(name, value)` and added is the row the table holds; the values come back typed.
 void ATableIsColumnsAndRowsAndEveryPieceIsAReference() {
   DataTable table;
-  table = table.DataTable("DataTable");
+  table = DataTable::DataTable("DataTable");
   CHECK_TEXT("the name", T(table.TableName()), "DataTable");
   DataColumn column;
-  column = column.DataColumn("Month");
+  column = DataColumn::DataColumn("Month");
   column.DataType(Type::GetType("System.String"));
   table.Columns().Add(column);
   table.Columns().Add("Amount").DataType(Type::GetType("System.Decimal"));
@@ -150,7 +153,7 @@ void ATableIsColumnsAndRowsAndEveryPieceIsAReference() {
 /// table. `ClearMeasures` forgets the measures and keeps the rest.
 void ChartDataHoldsTheShape() {
   BusinessChartData data;
-  data = data.BusinessChartData();
+  data = BusinessChartData::BusinessChartData();
   data.XDimension("Month");
   DataMeasureType type;
   type = kStepLineOrdinal;
@@ -167,6 +170,31 @@ void ChartDataHoldsTheShape() {
   CHECK_TEXT("and keeps the dimension", T(data.XDimension()), "Month");
 }
 
+void CopiedHandlesRetainReferenceIdentity() {
+  const DataTable table = DataTable::DataTable("shared");
+  DataTable alias = table;
+  table.Columns().Add("Amount");
+  CHECK_TRUE("copied table handles observe the same columns", alias.Columns().Count() == 1);
+  const DataRow row = table.NewRow();
+  DataRow copiedRow = row;
+  const auto amount = agiru::Decimal::FromInvariantString("1234567890.123456789012345678");
+  copiedRow.Item("Amount", Variant(amount));
+  table.Rows().Add(row);
+  CHECK_TRUE("copied row handles preserve the exact decimal in the table",
+             alias.Rows().Item(Integer{0}).Item("Amount").Get<agiru::Decimal>() == amount);
+  auto chart = BusinessChartData::BusinessChartData();
+  auto copiedChart = chart;
+  copiedChart.DataTable(alias);
+  copiedChart.XDimension("Amount");
+  CHECK_TEXT("copied chart handles observe the same dimension", T(chart.XDimension()), "Amount");
+  CHECK_TRUE("a chart retains the same table storage", chart.DataTable().Rows().Count() == 1);
+  copiedChart.DataTable().Rows().Clear();
+  CHECK_TRUE("writes through the chart reach the original table", table.Rows().Count() == 0);
+  alias = DataTable::DataTable("detached");
+  CHECK_TRUE("rebinding a copied table handle leaves the original storage intact",
+             alias.Columns().Count() == 0 && table.Columns().Count() == 1);
+}
+
 }
 
 int main() {
@@ -176,5 +204,6 @@ int main() {
     CultureIdentityOwnsItsNames();
     ATableIsColumnsAndRowsAndEveryPieceIsAReference();
     ChartDataHoldsTheShape();
+    CopiedHandlesRetainReferenceIdentity();
   });
 }

@@ -12,6 +12,9 @@ namespace {
 using agiru::Integer;
 using agiru::dotnet::DataMeasureType;
 
+constexpr Integer kStackedColumnOrdinal = 11;
+constexpr Integer kUnknownOrdinal = -17;
+
 constexpr std::array<std::pair<DataMeasureType, Integer>, 15> kDeclaredTypes{{
     {DataMeasureType::Point(), 0},
     {DataMeasureType::Bubble(), 2},
@@ -33,7 +36,7 @@ constexpr std::array<std::pair<DataMeasureType, Integer>, 15> kDeclaredTypes{{
 static_assert(std::is_convertible_v<DataMeasureType, Integer>);
 static_assert(DataMeasureType{}.AsInteger() == 0);
 static_assert(DataMeasureType::Line().AsInteger() == 3);
-static_assert(DataMeasureType::StackedColumn().AsInteger() == 11);
+static_assert(DataMeasureType::StackedColumn().AsInteger() == kStackedColumnOrdinal);
 
 void DeclaredValuesAreNotDensePositions() {
   for (const auto &[type, expected] : kDeclaredTypes) {
@@ -51,9 +54,10 @@ void ValueCopiesDoNotAliasAndUnknownNumbersArePreserved() {
   DataMeasureType copy = original;
   original = DataMeasureType::StackedColumn();
   CHECK_TRUE("a value copy does not observe later writes", copy.AsInteger() == 3);
-  CHECK_TRUE("writing one value changes only that value", original.AsInteger() == 11);
-  copy = Integer{-17};
-  CHECK_TRUE("unknown numeric values are not renumbered", copy.AsInteger() == -17);
+  CHECK_TRUE("writing one value changes only that value",
+             original.AsInteger() == kStackedColumnOrdinal);
+  copy = Integer{kUnknownOrdinal};
+  CHECK_TRUE("unknown numeric values are not renumbered", copy.AsInteger() == kUnknownOrdinal);
   copy = Integer{100};
   CHECK_TRUE("extension numeric values are not clamped", copy.AsInteger() == 100);
 }

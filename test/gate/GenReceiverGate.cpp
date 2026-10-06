@@ -16,24 +16,12 @@ void NativeAliasesRemainRebuiltTypes() {
   const auto &types = agiru::gen::RebuiltDotNet();
   agiru::al::VarDecl declaration;
   declaration.type = "DotNet";
-  for (const auto *name : {"ArrayList",
-                           "JArray",
-                           "JObject",
-                           "JProperty",
-                           "JValue",
-                           "BinaryReader",
-                           "BinaryWriter",
-                           "CultureInfo",
-                           "String",
-                           "Regex",
-                           "TimeSpan",
-                           "Encoding",
-                           "UTF8Encoding",
-                           "UnicodeEncoding",
-                           "ASCIIEncoding",
-                           "StreamReader",
-                           "Uri",
-                           "UriBuilder"}) {
+  for (const auto *name :
+       {"ArrayList",         "JArray",       "JObject",      "JProperty",       "JValue",
+        "BinaryReader",      "BinaryWriter", "CultureInfo",  "String",          "Regex",
+        "TimeSpan",          "Encoding",     "UTF8Encoding", "UnicodeEncoding", "ASCIIEncoding",
+        "StreamReader",      "Uri",          "UriBuilder",   "DataColumn",      "DataTable",
+        "BusinessChartData", "Queue"}) {
     declaration.subtype = name;
     CHECK_TRUE("an AL type alias remains implemented", types.contains(name));
     CHECK_TRUE("the alias does not emit an absent CLR stub",

@@ -2,6 +2,33 @@ namespace Microsoft.Fixture;
 
 codeunit 50261 "Stream Alias Consumer"
 {
+    procedure ClrChart(Value: Decimal): Decimal
+    var
+        Table: DotNet DataTable;
+        Column: DotNet DataColumn;
+        Row: DotNet DataRow;
+        Chart: DotNet BusinessChartData;
+    begin
+        Table := Table.DataTable();
+        Column := Column.DataColumn('Amount');
+        Table.Columns.Add(Column);
+        Row := Table.NewRow();
+        Row.Item('Amount', Value);
+        Table.Rows.Add(Row);
+        Chart := Chart.BusinessChartData();
+        Chart.DataTable := Table;
+        exit(Chart.DataTable.Rows.Item(0).Item('Amount'));
+    end;
+
+    procedure ClrQueue(Value: Text): Text
+    var
+        Queue: DotNet Queue;
+    begin
+        Queue := Queue.Queue();
+        Queue.Enqueue(Value);
+        exit(Queue.Dequeue());
+    end;
+
     procedure ClrUri(Value: Text): Text
     var
         Address: DotNet Uri;

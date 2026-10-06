@@ -9,11 +9,14 @@
 
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 using agiru::Variant;
 using agiru::dotnet::Queue;
 
 namespace {
+
+static_assert(std::is_const_v<decltype(Queue::Queue)>);
 
 /// .NET's `Queue` IS FIRST IN, FIRST OUT, and its constructor is spelled `Queue.Queue()` the way
 /// AL spells it. `Workflow.CreateInstance` enqueues step descriptions and dequeues them into a
@@ -21,7 +24,7 @@ namespace {
 /// a `Dequeue` the way .NET does rather than answering nothing.
 void FirstInFirstOut() {
   Queue queue;
-  queue = queue.Queue();
+  queue = Queue::Queue();
   CHECK_TRUE("a new queue is empty", queue.Count() == 0);
   queue.Enqueue(Variant(std::string("step 1")));
   queue.Enqueue(Variant(std::string("step 2")));

@@ -129,7 +129,7 @@ private:
 /// \brief The platform's `BusinessChartData`: the table a chart draws, its X (and Z) dimension
 ///        and its measures, which `Business Chart Impl.` fills and serialises for the add-in.
 ///        A REFERENCE, like every .NET class.
-class BusinessChartData {
+class ChartData {
 public:
   /// \brief One measure: a column of the table and how it is drawn.
   struct Measure {
@@ -140,15 +140,15 @@ public:
   /// \brief The binder behind `D := D.BusinessChartData()`.
   struct Binder {
     /// \brief `new BusinessChartData()`. \return Empty chart data.
-    [[nodiscard]] class BusinessChartData operator()() const {
-      class BusinessChartData made;
+    [[nodiscard]] class ChartData operator()() const {
+      class ChartData made;
       made.held_ = std::make_shared<Held>();
       return made;
     }
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder BusinessChartData; // NOLINT(misc-non-private-member-variables-in-classes)
+  static constexpr Binder BusinessChartData{};
 
   /// \brief `XDimension` read. \return The column drawn along X.
   [[nodiscard]] ::agiru::Text<0> XDimension() const { return Held_().xDimension; }
@@ -206,13 +206,13 @@ public:
   [[nodiscard]] const std::vector<Measure> &Measures() const { return Held_().measures; }
 
   /// \brief `DataTable := table`: the table the chart draws. \param table It. \return It.
-  class DataTable DataTable(const class DataTable &table) {
+  class TabularData DataTable(const class TabularData &table) {
     Held_().table = table;
     return table;
   }
 
   /// \brief `DataTable` read. \return The table the chart draws.
-  [[nodiscard]] class DataTable DataTable() const { return Held_().table; }
+  [[nodiscard]] class TabularData DataTable() const { return Held_().table; }
 
   /// \brief `ShowChartCondensed := flag`. \param condensed The flag. \return It.
   Boolean ShowChartCondensed(Boolean condensed) {
@@ -231,7 +231,7 @@ private:
     std::string xDimension;
     std::string zDimension;
     std::vector<Measure> measures;
-    class DataTable table;
+    class TabularData table;
     Boolean condensed = false;
   };
 
@@ -242,5 +242,8 @@ private:
 
   std::shared_ptr<Held> held_;
 };
+
+/// \brief The AL name of the native chart data.
+using BusinessChartData = ChartData;
 
 }

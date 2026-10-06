@@ -1,5 +1,6 @@
 #include "type/BigInteger.h"
 #include "type/Blob.h"
+#include "type/Decimal.h"
 #include "type/File.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
@@ -14,6 +15,12 @@
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
     agiru::Fixture::StreamAliasConsumer_Codeunit consumer;
+    const auto measure = agiru::Decimal::FromInvariantString("1234567890.123456789012345678");
+    CHECK_TRUE("generated column/table/chart factories preserve exact typed data",
+               consumer.ClrChart(measure) == measure);
+    CHECK_TEXT("generated queue factories retain the AL name and Unicode data",
+               consumer.ClrQueue("hällo").Value(),
+               "hällo");
     CHECK_TEXT("generated URI factories and read/write properties retain AL names",
                consumer.ClrUri("HTTPS://Example.COM:443/path?old=1#fragment").Value(),
                "https://example.com/path?new=2#fragment");

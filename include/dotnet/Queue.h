@@ -17,16 +17,16 @@ namespace agiru::dotnet {
 /// enqueuing each step's `ToString()` and dequeuing it into `FindByAttributes` (2 cases of
 /// Workflow Engine UT, 2026-09-12). An element goes in as whatever AL handed over and comes out
 /// as a `Variant`, which AL unwraps into the parameter it reaches -- the way `object` does in .NET.
-class Queue {
+class VariantQueue {
 public:
   /// \brief The binder behind `Q := Q.Queue()`.
   struct Binder {
     /// \brief `new Queue()`. \return An empty queue.
-    [[nodiscard]] class Queue operator()() const { return {}; }
+    [[nodiscard]] class VariantQueue operator()() const { return {}; }
   };
 
   /// \brief The constructor, spelled the way AL spells it: `Queue := Queue.Queue()`.
-  Binder Queue; // NOLINT(misc-non-private-member-variables-in-classes)
+  static constexpr Binder Queue{};
 
   /// \brief `Queue.Enqueue(Object)`: adds an element at the end.
   /// \param item The element.
@@ -65,5 +65,8 @@ public:
 private:
   std::deque<Variant> items_;
 };
+
+/// \brief The AL name of the native variant queue.
+using Queue = VariantQueue;
 
 }
