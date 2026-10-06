@@ -5,6 +5,8 @@
 #include "runtime/test/RunnerDatabase.h"
 #include "type/Date.h"
 
+#include "ChildExitStatus.h"
+
 #include <algorithm>
 #include <array>
 #include <csignal>
@@ -21,8 +23,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include <sys/wait.h>
 
 namespace {
 
@@ -174,10 +174,9 @@ int RunIsolated(const Options &options, std::span<const agiru::TestCatalogue *co
     std::fflush(stdout);
     std::size_t ran = 0;
     std::size_t of = 0;
-    if (status != -1 && WIFEXITED(status) && !tail.empty() &&
-        std::sscanf(tail.c_str(), "%zu of %zu", &ran, &of) == 2 &&
+    if (!tail.empty() && std::sscanf(tail.c_str(), "%zu of %zu", &ran, &of) == 2 &&
         of == codeunit->Methods().size() && ran <= of &&
-        WEXITSTATUS(status) == (ran == of ? 0 : 1)) {
+        agiru::cli::MatchesExpectedTestExit(status, ran == of)) {
       passed += ran;
       failed += of - ran;
       continue;
