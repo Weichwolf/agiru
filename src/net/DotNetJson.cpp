@@ -6,6 +6,7 @@
 #include "type/Decimal.h"
 #include "type/Integer.h"
 #include "type/JsonHandle.h"
+#include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Variant.h"
 
@@ -25,11 +26,12 @@ namespace {
 using Json = ::agiru::detail::JsonNode;
 
 constexpr int kIndent = 2;
+constexpr std::size_t kEstimatedBytesPerLine = 16;
 
 std::string Indented(const Json &node) {
-  std::string text = node.dump(kIndent);
+  const std::string text = node.dump(kIndent);
   std::string out;
-  out.reserve(text.size() + (text.size() / 16));
+  out.reserve(text.size() + (text.size() / kEstimatedBytesPerLine));
   for (const char c : text) {
     if (c == '\n') { out += '\r'; }
     out += c;
@@ -51,9 +53,9 @@ std::string LeafText(const Json &node) {
 }
 
 Json FromVariant(const ::agiru::Variant &value) {
-  if (value.IsEmpty()) { return Json(); }
+  if (value.IsEmpty()) { return {}; }
   if (const JsonInVariant *held = value.JsonHeld(); held != nullptr) {
-    if (held->handle.Empty()) { return Json(); }
+    if (held->handle.Empty()) { return {}; }
     return ::agiru::detail::JsonNodeOf(held->handle);
   }
   if (value.Is<Boolean>()) { return Json(static_cast<bool>(value.Get<Boolean>())); }
@@ -68,11 +70,12 @@ Json FromVariant(const ::agiru::Variant &value) {
 }
 
 JToken TokenAt(const ::agiru::detail::JsonHandle &tree, Json &node) {
-  return JToken{::agiru::detail::JsonHandleAt(tree, node)};
+  JToken token{::agiru::detail::JsonHandleAt(tree, node)};
+  return token;
 }
 
 ::agiru::Variant Carried(const JToken &token) {
-  return ::agiru::Variant(token);
+  return {token};
 }
 
 bool FilterMatches(const Json &item, std::string_view name, std::string_view wanted) {
@@ -84,7 +87,7 @@ std::vector<::agiru::Variant> Selected(const ::agiru::detail::JsonHandle &handle
                                        std::string_view path) {
   std::vector<::agiru::Variant> found;
   if (handle.Empty()) { return found; }
-  Json &node = ::agiru::detail::JsonNodeOf(handle);
+  const Json &node = ::agiru::detail::JsonNodeOf(handle);
   std::string_view rest = path;
   if (rest.starts_with("$")) { rest.remove_prefix(1); }
   const std::string_view filter = "[?(@.";
@@ -177,19 +180,18 @@ GenericIEnumerable1 JToken::SelectTokens(std::string_view path,
 ::agiru::Variant JToken::Value() const {
   if (handle_.Empty()) { return {}; }
   const Json &node = ::agiru::detail::JsonNodeOf(handle_);
-  if (node.is_string()) { return ::agiru::Variant(node.Text()); }
+  if (node.is_string()) { return {node.Text()}; }
   if (node.is_boolean()) { return ::agiru::Variant(Boolean{node.Boolean()}); }
   if (node.is_number_integer()) {
     const auto whole = ::agiru::detail::JsonInteger(node.Text());
     if (whole >= std::numeric_limits<Integer>::min() &&
         whole <= std::numeric_limits<Integer>::max()) {
-      return ::agiru::Variant(static_cast<Integer>(whole));
+      return {static_cast<Integer>(whole)};
     }
-    return ::agiru::Variant(static_cast<BigInteger>(whole));
+    return {static_cast<BigInteger>(whole)};
   }
   if (node.is_number_float()) {
-    return ::agiru::Variant(
-        Decimal::FromInvariantString(::agiru::detail::ExactJsonDecimal(node.Text())));
+    return {Decimal::FromInvariantString(::agiru::detail::ExactJsonDecimal(node.Text()))};
   }
   if (node.is_null()) { return {}; }
   return Carried(*this);
@@ -232,7 +234,7 @@ JToken JToken::Item(const ::agiru::Variant &key) const {
 GenericIEnumerator1 JToken::GetEnumerator() const {
   std::vector<::agiru::Variant> items;
   if (!handle_.Empty()) {
-    Json &node = ::agiru::detail::JsonNodeOf(handle_);
+    const Json &node = ::agiru::detail::JsonNodeOf(handle_);
     if (node.is_array()) {
       for (const auto &held : node.Children()) {
         Json &item = held.Node();
@@ -240,7 +242,7 @@ GenericIEnumerator1 JToken::GetEnumerator() const {
       }
     } else if (node.is_object()) {
       for (const auto &[name, value] : node.Members()) {
-        items.push_back(::agiru::Variant(JProperty::Of(handle_, name)));
+        items.emplace_back(JProperty::Of(handle_, name));
       }
     }
   }
@@ -266,7 +268,7 @@ JToken::operator JValue() const {
 }
 
 JToken::operator JProperty() const {
-  class JProperty made;
+  class JsonPropertyReference made;
   made = *this;
   return made;
 }
@@ -300,12 +302,12 @@ JValue JValue::Binder::operator()(const ::agiru::Variant &value) const {
 }
 
 JValue JValue::Over(::agiru::detail::JsonHandle handle) {
-  class JValue made;
+  class JsonValueReference made;
   made.handle_ = std::move(handle);
   return made;
 }
 
-class JValue &JValue::operator=(const JToken &token) {
+class JsonValueReference &JValue::operator=(const JToken &token) {
   handle_ = token.Handle();
   return *this;
 }
@@ -323,7 +325,7 @@ JProperty JProperty::Binder::operator()(std::string_view name,
 }
 
 JProperty JProperty::Of(const ::agiru::detail::JsonHandle &owner, std::string name) {
-  class JProperty made;
+  class JsonPropertyReference made;
   made.owner_ = owner;
   made.name_ = std::move(name);
   Json &object = ::agiru::detail::JsonNodeOf(owner);
@@ -333,14 +335,14 @@ JProperty JProperty::Of(const ::agiru::detail::JsonHandle &owner, std::string na
   return made;
 }
 
-class JProperty &JProperty::operator=(const JToken &token) {
+class JsonPropertyReference &JProperty::operator=(const JToken &token) {
   handle_ = token.Handle();
   owner_ = {};
   name_.clear();
   return *this;
 }
 
-class JProperty &JProperty::operator=(const ::agiru::Variant &value) {
+class JsonPropertyReference &JProperty::operator=(const ::agiru::Variant &value) {
   if (const JsonInVariant *held = value.JsonHeld();
       held != nullptr && held->kind == ::agiru::detail::JsonKind::Property) {
     owner_ = held->owner;
@@ -376,7 +378,7 @@ JToken JProperty::Value(const JToken &token) {
   return ::agiru::Text<0>{Json(name_).dump() + ": " + value};
 }
 
-void JProperty::Replace(const class JProperty &property) {
+void JProperty::Replace(const class JsonPropertyReference &property) {
   if (owner_.Empty()) { throw Error("JProperty.Replace: the property is in no object"); }
   Json &object = ::agiru::detail::JsonNodeOf(owner_);
   if (!object.is_object()) { throw Error("JProperty.Replace: the owner is not an object"); }
@@ -398,17 +400,17 @@ JObject JObject::Binder::operator()() const {
 }
 
 JObject JObject::Over(::agiru::detail::JsonHandle handle) {
-  class JObject made;
+  class JsonObjectReference made;
   made.handle_ = std::move(handle);
   return made;
 }
 
-class JObject &JObject::operator=(const JToken &token) {
+class JsonObjectReference &JObject::operator=(const JToken &token) {
   handle_ = token.Handle();
   return *this;
 }
 
-class JObject &JObject::operator=(const ::agiru::Variant &value) {
+class JsonObjectReference &JObject::operator=(const ::agiru::Variant &value) {
   handle_ = HandleOf(value);
   return *this;
 }
@@ -441,7 +443,7 @@ void JObject::Add(const JProperty &property) {
 
 JProperty JObject::Property(std::string_view name) const {
   if (handle_.Empty()) { return {}; }
-  Json &object = ::agiru::detail::JsonNodeOf(handle_);
+  const Json &object = ::agiru::detail::JsonNodeOf(handle_);
   if (!object.is_object() || !object.contains(std::string(name))) { return {}; }
   return JProperty::Of(handle_, std::string(name));
 }
@@ -458,10 +460,10 @@ JProperty JObject::Property(std::string_view name) const {
 GenericIEnumerable1 JObject::Properties() const {
   std::vector<::agiru::Variant> items;
   if (!handle_.Empty()) {
-    Json &object = ::agiru::detail::JsonNodeOf(handle_);
+    const Json &object = ::agiru::detail::JsonNodeOf(handle_);
     if (object.is_object()) {
       for (const auto &[name, value] : object.Members()) {
-        items.push_back(::agiru::Variant(JProperty::Of(handle_, name)));
+        items.emplace_back(JProperty::Of(handle_, name));
       }
     }
   }
@@ -480,17 +482,17 @@ JArray JArray::Binder::operator()() const {
 }
 
 JArray JArray::Over(::agiru::detail::JsonHandle handle) {
-  class JArray made;
+  class JsonArrayReference made;
   made.handle_ = std::move(handle);
   return made;
 }
 
-class JArray &JArray::operator=(const JToken &token) {
+class JsonArrayReference &JArray::operator=(const JToken &token) {
   handle_ = token.Handle();
   return *this;
 }
 
-class JArray &JArray::operator=(const ::agiru::Variant &value) {
+class JsonArrayReference &JArray::operator=(const ::agiru::Variant &value) {
   handle_ = HandleOf(value);
   return *this;
 }

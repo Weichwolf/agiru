@@ -24,10 +24,18 @@
 
 namespace agiru::dotnet {
 
-class JArray;
-class JObject;
-class JProperty;
-class JValue;
+class JsonArrayReference;
+/// \brief The AL spelling of the JSON reference type.
+using JArray = JsonArrayReference;
+class JsonObjectReference;
+/// \brief The AL spelling of the JSON reference type.
+using JObject = JsonObjectReference;
+class JsonPropertyReference;
+/// \brief The AL spelling of the JSON reference type.
+using JProperty = JsonPropertyReference;
+class JsonValueReference;
+/// \brief The AL spelling of the JSON reference type.
+using JValue = JsonValueReference;
 class JsonChildIterator;
 
 /// \brief How a `JToken` is seen, for the `Variant` that carries one.
@@ -116,7 +124,7 @@ public:
   void Replace(const JToken &token);
 
   /// \brief `JToken.Remove()`: not carried yet.
-  ::agiru::dotnet::Refused Remove{{.type = "JToken", .member = "Remove"}};
+  static constexpr ::agiru::dotnet::Refused Remove{{.type = "JToken", .member = "Remove"}};
 
   /// \brief AL `JObject := JToken` handed as an ARGUMENT: the same node, seen as an object.
   /// \return The object.
@@ -133,73 +141,74 @@ public:
   /// \brief AL `foreach Item in Token`: past the last child. \return The iterator.
   [[nodiscard]] JsonChildIterator end() const;
 
-protected:
+private:
+  friend class JsonValueReference;
+  friend class JsonPropertyReference;
+  friend class JsonObjectReference;
+  friend class JsonArrayReference;
   ::agiru::detail::JsonHandle handle_; ///< The node.
 };
 
 /// \brief Newtonsoft `JValue`: a leaf -- a string, a number, a boolean, a date or null.
-class JValue : public JToken {
+class JsonValueReference : public JToken {
 public:
   /// \brief The binder behind `JValue.JValue(value)`.
   struct Binder {
     /// \brief A leaf holding a value. \param value The value. \return The leaf.
-    [[nodiscard]] class JValue operator()(const ::agiru::Variant &value) const;
+    [[nodiscard]] class JsonValueReference operator()(const ::agiru::Variant &value) const;
   };
 
   static constexpr JsonKind kJsonKind = JsonKind::Value; ///< \see JsonKind
 
-  /// \brief The constructor, spelled the way AL spells it: `JValue := JValue.JValue(x)`. THE
-  ///        CLASS DECLARES NO CONSTRUCTOR OF ITS OWN, because C++ refuses a member named like
-  ///        its class beside one; `Over` is the factory instead.
-  Binder JValue{}; // NOLINT(misc-non-private-member-variables-in-classes)
+  /// \brief The immutable factory called as `JValue.JValue(x)` in AL.
+  static constexpr Binder JValue{};
 
   /// \brief A leaf over a node. \param handle The node. \return The leaf.
-  [[nodiscard]] static class JValue Over(::agiru::detail::JsonHandle handle);
+  [[nodiscard]] static class JsonValueReference Over(::agiru::detail::JsonHandle handle);
 
   /// \brief `JValue := <absent .NET member>`: the member refuses, the way it does everywhere.
   /// \tparam R The refusal. \param refused The member. \return Never.
   template <typename R>
     requires requires { typename R::IsAlRefusal; }
-  class JValue &operator=(const R &refused) {
+  class JsonValueReference &operator=(const R &refused) {
     static_cast<void>(static_cast<::agiru::Integer>(refused));
     return *this;
   }
 
   /// \brief `JValue := JToken`: the same node, seen as a leaf. \param token The token.
   /// \return This.
-  class JValue &operator=(const JToken &token);
+  class JsonValueReference &operator=(const JToken &token);
 
   /// \brief `JValue.CreateNull()`: a null leaf. \return It.
-  [[nodiscard]] class JValue CreateNull() const;
+  [[nodiscard]] class JsonValueReference CreateNull() const;
 };
 
 /// \brief Newtonsoft `JProperty`: a name inside an object, with the value it names.
-class JProperty : public JToken {
+class JsonPropertyReference : public JToken {
 public:
   /// \brief The binder behind `JProperty.JProperty(name, value)`.
   struct Binder {
     /// \brief A property not yet in any object. \param name Its name. \param value Its value.
     /// \return The property.
-    [[nodiscard]] class JProperty operator()(std::string_view name,
-                                             const ::agiru::Variant &value) const;
+    [[nodiscard]] class JsonPropertyReference operator()(std::string_view name,
+                                                         const ::agiru::Variant &value) const;
   };
 
   static constexpr JsonKind kJsonKind = JsonKind::Property; ///< \see JsonKind
 
-  /// \brief The constructor, spelled the way AL spells it; the class declares no constructor of
-  ///        its own for the reason `JValue` gives.
-  Binder JProperty{}; // NOLINT(misc-non-private-member-variables-in-classes)
+  /// \brief The immutable factory called as `JProperty.JProperty(name, value)` in AL.
+  static constexpr Binder JProperty{};
 
   /// \brief A property of an object. \param owner The object. \param name The member's name.
   /// \return The property, whose node is the member's value.
-  [[nodiscard]] static class JProperty Of(const ::agiru::detail::JsonHandle &owner,
-                                          std::string name);
+  [[nodiscard]] static class JsonPropertyReference Of(const ::agiru::detail::JsonHandle &owner,
+                                                      std::string name);
 
   /// \brief `JProperty := <absent .NET member>`: the member refuses, the way it does everywhere.
   /// \tparam R The refusal. \param refused The member. \return Never.
   template <typename R>
     requires requires { typename R::IsAlRefusal; }
-  class JProperty &operator=(const R &refused) {
+  class JsonPropertyReference &operator=(const R &refused) {
     static_cast<void>(static_cast<::agiru::Integer>(refused));
     return *this;
   }
@@ -207,10 +216,10 @@ public:
   /// \brief `JProperty := JToken`: a property standing on a value token with no name, which is
   ///        what `SelectToken` hands a `JProperty` variable; its `Value` is then the token itself.
   /// \param token The token. \return This.
-  class JProperty &operator=(const JToken &token);
+  class JsonPropertyReference &operator=(const JToken &token);
 
   /// \brief `JProperty := Variant`. \param value The Variant. \return This.
-  class JProperty &operator=(const ::agiru::Variant &value);
+  class JsonPropertyReference &operator=(const ::agiru::Variant &value);
 
   /// \brief `JProperty.Name`. \return The name.
   [[nodiscard]] ::agiru::Text<0> Name() const { return name_; }
@@ -227,7 +236,7 @@ public:
 
   /// \brief `JProperty.Replace(property)`: in the owning object, this name goes and the other
   ///        property's name and value take its place. \param property The replacement.
-  void Replace(const class JProperty &property);
+  void Replace(const class JsonPropertyReference &property);
 
   /// \brief The object this property lives in. \return Its node; empty when detached.
   [[nodiscard]] const ::agiru::detail::JsonHandle &Owner() const noexcept { return owner_; }
@@ -238,43 +247,42 @@ private:
 };
 
 /// \brief Newtonsoft `JObject`: an object node.
-class JObject : public JToken {
+class JsonObjectReference : public JToken {
 public:
   /// \brief The binder behind `JObject.JObject()`.
   struct Binder {
     /// \brief A new, empty object. \return It.
-    [[nodiscard]] class JObject operator()() const;
+    [[nodiscard]] class JsonObjectReference operator()() const;
   };
 
   static constexpr JsonKind kJsonKind = JsonKind::Object; ///< \see JsonKind
 
-  /// \brief The constructor, spelled the way AL spells it; the class declares no constructor of
-  ///        its own for the reason `JValue` gives.
-  Binder JObject{}; // NOLINT(misc-non-private-member-variables-in-classes)
+  /// \brief The immutable factory called as `JObject.JObject()` in AL.
+  static constexpr Binder JObject{};
 
   /// \brief An object over a node. \param handle The node. \return The object.
-  [[nodiscard]] static class JObject Over(::agiru::detail::JsonHandle handle);
+  [[nodiscard]] static class JsonObjectReference Over(::agiru::detail::JsonHandle handle);
 
   /// \brief `JObject := <absent .NET member>`: the member refuses, the way it does everywhere.
   /// \tparam R The refusal. \param refused The member. \return Never.
   template <typename R>
     requires requires { typename R::IsAlRefusal; }
-  class JObject &operator=(const R &refused) {
+  class JsonObjectReference &operator=(const R &refused) {
     static_cast<void>(static_cast<::agiru::Integer>(refused));
     return *this;
   }
 
   /// \brief `JObject := JToken` (`JObject := JArray.Item(i)`): the same node, seen as an object.
   /// \param token The token. \return This.
-  class JObject &operator=(const JToken &token);
+  class JsonObjectReference &operator=(const JToken &token);
 
   /// \brief `JObject := Variant` (an enumerator's `Current`). \param value The Variant.
   /// \return This.
-  class JObject &operator=(const ::agiru::Variant &value);
+  class JsonObjectReference &operator=(const ::agiru::Variant &value);
 
   /// \brief `JObject.Parse(json)`: a new object read from text. \param json The text.
   /// \return It. \throws Error when the text is not a JSON object.
-  [[nodiscard]] class JObject Parse(std::string_view json) const;
+  [[nodiscard]] class JsonObjectReference Parse(std::string_view json) const;
 
   /// \brief `JObject.Add(name, value)`: a member; an existing name raises, as Newtonsoft does.
   /// \param name The name. \param value The value -- a scalar, a token, an object, an array.
@@ -286,7 +294,7 @@ public:
 
   /// \brief `JObject.Property(name)`: the member as a property, or null. \param name The name.
   /// \return The property.
-  [[nodiscard]] class JProperty Property(std::string_view name) const;
+  [[nodiscard]] class JsonPropertyReference Property(std::string_view name) const;
 
   /// \brief `JObject.TryGetValue(name, token)`: the member's value when there is one.
   /// \param name The name. \param token Where the value lands. \return Whether it was there.
@@ -302,40 +310,39 @@ public:
 };
 
 /// \brief Newtonsoft `JArray`: an array node.
-class JArray : public JToken {
+class JsonArrayReference : public JToken {
 public:
   /// \brief The binder behind `JArray.JArray()`.
   struct Binder {
     /// \brief A new, empty array. \return It.
-    [[nodiscard]] class JArray operator()() const;
+    [[nodiscard]] class JsonArrayReference operator()() const;
   };
 
   static constexpr JsonKind kJsonKind = JsonKind::Array; ///< \see JsonKind
 
-  /// \brief The constructor, spelled the way AL spells it; the class declares no constructor of
-  ///        its own for the reason `JValue` gives.
-  Binder JArray{}; // NOLINT(misc-non-private-member-variables-in-classes)
+  /// \brief The immutable factory called as `JArray.JArray()` in AL.
+  static constexpr Binder JArray{};
 
   /// \brief An array over a node. \param handle The node. \return The array.
-  [[nodiscard]] static class JArray Over(::agiru::detail::JsonHandle handle);
+  [[nodiscard]] static class JsonArrayReference Over(::agiru::detail::JsonHandle handle);
 
   /// \brief `JArray := <absent .NET member>`: the member refuses, the way it does everywhere.
   /// \tparam R The refusal. \param refused The member. \return Never.
   template <typename R>
     requires requires { typename R::IsAlRefusal; }
-  class JArray &operator=(const R &refused) {
+  class JsonArrayReference &operator=(const R &refused) {
     static_cast<void>(static_cast<::agiru::Integer>(refused));
     return *this;
   }
 
   /// \brief `JArray := JToken`. \param token The token. \return This.
-  class JArray &operator=(const JToken &token);
+  class JsonArrayReference &operator=(const JToken &token);
 
   /// \brief `JArray := Variant`. \param value The Variant. \return This.
-  class JArray &operator=(const ::agiru::Variant &value);
+  class JsonArrayReference &operator=(const ::agiru::Variant &value);
 
   /// \brief `JArray.Parse(json)`: a new array read from text. \param json The text. \return It.
-  [[nodiscard]] class JArray Parse(std::string_view json) const;
+  [[nodiscard]] class JsonArrayReference Parse(std::string_view json) const;
 
   /// \brief `JArray.Add(value)`: appends. \param value A scalar, a token, an object, an array.
   void Add(const ::agiru::Variant &value);
@@ -387,12 +394,14 @@ public:
   struct Binder {};
 
   /// \brief `JsonConvert.SerializeXmlNode(...)`: not carried yet.
-  ::agiru::dotnet::Refused SerializeXmlNode{{.type = "JsonConvert", .member = "SerializeXmlNode"}};
+  static constexpr ::agiru::dotnet::Refused SerializeXmlNode{
+      {.type = "JsonConvert", .member = "SerializeXmlNode"}};
   /// \brief `JsonConvert.DeserializeXmlNode(...)`: not carried yet.
-  ::agiru::dotnet::Refused DeserializeXmlNode{
+  static constexpr ::agiru::dotnet::Refused DeserializeXmlNode{
       {.type = "JsonConvert", .member = "DeserializeXmlNode"}};
   /// \brief `JsonConvert.SerializeObject(object)`: not carried yet.
-  ::agiru::dotnet::Refused SerializeObject{{.type = "JsonConvert", .member = "SerializeObject"}};
+  static constexpr ::agiru::dotnet::Refused SerializeObject{
+      {.type = "JsonConvert", .member = "SerializeObject"}};
 };
 
 }

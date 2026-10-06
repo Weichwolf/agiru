@@ -42,10 +42,15 @@ static_assert(
     std::same_as<decltype(std::declval<GenericDictionary2::Entry>().Key()), const Variant &>);
 static_assert(!std::is_invocable_v<GenericDictionary2::Binder, const std::string &>);
 static_assert(!std::is_invocable_v<GenericDictionary2::Binder, Integer, Integer>);
+static_assert(std::is_const_v<decltype(GenericDictionary2::Dictionary)>);
+static_assert(std::is_const_v<decltype(dotnet::ArrayList::ArrayList)>);
+static_assert(std::is_copy_assignable_v<dotnet::ArrayList>);
+static_assert(std::is_move_assignable_v<dotnet::ArrayList>);
 
 void TypedKeysStayDistinct() {
   GenericDictionary2 dictionary;
-  dictionary = dictionary.Dictionary(static_cast<Integer>(kSupportedKeyTypes));
+  dictionary =
+      agiru::dotnet::GenericDictionary2::Dictionary(static_cast<Integer>(kSupportedKeyTypes));
   const std::array<Variant, kSupportedKeyTypes> keys{Variant{Boolean{true}},
                                                      Variant{Integer{1}},
                                                      Variant{BigInteger{1}},
@@ -78,14 +83,14 @@ void TypedKeysStayDistinct() {
 
 void ReferenceAliasesShareOneStore() {
   GenericDictionary2 dictionary;
-  dictionary = dictionary.Dictionary();
+  dictionary = agiru::dotnet::GenericDictionary2::Dictionary();
   dictionary.Add("source", Integer{1});
   GenericDictionary2 alias = dictionary;
   alias.Add("alias", Integer{2});
   CHECK_TRUE("copy aliases the dictionary", dictionary.ContainsKey("alias"));
   dictionary.Remove("source");
   CHECK_TRUE("removal is shared", !alias.ContainsKey("source"));
-  dictionary = dictionary.Dictionary();
+  dictionary = agiru::dotnet::GenericDictionary2::Dictionary();
   CHECK_TRUE("construction detaches only its variable", dictionary.Count() == 0);
   CHECK_TRUE("old alias retains its store", alias.Count() == 1);
   alias.Clear();
@@ -100,9 +105,9 @@ void ErrorsDoNotInventValues() {
   GenericDictionary2 dictionary;
   CHECK_TRUE("unassigned .NET reference is null", dictionary.IsNull());
   CHECK_TRUE("null reference operations raise", Raises([&] { (void)dictionary.Count(); }));
-  dictionary = dictionary.Dictionary(0);
+  dictionary = agiru::dotnet::GenericDictionary2::Dictionary(0);
   CHECK_TRUE("constructed dictionary is not null", !dictionary.IsNull());
-  CHECK_TRUE("negative capacity raises", Raises([&] { (void)dictionary.Dictionary(-1); }));
+  CHECK_TRUE("negative capacity raises", Raises([&] { (void)GenericDictionary2::Dictionary(-1); }));
   CHECK_TRUE("null key raises", Raises([&] { dictionary.Add(Variant{}, Integer{1}); }));
   CHECK_TRUE("null ContainsKey raises", Raises([&] { (void)dictionary.ContainsKey(Variant{}); }));
   CHECK_TRUE("unsupported CLR box refuses explicitly",
@@ -129,7 +134,7 @@ void ErrorsDoNotInventValues() {
 
 void EntriesRetainTypedSnapshotsAndOwnership() {
   GenericDictionary2 dictionary;
-  dictionary = dictionary.Dictionary();
+  dictionary = agiru::dotnet::GenericDictionary2::Dictionary();
   dictionary.Add(kCustomerTableId, "SORTING(No.)");
   dictionary.Add(kItemTableId, "WHERE(Blocked=CONST(No))");
   Integer seen = 0;
@@ -150,7 +155,7 @@ void EntriesRetainTypedSnapshotsAndOwnership() {
   CHECK_TRUE("iterator retains the object after its variable clears",
              (*retained).Key().IsInteger());
   GenericDictionary2 alias;
-  alias = alias.Dictionary();
+  alias = agiru::dotnet::GenericDictionary2::Dictionary();
   alias.Add("before", Integer{1});
   auto invalidated = alias.begin();
   alias.Add("after", Integer{2});

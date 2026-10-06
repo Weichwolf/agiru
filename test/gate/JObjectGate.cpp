@@ -1,15 +1,18 @@
 #include "dotnet/Generic.h"
 #include "dotnet/JObject.h"
 #include "runtime/ErrorValue.h"
+#include "type/BigInteger.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
 #include <string>
+#include <string_view>
+#include <type_traits>
 
 using agiru::Variant;
 using agiru::dotnet::GenericIEnumerable1;
@@ -22,6 +25,26 @@ using agiru::dotnet::JValue;
 
 namespace {
 
+constexpr agiru::Integer kAddedValue = 7;
+constexpr agiru::Integer kReplacedValue = 8;
+constexpr agiru::Integer kChangedValue = 9;
+constexpr agiru::Integer kInsertedValue = 5;
+constexpr agiru::Integer kSiblingCount = 128;
+
+static_assert(std::is_const_v<decltype(JObject::JObject)>);
+static_assert(std::is_const_v<decltype(JArray::JArray)>);
+static_assert(std::is_const_v<decltype(JValue::JValue)>);
+static_assert(std::is_const_v<decltype(JProperty::JProperty)>);
+static_assert(std::is_const_v<decltype(JToken::Remove)>);
+static_assert(std::is_copy_assignable_v<JObject>);
+static_assert(std::is_move_assignable_v<JObject>);
+static_assert(std::is_copy_assignable_v<JArray>);
+static_assert(std::is_move_assignable_v<JArray>);
+static_assert(std::is_copy_assignable_v<JValue>);
+static_assert(std::is_move_assignable_v<JValue>);
+static_assert(std::is_copy_assignable_v<JProperty>);
+static_assert(std::is_move_assignable_v<JProperty>);
+
 std::string T(const agiru::Text<0> &text) {
   return std::string(std::string_view(text));
 }
@@ -33,7 +56,7 @@ std::string T(const agiru::Text<0> &text) {
 /// `ToString()` is the INDENTED form Newtonsoft renders with `\r\n` line breaks.
 void AnObjectIsARefereceIntoATreeAndRendersIndented() {
   JObject object{};
-  object = object.JObject();
+  object = JObject::JObject();
   CHECK_TRUE("a new object is not null", !agiru::IsNull(object));
   object.Add("unitCode", Variant(std::string("PCS")));
   object.Add("qty", Variant(agiru::Integer{3}));
@@ -50,16 +73,16 @@ void AnObjectIsARefereceIntoATreeAndRendersIndented() {
   CHECK_TEXT("a property carries its name", T(property.Name()), "unitCode");
   CHECK_TEXT("and its value renders as the bare text", T(property.Value().ToString()), "PCS");
   JValue replacement;
-  replacement = replacement.JValue(Variant(std::string("BOX")));
+  replacement = JValue::JValue(Variant(std::string("BOX")));
   property.Value(replacement);
   CHECK_TEXT("writing through the property changes the object",
              T(object.SelectToken("unitCode").ToString()),
              "BOX");
-  JToken missing = object.SelectToken("nothing.here");
+  const JToken missing = object.SelectToken("nothing.here");
   CHECK_TRUE("a path that names nothing is null", agiru::IsNull(missing));
 
   JObject parsed;
-  parsed = parsed.Parse("{\"a\": {\"b\": [10, 20]}, \"flag\": true}");
+  parsed = parsed.Parse(R"({"a": {"b": [10, 20]}, "flag": true})");
   CHECK_TEXT("a nested path", T(parsed.SelectToken("a.b[1]").ToString()), "20");
   CHECK_TEXT("a boolean renders the way .NET renders one",
              T(parsed.SelectToken("flag").ToString()),
@@ -75,7 +98,7 @@ void AnObjectIsARefereceIntoATreeAndRendersIndented() {
 /// string leaf and the indented JSON of an object.
 void AVariantCarriesATokenAndFormatRendersIt() {
   JObject object{};
-  object = object.Parse("{\"name\": \"Bicycle\", \"price\": 2800.5}");
+  object = object.Parse(R"({"name": "Bicycle", "price": 2800.5})");
   const Variant held = object.Property("name").Value();
   CHECK_TEXT("Format of a held string leaf", T(agiru::Format(held)), "Bicycle");
   JObject again;
@@ -94,13 +117,13 @@ void AVariantCarriesATokenAndFormatRendersIt() {
 /// takes what the enumerator's `Current` hands it.
 void AnArrayEnumeratesAndFiltersItsObjects() {
   JArray array;
-  array = array.Parse("[{\"id\": \"A\", \"n\": 1}, {\"id\": \"B\", \"n\": 2}]");
+  array = array.Parse(R"([{"id": "A", "n": 1}, {"id": "B", "n": 2}])");
   CHECK_TRUE("Count is the item count", array.Count() == 2);
   JObject second;
   second = array.Item(Variant(agiru::Integer{1}));
   CHECK_TEXT("Item by index, seen as an object", T(second.SelectToken("id").ToString()), "B");
 
-  GenericIEnumerable1 matches = array.SelectTokens("$[?(@.id == 'B')]", false);
+  const GenericIEnumerable1 matches = array.SelectTokens("$[?(@.id == 'B')]", false);
   GenericIEnumerator1 walker = matches.GetEnumerator();
   CHECK_TRUE("the filter finds the one object", walker.MoveNext());
   JObject found;
@@ -113,12 +136,12 @@ void AnArrayEnumeratesAndFiltersItsObjects() {
   CHECK_TRUE("foreach walks the items as objects", walked == 4);
 
   JArray more;
-  more = more.Parse("[{\"id\": \"C\"}]");
+  more = more.Parse(R"([{"id": "C"}])");
   array.Merge(more);
   CHECK_TRUE("Merge appends the other's items", array.Count() == 3);
   JObject copy;
   copy = array.DeepClone();
-  more.Add(Variant(agiru::Integer{7}));
+  more.Add(Variant(kAddedValue));
   CHECK_TRUE("a deep clone is its own tree", copy.Count() == 3);
 }
 
@@ -126,7 +149,7 @@ void AnArrayEnumeratesAndFiltersItsObjects() {
 /// value inside the object (`JSON Management.ReplaceOrAddJPropertyInJObject`).
 void PropertiesEnumerateAndReplace() {
   JObject object{};
-  object = object.Parse("{\"first\": 1, \"second\": 2}");
+  object = object.Parse(R"({"first": 1, "second": 2})");
   GenericIEnumerator1 walker = object.Properties().GetEnumerator();
   std::string names;
   while (walker.MoveNext()) {
@@ -137,12 +160,12 @@ void PropertiesEnumerateAndReplace() {
   CHECK_TEXT("the names in document order", names, "first;second;");
   JProperty renamed;
   JToken first = object.SelectToken("first");
-  renamed = renamed.JProperty("third", Variant(agiru::Integer{3}));
+  renamed = JProperty::JProperty("third", Variant(agiru::Integer{3}));
   object.Property("second").Replace(renamed);
   CHECK_TEXT("Replace swaps name and value in place",
              T(object.ToString()),
              "{\r\n  \"first\": 1,\r\n  \"third\": 3\r\n}");
-  first.Replace(JValue{}.JValue(Variant(agiru::Integer{8})));
+  first.Replace(JValue::JValue(Variant(kReplacedValue)));
   CHECK_TEXT("renaming another property keeps existing aliases attached",
              T(object.SelectToken("first").ToString()),
              "8");
@@ -163,17 +186,17 @@ void ExactNumbersAndStableAliasesShareTheEngine() {
   CHECK_TRUE("Int64 Variant retains all bits",
              object.SelectToken("whole").Value().Get<agiru::BigInteger>() == 9223372036854775807LL);
   const JToken held = object.SelectToken("nested");
-  for (agiru::Integer index = 0; index < 128; ++index) {
+  for (agiru::Integer index = 0; index < kSiblingCount; ++index) {
     object.Add(std::to_string(index), Variant(index));
   }
   CHECK_TEXT("retained token survives sibling growth", T(held.SelectToken("n").ToString()), "1");
   JValue seven;
-  seven = seven.JValue(Variant(agiru::Integer{7}));
+  seven = JValue::JValue(Variant(kAddedValue));
   held.SelectToken("n").Replace(seven);
   CHECK_TEXT(
       "retained token writes through to parent", T(object.SelectToken("nested.n").ToString()), "7");
-  JToken clone = object.DeepClone();
-  object.SelectToken("nested.n").Replace(JValue{}.JValue(Variant(agiru::Integer{9})));
+  const JToken clone = object.DeepClone();
+  object.SelectToken("nested.n").Replace(JValue::JValue(Variant(kChangedValue)));
   CHECK_TEXT("DeepClone is independent", T(clone.SelectToken("nested.n").ToString()), "7");
   CHECK_TRUE("retained node can be detached", object.Remove("nested"));
   CHECK_TEXT("detached node remains readable", T(held.SelectToken("n").ToString()), "9");
@@ -185,12 +208,12 @@ void ExactNumbersAndStableAliasesShareTheEngine() {
   CHECK_TRUE("an empty index is not zero in the .NET adapter",
              array.SelectToken("$[]").IsNullObject());
   const JToken item = array.Item(Variant(agiru::Integer{1}));
-  array.Insert(0, Variant(agiru::Integer{5}));
+  array.Insert(0, Variant(kInsertedValue));
   CHECK_TEXT("array alias survives index shifts", T(item.ToString()), "20");
   array.RemoveAt(2);
   CHECK_TEXT("removed array alias remains readable", T(item.ToString()), "20");
   JObject out;
-  out = out.JObject();
+  out = JObject::JObject();
   out.Add("amount", Variant(agiru::Decimal::FromInvariantString("999999999999999.99")));
   CHECK_TEXT(".NET Decimal serialization is an exact number",
              T(out.ToString()),

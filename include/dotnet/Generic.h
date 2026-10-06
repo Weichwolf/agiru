@@ -139,7 +139,7 @@ public:
   };
 
   /// \brief `Dict.Dictionary(...)`, the constructor as AL calls it.
-  Binder Dictionary;
+  static constexpr Binder Dictionary{};
 
   /// \brief Adds a new typed key; never replaces an existing value.
   /// \param key Non-null supported boxed key. \param value The value, including null.
@@ -218,20 +218,25 @@ private:
   std::shared_ptr<Store> store_;
 };
 
+class VariantArrayList;
+/// \brief The AL spelling of the erased .NET array list.
+using ArrayList = VariantArrayList;
+
 /// \brief .NET `System.Collections.ArrayList`, rebuilt: a list of Variants with the members the
 ///        BaseApp names -- `Add`, `Count`, `Contains`, `Clear`, `Item` and a `foreach` --
 ///        constructed as AL spells it, `List := List.ArrayList()`, also from a sequence
 ///        (`SheetNames.ArrayList(Reader.SheetNames())`, `Excel Buffer`). 9 declarations in 4
 ///        objects (measured 2026-09-10); `Request Page Parameters Helper` could not compile
 ///        without it (19 UT cases).
-class ArrayList {
+class VariantArrayList {
 public:
-  /// \brief The binder behind the constructor call. The class has no user-declared constructor,
-  ///        because only then may a data member carry the class's own name.
+  /// \brief The stateless binder behind the AL constructor call.
   struct Binder {
     /// \brief `new ArrayList()`.
     /// \return An empty list.
-    [[nodiscard]] class ArrayList operator()() const { return ::agiru::dotnet::ArrayList{}; }
+    [[nodiscard]] class VariantArrayList operator()() const {
+      return ::agiru::dotnet::VariantArrayList{};
+    }
 
     /// \brief `new ArrayList(collection)`: the items of anything that iterates over Variants.
     /// \tparam Source The collection.
@@ -241,8 +246,8 @@ public:
       requires requires(const Source &s) {
         { *s.begin() } -> std::convertible_to<Variant>;
       }
-    [[nodiscard]] class ArrayList operator()(const Source &source) const {
-      ::agiru::dotnet::ArrayList out;
+    [[nodiscard]] class VariantArrayList operator()(const Source &source) const {
+      ::agiru::dotnet::VariantArrayList out;
       for (const auto &item : source) { out.Add(item); }
       return out;
     }
@@ -255,14 +260,14 @@ public:
       requires(!requires(const Source &s) {
         { *s.begin() } -> std::convertible_to<Variant>;
       })
-    [[nodiscard]] class ArrayList operator()(const Source &source) const {
+    [[nodiscard]] class VariantArrayList operator()(const Source &source) const {
       static_cast<void>(static_cast<Integer>(source));
-      return ::agiru::dotnet::ArrayList{};
+      return ::agiru::dotnet::VariantArrayList{};
     }
   };
 
   /// \brief `List.ArrayList(...)`, the constructor as AL calls it.
-  Binder ArrayList;
+  static constexpr Binder ArrayList{};
 
   /// \brief .NET `ArrayList.Add(item)`.
   /// \param item The item.
