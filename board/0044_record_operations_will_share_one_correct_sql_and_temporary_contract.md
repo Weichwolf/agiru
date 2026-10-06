@@ -3,19 +3,19 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay current Field/Table/Page Metadata, scalar catalogue CalcFields and RecordRef
-repairs with 0013/0058 on every UT identity; trace the Incoming Documents regression.
+Next: replay shared positions with 0013/0058 on every UT identity;
+trace Incoming Documents' remaining conversion and invalid-content failures.
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
 Complete Field classification, SQLDataType, package provenance and permissions;
 qualify calculated catalogue predicates.
 Replay the shared Record/RecordRef position repair; qualify regional scalar formatting,
 StoredImage, virtual SystemId and diagnostic/localization contracts.
-Latest completed AL replay (`feff11f`, content `2ba8b347ffe5`) is 2212/2314:
-two gains and no losses/added/missing/duplicate identities versus `a554715`, zero
-incomplete codeunits. Build and 153 C++/specialist checks pass. Shared Table/Page
-navigation, source-owned page IDs and RecordRef.Get consumption are included;
-scalar catalogue CalcFields and Unicode caption fallback are not. The unsealed/null
+Latest completed AL replay (`51831ed`, content `f026b8fc8be6`) is 2218/2314:
+six gains and no losses/added/missing/duplicate identities versus `feff11f`, zero
+incomplete codeunits. Build and 154 C++/specialist checks pass. Scalar catalogue
+CalcFields and Unicode caption fallback are included; the position repair is not.
+The previous Incoming Documents mapping regression is recovered. The unsealed/null
 seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Implementation
@@ -173,8 +173,9 @@ seed prevents causal A/B proof; full G1 remains open (0058).
   the typed-header control reject. Six affected runtime units pass focused tidy;
   Table.cpp retains sixteen earlier findings and the gate inherits two earlier Table.h
   constness findings. No new diagnostic, suppression or golden/baseline increase.
-  Frozen `feff11f` / content `2ba8b347ffe5` passes build and 153/153 C++/specialist cases;
-  its AL replay is 2212/2314 and excludes this scalar calculation. Full G1 remains open.
+  Frozen `51831ed` / content `f026b8fc8be6` includes this calculation and passes build
+  and 154/154 C++/specialist cases; AL is 2218/2314, six gains/no losses versus feff11f.
+  Full G1 remains open.
 - `PageMetadata.{h,cpp}` and `PageMetadataNavigation.cpp` activate native
   Get/Find/FindSet/Next/Count/IsEmpty for qualified English declaration rows over
   `InstalledPages()`. They reuse CatalogueNavigation with three call-scoped scratch

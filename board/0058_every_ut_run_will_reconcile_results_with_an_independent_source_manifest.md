@@ -8,37 +8,33 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Latest completed integration: `feff11f` / content `2ba8b347ffe5`:
-  slice-check/all/test pass; 153/153 C++/specialist cases.
-  AL: 2212/2314 passed, 102 failed, eighty codeunits, zero incomplete/duplicate
-  identities; six workers, 1507 seconds. Target exits: 0/0/0/2; G1 remains open.
-  Compared with `a554715`'s 2210/2314: two gains, no losses or added/missing
-  identities, twelve changed failed errors. Gains: ERM VAT Tool - UT (134061),
-  ShowItemChargeInVATRateChangeLogEntries and ShowResourceVATRateChangeLogEntries.
-  Page Metadata now exposes DataCaptionFields/SourceTableView gaps; Item navigation
-  reaches the unimplemented EntityText.ReadPermission instead of the provider guard.
+- Latest completed integration: `51831ed` / content `f026b8fc8be6`:
+  slice-check/all/test pass; 154/154 C++/specialist cases.
+  AL: 2218/2314 passed, 96 failed, eighty codeunits, zero incomplete/duplicate
+  identities; six workers, 1475 seconds. Target exits: 0/0/0/2; G1 remains open.
+  Compared with `feff11f`'s 2212/2314: six gains, no losses or added/missing
+  identities, one changed failed error. All gains belong to Incoming Doc. To
+  Data Exch.UT (139154): PEPPOL no-mapping, single/multiple import failure,
+  invalid namespace, without mapping and successful processing cases. The earlier
+  TestProcessWithDataExchWithoutMappingFails regression is recovered. Invalid-content
+  processing now reaches an error-message assertion instead of a Field storage refusal.
   Original BCApps/System pins and all source/input hashes remain unchanged.
   Seed identity is null/unsealed: diagnostic comparison, not causal A/B or G1.
   Result digest from `jq -sc 'sort_by(.codeunit_id,.method)|map({codeunit_id,method,status,error})'
-  followed by `sha256sum`: `c20475839605efefa8f8fa07643782f36c14543c0e4f3527b9f24991d5bd2eef`.
+  followed by `sha256sum`: `f036244cb3acdb0e0a31a520bc773497b3a91cdc4f12efc64a87501262097ab1`.
 - This completed snapshot includes native Table/Page Metadata navigation,
-  source-owned page IDs and RecordRef.Get consumption/diagnostics. It excludes
-  scalar catalogue CalcFields (`b221e0d`) and Unicode caption fallback (`48fcd03`).
-  Their local gates pass 67/128 checks, generated AL bindings pass, and all 79
-  compiled metadata controls plus the header control reject. Replay the complete
-  population before attributing gains. Runtime contract evidence belongs in 0013/0044;
-  superseded local receipts and predecessor result details are recoverable at `48fcd03`.
+  source-owned page IDs, RecordRef.Get consumption/diagnostics, scalar catalogue
+  CalcFields (`b221e0d`) and Unicode caption fallback (`48fcd03`). It excludes the
+  shared position repair (`65d3ade`), whose AL replay is next. Runtime contract
+  evidence belongs in 0013/0044; superseded results are recoverable at `65d3ade`.
 - Latest AL failure concentrations: thirteen incoming-document conversion failures,
-  seven Nothing-to-handle paths, five Field and two Table Metadata storage refusals,
+  seven Nothing-to-handle paths,
   four Inventory Profile missing temporary rows and four WorkbookWriter.Create refusals.
   Three EntityText.ReadPermission refusals remain; Page Metadata's canonical views
   and DataCaptionFields still refuse rather than project defaults.
-  The two Table Metadata cases are Incoming Doc. To Data Exch.UT's
-  TestPEPPOLInvoiceToGenJnlLineFailsNoMapping and TestPeppolImportMultipleFails.
-  Native scalar CalcFields previously sent Field/Table/Page Metadata to the guarded SQL
-  storage path. The shared catalogue calculation now has direct native and generated-AL
-  caption lookup probes from DataExchFieldMapping.Table.al (0044). Replay every identity
-  before attributing any UT gain; correlated native predicates and full providers remain gaps.
+  No former Field/Table Metadata storage refusal remains in this measured population.
+  Keep provider write guards: catalogue calculations must not provision SQL copies.
+  Correlated native predicates, invalid-content diagnostics and full providers remain gaps.
 - Raw census: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
   113,111 methods; fifteen approved exclusions leave 113,096 required.
   Zero unmeasured files; seven conditional assignments still refuse.
