@@ -9,6 +9,7 @@
 
 #include "Check.h"
 #include "fixture/codeunit/StreamAliasConsumer.h"
+#include "fixture/table/GlobalStreamReaderConsumer.h"
 
 #include <string_view>
 
@@ -33,6 +34,13 @@ int main() {
                consumer.ReadDecodedLines(lines).Value(),
                "hällo|world\n");
     agiru::Blob empty;
+    agiru::Fixture::GlobalStreamReaderConsumer_Table globalReader;
+    CHECK_TEXT("table global CLR properties retain their getter binding",
+               globalReader.ReadFirst(lines).Value(),
+               "hällo");
+    CHECK_TEXT("rebinding a table global CLR reader preserves its empty-stream property",
+               globalReader.ReadFirst(empty).Value(),
+               "empty");
     CHECK_TEXT("generated CLR reader end property recognizes an empty stream",
                consumer.ReadDecodedLines(empty).Value(),
                "empty");

@@ -6,7 +6,7 @@ CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-streams.XXXXXX)
 mkdir -p "$proof/source" "$proof/files"
 export TMPDIR="$proof/files"
-cp test/runtime/streams/Fixture.Codeunit.al "$proof/source/Fixture.Codeunit.al"
+cp test/runtime/streams/*.al "$proof/source/"
 cp test/transpiler/native-enums/source/app.json "$proof/source/app.json"
 printf '%s\n' '{"apps":[{"name":"fixture","source":"source"}]}' > "$proof/apps.json"
 printf '%s\n' '{"include":["Microsoft"],"exclude":[],"product_exclude":[]}' > "$proof/scope.json"

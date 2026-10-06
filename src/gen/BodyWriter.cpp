@@ -1878,7 +1878,7 @@ public:
           page != index.end() && page->second.fields.contains(LowerKey(std::string(member.field)));
       return !control && RuntimeCallable(member.field);
     }
-    if (local != nullptr && !DeclaresAnObject(*local)) { return RuntimeCallable(member.field); }
+    if (held != nullptr && !DeclaresAnObject(*held)) { return RuntimeCallable(member.field); }
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
       return RuntimeCallable(member.field) &&
              !fields->contains(LowerKey(std::string(member.field)));

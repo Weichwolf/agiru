@@ -69,7 +69,9 @@ void DeclarationsTakePrecedenceOverGetterNames() {
   binding.fields["description"] = agiru::gen::FieldIdentifier(row, "Description");
   const auto table = agiru::al::ParseTable(R"(table 50271 Caller {
     fields { field(1; Stored; Text[100]) {} }
-    var GlobalPage: TestPage Fixture;
+    var
+      GlobalPage: TestPage Fixture;
+      GlobalReader: DotNet StreamReader;
     procedure Read(ParameterPage: TestPage Fixture)
     var
       LocalPage: TestPage Fixture;
@@ -88,6 +90,8 @@ void DeclarationsTakePrecedenceOverGetterNames() {
       Number := Rows.Count;
       Stored := Row.Description;
       Number := Property.Description;
+      if GlobalReader.EndOfStream then
+        Number := 1;
     end;
   })");
   const auto body = agiru::gen::WriteSource(table, "Caller.Table.al", objects);
@@ -100,6 +104,7 @@ void DeclarationsTakePrecedenceOverGetterNames() {
   CHECK_TRUE("query columns are not primitive methods", body.contains("Rows.Count;"));
   CHECK_TRUE("record fields are not CLR getters", body.contains("Row.Description;"));
   CHECK_TRUE("the actual CLR property remains a getter", body.contains("Property.Description()"));
+  CHECK_TRUE("global CLR properties remain getters", body.contains("GlobalReader.EndOfStream()"));
 }
 
 void HeadersAreNotInsertedTwice() {
