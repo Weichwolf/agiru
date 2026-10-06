@@ -679,9 +679,9 @@ bool RunCodeunitByNumber(bool value, ::agiru::Integer Number, Arguments &&...arg
     throw Error("Codeunit.Run(" + std::to_string(Number) +
                 "): this build carries no codeunit of that number");
   }
-  void *record = nullptr;
-  TableId table{};
   if constexpr (sizeof...(Arguments) > 0) {
+    void *record = nullptr;
+    TableId table{};
     const auto take = [&](auto &argument) {
       using A = std::remove_cvref_t<decltype(argument)>;
       if constexpr (requires { argument.operator->(); }) {
@@ -704,8 +704,10 @@ bool RunCodeunitByNumber(bool value, ::agiru::Integer Number, Arguments &&...arg
       }
     };
     (take(arguments), ...);
+    return entry->run(record, table, value);
+  } else {
+    return entry->run(nullptr, TableId{}, value);
   }
-  return entry->run(record, table, value);
 }
 
 }

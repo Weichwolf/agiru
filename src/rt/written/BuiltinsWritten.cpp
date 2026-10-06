@@ -30,7 +30,6 @@
 #include "type/List.h"
 #include "type/ObjectType.h"
 #include "type/RecordId.h"
-#include "type/Refusal.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/StringValue.h"
@@ -47,7 +46,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <expected>
 #include <filesystem>
 #include <format>
 #include <limits>
@@ -114,13 +112,32 @@ std::string TimeText(const ::agiru::Time &held, ::agiru::Integer format) {
       "{:02}{:02}{:02}.{:03}T", held.Hour(), held.Minute(), held.Second(), held.Millisecond());
 }
 
+std::string BooleanText(Boolean value, ::agiru::Integer format) {
+  if (AsText(format)) { return ToText(value); }
+  if (format == kXmlFormat) { return value ? "true" : "false"; }
+  return value ? "1" : "0";
+}
+
+std::string GuidText(const Guid &value, ::agiru::Integer format) {
+  std::string text = value.ToText();
+  if (format == kTrailingSignFormat && text.size() >= 2 && text.front() == '{' &&
+      text.back() == '}') {
+    text = text.substr(1, text.size() - 2);
+  }
+  return text;
+}
+
+std::string JsonText(const ::agiru::JsonInVariant &held) {
+  if (held.kind == ::agiru::detail::JsonKind::Property) {
+    return std::string(
+        std::string_view(::agiru::dotnet::JProperty::Of(held.owner, held.name).ToString()));
+  }
+  return std::string(std::string_view(::agiru::dotnet::JToken{held.handle}.ToString()));
+}
+
 std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
   if (Value.IsEmpty()) { throw Error("Format: the Variant holds no value"); }
-  if (Value.Is<Boolean>()) {
-    if (AsText(format)) { return ToText(Value.Get<Boolean>()); }
-    if (format == kXmlFormat) { return Value.Get<Boolean>() ? "true" : "false"; }
-    return Value.Get<Boolean>() ? "1" : "0";
-  }
+  if (Value.Is<Boolean>()) { return BooleanText(Value.Get<Boolean>(), format); }
   if (Value.Is<::agiru::Integer>()) {
     const std::string text = ToText(Value.Get<::agiru::Integer>());
     return TrailingSign(format) ? WithTrailingSign(text) : text;
@@ -138,14 +155,7 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
   if (Value.Is<Time>()) { return TimeText(Value.Get<Time>(), format); }
   if (Value.Is<DateTime>()) { return Value.Get<DateTime>().ToInvariantString(); }
   if (Value.Is<Duration>()) { return Value.Get<Duration>().ToInvariantString(); }
-  if (Value.Is<Guid>()) {
-    std::string text = Value.Get<Guid>().ToText();
-    if (format == kTrailingSignFormat && text.size() >= 2 && text.front() == '{' &&
-        text.back() == '}') {
-      text = text.substr(1, text.size() - 2);
-    }
-    return text;
-  }
+  if (Value.Is<Guid>()) { return GuidText(Value.Get<Guid>(), format); }
   if (Value.Is<RecordId>()) { return Value.Get<RecordId>().ToText(); }
   if (Value.Is<DateFormula>()) { return Value.Get<DateFormula>().ToText(); }
   if (Value.Is<OrdinalInVariant>()) { return OrdinalText(Value.Get<OrdinalInVariant>(), format); }
@@ -154,11 +164,7 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
   }
   if (Value.Is<Blob>()) { return {}; }
   if (const ::agiru::JsonInVariant *held = Value.JsonHeld(); held != nullptr) {
-    if (held->kind == ::agiru::detail::JsonKind::Property) {
-      return std::string(
-          std::string_view(::agiru::dotnet::JProperty::Of(held->owner, held->name).ToString()));
-    }
-    return std::string(std::string_view(::agiru::dotnet::JToken{held->handle}.ToString()));
+    return JsonText(*held);
   }
   throw Error(std::string("Format: a Variant holding ") + Value.HeldName() +
               " has no text form yet");
@@ -573,8 +579,7 @@ std::string ApplicationArea(std::string_view ApplicationArea) {
 }
 
 ::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date) {
-  const std::expected<::agiru::DateFormula, ::agiru::Refusal> formula =
-      ::agiru::DateFormula::FromText(DateExpression);
+  const auto formula = ::agiru::DateFormula::FromText(DateExpression);
   if (!formula.has_value()) {
     throw ::agiru::Error("System.CalcDate: " + std::string(DateExpression) +
                          " is not a date "

@@ -36,8 +36,11 @@ for control in no-borrow no-restore assignment-alias; do
     control == "no-restore" && /~BorrowScope\(\)/ {
       sub(/borrower_.borrowed_ = previous_;/, "static_cast<void>(previous_);"); changed++
     }
-    control == "assignment-alias" && /Globals &operator=\(\[\[maybe_unused\]\] const Globals &other\)/ {
-      sub(/return \*this;/, "borrowed_ = const_cast<Globals *>(\\&other); return *this;"); changed++
+    control == "assignment-alias" && /Globals &operator=\(const Globals &other\)/ {
+      print
+      print "    borrowed_ = const_cast<Globals *>(&other);"
+      changed++
+      next
     }
     { print }
     END { if (changed != 1) exit 2 }
