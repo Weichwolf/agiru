@@ -3,6 +3,7 @@ namespace Microsoft.Fixture;
 page 50271 "Extension Controls"
 {
     PageType = Card;
+    MultipleNewLines = true;
     layout
     {
         area(Content)

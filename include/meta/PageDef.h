@@ -12,6 +12,8 @@
 
 namespace agiru {
 
+struct ModuleDef;
+
 /// \brief AL's `PageType` values, `devenv-pagetype-property.md`, in the order the page lists them.
 ///
 /// \note THE CATEGORY IS NOT THE VALUE. `devenv-page-types-and-layouts.md` divides the nineteen
@@ -528,6 +530,16 @@ struct PageDef {
   std::string_view extensible{};
   std::string_view access{};        ///< \see extensible
   std::string_view obsoleteState{}; ///< \see extensible
+
+  /// \brief Original declaring application, or nullptr when source ownership is unavailable.
+  /// Extensions do not replace the base owner; the immutable definition is shared per app.
+  const ModuleDef *module{};
+
+  /// \brief Original AL namespace, without conversion into a C++ namespace.
+  std::string_view nameSpace{};
+
+  /// \brief The page/request-page MultipleNewLines property; its documented default is false.
+  bool multipleNewLines = false;
 };
 
 /// \brief Finds a control by its AL name, anywhere in a tree.

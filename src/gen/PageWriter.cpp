@@ -816,6 +816,25 @@ std::string PageTypeOf(const al::PageObject &page) {
   return "Card";
 }
 
+std::string PageReflectionProperties(const al::PageObject &page, const Objects &objects) {
+  std::string out;
+  if (!objects.module.empty()) {
+    if (objects.moduleHeader.empty()) {
+      throw std::runtime_error("page declaration has no original module header: " + page.name);
+    }
+    out += "    .module = &" + objects.module + ",\n";
+  }
+  if (!page.nameSpace.empty()) { out += "    .nameSpace = " + Literal(page.nameSpace) + ",\n"; }
+  if (const auto *found = Find(page.properties, "MultipleNewLines"); found != nullptr) {
+    const std::string value = LowerKey(found->text);
+    if (value != "true" && value != "false") {
+      throw std::invalid_argument("MultipleNewLines must be true or false: " + found->text);
+    }
+    out += "    .multipleNewLines = " + value + ",\n";
+  }
+  return out;
+}
+
 }
 
 std::string
@@ -922,6 +941,7 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
   text("extensible", "Extensible");
   text("access", "Access");
   text("obsoleteState", "ObsoleteState");
+  out += PageReflectionProperties(page, objects);
   out += "};\n\n";
   for (const auto &[named, controls] :
        {std::pair{layout, &page.layout}, std::pair{actions, &page.actions}}) {

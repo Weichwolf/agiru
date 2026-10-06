@@ -5,7 +5,9 @@
 #include "PageWriter.h"
 #include "Parser.h"
 
+#include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace {
 
@@ -153,6 +155,68 @@ void ComputedSourcesUseTheNormalBodyWriter() {
              header.contains("Evaluate(page.SourceRows.operator->()->operator[](1).Amount, text)"));
 }
 
+void PageDeclarationsRetainSourceIdentity() {
+  const auto page = agiru::al::ParsePage(R"(namespace Microsoft.Authored.Pages;
+page 50104 "Original Page Name"
+{
+    Caption = 'Different translated caption';
+    MultipleNewLines = true;
+})");
+  agiru::gen::Objects objects;
+  objects.module = "::agiru::app::kAuthoredModule";
+  objects.moduleHeader = "AuthoredModule.h";
+  const auto definition = agiru::gen::WriteDefinitions(page, "Original.Page.al", objects, nullptr);
+  CHECK_TRUE("page declaration borrows its original immutable application",
+             definition.contains(".module = &::agiru::app::kAuthoredModule,"));
+  CHECK_TRUE("only the definition includes its named application header",
+             definition.contains("#include \"AuthoredModule.h\"") &&
+                 !agiru::gen::WritePage(page, "Original.Page.al", objects)
+                      .text.contains("AuthoredModule.h"));
+  CHECK_TRUE("reflection retains the AL namespace, not its C++ spelling",
+             definition.contains(".nameSpace = \"Microsoft.Authored.Pages\","));
+  CHECK_TRUE("MultipleNewLines retains its declared true value",
+             definition.contains(".multipleNewLines = true,"));
+  CHECK_TRUE("caption remains independent of the original object name",
+             definition.contains(".name = OriginalPageName_Page::kName,") &&
+                 definition.contains(".caption = \"Different translated caption\","));
+  const auto unowned =
+      agiru::gen::WriteDefinitions(page, "Original.Page.al", agiru::gen::Objects{}, nullptr);
+  CHECK_TRUE("absent application ownership is not inferred from the namespace",
+             !unowned.contains(".module =") && !unowned.contains("AuthoredModule.h"));
+  CHECK_TRUE("unowned declarations still retain their original namespace",
+             unowned.contains(".nameSpace = \"Microsoft.Authored.Pages\","));
+  objects.moduleHeader.clear();
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::gen::WriteDefinitions(page, "Original.Page.al", objects, nullptr));
+  } catch (const std::runtime_error &error) {
+    refused = std::string_view(error.what()).contains("no original module header");
+  }
+  CHECK_TRUE("a known owner without its declaration header refuses", refused);
+}
+
+void MultipleNewLinesHasNoGuessedValues() {
+  const auto absent = agiru::al::ParsePage(R"(page 50105 "Default Page" { })");
+  CHECK_TRUE("an absent property uses the declared PageDef false default",
+             !agiru::gen::PageDefinition(absent, {}, nullptr).contains(".multipleNewLines"));
+  CHECK_TRUE("a namespace-free page is not assigned a namespace",
+             !agiru::gen::PageDefinition(absent, {}, nullptr).contains(".nameSpace"));
+  const auto disabled =
+      agiru::al::ParsePage(R"(page 50106 "Disabled Page" { MultipleNewLines = FALSE; })");
+  CHECK_TRUE(
+      "explicit false retains a case-insensitive Boolean value",
+      agiru::gen::PageDefinition(disabled, {}, nullptr).contains(".multipleNewLines = false,"));
+  const auto invalid =
+      agiru::al::ParsePage(R"(page 50107 "Invalid Page" { MultipleNewLines = Enabled; })");
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::gen::PageDefinition(invalid, {}, nullptr));
+  } catch (const std::invalid_argument &error) {
+    refused = std::string_view(error.what()).contains("MultipleNewLines must be true or false");
+  }
+  CHECK_TRUE("a nonliteral value refuses instead of silently becoming false", refused);
+}
+
 }
 
 int main() {
@@ -160,5 +224,7 @@ int main() {
     UserControlsArePageMembers();
     PartNamesDoNotHidePageProcedures();
     ComputedSourcesUseTheNormalBodyWriter();
+    PageDeclarationsRetainSourceIdentity();
+    MultipleNewLinesHasNoGuessedValues();
   });
 }

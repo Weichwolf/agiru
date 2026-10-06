@@ -29,9 +29,12 @@ values, error/TryFunction boundaries and lazy ternary branches; an operand-order
 source mutant must fail. `make boolean-expressions JOBS=2` is the focused entry point.
 
 `transpiler/control-extensions.sh` executes page/report-request-page control order,
-forward anchors and property overrides. Missing/cyclic anchors must refuse in both
-analysis and generation, retaining previous output. `make control-extensions JOBS=2`
-is the focused entry point; move operations and modified triggers remain separate gaps.
+forward anchors and property overrides across separate declaring/extension apps.
+Application identity, raw AL namespace and MultipleNewLines survive composition;
+defaults and independent names/captions execute. Three compiled metadata controls reject.
+Missing/cyclic anchors must refuse in both analysis and generation, retaining previous
+output. `make control-extensions JOBS=2` is the focused entry point; live Page Metadata,
+move operations and modified triggers remain separate gaps.
 
 `transpiler/native-table-ids.sh` executes source-owned `Database::` constants through
 codeunit/table/page/report procedures without promoting unbound native declarations to

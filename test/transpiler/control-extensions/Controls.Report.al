@@ -6,6 +6,7 @@ report 50273 "Extension Request Controls"
     dataset { }
     requestpage
     {
+        MultipleNewLines = true;
         layout
         {
             area(Content)

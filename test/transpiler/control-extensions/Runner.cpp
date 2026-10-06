@@ -1,8 +1,10 @@
+#include "meta/ModuleDef.h"
 #include "meta/PageDef.h"
 
 #include "Check.h"
 #include "fixture/page/ExtensionControls.h"
 #include "fixture/report/ExtensionRequestControls.h"
+#include "other/page/DefaultPageProperties.h"
 
 #include <array>
 #include <cstddef>
@@ -31,6 +33,15 @@ void Ordered(std::span<const agiru::ControlDef> controls, std::span<const std::s
 }
 
 void Extended(const agiru::PageDef &page) {
+  CHECK_TRUE("an extended page retains its original application", page.module != nullptr);
+  if (page.module == nullptr) { throw std::runtime_error("missing original page application"); }
+  CHECK_TEXT("application identity is borrowed from the declaring app",
+             page.module->id,
+             "118874ab-44bc-4ccb-9daf-59763539ab16");
+  CHECK_TEXT(
+      "page namespace remains its original AL spelling", page.nameSpace, "Microsoft.Fixture");
+  CHECK_TRUE("page/request-page MultipleNewLines survives extension composition",
+             page.multipleNewLines);
   constexpr std::array<std::string_view, 6> fields{
       "First", "Before", "Original", "After", "Later", "Dependent"};
   constexpr std::array<std::string_view, 6> actions{"FirstAction",
@@ -63,5 +74,17 @@ int main() {
   return gate::Run("Generated Control Extensions", [] {
     Extended(agiru::PageTraits<agiru::Fixture::ExtensionControls_Page>::kPage);
     Extended(agiru::PageTraits<agiru::Fixture::ExtensionRequestControls_Report>::kPage);
+    const auto &defaults = agiru::PageTraits<agiru::Other::DefaultPageProperties_Page>::kPage;
+    CHECK_TRUE("MultipleNewLines defaults to false", !defaults.multipleNewLines);
+    CHECK_TRUE("pages in different namespaces borrow the same declaring application",
+               defaults.module ==
+                   agiru::PageTraits<agiru::Fixture::ExtensionControls_Page>::kPage.module);
+    CHECK_TEXT("a second namespace does not change application ownership",
+               defaults.nameSpace,
+               "Microsoft.Other");
+    CHECK_TEXT("the original AL object name remains independent",
+               defaults.name,
+               "Default Page Properties");
+    CHECK_TEXT("a different caption is retained", defaults.caption, "A distinct page caption");
   });
 }

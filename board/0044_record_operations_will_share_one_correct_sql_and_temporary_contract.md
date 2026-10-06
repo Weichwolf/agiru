@@ -4,7 +4,9 @@ Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
 Next: replay qualified Integer, Field and Table Metadata repairs with 0013/0058 on every UT
-identity. Complete Field classification, SQLDataType, package provenance and permissions.
+identity. Complete Page Metadata from the native provider contract; qualify canonical
+views, static property resolution, localized text, masks, identity and permissions before activation.
+Complete Field classification, SQLDataType, package provenance and permissions.
 Investigate StoredImage; qualify remaining virtual SystemId and diagnostic/localization contracts.
 Latest completed AL replay (`61344f7`) is 2171/2314 with 36 gains and zero losses
 against `00c187c`; two Table Metadata navigation refusals remain in Incoming Doc.
@@ -88,6 +90,32 @@ Do not attribute unmeasured gains to either increment.
 
 ## Acceptance
 
+- `PageDef` now borrows its original ModuleDef and raw AL namespace and retains
+  MultipleNewLines (documented false default). `PageWriter.cpp` emits the identity
+  without widening public includes; known owners without headers and invalid Boolean
+  properties refuse. GenPageGate passes 37 checks; generated control-extension execution
+  retains 62 and adds thirteen, including separate extension-app ownership and request pages.
+  Replaying the new generator gate against frozen `a554715` fails eight new checks.
+  Three compiled missing-owner/C++-namespace/lost-property controls reject; original
+  missing/cyclic-anchor and order controls remain. Fixture focused tidy passes;
+  GenPageGate retains the existing BodyWriter.h adjacent-parameter finding. PageWriter's
+  23 normalized diagnostics match an independent frozen `a554715` replay exactly.
+  No suppressions/baseline increases. PageDef standalone frontend: 494.8 → 518.9 ms,
+  three rounds each/no PCH; no performance improvement claimed. Slice: 14225/0 missing.
+  Verified-package regeneration still exits 1 with 5683 refused properties.
+  Sources: developer `f928288ee840`, properties/devenv-multiplenewlines-property.md;
+  BCApps `d99152ee35f0`, BaseApp/Utilities/PageManagement.Codeunit.al (Get/card/caption),
+  user docs `bf5ffffa9b02`, business-central/ui-search.md; predecessor 1417/1752
+  separate original names/captions and preserve all registered pages/native enum types.
+  Original BC29 Ncl DLL SHA256 `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`:
+  PageDataProvider iterator RVA `2ebe14` reads frozen extended declarations, original
+  names, truncated metadata text, static Editable, MultipleNewLines, AppID and normalized
+  ALNamespace; GenerateSourceTableViewString RVA `a6dbc` formats sorting/filter IDs,
+  not raw AL source. Artifact/source provenance is in 0013. Qualify these semantics
+  independently; predecessor field numbers/caption widths/doc-order enum ordinals are
+  not authority. The live provider remains explicitly refused: no claim that the five
+  ERM VAT Tool - UT page-navigation failures or full G1 are repaired. This increment
+  is not included in the running `a554715` snapshot.
 - Integer SQL projection now preserves the selected Runtime-18 profile: original
   BC29 virtual timestamp 1, physical timestamp alias, blank identity/audit values
   and nonstored user lookups. Unknown/mistyped stored fields still refuse.

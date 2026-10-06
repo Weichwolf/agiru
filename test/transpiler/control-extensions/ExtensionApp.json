@@ -1,0 +1,14 @@
+{
+  "id": "834a40c9-7a26-46f2-9348-3f6cc8c71719",
+  "name": "Page Extensions",
+  "publisher": "Tests",
+  "version": "1.0.0.0",
+  "dependencies": [
+    {
+      "id": "118874ab-44bc-4ccb-9daf-59763539ab16",
+      "name": "Enum Consumer",
+      "publisher": "Tests",
+      "version": "1.0.0.0"
+    }
+  ]
+}
