@@ -1,10 +1,13 @@
 #include "dotnet/CultureInfo.h"
 
+#include "type/Integer.h"
 #include "type/Language.h"
 
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -12,42 +15,61 @@ namespace agiru::dotnet {
 
 namespace {
 
-struct Culture {
-  std::int32_t lcid;
-  std::string_view name;
-  std::string_view two;
-  std::string_view three;
-};
-
 constexpr std::int32_t kInvariantLcid = 127;
 
-constexpr std::array<Culture, 52> kCultures{{
-    {kInvariantLcid, "", "iv", "IVL"},   {1025, "ar-SA", "ar", "ARA"},
-    {1026, "bg-BG", "bg", "BGR"},        {1027, "ca-ES", "ca", "CAT"},
-    {1028, "zh-TW", "zh", "CHT"},        {1029, "cs-CZ", "cs", "CSY"},
-    {1030, "da-DK", "da", "DAN"},        {1031, "de-DE", "de", "DEU"},
-    {1032, "el-GR", "el", "ELL"},        {1033, "en-US", "en", "ENU"},
-    {1034, "es-ES_tradnl", "es", "ESP"}, {1035, "fi-FI", "fi", "FIN"},
-    {1036, "fr-FR", "fr", "FRA"},        {1037, "he-IL", "he", "HEB"},
-    {1038, "hu-HU", "hu", "HUN"},        {1039, "is-IS", "is", "ISL"},
-    {1040, "it-IT", "it", "ITA"},        {1041, "ja-JP", "ja", "JPN"},
-    {1042, "ko-KR", "ko", "KOR"},        {1043, "nl-NL", "nl", "NLD"},
-    {1044, "nb-NO", "nb", "NOR"},        {1045, "pl-PL", "pl", "PLK"},
-    {1046, "pt-BR", "pt", "PTB"},        {1048, "ro-RO", "ro", "ROM"},
-    {1049, "ru-RU", "ru", "RUS"},        {1050, "hr-HR", "hr", "HRV"},
-    {1051, "sk-SK", "sk", "SKY"},        {1053, "sv-SE", "sv", "SVE"},
-    {1054, "th-TH", "th", "THA"},        {1055, "tr-TR", "tr", "TRK"},
-    {1057, "id-ID", "id", "IND"},        {1058, "uk-UA", "uk", "UKR"},
-    {1060, "sl-SI", "sl", "SLV"},        {1061, "et-EE", "et", "ETI"},
-    {1062, "lv-LV", "lv", "LVI"},        {1063, "lt-LT", "lt", "LTH"},
-    {1066, "vi-VN", "vi", "VIT"},        {1069, "eu-ES", "eu", "EUQ"},
-    {1086, "ms-MY", "ms", "MSL"},        {2052, "zh-CN", "zh", "CHS"},
-    {2055, "de-CH", "de", "DES"},        {2057, "en-GB", "en", "ENG"},
-    {2058, "es-MX", "es", "ESM"},        {2060, "fr-BE", "fr", "FRB"},
-    {2064, "it-CH", "it", "ITS"},        {2067, "nl-BE", "nl", "NLB"},
-    {2068, "nn-NO", "nn", "NON"},        {2070, "pt-PT", "pt", "PTG"},
-    {3079, "de-AT", "de", "DEA"},        {3081, "en-AU", "en", "ENA"},
-    {3082, "es-ES", "es", "ESN"},        {3084, "fr-CA", "fr", "FRC"},
+constexpr std::array<CultureValue::Identity, 52> kCultures{{
+    {.lcid = kInvariantLcid, .name = "", .two = "iv", .three = "IVL"},
+    {.lcid = 1025, .name = "ar-SA", .two = "ar", .three = "ARA"},
+    {.lcid = 1026, .name = "bg-BG", .two = "bg", .three = "BGR"},
+    {.lcid = 1027, .name = "ca-ES", .two = "ca", .three = "CAT"},
+    {.lcid = 1028, .name = "zh-TW", .two = "zh", .three = "CHT"},
+    {.lcid = 1029, .name = "cs-CZ", .two = "cs", .three = "CSY"},
+    {.lcid = 1030, .name = "da-DK", .two = "da", .three = "DAN"},
+    {.lcid = 1031, .name = "de-DE", .two = "de", .three = "DEU"},
+    {.lcid = 1032, .name = "el-GR", .two = "el", .three = "ELL"},
+    {.lcid = 1033, .name = "en-US", .two = "en", .three = "ENU"},
+    {.lcid = 1034, .name = "es-ES_tradnl", .two = "es", .three = "ESP"},
+    {.lcid = 1035, .name = "fi-FI", .two = "fi", .three = "FIN"},
+    {.lcid = 1036, .name = "fr-FR", .two = "fr", .three = "FRA"},
+    {.lcid = 1037, .name = "he-IL", .two = "he", .three = "HEB"},
+    {.lcid = 1038, .name = "hu-HU", .two = "hu", .three = "HUN"},
+    {.lcid = 1039, .name = "is-IS", .two = "is", .three = "ISL"},
+    {.lcid = 1040, .name = "it-IT", .two = "it", .three = "ITA"},
+    {.lcid = 1041, .name = "ja-JP", .two = "ja", .three = "JPN"},
+    {.lcid = 1042, .name = "ko-KR", .two = "ko", .three = "KOR"},
+    {.lcid = 1043, .name = "nl-NL", .two = "nl", .three = "NLD"},
+    {.lcid = 1044, .name = "nb-NO", .two = "nb", .three = "NOR"},
+    {.lcid = 1045, .name = "pl-PL", .two = "pl", .three = "PLK"},
+    {.lcid = 1046, .name = "pt-BR", .two = "pt", .three = "PTB"},
+    {.lcid = 1048, .name = "ro-RO", .two = "ro", .three = "ROM"},
+    {.lcid = 1049, .name = "ru-RU", .two = "ru", .three = "RUS"},
+    {.lcid = 1050, .name = "hr-HR", .two = "hr", .three = "HRV"},
+    {.lcid = 1051, .name = "sk-SK", .two = "sk", .three = "SKY"},
+    {.lcid = 1053, .name = "sv-SE", .two = "sv", .three = "SVE"},
+    {.lcid = 1054, .name = "th-TH", .two = "th", .three = "THA"},
+    {.lcid = 1055, .name = "tr-TR", .two = "tr", .three = "TRK"},
+    {.lcid = 1057, .name = "id-ID", .two = "id", .three = "IND"},
+    {.lcid = 1058, .name = "uk-UA", .two = "uk", .three = "UKR"},
+    {.lcid = 1060, .name = "sl-SI", .two = "sl", .three = "SLV"},
+    {.lcid = 1061, .name = "et-EE", .two = "et", .three = "ETI"},
+    {.lcid = 1062, .name = "lv-LV", .two = "lv", .three = "LVI"},
+    {.lcid = 1063, .name = "lt-LT", .two = "lt", .three = "LTH"},
+    {.lcid = 1066, .name = "vi-VN", .two = "vi", .three = "VIT"},
+    {.lcid = 1069, .name = "eu-ES", .two = "eu", .three = "EUQ"},
+    {.lcid = 1086, .name = "ms-MY", .two = "ms", .three = "MSL"},
+    {.lcid = 2052, .name = "zh-CN", .two = "zh", .three = "CHS"},
+    {.lcid = 2055, .name = "de-CH", .two = "de", .three = "DES"},
+    {.lcid = 2057, .name = "en-GB", .two = "en", .three = "ENG"},
+    {.lcid = 2058, .name = "es-MX", .two = "es", .three = "ESM"},
+    {.lcid = 2060, .name = "fr-BE", .two = "fr", .three = "FRB"},
+    {.lcid = 2064, .name = "it-CH", .two = "it", .three = "ITS"},
+    {.lcid = 2067, .name = "nl-BE", .two = "nl", .three = "NLB"},
+    {.lcid = 2068, .name = "nn-NO", .two = "nn", .three = "NON"},
+    {.lcid = 2070, .name = "pt-PT", .two = "pt", .three = "PTG"},
+    {.lcid = 3079, .name = "de-AT", .two = "de", .three = "DEA"},
+    {.lcid = 3081, .name = "en-AU", .two = "en", .three = "ENA"},
+    {.lcid = 3082, .name = "es-ES", .two = "es", .three = "ESN"},
+    {.lcid = 3084, .name = "fr-CA", .two = "fr", .three = "FRC"},
 }};
 
 bool SameTag(std::string_view a, std::string_view b) {
@@ -61,62 +83,46 @@ bool SameTag(std::string_view a, std::string_view b) {
   return true;
 }
 
-class CultureInfo Made(const Culture &culture) {
-  class CultureInfo made;
-  return made.Fill_(culture.lcid, culture.name, culture.two, culture.three);
 }
 
-}
+CultureValue::CultureValue(Identity identity)
+    : name_(identity.name), two_(identity.two), three_(identity.three), lcid_(identity.lcid) {}
 
-class CultureInfo &CultureInfo::Fill_(std::int32_t lcid,
-                                      std::string_view name,
-                                      std::string_view two,
-                                      std::string_view three) {
-  lcid_ = lcid;
-  name_ = std::string(name);
-  two_ = std::string(two);
-  three_ = std::string(three);
-  return *this;
-}
-
-class CultureInfo CultureInfo::Binder::operator()(Integer lcid) const {
+CultureValue CultureInfo::Binder::operator()(Integer lcid) const {
   return GetCultureInfo(lcid);
 }
 
-class CultureInfo CultureInfo::Binder::operator()(std::string_view name) const {
+CultureValue CultureInfo::Binder::operator()(std::string_view name) const {
   return GetCultureInfo(name);
 }
 
-class CultureInfo CultureInfo::InvariantCulture() {
-  return Made(kCultures.front());
+CultureValue CultureInfo::InvariantCulture() {
+  return CultureValue{kCultures.front()};
 }
 
-class CultureInfo CultureInfo::CurrentCulture() {
+CultureValue CultureInfo::CurrentCulture() {
   return GetCultureInfo(Language::Current());
 }
 
-class CultureInfo CultureInfo::GetCultureInfo(Integer lcid) {
-  const auto found = std::ranges::find_if(
-      kCultures, [lcid](const Culture &culture) { return culture.lcid == lcid; });
-  if (found != kCultures.end()) { return Made(*found); }
-  class CultureInfo unknown;
-  return unknown.Fill_(lcid, "", "Unknown", "Unknown");
+CultureValue CultureInfo::GetCultureInfo(Integer lcid) {
+  const auto *const found = std::ranges::find_if(
+      kCultures, [lcid](const Identity &culture) { return culture.lcid == lcid; });
+  if (found != kCultures.end()) { return CultureValue{*found}; }
+  return CultureValue{Identity{.lcid = lcid, .name = "", .two = "Unknown", .three = "Unknown"}};
 }
 
-class CultureInfo CultureInfo::GetCultureInfo(std::string_view name) {
-  const auto found = std::ranges::find_if(
-      kCultures, [name](const Culture &culture) { return SameTag(culture.name, name); });
-  if (found != kCultures.end()) { return Made(*found); }
-  class CultureInfo unknown;
-  return unknown.Fill_(0, name, "Unknown", "Unknown");
+CultureValue CultureInfo::GetCultureInfo(std::string_view name) {
+  const auto *const found = std::ranges::find_if(
+      kCultures, [name](const Identity &culture) { return SameTag(culture.name, name); });
+  if (found != kCultures.end()) { return CultureValue{*found}; }
+  return CultureValue{Identity{.lcid = 0, .name = name, .two = "Unknown", .three = "Unknown"}};
 }
 
-class CultureInfo CultureInfo::Parent() const {
+CultureValue CultureInfo::Parent() const {
   const std::size_t dash = name_.find('-');
   if (dash == std::string::npos) { return *this; }
   const std::string_view two = std::string_view(name_).substr(0, dash);
-  class CultureInfo neutral;
-  return neutral.Fill_(0, two, two, three_);
+  return CultureValue{Identity{.lcid = 0, .name = two, .two = two, .three = three_}};
 }
 
 }

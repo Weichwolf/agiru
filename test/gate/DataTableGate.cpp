@@ -5,13 +5,15 @@
 #include "runtime/ErrorValue.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
 #include <string>
+#include <string_view>
+#include <type_traits>
 
 using agiru::Integer;
 using agiru::Variant;
@@ -24,6 +26,10 @@ using agiru::dotnet::DataTable;
 using agiru::dotnet::Type;
 
 namespace {
+
+constexpr Integer kWindowsEnglishUnitedStatesLcid = 1033;
+constexpr Integer kStepLineOrdinal = 5;
+static_assert(std::is_const_v<decltype(CultureInfo::CultureInfo)>);
 
 std::string T(const agiru::Text<0> &text) {
   return std::string(std::string_view(text));
@@ -51,13 +57,13 @@ void ATypeIsItsFullName() {
 /// .NET answers a custom culture, rather than refusing.
 void ACultureIsATagAndANumber() {
   CultureInfo culture;
-  culture = culture.CultureInfo(Integer{1033});
+  culture = CultureInfo::CultureInfo(kWindowsEnglishUnitedStatesLcid);
   CHECK_TEXT("en-US by LCID", T(culture.Name()), "en-US");
   CHECK_TRUE("and its LCID", culture.LCID() == 1033);
   CHECK_TEXT("two-letter ISO", T(culture.TwoLetterISOLanguageName()), "en");
   CHECK_TEXT("three-letter Windows", T(culture.ThreeLetterWindowsLanguageName()), "ENU");
   CHECK_TEXT("the parent is the neutral culture", T(culture.Parent().Name()), "en");
-  culture = culture.CultureInfo("de-de");
+  culture = CultureInfo::CultureInfo("de-de");
   CHECK_TRUE("by name, without regard to case", culture.LCID() == 1031);
   CHECK_TEXT("the invariant culture has no name", T(CultureInfo::InvariantCulture().Name()), "");
   CHECK_TRUE("and LCID 127", CultureInfo::InvariantCulture().LCID() == 127);
@@ -65,6 +71,29 @@ void ACultureIsATagAndANumber() {
              T(CultureInfo::GetCultureInfo(Integer{9999}).ThreeLetterWindowsLanguageName()),
              "Unknown");
   CHECK_TRUE("and its LCID", CultureInfo::GetCultureInfo(Integer{9999}).LCID() == 9999);
+  const auto custom = CultureInfo::GetCultureInfo("custom-tag");
+  CHECK_TEXT("an unknown language retains its name", T(custom.Name()), "custom-tag");
+  CHECK_TRUE("an unknown language has no catalogue LCID", custom.LCID() == 0);
+  CHECK_TEXT("an unknown language does not invent ISO names",
+             T(custom.TwoLetterISOLanguageName()),
+             "Unknown");
+}
+
+void CultureIdentityOwnsItsNames() {
+  std::string tag = "en-US";
+  std::string iso = "en";
+  std::string windows = "ENU";
+  const CultureInfo owned{CultureInfo::Identity{
+      .lcid = kWindowsEnglishUnitedStatesLcid, .name = tag, .two = iso, .three = windows}};
+  tag = "changed";
+  iso = "changed";
+  windows = "changed";
+  CHECK_TEXT("the named culture value owns the language tag", T(owned.Name()), "en-US");
+  CHECK_TEXT(
+      "the named culture value owns the ISO name", T(owned.TwoLetterISOLanguageName()), "en");
+  CHECK_TEXT("the named culture value owns the Windows name",
+             T(owned.ThreeLetterWindowsLanguageName()),
+             "ENU");
 }
 
 /// A `DataTable` IS COLUMNS AND ROWS OF VARIANTS, AND EVERY PIECE IS A REFERENCE: a column added
@@ -124,7 +153,7 @@ void ChartDataHoldsTheShape() {
   data = data.BusinessChartData();
   data.XDimension("Month");
   DataMeasureType type;
-  type = Integer{5};
+  type = kStepLineOrdinal;
   data.AddMeasure("Amount", type);
   data.AddMeasure("Count", DataMeasureType::Line());
   CHECK_TEXT("the X dimension", T(data.XDimension()), "Month");
@@ -144,6 +173,7 @@ int main() {
   return gate::Run("DataTable", [] {
     ATypeIsItsFullName();
     ACultureIsATagAndANumber();
+    CultureIdentityOwnsItsNames();
     ATableIsColumnsAndRowsAndEveryPieceIsAReference();
     ChartDataHoldsTheShape();
   });

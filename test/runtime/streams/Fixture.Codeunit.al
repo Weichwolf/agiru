@@ -2,6 +2,14 @@ namespace Microsoft.Fixture;
 
 codeunit 50261 "Stream Alias Consumer"
 {
+    procedure CultureName(CultureId: Integer): Text
+    var
+        Culture: DotNet CultureInfo;
+    begin
+        Culture := Culture.CultureInfo(CultureId);
+        exit(Culture.Name);
+    end;
+
     procedure BinaryRoundTrip(var Store: Blob; Value: Text): Text
     var
         Output: OutStream;

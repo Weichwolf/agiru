@@ -2,13 +2,17 @@
 
 #include "dotnet/Refused.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 
 #include <cstdint>
 #include <string>
 #include <string_view>
 
 namespace agiru::dotnet {
+
+class CultureValue;
+/// \brief The AL name of the culture identity value.
+using CultureInfo = CultureValue;
 
 /// \brief .NET `System.Globalization.CultureInfo`, rebuilt as a NAME AND A NUMBER: the language
 ///        tag (`en-US`), its Windows LCID (1033), the two-letter ISO name (`en`) and the
@@ -19,31 +23,45 @@ namespace agiru::dotnet {
 ///          the formatting layer's, which is not rebuilt yet (board:0035). A culture this table
 ///          does not carry keeps the name or number it was made from and answers `Unknown` for
 ///          the rest, the way .NET answers a custom culture, rather than refusing.
-class CultureInfo {
+class CultureValue {
 public:
+  /// \brief Named culture fields used by the native catalogue.
+  struct Identity {
+    std::int32_t lcid = 0;  ///< Windows language identifier.
+    std::string_view name;  ///< Language tag.
+    std::string_view two;   ///< Two-letter ISO language name.
+    std::string_view three; ///< Three-letter Windows language name.
+  };
+
+  /// \brief An empty culture value.
+  CultureValue() = default;
+
+  /// \param identity Culture fields copied into owned storage.
+  explicit CultureValue(Identity identity);
+
   /// \brief The binder behind `C := C.CultureInfo(1033)` and `C := C.CultureInfo('en-US')`.
   struct Binder {
     /// \brief `new CultureInfo(lcid)`. \param lcid The Windows language id. \return The culture.
-    [[nodiscard]] class CultureInfo operator()(Integer lcid) const;
+    [[nodiscard]] CultureValue operator()(Integer lcid) const;
 
     /// \brief `new CultureInfo(name)`. \param name The language tag. \return The culture.
-    [[nodiscard]] class CultureInfo operator()(std::string_view name) const;
+    [[nodiscard]] CultureValue operator()(std::string_view name) const;
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder CultureInfo; // NOLINT(misc-non-private-member-variables-in-classes)
+  static constexpr Binder CultureInfo{};
 
   /// \brief `CultureInfo.InvariantCulture`: the culture with no name and LCID 127. \return It.
-  [[nodiscard]] static class CultureInfo InvariantCulture();
+  [[nodiscard]] static CultureValue InvariantCulture();
 
   /// \brief `CultureInfo.CurrentCulture`: the session's language. \return It.
-  [[nodiscard]] static class CultureInfo CurrentCulture();
+  [[nodiscard]] static CultureValue CurrentCulture();
 
   /// \brief `CultureInfo.GetCultureInfo(lcid)`. \param lcid The id. \return The culture.
-  [[nodiscard]] static class CultureInfo GetCultureInfo(Integer lcid);
+  [[nodiscard]] static CultureValue GetCultureInfo(Integer lcid);
 
   /// \brief `CultureInfo.GetCultureInfo(name)`. \param name The tag. \return The culture.
-  [[nodiscard]] static class CultureInfo GetCultureInfo(std::string_view name);
+  [[nodiscard]] static CultureValue GetCultureInfo(std::string_view name);
 
   /// \brief `CultureInfo.Name`: the language tag, `en-US`; empty for the invariant culture.
   /// \return It.
@@ -62,7 +80,7 @@ public:
 
   /// \brief `CultureInfo.Parent`: the neutral culture of a specific one, `en` for `en-US`; the
   ///        invariant culture is its own parent. \return It.
-  [[nodiscard]] class CultureInfo Parent() const;
+  [[nodiscard]] CultureValue Parent() const;
 
   /// \brief `CultureInfo.ToString()`: the name. \return It.
   [[nodiscard]] ::agiru::Text<0> ToString() const { return name_; }
@@ -81,16 +99,10 @@ public:
   /// \tparam R The refusal. \param refused It. \return This.
   template <typename R>
     requires requires { typename R::IsAlRefusal; }
-  class CultureInfo &operator=(const R &refused) {
+  CultureValue &operator=(const R &refused) {
     static_cast<void>(refused);
     return *this;
   }
-
-  /// \brief Fills the four values; what the binder and the factories call. \param lcid The id.
-  ///        \param name The tag. \param two The ISO name. \param three The Windows name.
-  /// \return This.
-  class CultureInfo &
-  Fill_(std::int32_t lcid, std::string_view name, std::string_view two, std::string_view three);
 
 private:
   std::string name_;

@@ -13,6 +13,10 @@
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
     agiru::Fixture::StreamAliasConsumer_Codeunit consumer;
+    constexpr agiru::Integer kWindowsEnglishUnitedStatesLcid = 1033;
+    CHECK_TEXT("generated immutable culture factories retain their AL name",
+               consumer.CultureName(kWindowsEnglishUnitedStatesLcid).Value(),
+               "en-US");
     agiru::Blob note;
     CHECK_TEXT("generated immutable CLR factories preserve Unicode data",
                consumer.BinaryRoundTrip(note, "hällo").Value(),

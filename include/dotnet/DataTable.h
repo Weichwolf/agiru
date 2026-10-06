@@ -159,7 +159,7 @@ public:
   /// \brief `Columns.Item(index)`. \param index The position, from 0. \return The column.
   /// \throws Error when the index is outside the collection.
   [[nodiscard]] class DataColumn Item(Integer index) const {
-    const std::size_t at = static_cast<std::size_t>(index);
+    const auto at = static_cast<std::size_t>(index);
     if (index < 0 || at >= columns_->size()) {
       throw Error("DataTable.Columns: there is no column " + std::to_string(index));
     }
@@ -278,7 +278,7 @@ private:
   }
 
   [[nodiscard]] std::size_t Position_(Integer index) const {
-    const std::size_t at = static_cast<std::size_t>(index);
+    const auto at = static_cast<std::size_t>(index);
     if (index < 0 || at >= Held_().values.size()) {
       throw Error("DataRow: there is no column " + std::to_string(index));
     }
@@ -303,7 +303,7 @@ public:
   /// \brief `Rows.Item(index)`. \param index The position, from 0. \return The row.
   /// \throws Error when the index is outside the collection.
   [[nodiscard]] class DataRow Item(Integer index) const {
-    const std::size_t at = static_cast<std::size_t>(index);
+    const auto at = static_cast<std::size_t>(index);
     if (index < 0 || at >= rows_->size()) {
       throw Error("DataTable.Rows: there is no row " + std::to_string(index));
     }
@@ -373,10 +373,10 @@ public:
   void Clear() { Held_().rows->clear(); }
 
   /// \brief `DataTable.Locale` read. \return The culture the table was given.
-  [[nodiscard]] class CultureInfo Locale() const { return Held_().locale; }
+  [[nodiscard]] CultureInfo Locale() const { return Held_().locale; }
 
   /// \brief `DataTable.Locale := culture`. \param culture The culture. \return It.
-  class CultureInfo Locale(const class CultureInfo &culture) {
+  CultureInfo Locale(const CultureInfo &culture) {
     Held_().locale = culture;
     return culture;
   }
@@ -409,7 +409,7 @@ private:
         std::make_shared<std::vector<class DataColumn>>();
     std::shared_ptr<std::vector<class DataRow>> rows =
         std::make_shared<std::vector<class DataRow>>();
-    class CultureInfo locale = CultureInfo::InvariantCulture();
+    CultureInfo locale = CultureInfo::InvariantCulture();
   };
 
   static class DataTable Made(std::string_view name) {
