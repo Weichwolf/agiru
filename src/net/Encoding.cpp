@@ -194,38 +194,38 @@ std::string ArrayToBytes(const Array &bytes, Integer index, Integer count) {
 
 }
 
-class Encoding Encoding::Binder::operator()() const {
+class EncodingValue Encoding::Binder::operator()() const {
   return Encoding::UTF8();
 }
 
-class Encoding Encoding::UTF8() {
+class EncodingValue Encoding::UTF8() {
   return Made(kUtf8, true);
 
 }
 
-class Encoding
+class EncodingValue
 Encoding::Unicode() {
 
   return Made(kUtf16, true);
 }
 
-class Encoding Encoding::ASCII() {
+class EncodingValue Encoding::ASCII() {
   return Made(kAscii, false);
 
 }
 
-class Encoding
+class EncodingValue
 Encoding::Default() {
 
   return Made(kUtf8, false);
 }
 
-class Encoding Encoding::UTF32() {
+class EncodingValue Encoding::UTF32() {
   return Made(kUtf32, true);
 
 }
 
-class Encoding
+class EncodingValue
 Encoding::GetEncoding(Integer codePage) {
 
   const std::int32_t page = codePage;
@@ -238,7 +238,7 @@ Encoding::GetEncoding(Integer codePage) {
               " has no implementation (board:0035)");
 }
 
-class Encoding Encoding::GetEncoding(std::string_view name) {
+class EncodingValue Encoding::GetEncoding(std::string_view name) {
   std::string lowered;
   for (const char c : name) {
     lowered += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -256,7 +256,9 @@ class Encoding Encoding::GetEncoding(std::string_view name) {
   throw Error("Encoding.GetEncoding: the encoding " + std::string(name) + " is not one known here");
 }
 
-Array Encoding::Convert(const class Encoding &from, const class Encoding &to, const Array &bytes) {
+Array Encoding::Convert(const class EncodingValue &from,
+                        const class EncodingValue &to,
+                        const Array &bytes) {
   return BytesToArray(to.Encode(from.Decode(ArrayToBytes(bytes, 0, bytes.Length()))));
 }
 
@@ -397,21 +399,22 @@ Array Encoding::GetPreamble() const {
   return ::agiru::Text<0>{"windows-" + std::to_string(codePage_)};
 }
 
-class UTF8Encoding UTF8Encoding::Binder::operator()(Boolean emitBom) const {
-  class UTF8Encoding out;
-  static_cast<class Encoding &>(out) = Encoding::Made(Encoding::kUtf8, static_cast<bool>(emitBom));
+class Utf8EncodingValue UTF8Encoding::Binder::operator()(Boolean emitBom) const {
+  class Utf8EncodingValue out;
+  static_cast<class EncodingValue &>(out) =
+      Encoding::Made(Encoding::kUtf8, static_cast<bool>(emitBom));
   return out;
 }
 
-class UnicodeEncoding UnicodeEncoding::Binder::operator()() const {
-  class UnicodeEncoding out;
-  static_cast<class Encoding &>(out) = Encoding::Unicode();
+class Utf16EncodingValue UnicodeEncoding::Binder::operator()() const {
+  class Utf16EncodingValue out;
+  static_cast<class EncodingValue &>(out) = Encoding::Unicode();
   return out;
 }
 
-class ASCIIEncoding ASCIIEncoding::Binder::operator()() const {
-  class ASCIIEncoding out;
-  static_cast<class Encoding &>(out) = Encoding::ASCII();
+class AsciiEncodingValue ASCIIEncoding::Binder::operator()() const {
+  class AsciiEncodingValue out;
+  static_cast<class EncodingValue &>(out) = Encoding::ASCII();
   return out;
 }
 

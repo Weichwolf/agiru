@@ -13,11 +13,17 @@
 #include <print>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 using agiru::dotnet::Encoding;
 
 namespace {
+
+static_assert(std::is_const_v<decltype(Encoding::Encoding)>);
+static_assert(std::is_const_v<decltype(agiru::dotnet::UTF8Encoding::UTF8Encoding)>);
+static_assert(std::is_const_v<decltype(agiru::dotnet::UnicodeEncoding::UnicodeEncoding)>);
+static_assert(std::is_const_v<decltype(agiru::dotnet::ASCIIEncoding::ASCIIEncoding)>);
 
 constexpr unsigned kAsciiBoundary = 128;
 constexpr unsigned kTwoByteBoundary = 2048;

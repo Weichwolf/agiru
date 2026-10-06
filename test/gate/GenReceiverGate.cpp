@@ -26,7 +26,11 @@ void NativeAliasesRemainRebuiltTypes() {
                            "CultureInfo",
                            "String",
                            "Regex",
-                           "TimeSpan"}) {
+                           "TimeSpan",
+                           "Encoding",
+                           "UTF8Encoding",
+                           "UnicodeEncoding",
+                           "ASCIIEncoding"}) {
     declaration.subtype = name;
     CHECK_TRUE("an AL type alias remains implemented", types.contains(name));
     CHECK_TRUE("the alias does not emit an absent CLR stub",

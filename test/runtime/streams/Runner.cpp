@@ -14,6 +14,9 @@
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
     agiru::Fixture::StreamAliasConsumer_Codeunit consumer;
+    constexpr agiru::Integer kEncodingFactoryCodePageSum = 65001 + 65001 + 1200 + 20127;
+    CHECK_TRUE("generated CLR encoding factories retain all four AL constructor names",
+               consumer.ClrEncodingPages() == kEncodingFactoryCodePageSum);
     CHECK_TEXT("generated CLR string factories preserve Unicode",
                consumer.ClrString("hällo").Value(),
                "hällo");

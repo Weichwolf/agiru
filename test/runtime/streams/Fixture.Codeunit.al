@@ -2,6 +2,20 @@ namespace Microsoft.Fixture;
 
 codeunit 50261 "Stream Alias Consumer"
 {
+    procedure ClrEncodingPages(): Integer
+    var
+        Base: DotNet Encoding;
+        Utf8: DotNet UTF8Encoding;
+        Utf16: DotNet UnicodeEncoding;
+        Ascii: DotNet ASCIIEncoding;
+    begin
+        Base := Base.Encoding();
+        Utf8 := Utf8.UTF8Encoding(true);
+        Utf16 := Utf16.UnicodeEncoding();
+        Ascii := Ascii.ASCIIEncoding();
+        exit(Base.CodePage + Utf8.CodePage + Utf16.CodePage + Ascii.CodePage);
+    end;
+
     procedure ClrString(Value: Text): Text
     var
         StringValue: DotNet String;

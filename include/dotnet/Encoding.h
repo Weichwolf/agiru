@@ -3,14 +3,29 @@
 #include "dotnet/Regex.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <string_view>
 
 namespace agiru::dotnet {
+
+class EncodingValue;
+/// \brief The AL name of the native Encoding value.
+using Encoding = EncodingValue;
+
+class Utf8EncodingValue;
+/// \brief The AL name of the native UTF8Encoding value.
+using UTF8Encoding = Utf8EncodingValue;
+
+class Utf16EncodingValue;
+/// \brief The AL name of the native UnicodeEncoding value.
+using UnicodeEncoding = Utf16EncodingValue;
+
+class AsciiEncodingValue;
+/// \brief The AL name of the native ASCIIEncoding value.
+using ASCIIEncoding = AsciiEncodingValue;
 
 /// \brief .NET `System.Text.Encoding` with UTF-8, UTF-16LE and UTF-32LE replacement decoding.
 ///        Unicode encoders replace unpaired UTF-16 surrogates; byte conversion emits no BOM.
@@ -23,45 +38,45 @@ namespace agiru::dotnet {
 ///       (`Array.GetValue(i)` is an Integer there too).
 /// \note `GetEncoding(0)` currently selects 1252 for the Windows-compatible server default;
 ///       locale-dependent ANSI/OEM selection remains unqualified. `Encoding.Default` is UTF-8.
-class Encoding {
+class EncodingValue {
 public:
   /// \brief The binder behind `E := E.Encoding()`, which AL never calls with arguments.
   struct Binder {
     /// \brief `new Encoding()`: the default, UTF-8. \return The encoding.
-    [[nodiscard]] class Encoding operator()() const;
+    [[nodiscard]] class EncodingValue operator()() const;
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder Encoding;
+  static constexpr Binder Encoding{};
 
   /// \brief `Encoding.UTF8`. \return UTF-8, with a preamble.
-  [[nodiscard]] static class Encoding UTF8();
+  [[nodiscard]] static class EncodingValue UTF8();
 
   /// \brief `Encoding.Unicode`. \return UTF-16 little-endian, with a preamble.
-  [[nodiscard]] static class Encoding Unicode();
+  [[nodiscard]] static class EncodingValue Unicode();
 
   /// \brief `Encoding.ASCII`. \return ASCII.
-  [[nodiscard]] static class Encoding ASCII();
+  [[nodiscard]] static class EncodingValue ASCII();
 
   /// \brief `Encoding.Default`. \return UTF-8.
-  [[nodiscard]] static class Encoding Default();
+  [[nodiscard]] static class EncodingValue Default();
 
   /// \brief `Encoding.UTF32`. \return UTF-32 little-endian.
-  [[nodiscard]] static class Encoding UTF32();
+  [[nodiscard]] static class EncodingValue UTF32();
 
   /// \brief `Encoding.GetEncoding(codePage)`. \param codePage The declared numeric codepage.
   /// \return The supported encoding. \throws Error for an unimplemented codepage.
-  [[nodiscard]] static class Encoding GetEncoding(Integer codePage);
+  [[nodiscard]] static class EncodingValue GetEncoding(Integer codePage);
 
   /// \brief `Encoding.GetEncoding(name)`. \param name `utf-8`, `utf-16`, `us-ascii`,
   ///        `windows-1252`, `iso-8859-1` or a supported alias. \return The encoding.
   /// \throws Error for an unknown name or unsupported page; never guesses from a prefix.
-  [[nodiscard]] static class Encoding GetEncoding(std::string_view name);
+  [[nodiscard]] static class EncodingValue GetEncoding(std::string_view name);
 
   /// \brief `Encoding.Convert(from, to, bytes)`. \param from The bytes' encoding. \param to The
   ///        wanted one. \param bytes The bytes. \return The bytes in the wanted encoding.
   [[nodiscard]] static Array
-  Convert(const class Encoding &from, const class Encoding &to, const Array &bytes);
+  Convert(const class EncodingValue &from, const class EncodingValue &to, const Array &bytes);
 
   /// \brief `Encoding.GetBytes(text)`. \param text The text. \return Its bytes.
   [[nodiscard]] Array GetBytes(std::string_view text) const;
@@ -132,8 +147,8 @@ public:
   /// \brief An encoding by code page, the factory every named one goes through.
   /// \param codePage The code page. \param preamble Whether `GetPreamble` answers a mark.
   /// \return The encoding.
-  static class Encoding Made(std::int32_t codePage, bool preamble) {
-    class Encoding out;
+  static class EncodingValue Made(std::int32_t codePage, bool preamble) {
+    class EncodingValue out;
     out.codePage_ = codePage;
     out.preamble_ = preamble;
     return out;
@@ -147,46 +162,46 @@ private:
 };
 
 /// \brief .NET `UTF8Encoding`: UTF-8 with or without a byte order mark.
-class UTF8Encoding : public Encoding {
+class Utf8EncodingValue : public Encoding {
 public:
   /// \brief The binder behind `E := E.UTF8Encoding([emitBom])`.
   struct Binder {
     /// \brief `new UTF8Encoding()` and `new UTF8Encoding(emitBom)`. \param emitBom Whether
     ///        `GetPreamble` answers the byte order mark. \return The encoding.
-    [[nodiscard]] class UTF8Encoding operator()(Boolean emitBom = false) const;
+    [[nodiscard]] class Utf8EncodingValue operator()(Boolean emitBom = false) const;
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder UTF8Encoding;
+  static constexpr Binder UTF8Encoding{};
 
 private:
   friend struct Binder;
 };
 
 /// \brief .NET `UnicodeEncoding`: UTF-16 little-endian.
-class UnicodeEncoding : public Encoding {
+class Utf16EncodingValue : public Encoding {
 public:
   /// \brief The binder behind `E := E.UnicodeEncoding()`.
   struct Binder {
     /// \brief `new UnicodeEncoding()`. \return The encoding.
-    [[nodiscard]] class UnicodeEncoding operator()() const;
+    [[nodiscard]] class Utf16EncodingValue operator()() const;
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder UnicodeEncoding;
+  static constexpr Binder UnicodeEncoding{};
 };
 
 /// \brief .NET `ASCIIEncoding`.
-class ASCIIEncoding : public Encoding {
+class AsciiEncodingValue : public Encoding {
 public:
   /// \brief The binder behind `E := E.ASCIIEncoding()`.
   struct Binder {
     /// \brief `new ASCIIEncoding()`. \return The encoding.
-    [[nodiscard]] class ASCIIEncoding operator()() const;
+    [[nodiscard]] class AsciiEncodingValue operator()() const;
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder ASCIIEncoding;
+  static constexpr Binder ASCIIEncoding{};
 };
 
 }
