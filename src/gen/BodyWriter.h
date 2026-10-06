@@ -19,6 +19,12 @@ struct OfVariable {
   std::string_view field;
 };
 
+struct OfPartControl {
+  std::string_view variable;
+  std::string_view part;
+  std::string_view control;
+};
+
 class Names {
 public:
   Names() = default;
@@ -42,12 +48,8 @@ public:
     return {};
   }
 
-  [[nodiscard]] virtual std::string PartControlSpelling(std::string_view variable,
-                                                        std::string_view part,
-                                                        std::string_view control) const {
-    static_cast<void>(variable);
-    static_cast<void>(part);
-    static_cast<void>(control);
+  [[nodiscard]] virtual std::string PartControlSpelling(const OfPartControl &member) const {
+    static_cast<void>(member);
     return {};
   }
 

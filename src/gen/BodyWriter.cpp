@@ -33,6 +33,7 @@ namespace agiru::gen {
 namespace {
 
 constexpr int kMaxDepth = 4096;
+constexpr int kXmlPortRecordIndent = 6;
 
 enum class ValueUse { Consumed, Discarded };
 
@@ -111,6 +112,11 @@ constexpr std::size_t kYearDigits = 4;
 constexpr std::size_t kPairDigits = 2;
 constexpr std::size_t kMilliDigits = 3;
 
+std::string DecimalDigits(std::string part) {
+  while (part.size() > 1 && part.front() == '0') { part.erase(0, 1); }
+  return part;
+}
+
 std::string Temporal(const std::string &literal) {
   std::string upper = literal;
   for (char &c : upper) { c = static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
@@ -123,18 +129,14 @@ std::string Temporal(const std::string &literal) {
     return zero ? "::agiru::DateTime{}"
                 : "::agiru::RefusedTemporal<::agiru::DateTime>(\"" + literal + "\")";
   }
-  const auto decimal = [](std::string part) {
-    while (part.size() > 1 && part.front() == '0') { part.erase(0, 1); }
-    return part;
-  };
   if (suffix == "D") {
     if (zero) { return "::agiru::Date{}"; }
     if (digits.size() != kDateDigits) {
       return "::agiru::RefusedTemporal<::agiru::Date>(\"" + literal + "\")";
     }
-    return "Date::FromYmd(" + decimal(digits.substr(0, kYearDigits)) + ", " +
-           decimal(digits.substr(kYearDigits, kPairDigits)) + ", " +
-           decimal(digits.substr(kYearDigits + kPairDigits, kPairDigits)) + ")";
+    return "Date::FromYmd(" + DecimalDigits(digits.substr(0, kYearDigits)) + ", " +
+           DecimalDigits(digits.substr(kYearDigits, kPairDigits)) + ", " +
+           DecimalDigits(digits.substr(kYearDigits + kPairDigits, kPairDigits)) + ")";
   }
   if (suffix == "T") {
     if (zero) { return "Time{}"; }
@@ -143,10 +145,10 @@ std::string Temporal(const std::string &literal) {
     if (clock.size() != kClockDigits) { return "RefusedTemporal<Time>(\"" + literal + "\")"; }
     std::string milli = point == std::string::npos ? "0" : digits.substr(point + 1);
     while (milli.size() < kMilliDigits) { milli += '0'; }
-    return "Time::FromHms(" + decimal(clock.substr(0, kPairDigits)) + ", " +
-           decimal(clock.substr(kPairDigits, kPairDigits)) + ", " +
-           decimal(clock.substr(2 * kPairDigits, kPairDigits)) + ", " +
-           decimal(milli.substr(0, kMilliDigits)) + ")";
+    return "Time::FromHms(" + DecimalDigits(clock.substr(0, kPairDigits)) + ", " +
+           DecimalDigits(clock.substr(kPairDigits, kPairDigits)) + ", " +
+           DecimalDigits(clock.substr(2 * kPairDigits, kPairDigits)) + ", " +
+           DecimalDigits(milli.substr(0, kMilliDigits)) + ")";
   }
   return "RefusedTemporal<Date>(\"" + literal + "\")";
 }
@@ -393,7 +395,7 @@ private:
                : expression;
   }
 
-  std::string Kinded(std::string_view kind, const std::string &name) {
+  std::string Kinded(std::string_view kind, const std::string &name) const {
     if (kind == "enums" && scope_.EnumObject(name).empty()) {
       return "RefusedOption(\"" + name + "\")";
     }
@@ -420,15 +422,14 @@ private:
     return {};
   }
 
-  std::string Scope(const al::Expr &expression) {
-    const al::Expr &base = expression.children.front();
+  std::string FieldScope(const al::Expr &base, std::string_view member) const {
     if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
         Indexed(base.children[0]).kind == al::ExprKind::Name &&
         base.children[1].kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.FieldEnumeration(
           OfVariable{.variable = Indexed(base.children[0]).text, .field = base.children[1].text});
-      if (!enumeration.empty()) { return AsOption(enumeration, expression.text); }
-      if (const std::string option = MethodOption(base.children[1].text, expression.text);
+      if (!enumeration.empty()) { return AsOption(enumeration, member); }
+      if (const std::string option = MethodOption(base.children[1].text, member);
           !option.empty() &&
           (LowerKey(base.children[1].text) != "type" ||
            LowerKey(scope_.DeclaredType(Indexed(base.children[0]).text)) == "fieldref")) {
@@ -436,37 +437,46 @@ private:
       }
       if (scope_.IsRecord(Indexed(base.children[0]).text)) {
         return "RefusedOption(\"" + Indexed(base.children[0]).text + "." + base.children[1].text +
-               "::" + expression.text + "\")";
+               "::" + std::string(member) + "\")";
       }
     }
+    return {};
+  }
+
+  std::string NamedScope(const al::Expr &base, const std::string &member) const {
     if (base.kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.Enumeration(base.text);
-      if (!enumeration.empty()) { return AsOption(enumeration, expression.text); }
+      if (!enumeration.empty()) { return AsOption(enumeration, member); }
       const std::string named = scope_.EnumObject(base.text);
-      if (!named.empty()) { return AsOption(named, expression.text); }
+      if (!named.empty()) { return AsOption(named, member); }
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
-      if (!kind.empty()) { return Kinded(kind, expression.text); }
+      if (!kind.empty()) { return Kinded(kind, member); }
       const std::string scoped =
           scope_.Resolve(base.text).empty() ? base.text : scope_.DeclaredType(base.text);
       if (IsAlTypeName(scoped) && !ScopesThroughItsSubtype(scoped)) {
-        const bool call =
-            RuntimeStaticCallable(StaticMember{.type = scoped, .member = expression.text});
-        return "::agiru::" + TypeName(scoped) +
-               "::" + RuntimeSpelling(EnumeratorName(expression.text)) + (call ? "()" : "");
+        const bool call = RuntimeStaticCallable(StaticMember{.type = scoped, .member = member});
+        return "::agiru::" + TypeName(scoped) + "::" + RuntimeSpelling(EnumeratorName(member)) +
+               (call ? "()" : "");
       }
       if (scope_.Resolve(base.text).empty()) {
-        const std::string lowered = LowerKey(base.text);
-        for (const auto &[method, option] : kMethodOptions) {
-          if (lowered == method) {
-            return "::agiru::" + std::string(option) +
-                   "::" + RuntimeSpelling(EnumeratorName(expression.text));
-          }
-        }
+        const std::string option = MethodOption(base.text, member);
+        if (!option.empty()) { return option; }
       }
       if (scope_.Resolve(base.text).empty() && NamesATableNumber(base.text)) {
-        return DatabaseNumber(expression.text);
+        return DatabaseNumber(member);
       }
+    }
+    return {};
+  }
+
+  std::string Scope(const al::Expr &expression) {
+    const al::Expr &base = expression.children.front();
+    if (const std::string field = FieldScope(base, expression.text); !field.empty()) {
+      return field;
+    }
+    if (const std::string named = NamedScope(base, expression.text); !named.empty()) {
+      return named;
     }
     const std::string resolved = Expression(base, kPrimaryPrecedence);
     if (resolved.find("::") == std::string::npos) {
@@ -544,6 +554,38 @@ private:
     return {};
   }
 
+  std::string ObjectArguments(const al::Expr &expression, std::size_t first, bool leading = false) {
+    std::string out;
+    for (std::size_t i = first; i < expression.children.size(); ++i) {
+      if (leading || i != first) { out += ", "; }
+      out += Expression(expression.children[i], 0);
+    }
+    return out;
+  }
+
+  std::string
+  NamedObjectRun(const al::Expr &expression, std::string_view kind, const std::string &member) {
+    const al::Expr &named = expression.children[1];
+    const std::size_t first = 2;
+    if (kind == "codeunits" && (member == "Run" || member == "Ok_Run")) {
+      const std::string unit = scope_.ObjectNamed(kind, named.text);
+      std::string out =
+          "::agiru::Codeunit<>::" + member + "(" +
+          (unit.starts_with("absent::") ? "::agiru::AbsentObjectId(\"" + named.text + "\")"
+                                        : "::agiru::CodeunitTraits<" + unit + ">::kId.Value()");
+      out += ObjectArguments(expression, first, true);
+      return out + ")";
+    }
+    if (kind == "pages" && (member == "Run" || member == "RunModal") &&
+        expression.children.size() == first) {
+      const std::string object = scope_.ObjectNamed(kind, named.text);
+      if (!object.starts_with("absent::")) {
+        return object + "::" + member + "(::agiru::kByNumber)";
+      }
+    }
+    return {};
+  }
+
   std::string RunObject(const al::Expr &expression, const al::Expr &callee, ValueUse use) {
     const al::Expr &named = expression.children[1];
     std::string member = Identifier(callee.children[1].text);
@@ -556,41 +598,20 @@ private:
     if (named.kind == al::ExprKind::Scope && !named.children.empty() &&
         named.children.front().kind == al::ExprKind::Name) {
       const std::string_view kind = KindNamespace(named.children.front().text);
-      if (kind == "codeunits" && (member == "Run" || member == "Ok_Run")) {
-        const std::string unit = scope_.ObjectNamed(kind, named.text);
-        std::string out =
-            "::agiru::Codeunit<>::" + member + "(" +
-            (unit.starts_with("absent::") ? "::agiru::AbsentObjectId(\"" + named.text + "\")"
-                                          : "::agiru::CodeunitTraits<" + unit + ">::kId.Value()");
-        for (std::size_t i = first; i < expression.children.size(); ++i) {
-          out += ", " + Expression(expression.children[i], 0);
-        }
-        return out + ")";
-      }
-      if (kind == "pages" && (member == "Run" || member == "RunModal") &&
-          expression.children.size() == first) {
-        const std::string object = scope_.ObjectNamed(kind, named.text);
-        if (!object.starts_with("absent::")) {
-          return object + "::" + member + "(::agiru::kByNumber)";
-        }
+      if (const std::string run = NamedObjectRun(expression, kind, member); !run.empty()) {
+        return run;
       }
       if (!kind.empty()) { subject = scope_.ObjectNamed(kind, named.text) + "{}"; }
     } else if (const std::string_view platform = PlatformObject(callee.children[0].text);
                !platform.empty()) {
       std::string out = std::string(platform) +
                         "::" + (RuntimeCallable(member) ? RuntimeSpelling(member) : member) + "(";
-      for (std::size_t i = 1; i < expression.children.size(); ++i) {
-        if (i != 1) { out += ", "; }
-        out += Expression(expression.children[i], 0);
-      }
+      out += ObjectArguments(expression, 1);
       return out + ")";
     }
     std::string out =
         subject + "." + (RuntimeCallable(member) ? RuntimeSpelling(member) : member) + "(";
-    for (std::size_t i = first; i < expression.children.size(); ++i) {
-      if (i != first) { out += ", "; }
-      out += Expression(expression.children[i], 0);
-    }
+    out += ObjectArguments(expression, first);
     return out + ")";
   }
 
@@ -1218,25 +1239,17 @@ private:
     bool callee = false;
   };
 
-  void Link(std::string &out, const Reach &reach, const How &how) {
-    if (reach.spelling == ".") {
-      out += how.arrow ? "->" : ".";
-    } else {
-      out += " ";
-      out += reach.spelling;
-      out += " ";
+  std::string PartControlAt(const Reach &reach) const {
+    if (reach.spelling != "." || reach.through == nullptr ||
+        reach.through->kind != al::ExprKind::Name || reach.link.kind != al::ExprKind::Name ||
+        reach.base.kind != al::ExprKind::Name) {
+      return {};
     }
-    const OfVariable member{.variable = reach.base.text, .field = reach.link.text};
-    if (reach.spelling == "." && reach.through != nullptr &&
-        reach.through->kind == al::ExprKind::Name && reach.link.kind == al::ExprKind::Name &&
-        reach.base.kind == al::ExprKind::Name) {
-      const std::string viaPart =
-          scope_.PartControlSpelling(reach.base.text, reach.through->text, reach.link.text);
-      if (!viaPart.empty()) {
-        out += viaPart;
-        return;
-      }
-    }
+    return scope_.PartControlSpelling(OfPartControl{
+        .variable = reach.base.text, .part = reach.through->text, .control = reach.link.text});
+  }
+
+  std::string RecordCall(const Reach &reach, const How &how, const OfVariable &member) const {
     const bool calledBesideAField =
         (how.callee || how.parens) && reach.spelling == "." &&
         reach.link.kind == al::ExprKind::Name && reach.base.kind == al::ExprKind::Name &&
@@ -1255,6 +1268,11 @@ private:
         }
       }
     }
+    return besideAField;
+  }
+
+  std::string CalledMember(const Reach &reach, const How &how, const OfVariable &member) const {
+    std::string besideAField = RecordCall(reach, how, member);
     const bool calledOnAQuery =
         how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
         reach.base.kind == al::ExprKind::Name &&
@@ -1272,6 +1290,23 @@ private:
       const std::string spelled = RuntimeSpelling(Identifier(reach.link.text));
       if (scope_.MemberSpelling(member) != spelled) { besideAField = spelled; }
     }
+    return besideAField;
+  }
+
+  void Link(std::string &out, const Reach &reach, const How &how) {
+    if (reach.spelling == ".") {
+      out += how.arrow ? "->" : ".";
+    } else {
+      out += " ";
+      out += reach.spelling;
+      out += " ";
+    }
+    const OfVariable member{.variable = reach.base.text, .field = reach.link.text};
+    if (const std::string viaPart = PartControlAt(reach); !viaPart.empty()) {
+      out += viaPart;
+      return;
+    }
+    const std::string besideAField = CalledMember(reach, how, member);
     out += !besideAField.empty() ? besideAField
            : reach.spelling == "." && reach.link.kind == al::ExprKind::Name
                ? scope_.MemberSpelling(member)
@@ -1806,19 +1841,24 @@ public:
                                                                           : &found->second.fields;
   }
 
+  [[nodiscard]] std::optional<bool> GlobalRecordCall(const OfVariable &member) const {
+    const al::VarDecl *global = Global(member.variable);
+    if (global == nullptr || TypeName(global->type) != "Record" || global->subtype.empty()) {
+      return std::nullopt;
+    }
+    const auto found = objects_.tables.find(LowerKey(global->subtype));
+    const bool field =
+        found != objects_.tables.end() &&
+        (found->second.fields.contains(LowerKey(std::string(member.field))) ||
+         (found->second.fields.empty() &&
+          PlatformFieldNamed(PlatformField{.table = global->subtype, .field = member.field})));
+    return !field && RuntimeCallable(member.field);
+  }
+
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     const al::VarDecl *local = Local(member.variable);
     if (local == nullptr) {
-      if (const al::VarDecl *global = Global(member.variable);
-          global != nullptr && TypeName(global->type) == "Record" && !global->subtype.empty()) {
-        const auto found = objects_.tables.find(LowerKey(global->subtype));
-        const bool field =
-            found != objects_.tables.end() &&
-            (found->second.fields.contains(LowerKey(std::string(member.field))) ||
-             (found->second.fields.empty() &&
-              PlatformFieldNamed(PlatformField{.table = global->subtype, .field = member.field})));
-        return !field && RuntimeCallable(member.field);
-      }
+      if (const auto call = GlobalRecordCall(member); call.has_value()) { return *call; }
     }
     const al::VarDecl *held = local != nullptr ? local : Global(member.variable);
     if (held != nullptr && TypeName(held->type) == "Query" && !held->subtype.empty()) {
@@ -2062,20 +2102,18 @@ public:
     return found == sub->second.fields.end() ? std::string{} : found->second;
   }
 
-  [[nodiscard]] std::string PartControlSpelling(std::string_view variable,
-                                                std::string_view part,
-                                                std::string_view control) const override {
-    for (const al::VarDecl *where : {Local(variable), Global(variable)}) {
-      const std::string spelled = PartControlOf_(where, part, control);
+  [[nodiscard]] std::string PartControlSpelling(const OfPartControl &member) const override {
+    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
+      const std::string spelled = PartControlOf_(where, member.part, member.control);
       if (!spelled.empty()) { return spelled; }
     }
     return {};
   }
 
-  [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+  [[nodiscard]] std::optional<std::string> DeclaredMember(const OfVariable &member) const {
     for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
       if (where == nullptr) { continue; }
-      const std::string control = ControlNamed(*where, member.field);
+      std::string control = ControlNamed(*where, member.field);
       if (!control.empty()) { return control; }
     }
     for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
@@ -2092,6 +2130,13 @@ public:
       if (where != nullptr && TypeName(where->type) == "DotNet") {
         return Identifier(member.field);
       }
+    }
+    return std::nullopt;
+  }
+
+  [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    if (auto declared = DeclaredMember(member); declared.has_value()) {
+      return std::move(*declared);
     }
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
       const auto field = fields->find(LowerKey(std::string(member.field)));
@@ -2616,10 +2661,8 @@ public:
     return found == sub->second.fields.end() ? std::string{} : found->second;
   }
 
-  [[nodiscard]] std::string PartControlSpelling(std::string_view variable,
-                                                std::string_view part,
-                                                std::string_view control) const override {
-    return PartControlOf_(DeclarationOf(variable), part, control);
+  [[nodiscard]] std::string PartControlSpelling(const OfPartControl &member) const override {
+    return PartControlOf_(DeclarationOf(member.variable), member.part, member.control);
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
@@ -3119,6 +3162,90 @@ std::string RenderedProperty(const al::Property &property) {
   return out;
 }
 
+struct ReportDataItem {
+  const al::PageControl &control;
+  const al::PageObject &page;
+  const Objects &objects;
+  const std::map<std::string, std::string> &named;
+  const TableRef &table;
+  const std::vector<const al::PageControl *> &ancestors;
+};
+
+bool DataItemLinkedFilters(const ReportDataItem &item, std::string &out) {
+  const auto &[control, page, objects, named, table, ancestors] = item;
+  const std::vector<DataItemLink> links = LinksOfDataItem(control);
+  if (links.empty() || ancestors.empty()) { return true; }
+  const al::PageControl *parent = ancestors.back();
+  if (const al::Property *reference = al::Find(control.properties, "DataItemLinkReference");
+      reference != nullptr) {
+    for (const al::PageControl *ancestor : ancestors) {
+      if (LowerKey(ancestor->name) == LowerKey(reference->text)) { parent = ancestor; }
+    }
+  }
+  const al::VarDecl *parentDeclared = DataItemVariable(page, parent->name);
+  const auto parentTable = parentDeclared == nullptr
+                               ? objects.tables.end()
+                               : objects.tables.find(LowerKey(parentDeclared->subtype));
+  if (parentTable == objects.tables.end()) {
+    out += "  throw ::agiru::Error(\"the dataitem " + control.name + " of report " + page.name +
+           " links to " + parent->name +
+           ", whose table this build does not carry (board:0063)\");\n}\n\n";
+    return false;
+  }
+  out += "  Item_Block.FilterGroup(::agiru::detail::kLinkFilterGroup);\n";
+  for (const DataItemLink &link : links) {
+    const auto field = table.fields.find(LowerKey(link.field));
+    const auto reference = parentTable->second.fields.find(LowerKey(link.reference));
+    if (field == table.fields.end() || reference == parentTable->second.fields.end()) {
+      out += "  throw ::agiru::Error(\"the dataitem " + control.name + " of report " + page.name +
+             " links " + link.field + " to " + parent->name + "." + link.reference +
+             ", and one of them is not a field this build knows (board:0063)\");\n}\n\n";
+      return false;
+    }
+    out += "  ::agiru::detail::LinkDataItem(Item_Block, Item_Block." + field->second + ", *" +
+           PageVariableIdentifier(page, parentDeclared->name) + ".operator->(), " +
+           PageVariableIdentifier(page, parentDeclared->name) + "->" + reference->second + ");\n";
+  }
+  out += "  Item_Block.FilterGroup(0);\n";
+
+  return true;
+}
+
+std::string DataItemCalculatedFields(const al::PageControl &control, const TableRef &table) {
+  std::string out;
+  if (const al::Property *calc = al::Find(control.properties, "CalcFields"); calc != nullptr) {
+    std::string members;
+    for (const std::string &name : al::ListValue(*calc)) {
+      const auto field = table.fields.find(LowerKey(name));
+      if (field == table.fields.end()) { continue; }
+      members += (members.empty() ? "" : ", ") + std::string("Item_Block.") + field->second;
+    }
+    if (!members.empty()) {
+      out += "          static_cast<void>(Item_Block.CalcFields(" + members + "));\n";
+    }
+  }
+  return out;
+}
+
+std::string DataItemRowColumns(const ReportDataItem &item) {
+  const auto &[control, page, objects, named, table, ancestors] = item;
+  std::string out;
+  const auto controlName = [&named, &page](const al::PageControl &item, std::string_view trigger) {
+    return ControlTrigger(trigger, ControlIdentifier(named, item.name), page.procedures);
+  };
+  if (HasColumns(control)) {
+    out += "          if (!Child_Block) {\n            BeginRow_();\n";
+    for (const al::PageControl *ancestor : ancestors) {
+      if (HasColumns(*ancestor)) {
+        out += "            " + controlName(*ancestor, "OnColumns") + "();\n";
+      }
+    }
+    out += "            " + controlName(control, "OnColumns") + "();\n";
+    out += "            EndRow_();\n            Emitted_Block = true;\n          }\n";
+  }
+  return out;
+}
+
 std::string DataItemWalk(const al::PageControl &control,
                          const std::string &pageClass,
                          const al::PageObject &page,
@@ -3135,7 +3262,6 @@ std::string DataItemWalk(const al::PageControl &control,
     return out;
   }
   const std::string variable = PageVariableIdentifier(page, declared->name);
-  const std::string tableClass = table->second.identifier;
   const auto controlName = [&named, &page](const al::PageControl &item, std::string_view trigger) {
     return ControlTrigger(trigger, ControlIdentifier(named, item.name), page.procedures);
   };
@@ -3147,41 +3273,13 @@ std::string DataItemWalk(const al::PageControl &control,
     out += "  ::agiru::detail::ApplyDataItemView(Item_Block, " + Literal(RenderedProperty(*view)) +
            ");\n";
   }
-  const std::vector<DataItemLink> links = LinksOfDataItem(control);
-  if (!links.empty() && !ancestors.empty()) {
-    const al::PageControl *parent = ancestors.back();
-    if (const al::Property *reference = al::Find(control.properties, "DataItemLinkReference");
-        reference != nullptr) {
-      for (const al::PageControl *ancestor : ancestors) {
-        if (LowerKey(ancestor->name) == LowerKey(reference->text)) { parent = ancestor; }
-      }
-    }
-    const al::VarDecl *parentDeclared = DataItemVariable(page, parent->name);
-    const auto parentTable = parentDeclared == nullptr
-                                 ? objects.tables.end()
-                                 : objects.tables.find(LowerKey(parentDeclared->subtype));
-    if (parentTable == objects.tables.end()) {
-      out += "  throw ::agiru::Error(\"the dataitem " + control.name + " of report " + page.name +
-             " links to " + parent->name +
-             ", whose table this build does not carry (board:0063)\");\n}\n\n";
-      return out;
-    }
-    out += "  Item_Block.FilterGroup(::agiru::detail::kLinkFilterGroup);\n";
-    for (const DataItemLink &link : links) {
-      const auto field = table->second.fields.find(LowerKey(link.field));
-      const auto reference = parentTable->second.fields.find(LowerKey(link.reference));
-      if (field == table->second.fields.end() || reference == parentTable->second.fields.end()) {
-        out += "  throw ::agiru::Error(\"the dataitem " + control.name + " of report " + page.name +
-               " links " + link.field + " to " + parent->name + "." + link.reference +
-               ", and one of them is not a field this build knows (board:0063)\");\n}\n\n";
-        return out;
-      }
-      out += "  ::agiru::detail::LinkDataItem(Item_Block, Item_Block." + field->second + ", *" +
-             PageVariableIdentifier(page, parentDeclared->name) + ".operator->(), " +
-             PageVariableIdentifier(page, parentDeclared->name) + "->" + reference->second + ");\n";
-    }
-    out += "  Item_Block.FilterGroup(0);\n";
-  }
+  const ReportDataItem item{.control = control,
+                            .page = page,
+                            .objects = objects,
+                            .named = named,
+                            .table = table->second,
+                            .ancestors = ancestors};
+  if (!DataItemLinkedFilters(item, out)) { return out; }
   out += "  bool Emitted_Block = false;\n";
   const al::Property *maxIteration = al::Find(control.properties, "MaxIteration");
   out += "  try {\n";
@@ -3190,17 +3288,7 @@ std::string DataItemWalk(const al::PageControl &control,
   }
   if (maxIteration != nullptr) { out += "    ::agiru::Integer Iterations_Block = 0;\n"; }
   out += "    if (Item_Block.FindSet()) {\n      do {\n        try {\n";
-  if (const al::Property *calc = al::Find(control.properties, "CalcFields"); calc != nullptr) {
-    std::string members;
-    for (const std::string &name : al::ListValue(*calc)) {
-      const auto field = table->second.fields.find(LowerKey(name));
-      if (field == table->second.fields.end()) { continue; }
-      members += (members.empty() ? "" : ", ") + std::string("Item_Block.") + field->second;
-    }
-    if (!members.empty()) {
-      out += "          static_cast<void>(Item_Block.CalcFields(" + members + "));\n";
-    }
-  }
+  out += DataItemCalculatedFields(control, table->second);
   if (Declares(control, "OnAfterGetRecord")) {
     out += "          " + controlName(control, "OnAfterGetRecord") + "();\n";
   }
@@ -3210,16 +3298,7 @@ std::string DataItemWalk(const al::PageControl &control,
     out += "          Child_Block = Walk_" + ControlIdentifier(named, child.name) +
            "_() || Child_Block;\n";
   }
-  if (HasColumns(control)) {
-    out += "          if (!Child_Block) {\n            BeginRow_();\n";
-    for (const al::PageControl *ancestor : ancestors) {
-      if (HasColumns(*ancestor)) {
-        out += "            " + controlName(*ancestor, "OnColumns") + "();\n";
-      }
-    }
-    out += "            " + controlName(control, "OnColumns") + "();\n";
-    out += "            EndRow_();\n            Emitted_Block = true;\n          }\n";
-  }
+  out += DataItemRowColumns(item);
   out += "          Emitted_Block = Emitted_Block || Child_Block;\n";
   out += "        } catch (const ::agiru::ReportSkip &) {}\n";
   if (maxIteration != nullptr) {
@@ -3239,7 +3318,7 @@ std::string DataItemWalk(const al::PageControl &control,
 std::string XmlNameOf(const al::PageControl &control) {
   const al::Property *named = al::Find(control.properties, "XmlName");
   if (named == nullptr) { named = al::Find(control.properties, "XMLName"); }
-  const std::string name = named == nullptr || named->text.empty() ? control.name : named->text;
+  std::string name = named == nullptr || named->text.empty() ? control.name : named->text;
   const al::Property *prefixed = al::Find(control.properties, "NamespacePrefix");
   if (prefixed == nullptr || prefixed->text.empty()) { return name; }
   return prefixed->text + ":" + name;
@@ -3311,49 +3390,102 @@ FieldSource FieldSourceOf(const al::PageControl &control) {
   return made;
 }
 
-std::string ElementExport(const al::PageControl &control,
-                          const std::string &pageClass,
-                          const al::PageObject &page,
-                          const Objects &objects,
-                          const std::map<std::string, std::string> &named,
-                          const std::vector<const al::PageControl *> &ancestors,
-                          int indent) {
-  const std::string pad(static_cast<std::size_t>(indent), ' ');
-  const std::string kind = LowerKey(control.kind);
-  const auto trigger = [&named, &page](const al::PageControl &item, std::string_view name) {
-    return ControlTrigger(name, ControlIdentifier(named, item.name), page.procedures);
+class XmlPortElements {
+public:
+  XmlPortElements(const al::PageObject &page,
+                  const Objects &objects,
+                  const std::map<std::string, std::string> &named)
+      : page_(page), objects_(objects), named_(named) {}
+
+  std::string Export(const al::PageControl &control,
+                     const std::vector<const al::PageControl *> &ancestors,
+                     int indent) const {
+    const Frame frame = FrameOf(control, ancestors, nullptr, false, indent);
+    if (frame.kind == "textelement" || frame.kind == "textattribute") { return ExportText(frame); }
+    if (frame.kind == "fieldelement" || frame.kind == "fieldattribute") {
+      return ExportField(frame);
+    }
+    return frame.kind == "tableelement" ? ExportRecord(frame) : std::string{};
+  }
+
+  std::string Import(const al::PageControl &control,
+                     const al::PageControl *record,
+                     bool validateByDefault,
+                     int indent,
+                     const std::vector<const al::PageControl *> &ancestors = {}) const {
+    const Frame frame = FrameOf(control, ancestors, record, validateByDefault, indent);
+    if (frame.kind == "textelement" || frame.kind == "textattribute") { return ImportText(frame); }
+    if (frame.kind == "fieldelement" || frame.kind == "fieldattribute") {
+      return ImportField(frame);
+    }
+    return frame.kind == "tableelement" ? ImportRecord(frame) : std::string{};
+  }
+
+private:
+  struct Frame {
+    const al::PageControl &control;
+    const std::vector<const al::PageControl *> &ancestors;
+    std::string pad;
+    std::string kind;
+    std::string xmlName;
+    const al::PageControl *record;
+    bool validateByDefault;
+    bool attribute;
+    int indent;
   };
-  const auto declares = [](const al::PageControl &item, std::string_view name) {
-    return std::ranges::any_of(item.triggers, [name](const al::ProcedureDecl &one) {
-      return LowerKey(one.name) == LowerKey(std::string(name));
-    });
-  };
-  std::string out;
-  const bool attribute = kind == "textattribute" || kind == "fieldattribute";
-  if (kind == "textelement" || kind == "textattribute") {
+
+  static Frame FrameOf(const al::PageControl &control,
+                       const std::vector<const al::PageControl *> &ancestors,
+                       const al::PageControl *record,
+                       bool validateByDefault,
+                       int indent) {
+    Frame frame{.control = control,
+                .ancestors = ancestors,
+                .pad = std::string(static_cast<std::size_t>(indent), ' '),
+                .kind = LowerKey(control.kind),
+                .xmlName = Literal(XmlNameOf(control)),
+                .record = record,
+                .validateByDefault = validateByDefault,
+                .attribute = false,
+                .indent = indent};
+    frame.attribute = frame.kind == "textattribute" || frame.kind == "fieldattribute";
+    return frame;
+  }
+
+  std::string Trigger(const al::PageControl &control, std::string_view name) const {
+    return ControlTrigger(name, ControlIdentifier(named_, control.name), page_.procedures);
+  }
+
+  std::string ExportText(const Frame &frame) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    const auto &ancestors = frame.ancestors;
+    const auto &indent = frame.indent;
+    const auto &attribute = frame.attribute;
+    std::string out;
     if (ContainerElement(control)) {
       out += pad + "try {\n";
-      if (declares(control, "OnBeforePassVariable")) {
-        out += pad + "  " + trigger(control, "OnBeforePassVariable") + "();\n";
+      if (Declares(control, "OnBeforePassVariable")) {
+        out += pad + "  " + Trigger(control, "OnBeforePassVariable") + "();\n";
       }
       out += pad + "  Out_().BeginGroup(" + Literal(XmlNameOf(control)) + ");\n";
       out += pad + "  Out_().Content(" + Literal(XmlNameOf(control)) +
-             ", std::string(::agiru::Format(" + PageVariableIdentifier(page, control.name) +
+             ", std::string(::agiru::Format(" + PageVariableIdentifier(page_, control.name) +
              ")), " + ElementWidth(control) + ");\n";
       std::vector<const al::PageControl *> below = ancestors;
       below.push_back(&control);
       for (const al::PageControl &child : control.children) {
-        out += ElementExport(child, pageClass, page, objects, named, below, indent + 2);
+        out += Export(child, below, indent + 2);
       }
       out += pad + "  Out_().EndGroup(" + Literal(XmlNameOf(control)) + ");\n";
       out += pad + "} catch (const ::agiru::XmlPortSkip &) {}\n";
       return out;
     }
     const bool unbound = ElementFlag(control, "Unbound", false);
-    const std::string variable = PageVariableIdentifier(page, control.name);
+    const std::string variable = PageVariableIdentifier(page_, control.name);
     out += pad + "for (;;) {\n" + pad + "  try {\n";
-    if (declares(control, "OnBeforePassVariable")) {
-      out += pad + "    " + trigger(control, "OnBeforePassVariable") + "();\n";
+    if (Declares(control, "OnBeforePassVariable")) {
+      out += pad + "    " + Trigger(control, "OnBeforePassVariable") + "();\n";
     }
     out += pad + "    Out_().Value(" + Literal(XmlNameOf(control)) +
            ", std::string(::agiru::Format(" + variable + ")), " + (attribute ? "true" : "false") +
@@ -3364,29 +3496,36 @@ std::string ElementExport(const al::PageControl &control,
     out += pad + (unbound ? "}\n" : "  break;\n" + pad + "}\n");
     return out;
   }
-  if (kind == "fieldelement" || kind == "fieldattribute") {
+
+  std::string ExportField(const Frame &frame) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    const auto &ancestors = frame.ancestors;
+    const auto &indent = frame.indent;
+    const auto &attribute = frame.attribute;
+    std::string out;
     const FieldSource source = FieldSourceOf(control);
-    const al::VarDecl *declared = DataItemVariable(page, source.variable);
-    const auto table = declared == nullptr ? objects.tables.end()
-                                           : objects.tables.find(LowerKey(declared->subtype));
-    if (declared == nullptr || table == objects.tables.end()) {
+    const al::VarDecl *declared = DataItemVariable(page_, source.variable);
+    const auto table = declared == nullptr ? objects_.tables.end()
+                                           : objects_.tables.find(LowerKey(declared->subtype));
+    if (declared == nullptr || table == objects_.tables.end()) {
       return pad + "throw ::agiru::Error(\"the element " + control.name + " of xmlport " +
-             page.name + " reads a table this build does not carry (board:0065)\");\n";
+             page_.name + " reads a table this build does not carry (board:0065)\");\n";
     }
     const auto field = table->second.fields.find(LowerKey(source.field));
     if (field == table->second.fields.end()) {
       return pad + "throw ::agiru::Error(\"the element " + control.name + " of xmlport " +
-             page.name + " reads " + source.field + ", which " + declared->subtype +
+             page_.name + " reads " + source.field + ", which " + declared->subtype +
              " does not declare (board:0065)\");\n";
     }
     const std::string formatted = "std::string(FormatsAsXml_() ? ::agiru::Format(" +
-                                  PageVariableIdentifier(page, declared->name) + "->" +
+                                  PageVariableIdentifier(page_, declared->name) + "->" +
                                   field->second + ", 0, 9) : ::agiru::Format(" +
-                                  PageVariableIdentifier(page, declared->name) + "->" +
+                                  PageVariableIdentifier(page_, declared->name) + "->" +
                                   field->second + "))";
     out += pad + "try {\n";
-    if (declares(control, "OnBeforePassField")) {
-      out += pad + "  " + trigger(control, "OnBeforePassField") + "();\n";
+    if (Declares(control, "OnBeforePassField")) {
+      out += pad + "  " + Trigger(control, "OnBeforePassField") + "();\n";
     }
     if (ContainerElement(control)) {
       out += pad + "  Out_().BeginGroup(" + Literal(XmlNameOf(control)) + ");\n";
@@ -3395,7 +3534,7 @@ std::string ElementExport(const al::PageControl &control,
       std::vector<const al::PageControl *> below = ancestors;
       below.push_back(&control);
       for (const al::PageControl &child : control.children) {
-        out += ElementExport(child, pageClass, page, objects, named, below, indent + 2);
+        out += Export(child, below, indent + 2);
       }
       out += pad + "  Out_().EndGroup(" + Literal(XmlNameOf(control)) + ");\n";
       out += pad + "} catch (const ::agiru::XmlPortSkip &) {}\n";
@@ -3406,23 +3545,10 @@ std::string ElementExport(const al::PageControl &control,
     out += pad + "} catch (const ::agiru::XmlPortSkip &) {}\n";
     return out;
   }
-  if (kind != "tableelement") { return out; }
-  const al::VarDecl *declared = DataItemVariable(page, control.name);
-  const auto table =
-      declared == nullptr ? objects.tables.end() : objects.tables.find(LowerKey(declared->subtype));
-  if (declared == nullptr || table == objects.tables.end() || table->second.header.empty()) {
-    return pad + "throw ::agiru::Error(\"the table element " + control.name + " of xmlport " +
-           page.name + " is on a table this build does not carry (board:0065)\");\n";
-  }
-  const std::string variable = PageVariableIdentifier(page, declared->name);
-  out += pad + "{\n";
-  out += pad + "  auto &Item_Block = *" + variable + ".operator->();\n";
-  if (const al::Property *view = al::Find(control.properties, "SourceTableView"); view != nullptr) {
-    out += pad + "  ::agiru::detail::ApplyElementView(Item_Block, " +
-           Literal(RenderedProperty(*view)) + ");\n";
-  }
-  const std::vector<DataItemLink> links = LinksOfDataItem(control, "LinkFields");
-  if (!links.empty()) {
+
+  const al::PageControl *ExportLinkParent(const Frame &frame) const {
+    const auto &control = frame.control;
+    const auto &ancestors = frame.ancestors;
     const al::PageControl *parent = ancestors.empty() ? nullptr : ancestors.back();
     if (const al::Property *reference = al::Find(control.properties, "LinkTable");
         reference != nullptr) {
@@ -3433,113 +3559,121 @@ std::string ElementExport(const al::PageControl &control,
     for (const al::PageControl *ancestor : ancestors) {
       if (parent == nullptr && LowerKey(ancestor->kind) == "tableelement") { parent = ancestor; }
     }
+    return parent;
+  }
+
+  std::string ExportLinks(const Frame &frame, const TableRef &table) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    std::string out;
+    const std::vector<DataItemLink> links = LinksOfDataItem(control, "LinkFields");
+    if (links.empty()) { return {}; }
+    const al::PageControl *parent = ExportLinkParent(frame);
     const al::VarDecl *parentDeclared =
-        parent == nullptr ? nullptr : DataItemVariable(page, parent->name);
+        parent == nullptr ? nullptr : DataItemVariable(page_, parent->name);
     const auto parentTable = parentDeclared == nullptr
-                                 ? objects.tables.end()
-                                 : objects.tables.find(LowerKey(parentDeclared->subtype));
-    if (parentTable == objects.tables.end()) {
+                                 ? objects_.tables.end()
+                                 : objects_.tables.find(LowerKey(parentDeclared->subtype));
+    if (parentTable == objects_.tables.end()) {
       out += pad + "  throw ::agiru::Error(\"the table element " + control.name + " of xmlport " +
-             page.name + " links to a table this build does not carry (board:0065)\");\n";
+             page_.name + " links to a table this build does not carry (board:0065)\");\n";
     } else {
       out += pad + "  Item_Block.FilterGroup(::agiru::detail::kElementLinkGroup);\n";
       for (const DataItemLink &link : links) {
-        const auto field = table->second.fields.find(LowerKey(link.field));
+        const auto field = table.fields.find(LowerKey(link.field));
         const auto ref = parentTable->second.fields.find(LowerKey(link.reference));
-        if (field == table->second.fields.end() || ref == parentTable->second.fields.end()) {
+        if (field == table.fields.end() || ref == parentTable->second.fields.end()) {
           out += pad + "  throw ::agiru::Error(\"the table element " + control.name +
-                 " of xmlport " + page.name + " links " + link.field +
+                 " of xmlport " + page_.name + " links " + link.field +
                  " to a field this build does not know (board:0065)\");\n";
           continue;
         }
         out += pad + "  Item_Block.SetRange(Item_Block." + field->second + ", " +
-               PageVariableIdentifier(page, parentDeclared->name) + "->" + ref->second + ");\n";
+               PageVariableIdentifier(page_, parentDeclared->name) + "->" + ref->second + ");\n";
       }
       out += pad + "  Item_Block.FilterGroup(0);\n";
     }
-  }
-  if (declares(control, "OnPreXmlItem")) {
-    out += pad + "  " + trigger(control, "OnPreXmlItem") + "();\n";
-  }
-  out += pad + "  try {\n";
-  out += pad + "    if (Item_Block.FindSet()) {\n" + pad + "      do {\n" + pad + "        try {\n";
-  if (const al::Property *calc = al::Find(control.properties, "CalcFields"); calc != nullptr) {
-    std::string members;
-    for (const std::string &name : al::ListValue(*calc)) {
-      const auto field = table->second.fields.find(LowerKey(name));
-      if (field == table->second.fields.end()) { continue; }
-      members += (members.empty() ? "" : ", ") + std::string("Item_Block.") + field->second;
-    }
-    if (!members.empty()) {
-      out += pad + "          static_cast<void>(Item_Block.CalcFields(" + members + "));\n";
-    }
-  }
-  if (declares(control, "OnAfterGetRecord")) {
-    out += pad + "          " + trigger(control, "OnAfterGetRecord") + "();\n";
-  }
-  out += pad + "          Out_().BeginRecord(" + Literal(XmlNameOf(control)) + ");\n";
-  std::vector<const al::PageControl *> below = ancestors;
-  below.push_back(&control);
-  for (const al::PageControl &child : control.children) {
-    out += ElementExport(child, pageClass, page, objects, named, below, indent + 10);
-  }
-  out += pad + "          Out_().EndRecord(" + Literal(XmlNameOf(control)) + ");\n";
-  out += pad + "        } catch (const ::agiru::XmlPortSkip &) {}\n";
-  out += pad + "      } while (Item_Block.Next() != 0);\n" + pad + "    }\n";
-  out += pad + "  } catch (const ::agiru::XmlPortBreak &) {}\n";
-  out += pad + "}\n";
-  return out;
-}
 
-std::string ElementImport(const al::PageControl &control,
-                          const std::string &pageClass,
-                          const al::PageObject &page,
-                          const Objects &objects,
-                          const std::map<std::string, std::string> &named,
-                          const al::PageControl *record,
-                          bool validateByDefault,
-                          int indent,
-                          std::vector<const al::PageControl *> ancestors = {}) {
-  const std::string pad(static_cast<std::size_t>(indent), ' ');
-  const std::string kind = LowerKey(control.kind);
-  const auto trigger = [&named, &page](const al::PageControl &item, std::string_view name) {
-    return ControlTrigger(name, ControlIdentifier(named, item.name), page.procedures);
-  };
-  const auto declares = [](const al::PageControl &item, std::string_view name) {
-    return std::ranges::any_of(item.triggers, [name](const al::ProcedureDecl &one) {
-      return LowerKey(one.name) == LowerKey(std::string(name));
-    });
-  };
-  std::string out;
-  const bool attribute = kind == "textattribute" || kind == "fieldattribute";
-  const std::string xmlName = Literal(XmlNameOf(control));
-  if (kind == "textelement" || kind == "textattribute") {
+    return out;
+  }
+
+  std::string ExportRecord(const Frame &frame) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    const auto &ancestors = frame.ancestors;
+    const auto &indent = frame.indent;
+    std::string out;
+    const al::VarDecl *declared = DataItemVariable(page_, control.name);
+    const auto table = declared == nullptr ? objects_.tables.end()
+                                           : objects_.tables.find(LowerKey(declared->subtype));
+    if (declared == nullptr || table == objects_.tables.end() || table->second.header.empty()) {
+      return pad + "throw ::agiru::Error(\"the table element " + control.name + " of xmlport " +
+             page_.name + " is on a table this build does not carry (board:0065)\");\n";
+    }
+    const std::string variable = PageVariableIdentifier(page_, declared->name);
+    out += pad + "{\n";
+    out += pad + "  auto &Item_Block = *" + variable + ".operator->();\n";
+    if (const al::Property *view = al::Find(control.properties, "SourceTableView");
+        view != nullptr) {
+      out += pad + "  ::agiru::detail::ApplyElementView(Item_Block, " +
+             Literal(RenderedProperty(*view)) + ");\n";
+    }
+    out += ExportLinks(frame, table->second);
+    if (Declares(control, "OnPreXmlItem")) {
+      out += pad + "  " + Trigger(control, "OnPreXmlItem") + "();\n";
+    }
+    out += pad + "  try {\n";
+    out +=
+        pad + "    if (Item_Block.FindSet()) {\n" + pad + "      do {\n" + pad + "        try {\n";
+    if (const std::string calculated = DataItemCalculatedFields(control, table->second);
+        !calculated.empty()) {
+      out += pad + calculated;
+    }
+    if (Declares(control, "OnAfterGetRecord")) {
+      out += pad + "          " + Trigger(control, "OnAfterGetRecord") + "();\n";
+    }
+    out += pad + "          Out_().BeginRecord(" + Literal(XmlNameOf(control)) + ");\n";
+    std::vector<const al::PageControl *> below = ancestors;
+    below.push_back(&control);
+    for (const al::PageControl &child : control.children) {
+      out += Export(child, below, indent + 10);
+    }
+    out += pad + "          Out_().EndRecord(" + Literal(XmlNameOf(control)) + ");\n";
+    out += pad + "        } catch (const ::agiru::XmlPortSkip &) {}\n";
+    out += pad + "      } while (Item_Block.Next() != 0);\n" + pad + "    }\n";
+    out += pad + "  } catch (const ::agiru::XmlPortBreak &) {}\n";
+    out += pad + "}\n";
+    return out;
+  }
+
+  std::string ImportText(const Frame &frame) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    const auto &ancestors = frame.ancestors;
+    const auto &indent = frame.indent;
+    const auto &attribute = frame.attribute;
+    const auto &xmlName = frame.xmlName;
+    const auto &record = frame.record;
+    const auto &validateByDefault = frame.validateByDefault;
+    std::string out;
     if (ContainerElement(control)) {
       out += pad + "if (In_().Enter(" + xmlName + ")) {\n";
       for (const al::PageControl &child : control.children) {
-        out += ElementImport(child,
-                             pageClass,
-                             page,
-                             objects,
-                             named,
-                             record,
-                             validateByDefault,
-                             indent + 2,
-                             ancestors);
+        out += Import(child, record, validateByDefault, indent + 2, ancestors);
       }
       if (!attribute) {
         out += pad + "  if (FormatsAsXml_()) {\n";
         out += pad + "    static_cast<void>(::agiru::Evaluate(" +
-               PageVariableIdentifier(page, control.name) + ", In_().Text()));\n";
+               PageVariableIdentifier(page_, control.name) + ", In_().Text()));\n";
         out += pad + "  }\n";
-        if (declares(control, "OnAfterAssignVariable")) {
-          out += pad + "  " + trigger(control, "OnAfterAssignVariable") + "();\n";
+        if (Declares(control, "OnAfterAssignVariable")) {
+          out += pad + "  " + Trigger(control, "OnAfterAssignVariable") + "();\n";
         }
       }
       out += pad + "  In_().Leave();\n" + pad + "}\n";
       return out;
     }
-    const std::string variable = PageVariableIdentifier(page, control.name);
+    const std::string variable = PageVariableIdentifier(page_, control.name);
     const bool unbound = ElementFlag(control, "Unbound", false);
     if (attribute) {
       out += pad + "{\n" + pad + "  static_cast<void>(::agiru::Evaluate(" + variable +
@@ -3549,52 +3683,53 @@ std::string ElementImport(const al::PageControl &control,
       out += pad + "  static_cast<void>(::agiru::Evaluate(" + variable + ", In_().Text()));\n";
       out += pad + "  In_().Leave();\n";
     }
-    if (declares(control, "OnAfterAssignVariable")) {
-      out += pad + "  " + trigger(control, "OnAfterAssignVariable") + "();\n";
+    if (Declares(control, "OnAfterAssignVariable")) {
+      out += pad + "  " + Trigger(control, "OnAfterAssignVariable") + "();\n";
     }
     out += pad + "}\n";
     return out;
   }
-  if (kind == "fieldelement" || kind == "fieldattribute") {
+
+  std::string ImportField(const Frame &frame) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    const auto &ancestors = frame.ancestors;
+    const auto &indent = frame.indent;
+    const auto &attribute = frame.attribute;
+    const auto &xmlName = frame.xmlName;
+    const auto &record = frame.record;
+    const auto &validateByDefault = frame.validateByDefault;
+    std::string out;
     const FieldSource source = FieldSourceOf(control);
-    const al::VarDecl *declared = DataItemVariable(page, source.variable);
-    const auto table = declared == nullptr ? objects.tables.end()
-                                           : objects.tables.find(LowerKey(declared->subtype));
-    if (declared == nullptr || table == objects.tables.end()) {
+    const al::VarDecl *declared = DataItemVariable(page_, source.variable);
+    const auto table = declared == nullptr ? objects_.tables.end()
+                                           : objects_.tables.find(LowerKey(declared->subtype));
+    if (declared == nullptr || table == objects_.tables.end()) {
       return pad + "throw ::agiru::Error(\"the element " + control.name + " of xmlport " +
-             page.name + " writes a table this build does not carry (board:0065)\");\n";
+             page_.name + " writes a table this build does not carry (board:0065)\");\n";
     }
     const auto field = table->second.fields.find(LowerKey(source.field));
     if (field == table->second.fields.end()) {
       return pad + "throw ::agiru::Error(\"the element " + control.name + " of xmlport " +
-             page.name + " writes " + source.field + ", which " + declared->subtype +
+             page_.name + " writes " + source.field + ", which " + declared->subtype +
              " does not declare (board:0065)\");\n";
     }
-    const std::string owner = PageVariableIdentifier(page, declared->name);
+    const std::string owner = PageVariableIdentifier(page_, declared->name);
     const bool validate = !declared->temporary && FieldValidation(control, validateByDefault);
     const std::string text = attribute ? "In_().Attribute(" + xmlName + ")" : "In_().Text()";
     out += pad + (attribute ? "{\n" : "if (In_().Enter(" + xmlName + ")) {\n");
     if (!attribute && ContainerElement(control)) {
       for (const al::PageControl &child : control.children) {
-        out += ElementImport(child,
-                             pageClass,
-                             page,
-                             objects,
-                             named,
-                             record,
-                             validateByDefault,
-                             indent + 2,
-                             ancestors);
+        out += Import(child, record, validateByDefault, indent + 2, ancestors);
       }
     }
     out += pad + "  {\n" + pad + "    auto Value_Block = " + owner + "->" + field->second + ";\n";
-    out += pad + "    static_cast<void>(::agiru::Evaluate(Value_Block, " + text +
-           (control.kind.empty() ? "" : "") + "));\n";
+    out += pad + "    static_cast<void>(::agiru::Evaluate(Value_Block, " + text + "));\n";
     out += pad + "    " + owner + "->" + field->second + " = Value_Block;\n";
     out += pad + "  }\n";
     if (!attribute) { out += pad + "  In_().Leave();\n"; }
-    if (declares(control, "OnAfterAssignField")) {
-      out += pad + "  " + trigger(control, "OnAfterAssignField") + "();\n";
+    if (Declares(control, "OnAfterAssignField")) {
+      out += pad + "  " + Trigger(control, "OnAfterAssignField") + "();\n";
     }
     if (validate) {
       out += pad + "  " + owner + "->Validate(" + owner + "->" + field->second + ");\n";
@@ -3602,24 +3737,15 @@ std::string ElementImport(const al::PageControl &control,
     out += pad + "}\n";
     return out;
   }
-  if (kind != "tableelement") { return out; }
-  const al::VarDecl *declared = DataItemVariable(page, control.name);
-  const auto table =
-      declared == nullptr ? objects.tables.end() : objects.tables.find(LowerKey(declared->subtype));
-  if (declared == nullptr || table == objects.tables.end() || table->second.header.empty()) {
-    return pad + "throw ::agiru::Error(\"the table element " + control.name + " of xmlport " +
-           page.name + " is on a table this build does not carry (board:0065)\");\n";
-  }
-  const std::string variable = PageVariableIdentifier(page, declared->name);
-  const bool autoSave = ElementFlag(control, "AutoSave", true);
-  const bool autoReplace = ElementFlag(control, "AutoReplace", false);
-  const bool autoUpdate = ElementFlag(control, "AutoUpdate", false);
-  out += pad + "try {\n";
-  out += pad + "  while (In_().Enter(" + xmlName + ")) {\n";
-  out += pad + "    auto &Item_Block = *" + variable + ".operator->();\n";
-  out += pad + "    Item_Block.Init();\n";
-  const std::vector<DataItemLink> links = LinksOfDataItem(control, "LinkFields");
-  if (!links.empty()) {
+
+  std::string ImportLinks(const Frame &frame, const TableRef &table) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    const auto &ancestors = frame.ancestors;
+    const auto &record = frame.record;
+    std::string out;
+    const std::vector<DataItemLink> links = LinksOfDataItem(control, "LinkFields");
+    if (links.empty()) { return {}; }
     const al::PageControl *parent = record;
     if (const al::Property *reference = al::Find(control.properties, "LinkTable");
         reference != nullptr) {
@@ -3628,76 +3754,112 @@ std::string ElementImport(const al::PageControl &control,
       }
     }
     const al::VarDecl *parentDeclared =
-        parent == nullptr ? nullptr : DataItemVariable(page, parent->name);
+        parent == nullptr ? nullptr : DataItemVariable(page_, parent->name);
     const auto parentTable = parentDeclared == nullptr
-                                 ? objects.tables.end()
-                                 : objects.tables.find(LowerKey(parentDeclared->subtype));
-    if (parentTable != objects.tables.end()) {
+                                 ? objects_.tables.end()
+                                 : objects_.tables.find(LowerKey(parentDeclared->subtype));
+    if (parentTable != objects_.tables.end()) {
       for (const DataItemLink &link : links) {
-        const auto field = table->second.fields.find(LowerKey(link.field));
+        const auto field = table.fields.find(LowerKey(link.field));
         const auto ref = parentTable->second.fields.find(LowerKey(link.reference));
-        if (field == table->second.fields.end() || ref == parentTable->second.fields.end()) {
-          continue;
-        }
+        if (field == table.fields.end() || ref == parentTable->second.fields.end()) { continue; }
         out += pad + "    Item_Block." + field->second + " = " +
-               PageVariableIdentifier(page, parentDeclared->name) + "->" + ref->second + ";\n";
+               PageVariableIdentifier(page_, parentDeclared->name) + "->" + ref->second + ";\n";
       }
     }
+
+    return out;
   }
-  if (declares(control, "OnAfterInitRecord")) {
-    out += pad + "    " + trigger(control, "OnAfterInitRecord") + "();\n";
-  }
-  out += pad + "    try {\n";
-  std::vector<const al::PageControl *> below = ancestors;
-  below.push_back(&control);
-  for (const al::PageControl &child : control.children) {
-    if (HoldsATableElement(child)) { continue; }
-    out += ElementImport(
-        child, pageClass, page, objects, named, &control, validateByDefault, indent + 6, below);
-  }
-  if (declares(control, "OnBeforeInsertRecord")) {
-    out += pad + "      " + trigger(control, "OnBeforeInsertRecord") + "();\n";
-  }
-  if (autoSave) {
-    out += pad + "      try {\n" + pad + "        static_cast<void>(Item_Block.Insert(true));\n";
-    out += pad + "      } catch (const ::agiru::Error &) {\n";
-    if (autoReplace || autoUpdate) {
-      out += pad + "        static_cast<void>(Item_Block.Modify(true));\n";
-    } else {
-      out += pad + "        throw;\n";
+
+  std::string ImportSave(const Frame &frame) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    std::string out;
+    const bool autoSave = ElementFlag(control, "AutoSave", true);
+    const bool autoReplace = ElementFlag(control, "AutoReplace", false);
+    const bool autoUpdate = ElementFlag(control, "AutoUpdate", false);
+    if (autoSave) {
+      out += pad + "      try {\n" + pad + "        static_cast<void>(Item_Block.Insert(true));\n";
+      out += pad + "      } catch (const ::agiru::Error &) {\n";
+      if (autoReplace || autoUpdate) {
+        out += pad + "        static_cast<void>(Item_Block.Modify(true));\n";
+      } else {
+        out += pad + "        throw;\n";
+      }
+      out += pad + "      }\n";
+      if (Declares(control, "OnAfterInsertRecord")) {
+        out += pad + "      " + Trigger(control, "OnAfterInsertRecord") + "();\n";
+      }
     }
-    out += pad + "      }\n";
-    if (declares(control, "OnAfterInsertRecord")) {
-      out += pad + "      " + trigger(control, "OnAfterInsertRecord") + "();\n";
+
+    return out;
+  }
+
+  std::string ImportRecord(const Frame &frame) const {
+    const auto &control = frame.control;
+    const auto &pad = frame.pad;
+    const auto &ancestors = frame.ancestors;
+    const auto &indent = frame.indent;
+    const auto &xmlName = frame.xmlName;
+    const auto &validateByDefault = frame.validateByDefault;
+    std::string out;
+    const al::VarDecl *declared = DataItemVariable(page_, control.name);
+    const auto table = declared == nullptr ? objects_.tables.end()
+                                           : objects_.tables.find(LowerKey(declared->subtype));
+    if (declared == nullptr || table == objects_.tables.end() || table->second.header.empty()) {
+      return pad + "throw ::agiru::Error(\"the table element " + control.name + " of xmlport " +
+             page_.name + " is on a table this build does not carry (board:0065)\");\n";
     }
+    const std::string variable = PageVariableIdentifier(page_, declared->name);
+    out += pad + "try {\n";
+    out += pad + "  while (In_().Enter(" + xmlName + ")) {\n";
+    out += pad + "    auto &Item_Block = *" + variable + ".operator->();\n";
+    out += pad + "    Item_Block.Init();\n";
+    out += ImportLinks(frame, table->second);
+    if (Declares(control, "OnAfterInitRecord")) {
+      out += pad + "    " + Trigger(control, "OnAfterInitRecord") + "();\n";
+    }
+    out += pad + "    try {\n";
+    std::vector<const al::PageControl *> below = ancestors;
+    below.push_back(&control);
+    for (const al::PageControl &child : control.children) {
+      if (HoldsATableElement(child)) { continue; }
+      out += Import(child, &control, validateByDefault, indent + kXmlPortRecordIndent, below);
+    }
+    if (Declares(control, "OnBeforeInsertRecord")) {
+      out += pad + "      " + Trigger(control, "OnBeforeInsertRecord") + "();\n";
+    }
+    out += ImportSave(frame);
+    for (const al::PageControl &child : control.children) {
+      if (!HoldsATableElement(child)) { continue; }
+      out += Import(child, &control, validateByDefault, indent + kXmlPortRecordIndent, below);
+    }
+    out += pad + "    } catch (const ::agiru::XmlPortSkip &) {}\n";
+    out += pad + "    In_().Leave();\n";
+    out += pad + "  }\n";
+    out += pad + "} catch (const ::agiru::XmlPortBreak &) {}\n";
+    return out;
   }
-  for (const al::PageControl &child : control.children) {
-    if (!HoldsATableElement(child)) { continue; }
-    out += ElementImport(
-        child, pageClass, page, objects, named, &control, validateByDefault, indent + 6, below);
-  }
-  out += pad + "    } catch (const ::agiru::XmlPortSkip &) {}\n";
-  out += pad + "    In_().Leave();\n";
-  out += pad + "  }\n";
-  out += pad + "} catch (const ::agiru::XmlPortBreak &) {}\n";
-  return out;
-}
+
+  const al::PageObject &page_;
+  const Objects &objects_;
+  const std::map<std::string, std::string> &named_;
+};
 
 std::string XmlPortWalk(const al::PageObject &page,
                         const std::string &pageClass,
                         const Objects &objects,
                         const std::map<std::string, std::string> &named) {
   std::string out;
+  const XmlPortElements elements(page, objects, named);
   const al::Property *defaults = al::Find(page.properties, "DefaultFieldsValidation");
   const bool validateByDefault = defaults == nullptr || LowerKey(defaults->text) != "false";
   out += "void " + pageClass + "::Export_() {\n";
-  for (const al::PageControl &root : page.dataset) {
-    out += ElementExport(root, pageClass, page, objects, named, {}, 2);
-  }
+  for (const al::PageControl &root : page.dataset) { out += elements.Export(root, {}, 2); }
   out += "}\n\n";
   out += "void " + pageClass + "::Import_() {\n";
   for (const al::PageControl &root : page.dataset) {
-    out += ElementImport(root, pageClass, page, objects, named, nullptr, validateByDefault, 2);
+    out += elements.Import(root, nullptr, validateByDefault, 2);
   }
   out += "}\n\n";
   out +=
@@ -3821,7 +3983,11 @@ std::string WriteSource(const al::PageObject &page,
     bodies += "void " + pageClass + "::ClearAll() {\n";
     for (const al::VarDecl &declared : page.variables) {
       const std::string named = PageVariableIdentifier(page, declared.name);
-      bodies += "  " + named + " = decltype(" + named + "){};\n";
+      bodies += "  ";
+      bodies += named;
+      bodies += " = decltype(";
+      bodies += named;
+      bodies += "){};\n";
     }
     bodies += "}\n\n";
   }
@@ -3830,6 +3996,87 @@ std::string WriteSource(const al::PageObject &page,
   out += BodyIncludes(bodies, objects);
   out += bodies;
   return WithRuntimeIncludes(out, PageKind(page));
+}
+
+namespace {
+
+std::string_view XmlFormatSpelling(std::string_view value) {
+  if (value == "variabletext") { return "VariableText"; }
+  if (value == "fixedtext") { return "FixedText"; }
+  return "Xml";
+}
+
+std::string_view XmlDirectionSpelling(std::string_view value) {
+  if (value == "import") { return "Import"; }
+  if (value == "export") { return "Export"; }
+  return "Both";
+}
+
+std::string_view XmlEncodingSpelling(std::string_view value) {
+  if (value == "utf8") { return "UTF8"; }
+  if (value == "utf16") { return "UTF16"; }
+  if (value == "windows" || value == "iso88592") { return "Windows"; }
+  return "MSDos";
+}
+
+std::string XmlPortDeclaration(const al::PageObject &page,
+                               const std::string &space,
+                               const std::string &identifier) {
+  std::string out;
+  const auto text = [&page](std::string_view name, std::string_view fallback) {
+    const al::Property *found = al::Find(page.properties, name);
+    return found == nullptr ? std::string(fallback) : found->text;
+  };
+  const std::string format = LowerKey(text("Format", "Xml"));
+  const std::string direction = LowerKey(text("Direction", "Both"));
+  const std::string encoding = format == "variabletext" || format == "fixedtext"
+                                   ? LowerKey(text("TextEncoding", "MSDOS"))
+                                   : LowerKey(text("Encoding", "UTF8"));
+  const std::string rootName =
+      page.dataset.empty() ? std::string{} : XmlNameOf(page.dataset.front());
+  out += "namespace " + space + " {\n\n";
+  const std::vector<std::pair<std::string, std::string>> namespaces =
+      NamespacesOf(al::Find(page.properties, "Namespaces"));
+  if (!namespaces.empty()) {
+    out += "constexpr std::array<XmlNamespaceDef, " + std::to_string(namespaces.size()) + "> k" +
+           identifier + "Namespaces{{\n";
+    for (const auto &[prefix, uri] : namespaces) {
+      out +=
+          "    XmlNamespaceDef{.prefix = " + Literal(prefix) + ", .uri = " + Literal(uri) + "},\n";
+    }
+    out += "}};\n\n";
+  }
+  out += "constexpr XmlPortDef k" + identifier + "XmlPort{\n";
+  out += "    .id = XmlPortId{" + std::to_string(page.id) + "},\n";
+  out += "    .name = " + ClassName(identifier, PageKind(page)) + "::kName,\n";
+  out += "    .format = XmlPortFormat::" + std::string(XmlFormatSpelling(format)) + ",\n";
+  out +=
+      "    .direction = XmlPortDirection::" + std::string(XmlDirectionSpelling(direction)) + ",\n";
+  out += "    .encoding = ::agiru::TextEncoding::" + std::string(XmlEncodingSpelling(encoding)) +
+         ",\n";
+  out += "    .fieldSeparator = " + Literal(text("FieldSeparator", "<,>")) + ",\n";
+  out += "    .recordSeparator = " + Literal(text("RecordSeparator", "<NewLine>")) + ",\n";
+  out += "    .fieldDelimiter = " + Literal(text("FieldDelimiter", "<\">")) + ",\n";
+  out += "    .tableSeparator = " + Literal(text("TableSeparator", "<NewLine><NewLine>")) + ",\n";
+  out += "    .useRequestPage = " +
+         std::string(LowerKey(text("UseRequestPage", "true")) == "false" ? "false" : "true") +
+         ",\n";
+  out += "    .formatEvaluateXml = " +
+         std::string(LowerKey(text("FormatEvaluate", "Legacy")) == "xml" ? "true" : "false") +
+         ",\n";
+  out += "    .rootName = " + Literal(rootName) + ",\n";
+  if (const std::string defaultNamespace = text("DefaultNamespace", "");
+      !defaultNamespace.empty()) {
+    out += "    .defaultNamespace = " + Literal(defaultNamespace) + ",\n";
+  }
+  if (LowerKey(text("UseDefaultNamespace", "false")) == "true") {
+    out += "    .useDefaultNamespace = true,\n";
+  }
+  if (!namespaces.empty()) { out += "    .namespaces = k" + identifier + "Namespaces,\n"; }
+  out += "};\n\n} // namespace " + space + "\n\n";
+  return out;
+}
+
 }
 
 std::string WriteDefinitions(const al::PageObject &page,
@@ -3847,71 +4094,7 @@ std::string WriteDefinitions(const al::PageObject &page,
   out += "\n" + PageDefinition(page, objects, source);
   const std::string space = NamespaceOf(page.nameSpace);
   const std::string identifier = Identifier(page.name);
-  if (page.xmlport) {
-    const auto text = [&page](std::string_view name, std::string_view fallback) {
-      const al::Property *found = al::Find(page.properties, name);
-      return found == nullptr ? std::string(fallback) : found->text;
-    };
-    const std::string format = LowerKey(text("Format", "Xml"));
-    const std::string direction = LowerKey(text("Direction", "Both"));
-    const std::string encoding = format == "variabletext" || format == "fixedtext"
-                                     ? LowerKey(text("TextEncoding", "MSDOS"))
-                                     : LowerKey(text("Encoding", "UTF8"));
-    const std::string rootName =
-        page.dataset.empty() ? std::string{} : XmlNameOf(page.dataset.front());
-    out += "namespace " + space + " {\n\n";
-    const std::vector<std::pair<std::string, std::string>> namespaces =
-        NamespacesOf(al::Find(page.properties, "Namespaces"));
-    if (!namespaces.empty()) {
-      out += "constexpr std::array<XmlNamespaceDef, " + std::to_string(namespaces.size()) + "> k" +
-             identifier + "Namespaces{{\n";
-      for (const auto &[prefix, uri] : namespaces) {
-        out += "    XmlNamespaceDef{.prefix = " + Literal(prefix) + ", .uri = " + Literal(uri) +
-               "},\n";
-      }
-      out += "}};\n\n";
-    }
-    out += "constexpr XmlPortDef k" + identifier + "XmlPort{\n";
-    out += "    .id = XmlPortId{" + std::to_string(page.id) + "},\n";
-    out += "    .name = " + ClassName(identifier, PageKind(page)) + "::kName,\n";
-    out += "    .format = XmlPortFormat::" +
-           std::string(format == "variabletext" ? "VariableText"
-                       : format == "fixedtext"  ? "FixedText"
-                                                : "Xml") +
-           ",\n";
-    out += "    .direction = XmlPortDirection::" +
-           std::string(direction == "import"   ? "Import"
-                       : direction == "export" ? "Export"
-                                               : "Both") +
-           ",\n";
-    out += "    .encoding = ::agiru::TextEncoding::" +
-           std::string(encoding == "utf8"       ? "UTF8"
-                       : encoding == "utf16"    ? "UTF16"
-                       : encoding == "windows"  ? "Windows"
-                       : encoding == "iso88592" ? "Windows"
-                                                : "MSDos") +
-           ",\n";
-    out += "    .fieldSeparator = " + Literal(text("FieldSeparator", "<,>")) + ",\n";
-    out += "    .recordSeparator = " + Literal(text("RecordSeparator", "<NewLine>")) + ",\n";
-    out += "    .fieldDelimiter = " + Literal(text("FieldDelimiter", "<\">")) + ",\n";
-    out += "    .tableSeparator = " + Literal(text("TableSeparator", "<NewLine><NewLine>")) + ",\n";
-    out += "    .useRequestPage = " +
-           std::string(LowerKey(text("UseRequestPage", "true")) == "false" ? "false" : "true") +
-           ",\n";
-    out += "    .formatEvaluateXml = " +
-           std::string(LowerKey(text("FormatEvaluate", "Legacy")) == "xml" ? "true" : "false") +
-           ",\n";
-    out += "    .rootName = " + Literal(rootName) + ",\n";
-    if (const std::string defaultNamespace = text("DefaultNamespace", "");
-        !defaultNamespace.empty()) {
-      out += "    .defaultNamespace = " + Literal(defaultNamespace) + ",\n";
-    }
-    if (LowerKey(text("UseDefaultNamespace", "false")) == "true") {
-      out += "    .useDefaultNamespace = true,\n";
-    }
-    if (!namespaces.empty()) { out += "    .namespaces = k" + identifier + "Namespaces,\n"; }
-    out += "};\n\n} // namespace " + space + "\n\n";
-  }
+  if (page.xmlport) { out += XmlPortDeclaration(page, space, identifier); }
   out += "namespace " + space + " {\n\nnamespace {\nnamespace " + identifier + "_unit {\nconst " +
          (page.xmlport  ? "RegisterXmlPort<"
           : page.report ? "RegisterReport<"

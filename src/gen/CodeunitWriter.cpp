@@ -1440,21 +1440,19 @@ public:
     return table == objects_.tables.end() ? std::string{} : table->second.identifier;
   }
 
-  [[nodiscard]] std::string PartControlSpelling(std::string_view variable,
-                                                std::string_view part,
-                                                std::string_view control) const override {
-    const al::VarDecl *declared = Declaration(variable);
+  [[nodiscard]] std::string PartControlSpelling(const OfPartControl &member) const override {
+    const al::VarDecl *declared = Declaration(member.variable);
     if (declared == nullptr || declared->subtype.empty()) { return {}; }
     const std::string type = TypeName(declared->type);
     if (type != "TestPage" && type != "Page") { return {}; }
     const TableIndex &index = PageIndexFor(objects_, type);
     const auto page = index.find(LowerKey(declared->subtype));
     if (page == index.end()) { return {}; }
-    const auto shown = page->second.parts.find(LowerKey(std::string(part)));
+    const auto shown = page->second.parts.find(LowerKey(std::string(member.part)));
     if (shown == page->second.parts.end()) { return {}; }
     const auto sub = index.find(shown->second);
     if (sub == index.end()) { return {}; }
-    const auto found = sub->second.fields.find(LowerKey(std::string(control)));
+    const auto found = sub->second.fields.find(LowerKey(std::string(member.control)));
     return found == sub->second.fields.end() ? std::string{} : found->second;
   }
 
