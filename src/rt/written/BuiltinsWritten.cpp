@@ -2,14 +2,15 @@
 
 #include "Builtins.h"
 #include "dotnet/JObject.h"
-#include "meta/EnumDef.h"
-#include "runtime/Catalogue.h"
+#include "runtime/Codeunit.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
 #include "runtime/test/Handlers.h"
+#include "type/AuditCategory.h"
 #include "type/BigInteger.h"
+#include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
@@ -17,17 +18,22 @@
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
+#include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ErrorInfo.h"
 #include "type/ExecutionContext.h"
 #include "type/File.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/JsonHandle.h"
 #include "type/List.h"
 #include "type/ObjectType.h"
 #include "type/RecordId.h"
+#include "type/Refusal.h"
+#include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/StringValue.h"
+#include "type/TableConnectionType.h"
 #include "type/TelemetryScope.h"
 #include "type/Text.h"
 #include "type/Time.h"
@@ -41,6 +47,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <limits>
@@ -88,10 +95,7 @@ bool AsText(::agiru::Integer format) {
 }
 
 std::string OrdinalText(const ::agiru::OrdinalInVariant &held, ::agiru::Integer format) {
-  if (!AsText(format)) { return std::to_string(held.ordinal); }
-  const EnumValueDef *member = ValueOf(held.values, held.ordinal);
-  if (member == nullptr) { return std::to_string(held.ordinal); }
-  return std::string(member->caption.empty() ? member->name : member->caption);
+  return AsText(format) ? held.ToText() : std::to_string(held.ordinal);
 }
 
 std::string DateText(const ::agiru::Date &held, ::agiru::Integer format) {

@@ -1,22 +1,28 @@
+#include "meta/EnumDef.h"
 #include "runtime/ErrorValue.h"
 #include "type/AlArray.h"
 #include "type/BigInteger.h"
+#include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Duration.h"
 #include "type/Integer.h"
+#include "type/Option.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
+#include <array>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <string>
+#include <string_view>
 
 using agiru::Date;
 using agiru::Error;
@@ -262,10 +268,61 @@ void AVariantLendsTextFromItsOwnStorage() {
              "after");
 }
 
+namespace {
+
+void OrdinalTextPreservesMetadataAndTypedValues() {
+  static constexpr std::array values{
+      agiru::EnumValueDef{.ordinal = 0, .name = "Zero", .caption = "Δ ready"},
+      agiru::EnumValueDef{.ordinal = 10, .name = "Ten", .caption = ""},
+      agiru::EnumValueDef{.ordinal = 20, .name = "", .caption = ""},
+      agiru::EnumValueDef{.ordinal = 30, .name = "Thirty", .caption = " "}};
+  static_assert(agiru::ValuesAreSorted(values));
+
+  struct Case {
+    agiru::Integer ordinal;
+    std::string_view expected;
+  };
+
+  static constexpr std::array cases{Case{.ordinal = 0, .expected = "Δ ready"},
+                                    Case{.ordinal = 10, .expected = "Ten"},
+                                    Case{.ordinal = 20, .expected = ""},
+                                    Case{.ordinal = 30, .expected = " "},
+                                    Case{.ordinal = 21, .expected = "21"},
+                                    Case{.ordinal = -7, .expected = "-7"}};
+  for (const Case &test : cases) {
+    const Variant value{agiru::OrdinalInVariant{.ordinal = test.ordinal, .values = values}};
+    CHECK_TEXT("ordinal Variant conversion preserves declared display text",
+               std::string_view(value),
+               test.expected);
+    const agiru::Text<250> assigned = value;
+    CHECK_TEXT(
+        "ordinal Variant assignment reaches typed Text", std::string_view(assigned), test.expected);
+    CHECK_TEXT("ordinal Variant conversion and Format share display semantics",
+               agiru::Format(value),
+               test.expected);
+    CHECK_TRUE("rendering does not change the held ordinal or metadata",
+               value.IsOption() && !value.IsText() &&
+                   value.Get<agiru::OrdinalInVariant>().ordinal == test.ordinal &&
+                   value.Get<agiru::OrdinalInVariant>().values.data() == values.data());
+    bool refused = false;
+    try {
+      (void)value.Get<agiru::Text<0>>();
+    } catch (const Error &) { refused = true; }
+    CHECK_TRUE("typed Variant Get remains strict after rendering", refused);
+  }
+  const Variant anonymous{agiru::Option<>::FromInteger(-7)};
+  CHECK_TEXT("an option without declared vocabulary retains its numeric text",
+             std::string_view(anonymous),
+             "-7");
+}
+
+}
+
 int main() {
   return gate::Run("Variant", [] {
     AVariantReadsAsTextWhateverItHolds();
     AVariantLendsTextFromItsOwnStorage();
+    OrdinalTextPreservesMetadataAndTypedValues();
     AnOptionTakesAnIntegerFromAVariant();
     AnIntegerTakesAnOptionsOrdinalFromAVariant();
     ATextPositionHoldsItsChar();

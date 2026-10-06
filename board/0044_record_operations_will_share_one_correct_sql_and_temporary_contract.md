@@ -3,7 +3,7 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay shared positions, XML diagnostics and 0073's loop-bound repair with
+Next: replay shared positions, XML diagnostics, ordinal Variant conversion and 0073's loop-bound repair with
 0013/0058 on every UT identity; investigate remaining failures in source order,
 including physical-inventory siblings and Incoming Documents conversions.
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
@@ -62,6 +62,32 @@ seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Useful implementation details
 
+- Ordinal Variant → Text: `WorkflowTableRelationValue.Table.al::CreateNew` assigns
+  FieldRef.Value to Text[250]; UpdateRelationValue compares that value with Format.
+  The frozen b2a8131 Workflow Engine UT failure reaches Variant::Rendered, refusing
+  held alternative 14. `OrdinalInVariant::ToText` in `src/net/Variant.cpp` now shares
+  the existing declared display policy with BuiltinsWritten's Format 0/1; Format 2/9
+  and strict typed Get are unchanged. No business-specific branch or mutable metadata.
+  Developer `f928288ee840`: variant/option data types, AL type conversion and
+  devenv-format-property.md; BCApps `d99152ee35f0`: BaseApp/System/Workflow;
+  user docs `bf5ffffa9b026`: across-how-to-enable-workflows.md; predecessor 1744/875
+  and runtime/test_format_variant_transparency.py. Do not copy the unrelated
+  OK/LookupOK sentinel or equate ordinal/text held types. BC29 NCL `277e35cbdfb8`:
+  NavIndirectValue.ToString `116ada` delegates to NavValue.ToString `1439a2`,
+  whose non-invariant path uses Format; NavOptionFormatter `1b7bfc` distinguishes
+  display 0/1 from numeric 2/9. Session culture/caption selection, invariant conversion
+  and the broader native blank-member policy remain unqualified.
+  `make variant-text JOBS=2`: Variant/Format/RecordRef 89/43/161 checks; three
+  compiled caption/blank/conversion defects reject in both independent consumers.
+  Isolated TestStartWorkflowWithNewlyAddedEvent passes 1/1 with current net preloaded
+  into b2a8131; this mixed-image diagnostic is not full UT gain or causal A/B proof.
+  The original and repaired diagnostic clones were removed; the unsealed seed was untouched.
+  Variant.cpp and RecordRefGate focused tidy pass; VariantGate/FormatGate retain
+  15/3 older findings. BuiltinsWritten retains 12, including the unsuppressed libc++
+  expected-provider contradiction; its Format dispatch complexity stays 37, not raised.
+  Its unchanged-layout public header adds only the method declaration;
+  three no-PCH rounds measure 1945.2 ms versus frozen b2a8131 2149.2 ms under concurrent
+  integration, not a speedup claim. Full current-image replay remains required.
 - Incoming Documents invalid-content diagnostic: developer `f928288ee840`
   `system-getlasterrortext--method.md` / `xmldocument-readfrom-string-xmldocument-method.md`;
   BCApps `d99152ee35f0` `Modules/System/Xml/XMLDOMManagement.Codeunit.al`

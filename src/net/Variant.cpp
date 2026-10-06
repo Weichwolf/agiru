@@ -1,15 +1,38 @@
 #include "type/Variant.h"
 
+#include "meta/EnumDef.h"
 #include "runtime/ErrorValue.h"
+#include "type/BigInteger.h"
+#include "type/Blob.h"
+#include "type/Boolean.h"
+#include "type/Date.h"
+#include "type/DateFormula.h"
+#include "type/DateTime.h"
+#include "type/Decimal.h"
+#include "type/Duration.h"
+#include "type/Guid.h"
+#include "type/Integer.h"
+#include "type/RecordId.h"
+#include "type/StringValue.h"
+#include "type/Time.h"
 
 #include <cerrno>
+#include <concepts>
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <variant>
 
 namespace agiru {
+
+std::string OrdinalInVariant::ToText() const {
+  const EnumValueDef *member = ValueOf(values, ordinal);
+  if (member == nullptr) { return std::to_string(ordinal); }
+  return std::string(member->caption.empty() ? member->name : member->caption);
+}
 
 std::string_view Variant::HeldName() const {
   return std::visit(

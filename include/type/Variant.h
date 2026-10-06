@@ -327,6 +327,11 @@ struct JsonInVariant {
 struct OrdinalInVariant {
   std::int32_t ordinal;                 ///< The declared number.
   std::span<const EnumValueDef> values; ///< The declared members, for the rendering.
+
+  /// \brief The declared display text shared by Variant conversion and standard Format 0/1.
+  /// \return The caption, then member name; the ordinal when no member is declared.
+  /// \note Blank declared members remain blank. Metadata is borrowed and never modified.
+  [[nodiscard]] std::string ToText() const;
 };
 
 /// \brief Two enumeration values are equal when their ordinals are.

@@ -394,6 +394,11 @@ void AValueCarriesItsType() {
   CHECK_TRUE("an option comes out as an option", type.IsOption() && !type.IsInteger());
   CHECK_TRUE("carrying the member's number", type.Get<agiru::OrdinalInVariant>().ordinal == 2);
   CHECK_TRUE("and the member names", type.Get<agiru::OrdinalInVariant>().values.size() == 3);
+  const agiru::Text<250> display = type;
+  CHECK_TEXT(
+      "an Option FieldRef value assigns its declared text", std::string_view(display), "All");
+  CHECK_TRUE("assigning Option FieldRef to Text retains its typed ordinal",
+             type.IsOption() && type.Get<agiru::OrdinalInVariant>().ordinal == 2);
 }
 
 /// POSITION AND ORDINAL ARE DIFFERENT QUESTIONS, and the platform gives both accessors because of

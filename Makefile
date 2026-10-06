@@ -20,7 +20,7 @@ export CCACHE_SLOPPINESS
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
-.PHONY: system-profiles
+.PHONY: system-profiles variant-text
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -132,6 +132,10 @@ for-loops: comments db tc ## execute captured AL for-loop bounds and counter/con
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenCodeunitGate
 	@"$(B)/gate_GenCodeunitGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/for-loops.sh"
+
+variant-text: comments db ## prove shared Variant/Format ordinal text and strict typed identity
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_VariantGate gate_FormatGate gate_RecordRefGate
+	@B="$(B)" bash "$(SELF)/test/runtime/variant-text.sh"
 
 native-enums: comments db tc ## execute source-loaded native enum fields, parameters and extensions
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt

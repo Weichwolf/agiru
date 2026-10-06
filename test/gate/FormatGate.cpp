@@ -73,6 +73,21 @@ void AnEnumerationRendersItsTextForZeroAndOneAndItsNumberForTwoAndNine() {
   const Variant answer{agiru::Enum<YesNo>{YesNo::No}};
   CHECK_TEXT("an enum renders its text the same way", Format(answer, 0, 0), "No");
   CHECK_TEXT("and its DECLARED ordinal, not its position", Format(answer, 0, 2), "10");
+
+  static constexpr std::array styledValues{
+      agiru::EnumValueDef{.ordinal = 10, .name = "DeclaredName", .caption = "Δ caption"},
+      agiru::EnumValueDef{.ordinal = 20, .name = "", .caption = ""}};
+  const Variant styled{agiru::OrdinalInVariant{.ordinal = 10, .values = styledValues}};
+  CHECK_TEXT("display Format uses the caption rather than the member name",
+             Format(styled, 0, 0),
+             "Δ caption");
+  CHECK_TEXT("edit Format shares the declared display text", Format(styled, 0, 1), "Δ caption");
+  CHECK_TEXT("code Format still returns the declared ordinal", Format(styled, 0, 2), "10");
+  CHECK_TEXT("XML Format still returns the declared ordinal", Format(styled, 0, 9), "10");
+  const Variant blank{agiru::OrdinalInVariant{.ordinal = 20, .values = styledValues}};
+  CHECK_TEXT("display Format preserves a declared blank member", Format(blank, 0, 0), "");
+  CHECK_TEXT("edit Format preserves a declared blank member", Format(blank, 0, 1), "");
+  CHECK_TEXT("numeric Format never replaces a blank member's ordinal", Format(blank, 0, 2), "20");
 }
 
 // The negative control for the alternative itself: `Assert.Equal` decides on `TypeOf`, so an option
