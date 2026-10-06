@@ -5,7 +5,7 @@ Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
 Next: replay XML diagnostics, ordinal Variant conversion, the RowVersion gate and 0073's loop-bound repair with
 0013/0058 on every UT identity; investigate remaining failures in source order,
-including physical-inventory siblings and Incoming Documents conversions.
+including XMLport import validation, physical-inventory siblings and Incoming Documents conversions.
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
 Complete Field classification, SQLDataType, package provenance and permissions;
@@ -62,6 +62,23 @@ seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Useful implementation details
 
+- XMLport import validation diagnosis: BC29 NCL SHA256 `277e35cbdfb8`,
+  NavXmlPortImporter `<AssignFieldValueAsync>d__25::MoveNext`, assigns through
+  SourceFieldTableNode, fires OnAfterAssignField, then branches past ValidateAsync
+  when that source table node is Temporary (IL 01de/01e5/0205/020a/023f).
+  `src/gen/BodyWriter.cpp::ElementImport` instead validates temporary fields and
+  fires the assignment trigger afterwards. GenXmlPortGate currently locks in the
+  wrong temporary-field behavior. Repair both orders; resolve the source owner,
+  retain explicit FieldValidate/default inheritance for physical nodes and qualify
+  generated execution with compiled negative controls. Preserve ordinary temporary
+  Record.Validate relation checks: predecessor 1663 proves those are required;
+  1325 identifies XMLport flags/error-swallowing hazards, not this native exception.
+  Developer `f928288ee840`: devenv-{fieldvalidate,defaultfieldsvalidation,
+  usetemporary-xmlport}-property.md and OnAfterAssignField triggers. BCApps
+  `d99152ee35f0`: ImpExpDataExchDefMap.XmlPort.al temporary TransformationRules
+  and DataExchDefUT::DataExhangeDefinitionImportInsertsRuleFromNextTransformationRuleField.
+  Native static inspection is version-bounded, not an executed BC comparison;
+  current full replay remains red and no import repair is implemented yet.
 - RowVersion disconnect observation: frozen b2a8131's C++ integration has one red
   (`disconnect removes an uncommitted writer`). PQfinish closes the frontend without
   waiting for backend rollback; delaying the original Connection destructor with
