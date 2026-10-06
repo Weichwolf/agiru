@@ -1,6 +1,8 @@
 #include "meta/PageDef.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/PageCore.h"
+#include "runtime/PageInstance.h"
 #include "runtime/PageSession.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
@@ -9,6 +11,7 @@
 #include "runtime/test/TestRequestPage.h"
 #include "type/Action.h"
 #include "type/Integer.h"
+#include "type/RecordId.h"
 
 #include "Check.h"
 #include "fixture/page/NavigationBlockedList.h"
@@ -45,6 +48,45 @@ void Prepare() {
   row.ID = 2;
   row.Value = kSecondValue;
   row.Insert();
+}
+
+void InstalledPageLifecycle() {
+  auto list = agiru::MakeInstalledPage(agiru::PageTraits<List>::kId);
+  auto card = agiru::MakeInstalledPage(agiru::PageTraits<Card>::kId);
+  CHECK_TRUE("generated catalogue links a closed production factory",
+             !list->IsOpen() && !card->IsOpen());
+  list->Open(agiru::PageOpenMode::View);
+  CHECK_TRUE("type-erased first uses the existing cursor", list->Move(agiru::PagePosition::First));
+  CHECK_TEXT("first positions on the declared key order", list->Controls().ControlText("ID"), "1");
+  CHECK_TRUE("type-erased next uses the existing cursor", list->Move(agiru::PagePosition::Next));
+  CHECK_TEXT("next reaches the next SQL row", list->Controls().ControlText("ID"), "2");
+  const agiru::RecordId selected = list->CurrentRecord();
+  CHECK_TRUE("selected row retains its declared table identity",
+             selected.TableNo() == agiru::TableTraits<Row>::kTable.id.Value());
+  CHECK_TRUE("type-erased previous uses the existing cursor",
+             list->Move(agiru::PagePosition::Previous));
+  CHECK_TEXT("previous reaches the preceding SQL row", list->Controls().ControlText("ID"), "1");
+  CHECK_TRUE("type-erased last uses the existing cursor", list->Move(agiru::PagePosition::Last));
+  CHECK_TRUE("exact record identity repositions the production page", list->SelectRecord(selected));
+  card->Open(agiru::PageOpenMode::Edit);
+  CHECK_TRUE("list identity selects the same row in a production card",
+             card->SelectRecord(selected));
+  CHECK_TEXT("production selection runs the generated after-get trigger",
+             card->Controls().ControlText("LoadedValue"),
+             "22");
+  CHECK_TEXT("production opening still exposes editing mode to AL",
+             card->Controls().ControlText("OpeningMode"),
+             "Yes");
+  CHECK_TRUE("the selected identity remains exact after navigation",
+             card->CurrentRecord() == selected);
+  bool refused = false;
+  try {
+    static_cast<void>(list->Move(agiru::PagePosition::Unknown));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PagePosition"; }
+  CHECK_TRUE("unknown movement refuses instead of changing selection",
+             refused && list->CurrentRecord() == selected);
+  list->Close();
+  card->Close();
 }
 
 void ListEditOpensSelectedCard() {
@@ -189,6 +231,10 @@ void TestHandlesRebindTheirGeneratedControls() {
   agiru::TestPage<Card> owner;
   owner.OpenEdit();
   CHECK_TRUE("test handle positions before copying", owner.GoToKey(3));
+  CHECK_TRUE("production Open does not shadow an AL Open control", owner.Open.AsBoolean());
+  CHECK_TRUE("production Move does not shadow an AL Move control", owner.Move.AsInteger() == 44);
+  CHECK_TRUE("production Declaration does not shadow an AL control",
+             owner.Declaration.AsInteger() == 44);
   {
     agiru::TestPage<Card> copied(owner);
     copied.Value.SetValue(kCopiedValue);
@@ -255,6 +301,7 @@ int main(int argc, char **argv) {
     const agiru::Session session(argv[1]);
     const agiru::detail::Scope isolation;
     Prepare();
+    InstalledPageLifecycle();
     ListEditOpensSelectedCard();
     ExplicitEditAndStandaloneModes();
     CardModificationPolicy();

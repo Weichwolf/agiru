@@ -141,8 +141,11 @@ The production `PageSession` and AL `TestPage` adapter share validation/save/tri
 execution. Generated delayed insertion and edit cases reconcile direct SQL results;
 production save errors propagate while AL test error collection remains explicit.
 Generated TestPage copy/move rebinding and request-page fields/filter accept/cancel
-paths retain adapter behaviour. Five compiled dispatcher defects and five
-navigation/error-policy/unbound controls must fail.
+paths retain adapter behaviour. The installed catalogue creates closed production
+instances, not headless page runs; mode/cursor/RecordId paths use the same kernel.
+AL controls Open/Move/Declaration retain their names. Missing/null/mismatched factories
+refuse. Eleven execution mutants and a control-shadowing compile refusal must reject;
+the narrow PageInstance interface must not pull in typed page/control/record headers.
 This is not HTTP/client parity, production permission storage, exact typed wire values
 or complete page lifecycle. View navigation remains open (0720).
 

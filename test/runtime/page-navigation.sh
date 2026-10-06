@@ -7,6 +7,8 @@ CXX=${CXX:-clang++-19}
 dsn=${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}
 proof=$(mktemp -d /tmp/agiru-page-navigation.XXXXXX)
 sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
+  src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
+  include/runtime/Page.h src/gen/BodyWriter.cpp \
   include/runtime/PageSession.h include/runtime/test/TestPage.h \
   test/gate/PageDispatcherGate.cpp test/runtime/page-navigation/Runner.cpp \
   test/runtime/page-navigation/*.al test/runtime/page-navigation.sh > "$proof/dispatcher-inputs.sha256"
@@ -63,6 +65,20 @@ for control in no-authorization no-enabled no-editable no-visible unknown-contro
   rg -q 'invalid commands refuse with the expected diagnostic' "$proof/dispatcher-$control.log"
   rm -- "$proof/dispatcher-$control" "$proof/dispatcher-$control.cpp"
 done
+awk '
+  /&instance->Declaration\(\) != entry->page/ {
+    sub(/&instance->Declaration\(\) != entry->page/, "false"); changed++
+  }
+  { print }
+  END { if (changed != 1) exit 2 }
+' src/rt/PageInstance.cpp > "$proof/wrong-factory.cpp"
+"$CXX" "${flags[@]}" test/gate/PageDispatcherGate.cpp "$proof/wrong-factory.cpp" \
+  "${links[@]}" -o "$proof/wrong-factory"
+status=0
+"$proof/wrong-factory" > "$proof/wrong-factory.log" 2>&1 || status=$?
+[[ "$status" = 1 ]]
+rg -q 'absent or invalid factories refuse instead of headless success' "$proof/wrong-factory.log"
+rm -- "$proof/wrong-factory" "$proof/wrong-factory.cpp"
 mkdir -p "$B/fixture-commands"
 jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/page-navigation/Runner.cpp" \
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
@@ -70,6 +86,19 @@ jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/page-navigation/Runne
   > "$B/fixture-commands/page-navigation.json"
 mkdir -p "$proof/mutant"
 cp -a include "$proof/mutant/"
+awk '
+  /PageSession\(\) = default;/ {
+    print "  void Open() {}"; changed++
+  }
+  { print }
+  END { if (changed != 1) exit 2 }
+' include/runtime/PageSession.h > "$proof/mutant/include/runtime/PageSession.h"
+if "$CXX" "-I$proof/mutant/include" "${flags[@]}" -c test/runtime/page-navigation/Runner.cpp \
+  -o "$proof/shadowed-controls.o" > "$proof/shadowed-controls.log" 2>&1; then
+  printf 'page-navigation: production API shadowed AL controls without refusal\n' >&2
+  exit 1
+fi
+rg -q "member 'Open' found in multiple base classes" "$proof/shadowed-controls.log"
 for control in no-card wrong-row no-policy collect-production-errors; do
   awk -v control="$control" '
     control == "no-card" && /if \(edit && EditCard_\(\)\)/ {
@@ -119,4 +148,4 @@ rm -- "$proof/unbound-integer.so" "$proof/runner" "$proof/runner.o"
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, production lifecycle and authorized control dispatch execute; ten compiled controls reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; eleven execution controls and one control-name compile refusal reject; %s\n' "$proof"

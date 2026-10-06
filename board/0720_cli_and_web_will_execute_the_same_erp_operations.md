@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: bind generated production page factories, exact typed values and one
+Next: deliver exact typed values, semantic HTML and one
 list → card → validate → save slice through HTTP, Node CMD and MCP.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
@@ -27,17 +27,29 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `PageSession<P>` now owns the common lifecycle/validation/save/trigger/part kernel;
   `TestPage<P>` adds generated test controls, traps and explicit row-error collection.
   Production row-save errors propagate; production handles are not publicly copyable.
-  Factories, SQL-backed authorization, command receipts/revisions, modal suspension,
-  HTML/HTTP and Node CMD/MCP remain pending. Failed-new-row retry recovery, non-delayed
-  primary-key insertion and complete lifecycle semantics are not qualified by extraction.
-  Container verification: 81 dispatcher checks and 48 generated navigation/lifecycle/
+  `PageInstance` owns a production adapter around that kernel, not a TestPage base;
+  `MakeInstalledPage` uses the same frozen catalogue and refuses missing/null/mismatched
+  factories. Creation stays closed; open/move/RecordId selection preserve existing AL
+  trigger paths. Composition keeps AL controls named Open/Move/Declaration unambiguous.
+  Only registration definitions include the typed factory. All 2,836 generated page
+  definitions now emit it; complete compilation/linking remains unproven.
+  `make transpile` still exits 1: 21 unresolved extension operations and 5,683 refused properties
+  remain counted, not a green-subset claim. SQL-backed authorization, command receipts/
+  revisions, modal suspension, HTML/HTTP and Node CMD/MCP remain pending.
+  Failed-new-row retry recovery, non-delayed primary-key insertion and complete lifecycle
+  semantics are not qualified by extraction.
+  Container verification: 96 dispatcher checks and 66 generated navigation/lifecycle/
   handle/request-page checks pass. Direct SQL confirms saved identity/value and missing
-  refused inserts. Five dispatcher defects and five navigation/error-policy/unbound
-  controls reject; 17 isolation checks pass. Twelve standalone header probes and
-  forced dependencies pass. Targeted dispatcher-source and generated-fixture runner
+  refused inserts. Eleven execution mutants and the AL-control shadowing compile
+  control reject. Generator page 42/report 27, catalogue 54 and isolation 17 checks pass.
+  Thirteen standalone header probes and forced dependencies pass. Targeted dispatcher-
+  source, production factory source and generated-fixture runner
   tidy pass; the gate consumer retains 16 findings in existing Page/PageSession/
-  Table/Codeunit implementations, without suppression changes. Full integration/UT
-  on this extraction remains pending; 0058 keeps the previous counted result.
+  Table/Codeunit implementations; BodyWriter retains 20 findings including existing
+  complexity/function-size debt, without suppression changes. Standalone include cost:
+  PageInstance 205 ms, PageSession 1,788 ms (three frontend rounds, no PCH); not a runtime
+  performance claim. Full integration/UT on this increment remains pending; 0058
+  keeps the previous counted result.
 - Refreshed archive SHA256:
   `f654cb6576768cb90fff2e0fb701043139ab4d36723e7427a498132a2e2ee6a3`.
   Inspect `~/Git/openerp/openerp/web/client/{protocol,screen,page_model,ui,session,cli_api,request_page}.py`
@@ -104,9 +116,8 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
   versions. Credentials/raw captures stay outside Git; private archive:
   `~/.local/share/agiru/bc-reference/2026-10-05/manifest.json`.
 
-1. Extract a C++ `PageDispatcher`/`PageSession` below the TestPage adapter.
-   Move production control contracts out of `runtime/test/`; reuse generated
-   factories/control accessors. One model owns modes, current key/version,
+1. Use the shared `PageDispatcher`/`PageSession` and generated production factories.
+   Complete one semantic model for modes, current key/version,
    accepted values versus invalid edit text, parts, dirty/new state and dialogs.
 2. Preserve open/fetch/current-row/validate/save/action/close trigger order,
    delayed insertion, header-before-part saves, SetRecords, SubPageLink and
@@ -224,8 +235,8 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 
 ## References and consolidation
 
-agiru: `include/meta/PageDef.h`, `include/runtime/{PageCore,PageDispatcher,PageSession}.h`,
-`src/gen/PageWriter.cpp`, `src/rt/{TestPage,Session}.cpp`, `src/cli/Main.cpp`.
+agiru: `include/meta/PageDef.h`, `include/runtime/{PageCore,PageDispatcher,PageInstance,PageSession}.h`,
+`src/gen/{BodyWriter,PageWriter}.cpp`, `src/rt/{PageInstance,TestPage,Session}.cpp`, `src/cli/Main.cpp`.
 Control-dispatch references: developer revision
 `f928288ee840334be73142e5fc0202c0e19b246d`,
 `properties/devenv-{enabled,editable,visible}-property.md`; BCApps revision
@@ -241,6 +252,10 @@ Shared-kernel extraction: developer `triggers-auto/page/devenv-onopenpage-page-t
 retains reread/part-refresh findings. `test/runtime/page-navigation/{Delayed.Page.al,
 Request.Report.al,Runner.cpp}` qualifies authored page/AL-test adapter behaviour,
 not report rendering, full BC lifecycle or a live HTTP session.
+Factory/lifecycle references: developer `methods-auto/testpage/testpage-{openview,
+openedit}-method.md`; BCApps `Bank/Ledger/BankAccountLedgerEntries.Page.al` declares
+the Open control; predecessor WI 1370 warns against replacing interactive instances
+with repeated headless Page.Run calls. Reference revisions are those above.
 Reproduce control dispatch with `make gate GATE=PageDispatcherGate JOBS=2`;
 navigation/compiled refusal controls with `make page-navigation JOBS=2`.
 These authored primitive tests are not live client or ERP parity evidence.

@@ -111,6 +111,16 @@ if reject_dependency "$proof/forced-Page.h.d" Page.h \
   printf 'header-dependencies: typed page machinery escaped the dispatcher boundary\n' >&2
   exit 1
 fi
+compile_header runtime/PageInstance.h "$proof/PageInstance.h.d"
+for forbidden in PageCore.h Page.h PageDef.h PageSession.h TestPage.h Record.h RecordId.h vector mutex; do
+  reject_dependency "$proof/PageInstance.h.d" "$forbidden"
+done
+compile_header runtime/PageInstance.h "$proof/forced-PageSession.h.d" -include runtime/PageSession.h
+if reject_dependency "$proof/forced-PageSession.h.d" PageSession.h \
+  > "$proof/forced-PageSession.h.log" 2>&1; then
+  printf 'header-dependencies: typed execution escaped the instance interface boundary\n' >&2
+  exit 1
+fi
 
 for forbidden in filesystem regex; do
   if [ "$forbidden" = filesystem ]; then header=RuntimeSurface.h; else header=dotnet/Regex.h; fi
@@ -121,4 +131,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: twelve standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page controls refused\n'
+printf 'header-dependencies: thirteen standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page controls refused\n'

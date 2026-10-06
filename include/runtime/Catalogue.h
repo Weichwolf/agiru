@@ -14,6 +14,8 @@
 
 namespace agiru {
 
+class PageInstance;
+
 /// \brief The generated declaration of one table. \see runtime/Table.h
 template <typename T> struct TableTraits;
 
@@ -142,6 +144,9 @@ struct PageEntry {
   ///                 true for a `var` record, false for a const one.
   /// \return The action the page closed with.
   ::agiru::Action (*run)(bool modal, void *record, const TableDef *table, bool writable);
+  /// \brief Creates a closed production page handle; the caller owns it.
+  /// Null means no interactive factory is linked, not a successful headless substitute.
+  PageInstance *(*makeSession)() = nullptr;
 };
 
 /// \brief Puts a page in the catalogue, once per generated page, at load time.

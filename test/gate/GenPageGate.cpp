@@ -166,6 +166,13 @@ page 50104 "Original Page Name"
   objects.module = "::agiru::app::kAuthoredModule";
   objects.moduleHeader = "AuthoredModule.h";
   const auto definition = agiru::gen::WriteDefinitions(page, "Original.Page.al", objects, nullptr);
+  CHECK_TRUE("ordinary page definitions link the production session factory",
+             definition.contains(
+                 "RegisterPage<OriginalPageName_Page, &MakePageSession<OriginalPageName_Page>>"));
+  CHECK_TRUE("only the registration definition needs the session implementation",
+             definition.contains("#include \"runtime/PageSession.h\"") &&
+                 !agiru::gen::WritePage(page, "Original.Page.al", objects)
+                      .text.contains("runtime/PageSession.h"));
   CHECK_TRUE("page declaration borrows its original immutable application",
              definition.contains(".module = &::agiru::app::kAuthoredModule,"));
   CHECK_TRUE("only the definition includes its named application header",

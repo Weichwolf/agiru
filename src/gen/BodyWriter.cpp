@@ -3840,6 +3840,7 @@ std::string WriteDefinitions(const al::PageObject &page,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + Identifier(page.name) + ".h\"\n\n";
+  if (!page.xmlport && !page.report) { out += "#include \"runtime/PageSession.h\"\n"; }
   if (page.report && !page.rendering.empty()) { out += "#include \"meta/ReportLayoutDef.h\"\n"; }
   out += kRuntimeIncludeMarker;
   const std::size_t bodyAt = out.size();
@@ -3916,6 +3917,9 @@ std::string WriteDefinitions(const al::PageObject &page,
           : page.report ? "RegisterReport<"
                         : "RegisterPage<") +
          ClassName(identifier, PageKind(page)) +
+         (!page.xmlport && !page.report
+              ? ", &MakePageSession<" + ClassName(identifier, PageKind(page)) + ">"
+              : std::string{}) +
          (page.xmlport  ? "> kInXmlPortCatalogue;\n} // namespace "
           : page.report ? "> kInReportCatalogue;\n} // namespace "
                         : "> kInPageCatalogue;\n} // namespace ") +

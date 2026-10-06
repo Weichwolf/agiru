@@ -1,11 +1,15 @@
 #include "meta/Ids.h"
 #include "meta/PageDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Page.h"
+#include "runtime/PageCore.h"
 #include "runtime/PageDispatcher.h"
+#include "runtime/PageInstance.h"
 #include "runtime/PageSession.h"
 #include "runtime/test/TestPage.h"
 #include "type/Boolean.h"
+#include "type/RecordId.h"
 #include "type/StringValue.h"
 
 #include "Check.h"
@@ -122,6 +126,27 @@ static_assert(agiru::PageTraits<CommandPage>::kName == kPage.name);
 namespace {
 
 using Operation = agiru::PageControlOperation;
+
+const agiru::RegisterPage<CommandPage, &agiru::MakePageSession<CommandPage>> kRegistration;
+constexpr agiru::PageDef kMetadataOnlyPage{.id = agiru::PageId{50132}, .name = "Metadata Only"};
+constexpr agiru::PageDef kMismatchedPage{.id = agiru::PageId{50133}, .name = "Wrong Factory"};
+constexpr agiru::PageDef kNullFactoryPage{.id = agiru::PageId{50134}, .name = "Null Factory"};
+constexpr std::array kIncompleteEntries{
+    agiru::PageEntry{.page = &kMetadataOnlyPage, .run = nullptr},
+    agiru::PageEntry{.page = &kMismatchedPage,
+                     .run = nullptr,
+                     .makeSession = &agiru::MakePageSession<CommandPage>},
+    agiru::PageEntry{.page = &kNullFactoryPage,
+                     .run = nullptr,
+                     .makeSession = +[]() -> agiru::PageInstance * { return nullptr; }}};
+
+struct RegisterIncomplete {
+  RegisterIncomplete() {
+    for (const auto &entry : kIncompleteEntries) { agiru::RegisterPageEntry(&entry); }
+  }
+};
+
+const RegisterIncomplete kIncompleteRegistration;
 
 template <typename T>
 concept HasTestTrap = requires(T &page) { page.Trap(); };
@@ -255,6 +280,61 @@ void ProductionSessionsUseTheSharedKernel() {
   second.Close();
 }
 
+void InstalledFactoriesDoNotRunHeadlessPages() {
+  auto first = agiru::MakeInstalledPage(kPage.id);
+  auto second = agiru::MakeInstalledPage(kPage.id);
+  CHECK_TRUE("installed factories create closed independent handles",
+             !first->IsOpen() && !second->IsOpen());
+  CHECK_TRUE("factory instance borrows the installed immutable declaration",
+             &first->Declaration() == &kPage);
+  bool refused = false;
+  try {
+    first->Open(agiru::PageOpenMode::Unknown);
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageOpenMode"; }
+  CHECK_TRUE("unknown opening modes refuse without opening a page", refused && !first->IsOpen());
+  first->Open(agiru::PageOpenMode::Edit);
+  second->Open(agiru::PageOpenMode::View);
+  Authorization authority;
+  agiru::PageDispatcher dispatcher(first->Declaration(), first->Controls(), authority);
+  static_cast<void>(dispatcher.Execute(
+      {.operation = Operation::Set, .control = "Value", .text = "factory input"}));
+  CHECK_TEXT("installed page factory reaches the existing AL binding",
+             first->Controls().ControlText("Value"),
+             "factory input");
+  CHECK_TEXT("another factory instance retains private page state",
+             second->Controls().ControlText("Value"),
+             "before");
+  Authorization viewAuthority;
+  agiru::PageDispatcher viewing(second->Declaration(), second->Controls(), viewAuthority);
+  Refuses(viewing, Operation::Set, "Value");
+  CHECK_TRUE("source-less pages expose an empty record identity", first->CurrentRecord().IsEmpty());
+  refused = false;
+  try {
+    static_cast<void>(first->SelectRecord({}));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageRecord"; }
+  CHECK_TRUE("source-less selection refuses explicitly", refused);
+  first->Close();
+  second->Close();
+  CHECK_TRUE("type-erased close releases both pages", !first->IsOpen() && !second->IsOpen());
+
+  struct Case {
+    agiru::PageId page;
+    std::string_view code;
+  };
+
+  const std::array cases{Case{.page = agiru::PageId{999999}, .code = "PageMissing"},
+                         Case{.page = kMetadataOnlyPage.id, .code = "PageFactoryMissing"},
+                         Case{.page = kMismatchedPage.id, .code = "PageFactoryMismatch"},
+                         Case{.page = kNullFactoryPage.id, .code = "PageFactoryMismatch"}};
+  for (const auto &test : cases) {
+    refused = false;
+    try {
+      static_cast<void>(agiru::MakeInstalledPage(test.page));
+    } catch (const agiru::Error &error) { refused = error.Code() == test.code; }
+    CHECK_TRUE("absent or invalid factories refuse instead of headless success", refused);
+  }
+}
+
 }
 
 int main() {
@@ -262,5 +342,6 @@ int main() {
     DispatchUsesExistingBindings();
     CurrentStateAndIdentityAreAuthoritative();
     ProductionSessionsUseTheSharedKernel();
+    InstalledFactoriesDoNotRunHeadlessPages();
   });
 }

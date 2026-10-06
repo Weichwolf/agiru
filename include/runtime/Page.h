@@ -653,13 +653,17 @@ template <typename P>
 
 /// \brief The catalogue entry of a generated page.
 /// \tparam P The generated page class.
-template <typename P>
-inline const PageEntry kPageEntry{.page = &PageTraits<P>::kPage, .run = &RunPageEntry<P>};
+/// \tparam Make Its closed production factory; nullptr explicitly leaves interactive use
+/// unavailable.
+template <typename P, PageInstance *(*Make)() = nullptr>
+inline constexpr PageEntry kPageEntry{
+    .page = &PageTraits<P>::kPage, .run = &RunPageEntry<P>, .makeSession = Make};
 
 /// \brief Puts a generated page in the catalogue by existing, the way `RegisterTable` does.
 /// \tparam P The generated page class.
-template <typename P> struct RegisterPage {
-  RegisterPage() { RegisterPageEntry(&kPageEntry<P>); }
+/// \tparam Make Its closed production factory, emitted in the registration definition only.
+template <typename P, PageInstance *(*Make)() = nullptr> struct RegisterPage {
+  RegisterPage() { RegisterPageEntry(&kPageEntry<P, Make>); }
 
   RegisterPage(const RegisterPage &) = delete;
   RegisterPage(RegisterPage &&) = delete;

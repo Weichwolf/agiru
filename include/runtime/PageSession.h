@@ -5,12 +5,14 @@
 #include "runtime/Error.h"
 #include "runtime/Page.h"
 #include "runtime/PageCore.h"
+#include "runtime/PageInstance.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Relation.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
+#include "type/RecordId.h"
 #include "type/StringValue.h"
 
 #include <algorithm>
@@ -58,6 +60,7 @@ public:
   static constexpr bool kHasRecord =
       requires(P &page) { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); };
 
+  /// \brief Starts closed; construction does not execute an AL trigger.
   PageSession() = default;
 
 protected:
@@ -94,10 +97,35 @@ protected:
   }
 
 public:
+  /// \brief Releases owned storage; explicit Close is required for AL save/close triggers.
   ~PageSession() override { Release_(); }
 
   /// \brief Whether this adapter currently holds an open page instance.
   [[nodiscard]] bool IsOpen() const { return page_ != nullptr; }
+
+  /// \brief Positions a production adapter using the same record/trigger kernel as GoToRecord.
+  /// \param record The exact table/primary-key identity.
+  /// \return Whether it was found; the interior underscore cannot shadow an AL control name.
+  [[nodiscard]] bool Select_Record(const RecordId &record) {
+    if constexpr (kHasRecord) {
+      return Landed_([&record](auto &rec) { return Platform_(rec).Get(record); });
+    } else {
+      static_cast<void>(record);
+      throw Error("The page has no source record.", "PageRecord");
+    }
+  }
+
+  /// \brief Reads the current source record identity for a production adapter.
+  /// \return The exact identity, or empty when this page has no source table.
+  /// \note A new record's key is not proof of persistence; this is not an AL control method.
+  [[nodiscard]] RecordId Current_Record() const {
+    static_cast<void>(Page_());
+    if constexpr (kHasRecord) {
+      return Record_().RecordId();
+    } else {
+      return {};
+    }
+  }
 
   /// \brief `PageSession.OpenNew()` -- opens the page on a new record.
   /// \throws Error when the page is already open, as AL does.
@@ -1276,5 +1304,53 @@ private:
   PageCore *parent_ = nullptr;
   std::string partName_;
 };
+
+/// \brief Makes the closed production adapter for a generated page catalogue entry.
+/// \tparam P The generated page class.
+/// \return An owned PageInstance; no TestPage controls, traps or AL opening are created.
+template <typename P> PageInstance *MakePageSession() {
+  class Adapter final : public PageInstance {
+  public:
+    [[nodiscard]] PageCore &Controls() override { return session_; }
+
+    [[nodiscard]] const PageDef &Declaration() const override { return PageTraits<P>::kPage; }
+
+    void Open(PageOpenMode mode) override {
+      switch (mode) {
+        case PageOpenMode::View: session_.OpenView(); return;
+        case PageOpenMode::Edit: session_.OpenEdit(); return;
+        case PageOpenMode::New: session_.OpenNew(); return;
+        case PageOpenMode::Unknown: break;
+      }
+      throw Error("Unknown page opening mode.", "PageOpenMode");
+    }
+
+    void Close() override { session_.Close(); }
+
+    [[nodiscard]] bool IsOpen() const override { return session_.IsOpen(); }
+
+    [[nodiscard]] bool Move(PagePosition position) override {
+      switch (position) {
+        case PagePosition::First: return session_.First();
+        case PagePosition::Next: return session_.Next();
+        case PagePosition::Previous: return session_.Previous();
+        case PagePosition::Last: return session_.Last();
+        case PagePosition::Unknown: break;
+      }
+      throw Error("Unknown page movement.", "PagePosition");
+    }
+
+    [[nodiscard]] bool SelectRecord(const RecordId &record) override {
+      return session_.Select_Record(record);
+    }
+
+    [[nodiscard]] RecordId CurrentRecord() const override { return session_.Current_Record(); }
+
+  private:
+    PageSession<P> session_;
+  };
+
+  return new Adapter();
+}
 
 }
