@@ -9,25 +9,30 @@ business workflows are active in 0720; full G1 acceptance does not block their i
 
 ## Current evidence
 
-- Latest completed integration: `b2a8131` / content `3ab8c23d656f`:
-  slice-check/all pass; C++/specialist test is 154/155, one red RowVersion disconnect
-  observation. `0cf1488` repairs and qualifies that gate without changing production
-  rowversion or connection semantics; its full integration replay is pending.
-  AL: 2218/2314 passed, 96 failed, eighty codeunits, zero incomplete/duplicate
-  identities; six workers, 1516 seconds. Target exits: 0/0/2/2; G1 remains open.
-  Compared with `51831ed`: no gains, losses, added/missing identities or changed errors.
-  The complete normalized result digest is unchanged.
-  Original BCApps/System pins and all source/input hashes remain unchanged.
+- Latest completed integration: `a107d129d845cf79dc4ada598ec5282e98a4f733` /
+  content `6a657002718f34eb22598f213531f0bfe599d038165e13a6e8f15daa7903224a`:
+  slice-check/all pass; C++/specialist test is 157/157, zero red.
+  AL: 2219/2314 passed, 95 failed, eighty codeunits, zero incomplete/duplicate
+  identities; six workers, 1143 seconds. Target exits: 0/0/0/2; G1 remains open.
+  Compared with `b2a8131`'s 2218/2314: two gains, one loss, no added/missing identities.
+  Gains: 134300.TestStartWorkflowWithNewlyAddedEvent and
+  139154.TestProcessWithDataExchWithInvalidContentFails.
+  Loss: 137462.VariantMandatoryAllowsPhysInvtRec; investigate item-tracking state
+  and isolation, not a new suppression. Three failures in that codeunit now share
+  a Qty. to Handle 3-versus-8 diagnostic; raw time-dependent lot values remain in receipts.
+  BCApps/System pins match the previous run; frozen inputs remain unchanged during verification.
   Seed identity is null/unsealed: diagnostic comparison, not causal A/B or G1.
   Result digest from `jq -sc 'sort_by(.codeunit_id,.method)|map({codeunit_id,method,status,error})'
-  followed by `sha256sum`: `f036244cb3acdb0e0a31a520bc773497b3a91cdc4f12efc64a87501262097ab1`.
+  followed by `sha256sum`: `7a886f6e03336a7c8754fbc78fcb4930913cd9a77cb7540cf795655267b68a47`.
 - This completed snapshot includes native Table/Page Metadata navigation,
   source-owned page IDs, RecordRef.Get consumption/diagnostics, scalar catalogue
   CalcFields (`b221e0d`), Unicode caption fallback (`48fcd03`) and shared positions
-  (`65d3ade`). It excludes Evaluate dispatch (`6f8c9ce`), XML diagnostics (`4dda6f5`),
-  captured loop bounds (`30293c8`), ordinal Variant text (`9985dc7`) and the RowVersion
-  gate repair (`0cf1488`); replay these together. Runtime contract evidence belongs
-  in 0013/0044/0073; superseded results are recoverable at `0cf1488`.
+  (`65d3ade`), Evaluate dispatch (`6f8c9ce`), XML diagnostics (`4dda6f5`), captured
+  loop bounds (`30293c8`), ordinal Variant text (`9985dc7`) and the RowVersion gate
+  repair (`0cf1488`). It excludes subsequent report-ordinal, XMLport field-validation
+  and client-dispatch increments; do not label it current-HEAD acceptance.
+  Runtime contract evidence belongs in 0013/0044/0073; superseded results are
+  recoverable at `c2df724`.
 - Latest AL failure concentrations: thirteen incoming-document conversion failures,
   seven Nothing-to-handle paths,
   four Inventory Profile missing temporary rows and four WorkbookWriter.Create refusals.
