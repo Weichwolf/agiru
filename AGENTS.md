@@ -92,6 +92,12 @@ bounded blocks, index declared keys according to their properties, and borrow co
 for transactions. Measure per-session memory and operation overhead against equivalent SQL.
 These are requirements, not claims that the current runtime meets them.
 
+For development, run the agiru server, served web assets and PostgreSQL together in
+one Podman container. The agent CLI runs outside it over the same HTTP endpoints
+as the browser. Keep database data persistent, use disposable test clones and preserve
+existing containers/data during migration. This development packaging does not mandate
+a single-container production topology or put Node.js in the ERP server.
+
 Linux/container multi-user performance and bounded resources drive architecture decisions.
 The single-user WASM demo must retain functional behaviour, but does not impose production
 throughput or scale guarantees. Share business/layout semantics; platform adapters may differ
@@ -235,7 +241,8 @@ A seed used as A/B proof needs a `complete` provenance row and a sealed template
 ## Work items
 
 `board/` contains only WIs, no README, index or activity diary. Keep one WI in progress
-and a small set of concrete outcomes; neither one WI per detail nor giant milestone WIs.
+and concrete outcome-sized WIs; maintain separate queued business-process families
+for BC sandbox execution and agiru replication, not one WI per field or test step.
 Each WI owns its priority, dependencies, next action, evidence, source files and acceptance.
 Keep later work queued behind explicit prerequisite contracts, without dependency cycles.
 Use durable source/test paths, pinned revisions and reproducible commands; never make a

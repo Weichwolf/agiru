@@ -7,6 +7,12 @@ repairs in coherent client increments; preserve existing tests and counted UT fa
 Next: extract the production page dispatcher and deliver one real
 list → card → validate → save slice through HTTP, Node CMD and MCP.
 
+Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
+Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
+sandbox reference execution and agiru replication. Their agiru prerequisites are
+specific working client contracts, not this WI's full acceptance; no dependency cycle.
+BC capture can proceed while client construction is underway. Keep one WI in progress.
+
 ## Existing foundation and refreshed implementation review
 
 - Preserve agiru's generated `PageDef`/control tree, typed bindings, `PageCore`,
