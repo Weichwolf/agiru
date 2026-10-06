@@ -4,7 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: wire one list → card → validate → save slice through the C++ HTTP server,
+Next: wire one list → card → validate → save slice through the shared C++ page runtime
+and qualified private HTTP transport behind nginx,
 including PostgreSQL authorization/session/revision/receipt ownership; use the
 external Node CMD/MCP client and representative real-browser/independent SQL checks.
 
@@ -15,6 +16,31 @@ specific working client contracts, not this WI's full acceptance; no dependency 
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
 ## Existing foundation and refreshed implementation review
+
+- Selected transport: unmodified nginx → private loopback libmicrohttpd → C++ handler;
+  no ERP module, custom HTTP/TLS parser or Node ERP server.
+  System libmicrohttpd supplies HTTP framing/polling/suspend-resume through a private
+  C API, without a C++ ABI dependency. Library LGPL-2.1+ and nginx BSD-2-Clause notices
+  remain installed under their Debian package copyright paths; owned adapter stays MIT.
+  nginx serves static assets, replaces forwarding headers and disables upstream retries/cache. Development is
+  loopback HTTP; production TLS/configuration remains unqualified. Native transport
+  uses fixed workers, bounded queue/connections and per-request/aggregate body limits;
+  AL/SQL never execute on its network event loop. Stop drains suspended requests.
+  `make http-test`: eleven actual HTTP cases pass, including external shell CMD/SDK
+  MCP, original encoded BC URI, exact Unicode/form/binary bytes, independent SQL
+  transport records, static assets, forged headers, ambiguous framing, error/limit
+  refusals, body release and bounded admission while workers block.
+  `HttpServerGate`: eleven checks; existing `PageHtmlGate`: 157, zero red.
+  Seventeen standalone-header/forced-dependency controls pass; HTTP source and gate
+  targeted tidy pass without new suppressions. Public transport header has no native
+  backend/DB/session/thread includes; measured frontend cost is 764.9 ms over three
+  no-PCH rounds, not a build-performance improvement or generated-app requirement.
+  Handler SQL is a fixture receipt, not AL Validate/Save/posting or production
+  authentication/session/permission parity. Existing `Session` still owns a resident
+  DB connection and default SYSTEM/blank user identity; fix identity/transaction leases
+  before admitting persistent users, rather than allocating a thread/connection per user.
+  Blocking-handler cancellation, durable command reconciliation and WASM transport
+  remain unqualified. Preserve these limits in the next real page/SQL increment.
 
 - Preserve agiru's generated `PageDef`/control tree, typed bindings, `PageCore`,
   TestPage lifecycle, validated record primitives and regression gates.

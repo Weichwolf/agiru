@@ -21,7 +21,7 @@ export CCACHE_SLOPPINESS
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
-.PHONY: page-profile client client-test
+.PHONY: page-profile client client-test http-test
 
 client: ## build the external Node agent CMD/MCP client from locked dependencies
 	@npm ci --prefix "$(SELF)/src/client" --ignore-scripts --no-fund --no-audit
@@ -30,6 +30,9 @@ client: ## build the external Node agent CMD/MCP client from locked dependencies
 
 client-test: client ## qualify CMD/MCP transports against a declared HTML/HTTP fixture, not ERP parity
 	@bash "$(SELF)/test/ui/agent-client.sh"
+
+http-test: client ## qualify external CMD/MCP over nginx/private C++ HTTP and PostgreSQL, not ERP parity
+	@bash "$(SELF)/test/ui/http-server.sh"
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -75,7 +78,7 @@ include-cost:      ## measure standalone header frontend cost without PCH
 dev-image:        ## build the single-container native/PostgreSQL development image
 	@bash "$(SELF)/scripts/dev_container.sh" image
 
-dev-start:        ## start development PostgreSQL; HTTP needs the later 0720 server
+dev-start:        ## start development PostgreSQL/nginx and optional native application COMMAND
 	@bash "$(SELF)/scripts/dev_container.sh" start $(COMMAND)
 
 dev-stop:         ## stop the development container without deleting its database volume

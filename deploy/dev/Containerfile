@@ -6,11 +6,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates clang-19 clang-format-19 clang-tidy-19 lld-19 \
     libc++-19-dev libc++abi-19-dev libunwind-19-dev libclang-rt-19-dev \
     cmake ninja-build ccache make python3 git curl unzip jq ripgrep \
-    libpq-dev postgresql-17 libxml2-dev libyyjson-dev libssl-dev util-linux tini \
+    libpq-dev postgresql-17 libxml2-dev libyyjson-dev libssl-dev libmicrohttpd-dev pkg-config nginx util-linux tini \
     && apt-get clean
 RUN groupadd --gid "$DEV_GID" agiru \
     && useradd --uid "$DEV_UID" --gid "$DEV_GID" --create-home agiru
 COPY entrypoint.sh /usr/local/bin/agiru-dev-entrypoint
+COPY nginx.conf /etc/agiru/nginx.conf
 RUN chmod 755 /usr/local/bin/agiru-dev-entrypoint
 ENV PGDATA=/var/lib/agiru/postgres \
     PATH=/usr/lib/postgresql/17/bin:$PATH \

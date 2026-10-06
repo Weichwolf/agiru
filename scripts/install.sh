@@ -6,5 +6,5 @@ sudo apt-get install -y \
   clang-19 clang-format-19 clang-tidy-19 lld-19 \
   libc++-19-dev libc++abi-19-dev libunwind-19-dev libclang-rt-19-dev \
   cmake ninja-build ccache python3 git curl unzip jq podman \
-  libpq-dev postgresql-client-17 libxml2-dev libyyjson-dev \
+  libpq-dev postgresql-client-17 libxml2-dev libyyjson-dev libmicrohttpd-dev pkg-config \
   doxygen graphviz

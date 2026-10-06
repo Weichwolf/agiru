@@ -167,6 +167,17 @@ production authentication, SQL effects, actual htmx browser behaviour or complet
 page/ERP parity. `AGIRU_PAGE_HTML_GATE` can select an explicitly built host producer.
 Fixtures and disposable mutant modules use `/tmp`; Node stays outside the ERP container.
 
+`make http-test` qualifies the native transport in `agiru-dev`: unmodified nginx
+on the sole published loopback port, libmicrohttpd on private container loopback and
+PostgreSQL together; actual external CMD and MCP calls preserve the C++ HTML profile.
+Eleven HTTP cases cover raw encoded URLs, exact POST/binary bytes, independent SQL
+transport records, static-file separation, forged forwarding headers, ambiguous
+framing refusals, request/response/header bounds, aggregate upload ownership,
+bounded worker admission and shutdown. SQL records are transport receipts, not AL
+Validate/Save/posting effects. The fixture's short-lived connections do not qualify
+production session leases. TLS, authentication/session authority, modal continuation,
+actual htmx browser execution and complete ERP parity remain pending.
+
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,
 cross-column OR, FlowFilters and owned expression snapshots. Seventy-seven compiled

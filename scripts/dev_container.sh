@@ -42,7 +42,13 @@ case "${1:-}" in
     owned
     shift
     [[ "$#" -gt 0 ]] || { printf 'dev-exec requires a command\n' >&2; exit 2; }
-    exec podman exec --user "$(id -u):$(id -g)" "$name" "$@"
+    flags=()
+    case "${AGIRU_DEV_INTERACTIVE:-0}" in
+      0) ;;
+      1) flags+=(--interactive) ;;
+      *) printf 'AGIRU_DEV_INTERACTIVE must be 0 or 1\n' >&2; exit 2 ;;
+    esac
+    exec podman exec "${flags[@]}" --user "$(id -u):$(id -g)" "$name" "$@"
     ;;
   *) printf 'Usage: %s image|start|stop|configure|exec COMMAND...\n' "$0" >&2; exit 2 ;;
 esac

@@ -145,6 +145,16 @@ if reject_dependency "$proof/forced-PageCore.h.d" PageCore.h \
   exit 1
 fi
 
+compile_header runtime/HttpServer.h "$proof/HttpServer.h.d"
+for forbidden in microhttpd.h Database.h Session.h Page.h thread condition_variable mutex deque; do
+  reject_dependency "$proof/HttpServer.h.d" "$forbidden"
+done
+compile_header runtime/HttpServer.h "$proof/forced-microhttpd.h.d" -include microhttpd.h
+if reject_dependency "$proof/forced-microhttpd.h.d" microhttpd.h > "$proof/forced-microhttpd.h.log" 2>&1; then
+  printf 'header-dependencies: native HTTP backend escaped the public transport boundary\n' >&2
+  exit 1
+fi
+
 for forbidden in filesystem regex; do
   if [ "$forbidden" = filesystem ]; then header=RuntimeSurface.h; else header=dotnet/Regex.h; fi
   compile_header "$header" "$proof/forced-$forbidden.d" -include "$forbidden"
@@ -154,4 +164,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: sixteen standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode controls refused\n'
+printf 'header-dependencies: seventeen standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP controls refused\n'

@@ -6,11 +6,11 @@ prefix=agiru-dev-check-$$
 volume=$prefix-data
 bad_volume=$prefix-bad-data
 proof=$(mktemp -d /tmp/agiru-dev-check.XXXXXX)
-sha256sum deploy/dev/Containerfile deploy/dev/entrypoint.sh scripts/dev_container.sh \
+sha256sum deploy/dev/Containerfile deploy/dev/entrypoint.sh deploy/dev/nginx.conf scripts/dev_container.sh \
   test/tooling/podman-development.sh > "$proof/inputs.sha256"
 podman image inspect "$image" --format '{{.Id}}' > "$proof/image.txt"
 cleanup() {
-  for suffix in main failure bad unowned; do
+  for suffix in main failure proxy-failure bad unowned; do
     target=$prefix-$suffix
     if podman container exists "$target"; then
       [[ "$(podman inspect --format '{{index .Config.Labels "io.agiru.development.test"}}' "$target")" = "$prefix" ]] || continue
@@ -28,7 +28,8 @@ trap cleanup EXIT
 ready() {
   for ((attempt=0; attempt<60; attempt++)); do
     if podman exec --user postgres "$prefix-main" psql -XAt -v ON_ERROR_STOP=1 \
-      -d agiru_gate -c 'SELECT 1' > "$proof/ready.log" 2>&1; then return; fi
+      -d agiru_gate -c 'SELECT 1' > "$proof/ready.log" 2>&1 \
+      && [[ "$(podman exec "$prefix-main" curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/ 2>/dev/null)" = 502 ]]; then return; fi
     [[ "$(podman inspect --format '{{.State.Running}}' "$prefix-main")" = true ]] || {
       podman logs "$prefix-main" >&2; return 1;
     }
@@ -43,6 +44,11 @@ podman run --detach --name "$prefix-main" --label io.agiru.development=true \
   --label "io.agiru.repository=$PWD" --label "io.agiru.development.test=$prefix" --volume "$volume:/var/lib/agiru" \
   "$image" /bin/sleep 300 > "$proof/main-id.txt"
 ready
+[[ "$(podman exec --user postgres "$prefix-main" psql -XAt -v ON_ERROR_STOP=1 -d agiru_gate -c 'SHOW server_encoding')" = UTF8 ]]
+[[ "$(podman exec "$prefix-main" curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/)" = 502 ]]
+podman exec "$prefix-main" ss -H -l -t -n > "$proof/listeners.log"
+rg -q '127\.0\.0\.1:5432' "$proof/listeners.log"
+rg -q '0\.0\.0\.0:8080' "$proof/listeners.log"
 podman exec --user postgres "$prefix-main" psql -XAt -v ON_ERROR_STOP=1 -d agiru_gate \
   -c "CREATE TABLE development_receipt (amount numeric); INSERT INTO development_receipt VALUES (1234.56)" \
   > "$proof/sql-write.log"
@@ -58,6 +64,11 @@ podman run --detach --name "$prefix-failure" --label "io.agiru.development.test=
   --volume "$volume:/var/lib/agiru" "$image" /bin/sh -c 'exit 42' > "$proof/failure-id.txt"
 [[ "$(timeout 45 podman wait "$prefix-failure")" = 42 ]]
 podman logs "$prefix-failure" > "$proof/application-exit.log" 2>&1
+podman run --detach --name "$prefix-proxy-failure" --label "io.agiru.development.test=$prefix" \
+  --volume "$volume:/var/lib/agiru" "$image" /bin/sh -c \
+  'sleep 1; kill -TERM "$(head -n 1 /run/agiru/nginx.pid)"; sleep 300' > "$proof/proxy-failure-id.txt"
+[[ "$(timeout 45 podman wait "$prefix-proxy-failure")" = 1 ]]
+podman logs "$prefix-proxy-failure" > "$proof/proxy-exit.log" 2>&1
 podman create --name "$prefix-unowned" --label "io.agiru.development.test=$prefix" \
   --entrypoint /bin/true "$image" > "$proof/unowned-id.txt"
 status=0
@@ -80,4 +91,4 @@ rg -q 'PostgreSQL storage version mismatch' "$proof/version-refusal.log"
 [[ "$(podman run --rm --entrypoint /bin/bash --volume "$bad_volume:/var/lib/agiru" "$image" \
   -c 'read -r marker < /var/lib/agiru/postgres/sentinel; printf "%s" "$marker"')" = preserve ]]
 sha256sum --check "$proof/inputs.sha256" > "$proof/input-integrity.log"
-printf 'podman-development: SQL persistence, supervisor exits, ownership and incompatible storage verified; %s\n' "$proof"
+printf 'podman-development: SQL persistence, nginx/app/PostgreSQL supervisor exits, ownership and incompatible storage verified; %s\n' "$proof"
