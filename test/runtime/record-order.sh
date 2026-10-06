@@ -18,6 +18,10 @@ temporary="$B/gate_TemporaryGate"
 "$temporary" > "$proof/temporary.log" 2>&1
 array="$B/gate_AlArrayGate"
 "$array" > "$proof/array.log" 2>&1
+series="$B/gate_CursorGate"
+"$series" > "$proof/series.log" 2>&1
+filter="$B/gate_FilterGate"
+"$filter" > "$proof/filter.log" 2>&1
 fetch_block=$(sed -n 's/^inline constexpr std::size_t kFetchBlock = \([0-9]*\);$/\1/p' src/rt/Cursor.h)
 [[ "$fetch_block" =~ ^[1-9][0-9]*$ ]]
 bounded_walks() {
@@ -40,6 +44,31 @@ AGIRU_TRACE_SQL=1 "$lifecycle" --trace-walks > "$proof/lifecycle-trace.log" 2>&1
 bounded_walks "$proof/lifecycle-trace.log" > "$proof/lifecycle-statements.log"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
+for control in series-zero-version series-source-alias; do
+  awk -v control="$control" '
+    control == "series-zero-version" && /^constexpr std::int64_t kSeriesRowVersion = 1;/ {
+      sub(/= 1;/, "= 0;"); changed++
+    }
+    control == "series-source-alias" && /columns \+= .* AS .*SqlColumn\(field\);/ {
+      sub(/SqlColumn\(field\)/, "Quoted(field.name)"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' src/rt/Selection.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_db -lagiru_net -o "$proof/$control.so"
+  status=0
+  LD_PRELOAD="$proof/$control.so" "$series" > "$proof/$control.log" 2>&1 || status=$?
+  [ "$status" -eq 1 ]
+  if [ "$control" = series-zero-version ]; then
+    rg -q 'FAIL .*native Integer rows use the virtual provider' "$proof/$control.log"
+  else
+    rg -q 'FAIL .*cursor operations must complete' "$proof/$control.log"
+    rg -q 'column "timestamp" does not exist' "$proof/$control.log"
+  fi
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
 for control in field-direction global-direction primary-ties uniform-predicate; do
   source=src/rt/RecordOrder.cpp
   if [ "$control" = uniform-predicate ]; then source=src/rt/Navigate.cpp; fi
@@ -297,6 +326,6 @@ sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   include/runtime/RecordState.h include/runtime/Table.h include/type/AlArray.h \
   test/gate/MixedOrderGate.cpp test/gate/SelectionChangeGate.cpp test/gate/CursorLifecycleGate.cpp \
   test/gate/DynamicRecordGate.cpp src/rt/Rename.cpp test/gate/RenameGate.cpp \
-  test/gate/TemporaryGate.cpp test/gate/AlArrayGate.cpp \
-  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" "$rename" "$temporary" "$array" > "$proof/inputs.sha256"
-printf 'record-order: order, selections, cursor lifecycle, dynamic writes, rename cascades and temporary arrays pass; twenty-six controls reject; %s\n' "$proof"
+  test/gate/TemporaryGate.cpp test/gate/AlArrayGate.cpp test/gate/{Cursor,Filter}Gate.cpp \
+  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" "$rename" "$temporary" "$array" "$series" "$filter" > "$proof/inputs.sha256"
+printf 'record-order: order, selections, cursor lifecycle, dynamic writes, rename cascades, temporary arrays and native series pass; twenty-eight controls reject; %s\n' "$proof"

@@ -106,6 +106,10 @@ Temporary operations use the same predicate; live metadata providers stay guarde
 
 `make record-order JOBS=2` verifies mixed field directions, global reversal,
 primary-key ties, filters, relative searches and cursor/keyset direction changes.
+Cursor/Filter gates also qualify native Integer SQL/typed/RecordRef projections:
+virtual timestamp 1, blank identity/audit values, physical timestamp alias and
+explicit refusal of unknown or mistyped stored fields. Compiled zero-version and
+source-alias controls reject; wide/unfiltered series cardinality remains a gap.
 The same exact-value matrix runs through typed Record and RecordRef on SQL and
 temporary rows. SelectionChangeGate adds changed filters/copies, keys/directions/views,
 active marks, unchanged setters and shared temporary Modify visibility. CursorLifecycleGate

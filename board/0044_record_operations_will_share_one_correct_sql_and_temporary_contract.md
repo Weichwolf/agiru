@@ -3,9 +3,9 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: qualify Integer's selected implicit fields with 0013 (72 current UT failures,
-38 lost passing methods), then installed Table Metadata filters/order/Find/Next/Count
-through the shared record primitives; investigate the StoredImage diagnostic.
+Next: replay the qualified Integer projection with 0013/0058 (72 previous failures,
+38 lost passes), then qualify Field's positive-key catalogue and installed Table
+Metadata filters/order/Find/Next/Count through shared primitives. Investigate StoredImage.
 Complete Field classification, SQLDataType, package provenance and implicit values;
 then Field navigation and the actual FieldName → catalogue → FieldRef caller.
 
@@ -84,6 +84,18 @@ then Field navigation and the actual FieldName → catalogue → FieldRef caller
 
 ## Acceptance
 
+- Integer SQL projection now preserves the selected Runtime-18 profile: original
+  BC29 virtual timestamp 1, physical timestamp alias, blank identity/audit values
+  and nonstored user lookups. Unknown/mistyped stored fields still refuse.
+  Cursor/Filter gates pass 255/129 checks; typed Record and RecordRef preserve
+  bounded counts, filters, forward/reverse navigation and exact implicit values.
+  Selection.cpp and both gates pass focused tidy; seven unchecked test optional
+  accesses were repaired without weakening comparisons or suppressing diagnostics.
+  `make record-order JOBS=2` retains the 26 prior controls and rejects zero-version
+  and source-alias mutants (seven/one failed checks). Original authority, artifact
+  hash and call-chain RVAs are in 0013. No PostgreSQL allocator or native profile
+  rollback is used. This is not wide-domain/cardinality, security or full UT proof;
+  the existing million-row cap still requires replacement, not acceptance.
 - SQL `GetBySystemId` now shares one reader and optional-result wrapper for typed
   records and RecordRef. A consumed miss returns false; a discarded miss raises
   the searched SystemId diagnostic instead of allowing work on a stale buffer.

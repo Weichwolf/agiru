@@ -2,6 +2,7 @@
 #include "platform/Integer.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Transaction.h"
 
@@ -39,16 +40,24 @@ void ComputedRowsProjectTheirDeclaredSystemFields(const Connection &connection) 
                       " WHERE " + selection.where + " ORDER BY " + selection.order;
   const auto rows = connection.Execute(select, selection.binds);
   CHECK_TRUE("the native series returns its bounded population", rows.Rows() == 3);
-  CHECK_TRUE("the computed projection matches the declared row width",
-             rows.Columns() == table.fields.size());
+  CHECK_TRUE("the computed projection matches the declared row width", rows.Columns() == 7);
+  CHECK_TRUE("the selected native field order places timestamp before Number",
+             table.fields[0].no.Value() == 0 && table.fields[1].no.Value() == 1);
   for (std::size_t index = 0; index < rows.Rows(); ++index) {
-    CHECK_TEXT("native numbers retain order", *rows.Value(index, 0), std::to_string(index + 1));
+    const auto value = [&](std::size_t column) {
+      return rows.Value(index, column).value_or("<NULL>");
+    };
+    CHECK_TEXT("native numbers retain order", value(1), std::to_string(index + 1));
+    CHECK_TEXT("native Integer rows use the virtual provider's timestamp", value(0), "1");
     CHECK_TEXT("an unpersisted virtual row has no stored system identity",
-               *rows.Value(index, 1),
+               value(2),
                "00000000-0000-0000-0000-000000000000");
-    CHECK_TEXT("a virtual row has no insertion audit instant",
-               *rows.Value(index, 2),
-               "1753-01-01 00:00:00");
+    CHECK_TEXT("a virtual row has no insertion audit instant", value(3), "1753-01-01 00:00:00");
+    CHECK_TEXT(
+        "a virtual row has no creator identity", value(4), "00000000-0000-0000-0000-000000000000");
+    CHECK_TEXT("a virtual row has no modification audit instant", value(5), "1753-01-01 00:00:00");
+    CHECK_TEXT(
+        "a virtual row has no modifier identity", value(6), "00000000-0000-0000-0000-000000000000");
   }
   auto invalid = select;
   const std::string column = "'00000000-0000-0000-0000-000000000000'::uuid AS \"SystemId\"";
@@ -64,6 +73,39 @@ void ComputedRowsProjectTheirDeclaredSystemFields(const Connection &connection) 
   } catch (const agiru::DatabaseError &) { refused = true; }
   control.Discard("");
   CHECK_TRUE("the previous narrow series shape fails actual SQL", refused);
+}
+
+void TypedAndReflectedIntegerReadsUseTheSameProvider() {
+  agiru::platform::Integer row;
+  row.SetRange(row.Number, -1, 1);
+  CHECK_TRUE("typed Integer reads find a computed row", row.FindSet());
+  CHECK_TRUE("typed Integer keeps exact Number and virtual timestamp",
+             row.Number == -1 && row.SystemRowVersion == 1);
+  CHECK_TRUE("typed Integer has blank system identity and audit fields",
+             row.SystemId.IsNull() && row.SystemCreatedAt.IsUndefined() &&
+                 row.SystemCreatedBy.IsNull() && row.SystemModifiedAt.IsUndefined() &&
+                 row.SystemModifiedBy.IsNull());
+  agiru::RecordRef reference;
+  reference.GetTable(row);
+  reference.Field(1).SetFilter("0..1");
+  CHECK_TRUE("RecordRef finds the same native series", reference.FindFirst());
+  agiru::platform::Integer reflected;
+  reference.SetTable(reflected);
+  CHECK_TRUE("RecordRef preserves exact Number and virtual timestamp",
+             reflected.Number == 0 && reflected.SystemRowVersion == 1);
+  CHECK_TRUE("reflected Integer preserves blank identity and audit fields",
+             reflected.SystemId.IsNull() && reflected.SystemCreatedAt.IsUndefined() &&
+                 reflected.SystemCreatedBy.IsNull() && reflected.SystemModifiedAt.IsUndefined() &&
+                 reflected.SystemModifiedBy.IsNull());
+  CHECK_TRUE("typed Integer counts its bounded view without implicit lookup columns",
+             row.Count() == 3);
+  CHECK_TRUE("RecordRef counts its own bounded view", reference.Count() == 2);
+  CHECK_TRUE("typed Next advances the computed record", row.Next() == 1 && row.Number == 0);
+  CHECK_TRUE("typed navigation retains the virtual timestamp", row.SystemRowVersion == 1);
+  CHECK_TRUE("typed FindLast reaches the bounded upper endpoint",
+             row.FindLast() && row.Number == 1);
+  CHECK_TRUE("typed reverse navigation retains the virtual timestamp",
+             row.Next(-1) == -1 && row.Number == 0 && row.SystemRowVersion == 1);
 }
 
 void Fill(const Connection &connection) {
@@ -196,6 +238,7 @@ int main() {
       // connection for exactly that -- so the gate opens the same boundary the runtime does.
       agiru::detail::Scope boundary;
       ComputedRowsProjectTheirDeclaredSystemFields(connection);
+      TypedAndReflectedIntegerReadsUseTheSameProvider();
       ItWalksMoreRowsThanItHolds(connection);
       AnEmptySetStepsNowhere(connection);
       AFullBlockPreservesItsLastRow(connection);
@@ -203,6 +246,6 @@ int main() {
       AWildcardBecomesALikeAndAnEmptyValueIsAValue(connection);
       boundary.Discard("");
       connection.Run("DROP TABLE cursor_gate");
-    } catch (const Error &e) { CHECK_TEXT("the gate needs a database", e.what(), "a database"); }
+    } catch (const Error &e) { CHECK_TEXT("cursor operations must complete", e.what(), ""); }
   });
 }

@@ -25,6 +25,7 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   pins and complete configured population. It includes declaring-owner customization,
   shared temporary arrays, Field.Get/property and Table Metadata.Get repairs. Wait for
   final target receipts; this snapshot does not include the later GetBySystemId increment.
+  It also lacks the later qualified Integer virtual timestamp/SQL alias repair.
   Current Parser/AlParserGate focused tidy passes after removing three findings without
   suppressions; the Parser gate retains previous checks and adds seventeen (159 total).
   TableWriter.cpp also passes focused tidy after six repairs; GenTable passes 105 checks
@@ -52,6 +53,11 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Developer `f928288ee840`: attributes/devenv-{tryfunction,normal}-attribute.md.
   `test/tooling/toolchain.py` owns DiscoveryGate/TranspilerAttributeCensusGate;
   the frozen failures are not suppressed and still need current-tree integration.
+- Integer projection's local repair passes Cursor/Filter 255/129 checks, shared
+  record-order controls and focused tidy (0013/0044). It addresses the observed
+  refusal path, but the full unchanged 2314-method replay must establish actual
+  gains/losses. Original BC29 Field catalogue starts at positive field numbers;
+  investigate the extra timestamp snapshot row without removing FieldRef(0).
 - Latest AL failure concentrations: seventy-two Integer rowversion paths,
   44 Table Metadata provider refusals, four Inventory Profile missing temporary rows
   and four WorkbookWriter.Create refusals. Fix their shared contracts, not callers.

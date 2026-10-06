@@ -50,6 +50,8 @@ constexpr Interval kSeriesDomain{.low = -1000000000, .high = 1000000000};
 
 constexpr std::int64_t kSeriesLimit = 1000000;
 
+constexpr std::int64_t kSeriesRowVersion = 1;
+
 Intervals Both(const Intervals &left, const Intervals &right) {
   Intervals both;
   for (const Interval &one : left) {
@@ -66,15 +68,21 @@ std::string SeriesColumns(const TableDef &table, const FieldDef &number) {
   std::string columns = "g::int AS " + Quoted(number.name);
   for (const auto &field : table.fields) {
     if (!Stored(field) || field.no == number.no) { continue; }
-    const auto *const system = std::ranges::find_if(kSystemFields, [&](const auto &declared) {
-      return declared.no == field.no &&
-             ((declared.alType == "Guid" && field.type == FieldType::Guid) ||
-              (declared.alType == "DateTime" && field.type == FieldType::DateTime));
-    });
-    if (system == kSystemFields.end()) {
+    const auto *const system =
+        std::ranges::find_if(kImplicitSystemFields, [&](const auto &declared) {
+          return declared.no == field.no &&
+                 ((declared.alType == "Guid" && field.type == FieldType::Guid) ||
+                  (declared.alType == "DateTime" && field.type == FieldType::DateTime) ||
+                  (declared.role == SystemFieldRole::Timestamp &&
+                   field.type == FieldType::BigInteger));
+        });
+    if (system == kImplicitSystemFields.end()) {
       throw Error("sequence provider cannot synthesize field " + std::string(field.name));
     }
-    columns += ", " + ColumnZero(field) + "::" + ColumnType(field) + " AS " + Quoted(field.name);
+    const std::string value = system->role == SystemFieldRole::Timestamp
+                                  ? std::to_string(kSeriesRowVersion)
+                                  : ColumnZero(field);
+    columns += ", " + value + "::" + ColumnType(field) + " AS " + SqlColumn(field);
   }
   return columns;
 }

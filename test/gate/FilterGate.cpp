@@ -96,6 +96,39 @@ bool Passes(std::string_view filter, std::string_view value, const FieldDef &def
   return Matches(ParseFilter(filter), value, def);
 }
 
+void SequenceColumnsRequireTheirImplicitContract() {
+  agiru::detail::RecordState state;
+  state.filters.push_back(
+      {.field = agiru::platform::Integer::Field_No::Number, .group = 0, .text = "-1..1"});
+  const auto valid = agiru::detail::Select(&state, agiru::platform::kIntegerTable);
+  CHECK_TRUE("the native virtual timestamp uses the SQL physical alias",
+             valid.from.contains("1::bigint AS \"timestamp\""));
+  CHECK_TRUE("native user lookups are not synthesized as stored columns",
+             !valid.from.contains("SystemCreatedByUserName"));
+  auto fields = agiru::platform::kIntegerFields;
+  for (auto &field : fields) {
+    if (field.no == agiru::FieldNo{0}) { field.type = FieldType::Integer; }
+  }
+  auto table = agiru::platform::kIntegerTable;
+  table.fields = fields;
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::detail::Select(&state, table));
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()).contains("cannot synthesize field SystemRowVersion");
+  }
+  CHECK_TRUE("a non-BigInteger timestamp cannot use the virtual provider value", refused);
+  fields = agiru::platform::kIntegerFields;
+  fields.back() = NumberField();
+  refused = false;
+  try {
+    static_cast<void>(agiru::detail::Select(&state, table));
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()).contains("cannot synthesize field Entry No.");
+  }
+  CHECK_TRUE("an unknown stored sequence column still refuses rather than becoming zero", refused);
+}
+
 /// `&` BINDS TIGHTER THAN `|`, which is the whole reason the parse is a list of lists.
 void ConjunctionBindsTighterThanDisjunction() {
   CHECK_TRUE("a range written as two comparisons holds",
@@ -709,6 +742,7 @@ void ANewRowTakesTheKeyItsFiltersFix() {
 
 int main() {
   return gate::Run("Filter", [] {
+    SequenceColumnsRequireTheirImplicitContract();
     ANewRowTakesTheKeyItsFiltersFix();
     AnUpperLimitOfABlankBoundIsTheBlankDate();
     AFlowFieldFilterBecomesACorrelatedSubquery();

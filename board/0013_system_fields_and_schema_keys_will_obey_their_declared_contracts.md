@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
-Next: restore Integer series navigation with qualified implicit-field values;
-replay the unchanged UT population and qualify catalogue activation under 0044.
+Next: replay qualified Integer projection on the unchanged UT population;
+qualify Field catalogue's positive-key domain and activation under 0044.
 Retain the full 2314-case UT population through replay.
 
 ## Implementation
@@ -101,15 +101,33 @@ Retain the full 2314-case UT population through replay.
   declarations, so the qualifier remains red; syntax success is not live-provider,
   business execution or G1 proof. Reproduce with `test/transpiler/native-consumers.sh`
   and `test/transpiler/native-binding/consumers.json`, after `make native-bindings`.
-- `make gate GATE=FilterGate JOBS=2` reproduces a native Integer regression:
-  `sequence provider cannot synthesize field SystemRowVersion`. The series builder
-  still recognizes only five legacy audit/identity fields. Qualify computed rowversion
-  and identity before changing it; do not invent zero/one stamps to obtain green.
-  Local `devenv-integer-virtual-table.md` specifies Number/range, not these values.
+- Integer's Runtime-18 projection now recognizes the canonical timestamp and retains
+  nonstored user lookups, rather than rejecting every computed read. Timestamp uses
+  the physical SQL alias; unknown/mistyped stored fields still refuse. The value 1
+  comes from original BC29 `IntegerDataProvider` iterator RVA `2e953c` →
+  `VirtualDataProvider.CreateVirtualRecordValues` RVA `adc40` →
+  `AddSystemFieldValues` RVA `adcb0`, with constant initialization RVA `addf3`.
+  The same original path supplies blank SystemId/audit values; it does not allocate
+  PostgreSQL rowversions. Native assembly SHA-256:
+  `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`,
+  original member `ServiceTier/PFiles64/Microsoft Dynamics NAV/290/Service/Microsoft.Dynamics.Nav.Ncl.dll`
+  in `https://bcartifacts-exdbf9fwegejdqak.b02.azurefd.net/onprem/29.0.54011.55407/platform`.
+  This is original static call-chain authority, not fresh sandbox/BC28 equivalence.
+  CursorGate passes 255 checks and FilterGate 129; SQL/typed/RecordRef agree on
+  bounded reads/counts/navigation and all six stored implicit values. Existing
+  one-million-row truncation remains a functional/scale gap: replace it with complete
+  interval/cardinality and bounded navigation contracts, not a larger cap.
   Completed `00c187c` replay: seventy-two Integer-related failures, including
   38 previously passing methods; one additional loss is Sales Invoice Aggregate's
   normal-field count (expected 77, actual 78). Preserve every identity. Qualify the
   provider and reflected field population together, rather than masking field 0.
+  Original BC29 FieldDataProvider iterator RVA `2e888c` clamps catalogue field keys
+  to 1..2147483647 and starts after the internal timestamp. This differs from
+  RecordRef.Field(0), which remains required. `Storage.cpp::PopulateSystemTables`
+  currently inserts timestamp into the SQL Field snapshot, and native Field.Get
+  incorrectly returns it for omitted trailing keys. Qualify the complete live
+  catalogue contract and separate native/temporary zero-key behavior; do not remove
+  timestamp from declarations, buffers or reflection to hide the aggregate failure.
 - Every bound native record now materializes the original Runtime-18 Normal,
   unlinked profile: ten implicit fields, typed offsets/capacities and nonstored
   User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;
