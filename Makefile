@@ -20,7 +20,7 @@ export CCACHE_SLOPPINESS
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
-.PHONY: system-profiles variant-text xmlport-import
+.PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -62,6 +62,25 @@ lint-config:       ## prove the clang-tidy function line limit at its boundary
 
 include-cost:      ## measure standalone header frontend cost without PCH
 	@B="$(B)" bash "$(SELF)/scripts/include_cost.sh" $(HEADERS)
+
+dev-image:        ## build the single-container native/PostgreSQL development image
+	@bash "$(SELF)/scripts/dev_container.sh" image
+
+dev-start:        ## start development PostgreSQL; HTTP needs the later 0720 server
+	@bash "$(SELF)/scripts/dev_container.sh" start $(COMMAND)
+
+dev-stop:         ## stop the development container without deleting its database volume
+	@bash "$(SELF)/scripts/dev_container.sh" stop
+
+dev-check:        ## verify the actual development image on owned disposable containers/volumes
+	@bash "$(SELF)/test/tooling/podman-development.sh"
+
+dev-configure:    ## configure isolated container compiler outputs and database endpoints
+	@bash "$(SELF)/scripts/dev_container.sh" configure
+
+dev-exec:        ## execute COMMAND inside the development container as the repository owner
+	@test -n "$(COMMAND)" || { printf 'COMMAND is required\n' >&2; exit 2; }
+	@bash "$(SELF)/scripts/dev_container.sh" exec $(COMMAND)
 
 slice-check:       ## count every slice source and refuse missing inputs without compiling
 	@B="$(B)" bash "$(SELF)/scripts/slice_check.sh"

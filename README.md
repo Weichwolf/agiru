@@ -26,3 +26,16 @@ checked-out BCApps source -- `make provision` refuses otherwise.
 
 XML uses system libxml2 (MIT); JSON uses system yyjson (MIT, Debian `libyyjson-dev`).
 The libraries remain private implementation dependencies; packaging must retain their notices.
+
+Development container (Clang/libc++ and PostgreSQL together; external Node CLI):
+
+```sh
+make dev-image dev-start dev-configure
+make dev-exec COMMAND='make gate GATE=GenXmlPortGate B=/workspace/build/podman JOBS=2'
+make dev-check
+make dev-stop
+```
+
+SQL data persists in `agiru-dev-postgres`; existing databases are not migrated or replaced.
+The current container starts PostgreSQL only. The C++ HTTP server, web assets and external
+CLI are pending; publishing loopback port 8080 does not prove a working ERP endpoint.

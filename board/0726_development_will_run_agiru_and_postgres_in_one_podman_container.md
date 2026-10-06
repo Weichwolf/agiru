@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: existing native compiler/runtime; 0720's HTTP server contract for client acceptance,
 not its full business milestone. Container/toolchain provisioning can proceed now.
-Next: package Clang 19/libc++ and PostgreSQL 17 with one supervised development
-entrypoint; preserve agiru-pg and seed data. Run the Node agent CLI on the host over HTTP.
+Next: connect 0720's C++ HTTP server and static assets to the supervised entrypoint;
+qualify the external Node CLI/browser and migrate a verified seed without changing agiru-pg.
 
 ## Implementation and acceptance
 
@@ -21,5 +21,19 @@ entrypoint; preserve agiru-pg and seed data. Run the Node agent CLI on the host 
   processes, and actual external CLI/web HTTP operation parity. Image build or SQL
   readiness alone is not server/client completion. Production topology remains separate.
 
-Files: `Containerfile`, `scripts/`, `Makefile`, `test/tooling/`, `test/ui/`.
-Evidence: packaging not implemented; existing agiru-pg is PostgreSQL 17 on host port 5433.
+Files: `deploy/dev/{Containerfile,entrypoint.sh}`, `scripts/dev_container.sh`,
+`Makefile`, `test/tooling/podman-development.sh`; HTTP acceptance belongs in `test/ui/`.
+
+## Current evidence
+
+- `make dev-image dev-start dev-configure`: Debian trixie, Clang 19/libc++, PostgreSQL 17;
+  persistent `agiru-dev-postgres` volume, host HTTP port bound to loopback, no published SQL port.
+  Existing agiru-pg and its source/seed databases remain unchanged.
+- Qualified image: `37a531d499da1689c81f3682cc692915b96aaa747ea8e160d45465f1bf5061d0`.
+  `make dev-check` passes committed exact SQL persistence across restart, PostgreSQL failure,
+  application exit 42, unowned container start/stop refusals and incompatible storage preservation.
+- `make dev-exec COMMAND='make gate GATE=GenXmlPortGate B=/workspace/build/podman JOBS=2'`:
+  container compilation succeeds; 27 checks, zero failures.
+- Default command is currently `database-only`; no HTTP ERP server or client parity is claimed.
+  `agiru_master` starts empty, not as a qualified BC seed. The development superuser/password
+  and PostgreSQL-only healthcheck are not production security or application readiness.

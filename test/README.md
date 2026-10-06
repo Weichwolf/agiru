@@ -20,6 +20,12 @@ Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.
 `make verify-check` checks build tooling without rebuilding C++.
 
+`make dev-check` is a host-only Podman packaging check, separate from `make test`:
+it uses owned disposable containers/volumes to verify committed SQL persistence,
+supervisor exits, container ownership refusals and incompatible storage preservation.
+It does not qualify an HTTP server, client parity or the BC seed. Run container C++
+gates through `make dev-exec` with `B=/workspace/build/podman`.
+
 `runtime/test-contexts.sh` executes generated AL call/selection semantics and negative
 controls. Its shared sorting controls require the compiled `gate_CurrentKeyGate`;
 `make test` builds both the transpiler and all gates before running the script.

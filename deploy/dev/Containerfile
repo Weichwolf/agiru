@@ -1,0 +1,23 @@
+FROM docker.io/library/debian:trixie-slim@sha256:918311b7b6c4c6f68b232ba516584925f6c78ad82b6fd534b98979df6438e483
+
+ARG DEV_UID=1000
+ARG DEV_GID=1001
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates clang-19 clang-format-19 clang-tidy-19 lld-19 \
+    libc++-19-dev libc++abi-19-dev libunwind-19-dev libclang-rt-19-dev \
+    cmake ninja-build ccache make python3 git curl unzip jq \
+    libpq-dev postgresql-17 libxml2-dev libyyjson-dev libssl-dev util-linux tini \
+    && apt-get clean
+RUN groupadd --gid "$DEV_GID" agiru \
+    && useradd --uid "$DEV_UID" --gid "$DEV_GID" --create-home agiru
+COPY entrypoint.sh /usr/local/bin/agiru-dev-entrypoint
+RUN chmod 755 /usr/local/bin/agiru-dev-entrypoint
+ENV PGDATA=/var/lib/agiru/postgres \
+    PATH=/usr/lib/postgresql/17/bin:$PATH \
+    CCACHE_DIR=/home/agiru/.cache/ccache
+WORKDIR /workspace
+EXPOSE 8080
+HEALTHCHECK --interval=5s --timeout=3s --start-period=30s \
+    CMD pg_isready -h 127.0.0.1 -p 5432 -U agiru -d agiru_gate
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/agiru-dev-entrypoint"]
+CMD ["database-only"]
