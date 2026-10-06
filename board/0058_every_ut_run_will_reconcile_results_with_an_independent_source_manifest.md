@@ -9,28 +9,28 @@ business workflows are active in 0720; full G1 acceptance does not block their i
 
 ## Current evidence
 
-- Latest completed integration: `a107d129d845cf79dc4ada598ec5282e98a4f733` /
-  content `6a657002718f34eb22598f213531f0bfe599d038165e13a6e8f15daa7903224a`:
-  slice-check/all pass; C++/specialist test is 157/157, zero red.
-  AL: 2219/2314 passed, 95 failed, eighty codeunits, zero incomplete/duplicate
-  identities; six workers, 1143 seconds. Target exits: 0/0/0/2; G1 remains open.
-  Compared with `b2a8131`'s 2218/2314: two gains, one loss, no added/missing identities.
-  Gains: 134300.TestStartWorkflowWithNewlyAddedEvent and
-  139154.TestProcessWithDataExchWithInvalidContentFails.
-  Loss: 137462.VariantMandatoryAllowsPhysInvtRec; investigate item-tracking state
-  and isolation, not a new suppression. Three failures in that codeunit now share
-  a Qty. to Handle 3-versus-8 diagnostic; raw time-dependent lot values remain in receipts.
+- Latest completed integration: `c79dd1bfb99d43b7aedaa8805d9f3bf598dadfc1` /
+  content `0922a47ce9a41720bdec522b433bc0c481c4d19d40b32de5547a269ca20e5ba7`:
+  slice-check/all pass; C++/specialist test is 159/159, zero red.
+  AL: 2221/2314 passed, 93 failed, eighty codeunits, zero incomplete/duplicate
+  identities; six workers, 1112 seconds. Target exits: 0/0/0/2; G1 remains open.
+  Manifest and executed identity-set digest match:
+  `86ced2a881afad70c781f23d54fc9a263ff133581736de8b04e830cf54e70827`.
+  Compared with `a107d129`'s 2219/2314: two gains, zero losses or missing identities.
+  Gains: 132543.DataExhangeDefinitionImportInsertsRuleFromNextTransformationRuleField
+  and 133771.RefundSharingPaymentDocShownOnRemittanceAdviceEntries.
   BCApps/System pins match the previous run; frozen inputs remain unchanged during verification.
   Seed identity is null/unsealed: diagnostic comparison, not causal A/B or G1.
   Result digest from `jq -sc 'sort_by(.codeunit_id,.method)|map({codeunit_id,method,status,error})'
-  followed by `sha256sum`: `7a886f6e03336a7c8754fbc78fcb4930913cd9a77cb7540cf795655267b68a47`.
+  followed by `sha256sum`: `d325737b7bfbdc879ac99cd0a479112342c55ad46ae985d0eea7be068b1ac3f0`.
 - This completed snapshot includes native Table/Page Metadata navigation,
   source-owned page IDs, RecordRef.Get consumption/diagnostics, scalar catalogue
   CalcFields (`b221e0d`), Unicode caption fallback (`48fcd03`) and shared positions
   (`65d3ade`), Evaluate dispatch (`6f8c9ce`), XML diagnostics (`4dda6f5`), captured
   loop bounds (`30293c8`), ordinal Variant text (`9985dc7`) and the RowVersion gate
-  repair (`0cf1488`). It excludes subsequent report-ordinal, XMLport field-validation
-  and client-dispatch increments; do not label it current-HEAD acceptance.
+  repair (`0cf1488`), report-ordinal, XMLport field-validation and page-dispatch/factory
+  increments. It excludes semantic HTML, Node clients and the HTTP prototype;
+  do not label it current-HEAD acceptance.
   Runtime contract evidence belongs in 0013/0044/0073; superseded results are
   recoverable at `c2df724`.
 - Latest AL failure concentrations: thirteen incoming-document conversion failures,
@@ -131,7 +131,8 @@ business workflows are active in 0720; full G1 acceptance does not block their i
 - Build, C++ gates, generator fixtures and lint pass without raised baselines.
   New contracts have meaningful negative controls. G1 is not full-suite/G3 proof.
 - Scope retirement neither removes core ERP nor bypasses denied permissions.
-  Only then release [0720](0720_cli_and_web_will_execute_the_same_erp_operations.md).
+  [0720](0720_cli_and_web_will_execute_the_same_erp_operations.md) proceeds independently;
+  its client-first goal does not relax these full G1 acceptance requirements.
 
 ## Consolidation
 
