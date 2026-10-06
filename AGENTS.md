@@ -24,23 +24,27 @@ documentation and commits are English.
 
 ## Delivery order
 
-1. Compile the complete in-scope AL tree and make the UT milestone pass through
-   `agiru run-tests`. Count the denominator from AL source text, independently of parsing
-   and linking. Report missing, refused and crashed cases; they never disappear from totals.
-2. After every UT is green, build the agent-only Node.js/TypeScript HTML-to-ASCII client
+1. First build the agent-only Node.js/TypeScript HTML-to-ASCII client
    with CMD/MCP adapters and the htmx web UI over one production page/command runtime.
    Prove CMD/MCP/web operation parity under `test/ui/`: messages, rows, exact typed values,
-   dialogs, permissions and database effects. Use the agent client for exhaustive business
-   workflows; verify the actual web client through representative browser samples.
-3. Run the complete AL test suite and CLI workflows; prove multi-user behaviour and complete
+   dialogs, permissions and database effects. A fully green UT milestone is not a prerequisite.
+2. Inventory and execute every product-scope business process from the local BC user
+   documentation through the agent client; independently verify ledger, stock and SQL effects.
+   Prioritize setup/master data, sales, purchases, finance, inventory/warehouse, then remaining
+   ERP areas. Verify the actual web client through representative browser samples. Fix runtime
+   defects that block clients or workflows; keep existing regressions and every known gap visible.
+3. Compile the complete in-scope AL tree and run the source-counted UT and complete AL
+   test suites; retain missing, refused and crashed identities. Prove multi-user behaviour and complete
    BC ERP functionality. Measure performance and resource use against equivalent BC workloads.
 4. After G2, deliver a browser-only, single-user Emscripten/WASM demo of agiru with embedded
    PostgreSQL, served entirely as static assets from GitHub Pages. Reuse the production
    business runtime and prove representative workflow/SQL parity; keep its bounds separate
    from production multi-user and scale guarantees.
 
-Historical pass counts are not current measurements. WIs 0058 → 0720 → 0721 own
-G1 → G2 → G3; 0724 depends on G2. Do not trade the full target for a green subset.
+Historical pass counts are not current measurements. 0720 owns client-first delivery and
+documented business workflows (G2); 0058 retains full UT acceptance (G1) without blocking
+client implementation. 0721 owns production qualification (G3); 0724 depends on G2.
+Do not trade the full target for a green subset.
 
 ## References before semantic changes
 
@@ -102,7 +106,7 @@ Registry-only report consumers use `runtime/ReportRegistry.h`; dataset/request-p
 execution stays in `runtime/Report.h`. Keep one registry, preserve its entry ABI and
 prove the narrow header's dependency profile with negative controls.
 
-## Client contract (after G1)
+## Client contract
 
 - C++ owns ERP execution, authorization and sessions. Node.js/TypeScript is a thin
   agent-client dependency, not a production ERP-server dependency (0720).
@@ -139,7 +143,7 @@ prove the narrow header's dependency profile with negative controls.
   PostgreSQL. Bound scans, pivot cardinality, output blocks and per-session memory.
 - Native Linux execution is primary. Prove the same layout/chart code and Cairo PDF
   backend in Emscripten with packaged resources; WASM support is not yet verified.
-  Preserve dependency licenses/notices. Client/analysis UI starts only after G1.
+  Preserve dependency licenses/notices. Client/analysis UI does not depend on G1 acceptance.
 
 ## Implementation rules
 
@@ -195,7 +199,7 @@ direct build; freeze only when continued editing or reproducible isolation requi
   Before a requested clean rebuild, finish/stop verification and preserve any unmerged
   source outside `build/`; clearing artifacts is not a test pass.
 - Keep tests grouped under `test/{gate,runtime,transpiler,reporting,tooling}`;
-  client parity belongs in `test/ui/` after G1. Boundaries: `test/README.md`.
+  client parity belongs in `test/ui/`. Boundaries: `test/README.md`.
   Bash orchestrates tests; Python tooling and AL transpiler fixtures are allowed.
   Fixture consumers need successful compile-command receipts before lint; missing
   commands refuse. Deliberately invalid compile inputs use `.cpp.in`.

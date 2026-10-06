@@ -1,9 +1,10 @@
 # 0720 — Deliver equivalent web, agent CMD and MCP clients (G2)
 
-Status: queued | Priority: P1
-Depends on: [0058](0058_every_ut_run_will_reconcile_results_with_an_independent_source_manifest.md)
-acceptance (G1). Start client implementation after every UT is green.
-Next after G1: extract the production page dispatcher and deliver one real
+Status: in progress | Priority: P0
+Depends on: existing generated page declarations, typed record/session primitives
+and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
+repairs in coherent client increments; preserve existing tests and counted UT failures.
+Next: extract the production page dispatcher and deliver one real
 list → card → validate → save slice through HTTP, Node CMD and MCP.
 
 ## Existing foundation and refreshed implementation review
@@ -160,7 +161,8 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 - Independent AL/SQL expectations detect a shared wrong implementation. Mutants
   remove a handler/HTML identity, alter scale/order, bypass permissions, duplicate
   posting, use stale revisions or suppress truncation; each must fail.
-- Preserve existing tests and G1. Native durability/lock-timeout/Commit-followed-by-
+- Preserve existing tests and G1's independently counted population; a green G1 is
+  not a client-start prerequisite. Native durability/lock-timeout/Commit-followed-by-
   error tests are distinct from rollback-only client scenario fixtures.
 - Agent workflows cover sales/purchases, journals, inventory/warehouse, recovery
   and report request options/filters/SaveValues/scheduling/downloads.

@@ -1,10 +1,11 @@
 # 0058 — Complete the source-counted UT milestone (G1)
 
-Status: queued | Priority: P0
+Status: queued | Priority: P1
 Depends on: 0013 effective profiles → 0044 live providers/record contracts;
 0073 call lowering; required native/report dataset contracts from 0063.
 Next: integrate each qualified repair and replay every configured UT identity;
-close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
+close remaining source/seed/runner/safety gaps. Client-first delivery and documented
+business workflows are active in 0720; full G1 acceptance does not block their implementation.
 
 ## Current evidence
 

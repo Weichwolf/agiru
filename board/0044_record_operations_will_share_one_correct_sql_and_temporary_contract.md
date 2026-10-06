@@ -1,9 +1,11 @@
 # 0044 — Share correct records and live metadata providers
 
-Status: in progress | Priority: P0
+Status: queued | Priority: P1
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay XML diagnostics, ordinal Variant conversion, the RowVersion gate and 0073's loop-bound repair with
+Next when needed by 0720's clients/workflows: repair their concrete record/runtime
+blockers. Preserve the pending XMLport increment and existing regression coverage.
+Replay XML diagnostics, ordinal Variant conversion, the RowVersion gate and 0073's loop-bound repair with
 0013/0058 on every UT identity; investigate remaining failures in source order,
 including XMLport import validation, physical-inventory siblings and Incoming Documents conversions.
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
