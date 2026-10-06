@@ -3,7 +3,9 @@
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "CodeunitWriter.h"
+#include "EnumWriter.h"
 #include "Names.h"
+#include "ObjectKind.h"
 #include "RuntimeSurface.h"
 #include "Scope.h"
 #include "TableWriter.h"
@@ -13,8 +15,10 @@
 #include <cstddef>
 #include <map>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -106,7 +110,7 @@ std::string FilterPart(const std::vector<al::Token> &value) {
 std::string ColumnFilterOf(const std::vector<al::Property> &properties) {
   const al::Property *found = al::Find(properties, "ColumnFilter");
   if (found == nullptr) { return {}; }
-  const std::string rest = FilterPart(found->value);
+  std::string rest = FilterPart(found->value);
   const std::size_t open = rest.find('(');
   const std::size_t close = rest.rfind(')');
   if (open == std::string::npos || close == std::string::npos || close < open) { return rest; }
@@ -308,30 +312,34 @@ QueryColumnSources(const al::QueryObject &query) {
   return sources;
 }
 
-QueryWritten
-WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Objects &objects) {
-  QueryWritten written;
-  Elements elements;
-  Gather(query.elements, elements, 0);
-  al::TableObject facade = FacadeOf(query, elements);
-  for (const al::ProcedureDecl &procedure : query.procedures) {
-    if (procedure.isTrigger && LowerKey(procedure.name) != "onbeforeopen") { ++written.triggers; }
-  }
-  const std::string identifier = Identifier(query.name);
-  const std::string className = ClassName(identifier, ObjectKind::Query);
-  const std::string space = NamespaceOf(query.nameSpace);
-  const std::string symbol = "k" + identifier + "Query";
-  const std::string number = std::to_string(query.id);
-  const al::Property *caption = al::Find(query.properties, "Caption");
-  const std::string captionText = caption == nullptr ? query.name : caption->text;
-  const std::string top = PropertyText(query.properties, "TopNumberOfRows");
+namespace {
 
+struct QueryEmission {
+  const al::QueryObject &query;
+  const std::string &sourcePath;
+  const Objects &objects;
+  const Elements &elements;
+  const al::TableObject &facade;
+  const std::vector<const TableRef *> &tables;
+  const std::set<std::string> &headers;
+  const std::string &identifier;
+  const std::string &className;
+  const std::string &space;
+  const std::string &symbol;
+  const std::string &number;
+  const std::string &captionText;
+  const std::string &top;
+};
+
+std::vector<const TableRef *> ReferencedQueryTables(const Elements &elements,
+                                                    const Objects &objects,
+                                                    std::set<std::string> &headers,
+                                                    std::vector<std::string> &missing) {
   std::vector<const TableRef *> tables;
-  std::set<std::string> headers{"meta/Ids.h", "meta/QueryDef.h", "runtime/Query.h"};
   for (const DataItem &item : elements.dataItems) {
     const auto found = objects.tables.find(LowerKey(item.table));
     if (found == objects.tables.end() || found->second.header.empty()) {
-      written.missing.push_back(item.table);
+      missing.push_back(item.table);
       tables.push_back(nullptr);
       continue;
     }
@@ -347,7 +355,7 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
     }
     const auto found = table->fields.find(LowerKey(column.field));
     if (found == table->fields.end()) {
-      written.missing.push_back(elements.dataItems[column.dataItem].table + "." + column.field);
+      missing.push_back(elements.dataItems[column.dataItem].table + "." + column.field);
       return false;
     }
     member = found->second;
@@ -357,8 +365,26 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
     std::string member;
     static_cast<void>(memberOf(column, member));
   }
-  if (!written.missing.empty()) { return written; }
+  return tables;
+}
 
+std::string QueryColumnMember(const Column &column, const std::vector<const TableRef *> &tables) {
+  if (column.field.empty() && column.method == "count") { return {}; }
+  return tables[column.dataItem]->fields.at(LowerKey(column.field));
+}
+
+std::string QueryHeader(const QueryEmission &frame) {
+  const auto &query = frame.query;
+  const auto &sourcePath = frame.sourcePath;
+  const auto &objects = frame.objects;
+  const auto &elements = frame.elements;
+  const auto &facade = frame.facade;
+  const auto &tables = frame.tables;
+  const auto &headers = frame.headers;
+  const auto &className = frame.className;
+  const auto &space = frame.space;
+  const auto &symbol = frame.symbol;
+  const auto &number = frame.number;
   std::string h;
   h += "// Generated from " + sourcePath + ". Do not edit.\n\n";
   h += "#pragma once\n\n";
@@ -374,8 +400,7 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
   h += "  static constexpr std::string_view kName{" + Literal(query.name) + "};\n";
   h += "  detail::QueryHandle State_Block;\n";
   for (const Column &column : elements.columns) {
-    std::string member;
-    static_cast<void>(memberOf(column, member));
+    const std::string member = QueryColumnMember(column, tables);
     const std::string method = MethodOf(column.method);
     const std::string type =
         IntegerValued(method)
@@ -399,15 +424,15 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
   h += "  static constexpr std::string_view kName{" + Literal(query.name) + "};\n";
   h += "  static constexpr const QueryDef &kQuery = " + space + "::" + symbol + ";\n";
   h += "};\n";
-  written.header = WithRuntimeIncludes(h, ObjectKind::Query);
+  return WithRuntimeIncludes(h, ObjectKind::Query);
+}
 
+std::string QueryLinks(const QueryEmission &frame) {
+  const auto &query = frame.query;
+  const auto &elements = frame.elements;
+  const auto &tables = frame.tables;
+  const auto &identifier = frame.identifier;
   std::string s;
-  s += "// Generated from " + sourcePath + ". Do not edit.\n\n";
-  s += "#include \"" + identifier + ".h\"\n\n";
-  s += kRuntimeIncludeMarker;
-  s += "\n" + SourceIncludesOf(facade.variables, facade.procedures, objects);
-  s += "\n#include <array>\n#include <cstddef>\n\n";
-  s += "namespace " + space + " {\n\nnamespace {\n\n";
   for (std::size_t i = 0; i < elements.dataItems.size(); ++i) {
     const DataItem &item = elements.dataItems[i];
     if (item.links.empty()) { continue; }
@@ -436,6 +461,31 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
     }
     s += "}};\n\n";
   }
+  return s;
+}
+
+std::string QuerySource(const QueryEmission &frame) {
+  const auto &query = frame.query;
+  const auto &sourcePath = frame.sourcePath;
+  const auto &objects = frame.objects;
+  const auto &elements = frame.elements;
+  const auto &facade = frame.facade;
+  const auto &tables = frame.tables;
+  const auto &identifier = frame.identifier;
+  const auto &className = frame.className;
+  const auto &space = frame.space;
+  const auto &symbol = frame.symbol;
+  const auto &number = frame.number;
+  const auto &captionText = frame.captionText;
+  const auto &top = frame.top;
+  std::string s;
+  s += "// Generated from " + sourcePath + ". Do not edit.\n\n";
+  s += "#include \"" + identifier + ".h\"\n\n";
+  s += kRuntimeIncludeMarker;
+  s += "\n" + SourceIncludesOf(facade.variables, facade.procedures, objects);
+  s += "\n#include <array>\n#include <cstddef>\n\n";
+  s += "namespace " + space + " {\n\nnamespace {\n\n";
+  s += QueryLinks(frame);
   s += "constexpr std::array<QueryDataItem, " + std::to_string(elements.dataItems.size()) + "> k" +
        identifier + "DataItems{{\n";
   for (std::size_t i = 0; i < elements.dataItems.size(); ++i) {
@@ -450,8 +500,7 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
   s += "constexpr std::array<QueryColumn, " + std::to_string(elements.columns.size()) + "> k" +
        identifier + "Columns{{\n";
   for (const Column &column : elements.columns) {
-    std::string member;
-    static_cast<void>(memberOf(column, member));
+    const std::string member = QueryColumnMember(column, tables);
     s += "    QueryColumn{.name = " + Literal(column.name) +
          ", .caption = " + Literal(column.caption) + ", .offset = offsetof(" + className + ", " +
          FieldIdentifier(facade, column.name) +
@@ -491,7 +540,48 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
        "Columns.size() == " + std::to_string(elements.columns.size()) + ", \"query " + number +
        " declares " + std::to_string(elements.columns.size()) + " columns and filters\");\n\n";
   s += "} // namespace " + space + "\n";
-  written.source = WithRuntimeIncludes(s, ObjectKind::Query);
+  return WithRuntimeIncludes(s, ObjectKind::Query);
+}
+
+}
+
+QueryWritten
+WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Objects &objects) {
+  QueryWritten written;
+  Elements elements;
+  Gather(query.elements, elements, 0);
+  const al::TableObject facade = FacadeOf(query, elements);
+  for (const al::ProcedureDecl &procedure : query.procedures) {
+    if (procedure.isTrigger && LowerKey(procedure.name) != "onbeforeopen") { ++written.triggers; }
+  }
+  const std::string identifier = Identifier(query.name);
+  const std::string className = ClassName(identifier, ObjectKind::Query);
+  const std::string space = NamespaceOf(query.nameSpace);
+  const std::string symbol = "k" + identifier + "Query";
+  const std::string number = std::to_string(query.id);
+  const al::Property *caption = al::Find(query.properties, "Caption");
+  const std::string captionText = caption == nullptr ? query.name : caption->text;
+  const std::string top = PropertyText(query.properties, "TopNumberOfRows");
+
+  std::set<std::string> headers{"meta/Ids.h", "meta/QueryDef.h", "runtime/Query.h"};
+  const auto tables = ReferencedQueryTables(elements, objects, headers, written.missing);
+  if (!written.missing.empty()) { return written; }
+  const QueryEmission frame{.query = query,
+                            .sourcePath = sourcePath,
+                            .objects = objects,
+                            .elements = elements,
+                            .facade = facade,
+                            .tables = tables,
+                            .headers = headers,
+                            .identifier = identifier,
+                            .className = className,
+                            .space = space,
+                            .symbol = symbol,
+                            .number = number,
+                            .captionText = captionText,
+                            .top = top};
+  written.header = QueryHeader(frame);
+  written.source = QuerySource(frame);
   return written;
 }
 
