@@ -1,3 +1,4 @@
+#include "meta/Ids.h"
 #include "meta/PageDef.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
@@ -6,9 +7,13 @@
 #include "runtime/RecordRef.h"
 #include "runtime/RecordState.h"
 #include "runtime/Relation.h"
+#include "type/Integer.h"
+#include "type/StringValue.h"
 
 #include <cctype>
+#include <cstddef>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -117,7 +122,11 @@ std::string CaptionOfFilters(const void *record, const TableDef &table, std::str
     const std::optional<std::string> single = SingleFilterValue(state, def->no);
     if (!single.has_value() || single->empty()) { continue; }
     const std::optional<ResolvedRelation> resolved = ResolveRelation(record, table, *def);
-    const TableEntry *entry = resolved.has_value() ? FindTable(resolved->table) : nullptr;
+    if (!resolved.has_value()) {
+      Append(caption, *single);
+      continue;
+    }
+    const TableEntry *entry = FindTable(resolved->table);
     if (entry == nullptr) {
       Append(caption, *single);
       continue;

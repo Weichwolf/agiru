@@ -4,12 +4,14 @@
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/Page.h"
 #include "runtime/PageCore.h"
 #include "runtime/PageDispatcher.h"
 #include "runtime/PageHtml.h"
 #include "runtime/PageInstance.h"
 #include "runtime/PageSession.h"
 #include "runtime/PageValue.h"
+#include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/SessionCommand.h"
 #include "runtime/Storage.h"
@@ -21,6 +23,7 @@
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/RecordId.h"
+#include "type/Variant.h"
 
 #include "Check.h"
 #include "OwnedDatabase.h"
@@ -95,6 +98,45 @@ void Prepare() {
   row.ID = 2;
   row.Value = kSecondValue;
   row.Insert();
+}
+
+void PageRunArgumentsBorrowTheLastUsableRecord() {
+  Row row;
+  agiru::detail::PageRunRecord source;
+  agiru::detail::TakePageRunRecord(source, row);
+  CHECK_TRUE("typed page arguments borrow their writable source",
+             source.record == &row && source.table == &agiru::TableTraits<Row>::kTable &&
+                 source.writable);
+  agiru::detail::TakePageRunRecord(source, std::as_const(row));
+  CHECK_TRUE("const typed page arguments cannot write back",
+             source.record == &row && !source.writable);
+  agiru::RecordRef reference;
+  reference.GetTable(row);
+  agiru::detail::TakePageRunRecord(source, reference);
+  CHECK_TRUE("open record references retain their owned record and table",
+             source.record == reference.RecordPointer() &&
+                 source.table == reference.TableDefinition() && source.writable);
+  agiru::detail::TakePageRunRecord(source, std::as_const(reference));
+  CHECK_TRUE("const record references cannot write back", !source.writable);
+  agiru::Variant held(reference);
+  agiru::detail::TakePageRunRecord(source, held);
+  CHECK_TRUE("a Variant record reference retains the existing writable alias contract",
+             source.record == reference.RecordPointer() && source.writable);
+  agiru::RecordRef closed;
+  agiru::detail::TakePageRunRecord(source, closed);
+  CHECK_TRUE("a closed later argument preserves the last usable record",
+             source.record == reference.RecordPointer());
+  agiru::Variant scalar(kFirstValue);
+  agiru::detail::TakePageRunRecord(source, scalar);
+  CHECK_TRUE("a scalar Variant does not replace the record selection",
+             source.record == reference.RecordPointer());
+  agiru::Variant owned(row);
+  agiru::detail::TakePageRunRecord(source, owned);
+  const auto *record = owned.HeldRecord();
+  CHECK_TRUE("a record Variant lends its own image rather than the original record",
+             record != nullptr && source.record == record->RecordPointer() &&
+                 source.record != &row && source.writable &&
+                 source.table == &agiru::TableTraits<Row>::kTable);
 }
 
 void InstalledPageLifecycle() {
@@ -433,6 +475,7 @@ int main(int argc, char **argv) {
     const agiru::Session session(argv[1]);
     const agiru::detail::Scope isolation;
     Prepare();
+    PageRunArgumentsBorrowTheLastUsableRecord();
     InstalledPageLifecycle();
     ListEditOpensSelectedCard();
     ExplicitEditAndStandaloneModes();

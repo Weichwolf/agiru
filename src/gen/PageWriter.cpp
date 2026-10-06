@@ -1582,6 +1582,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
           : object.report ? "Report<"
                           : "Page<") +
          pageClass + "> {\npublic:\n";
+  if (!object.report && !object.xmlport) { out += "  " + pageClass + "() = default;\n\n"; }
   {
     const std::string base = object.xmlport ? "XmlPort<" : object.report ? "Report<" : "Page<";
     const std::string header = object.xmlport ? "XmlPort.h" : object.report ? "Report.h" : "Page.h";

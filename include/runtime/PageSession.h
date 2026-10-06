@@ -10,6 +10,7 @@
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Relation.h"
+#include "runtime/SubPageLink.h"
 #include "runtime/Table.h"
 #include "runtime/TemporaryRecord.h"
 #include "type/Boolean.h"
@@ -22,6 +23,7 @@
 #include <cctype>
 #include <cstdint>
 #include <exception>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -631,16 +633,23 @@ public:
     }
   }
 
-  [[nodiscard]] std::string ControlFilterText(std::string_view control) const override {
+  [[nodiscard]] ::agiru::FieldNo ControlFieldNumber_(std::string_view control) const {
+    const ControlDef *def = ControlNamed_(control);
+    ::agiru::FieldNo no = def != nullptr ? def->field : ::agiru::FieldNo{};
     if constexpr (kHasRecord) {
-      if (page_ == nullptr) { return {}; }
-      const ControlDef *def = ControlNamed_(control);
-      ::agiru::FieldNo no = def != nullptr ? def->field : ::agiru::FieldNo{};
       if (no.Value() == 0) {
         for (const FieldDef &field : RecordTraits_().kTable.fields) {
           if (SameWord_(field.name, control)) { no = field.no; }
         }
       }
+    }
+    return no;
+  }
+
+  [[nodiscard]] std::string ControlFilterText(std::string_view control) const override {
+    if constexpr (kHasRecord) {
+      if (page_ == nullptr) { return {}; }
+      const ::agiru::FieldNo no = ControlFieldNumber_(control);
       if (no.Value() == 0) { return {}; }
       const detail::RecordState *state =
           reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
@@ -660,13 +669,7 @@ public:
 
   void SetControlFilter(std::string_view control, std::string_view filter) override {
     if constexpr (kHasRecord) {
-      const ControlDef *def = ControlNamed_(control);
-      ::agiru::FieldNo no = def != nullptr ? def->field : ::agiru::FieldNo{};
-      if (no.Value() == 0) {
-        for (const FieldDef &field : RecordTraits_().kTable.fields) {
-          if (SameWord_(field.name, control)) { no = field.no; }
-        }
-      }
+      const ::agiru::FieldNo no = ControlFieldNumber_(control);
       if (no.Value() == 0) {
         throw Error("the control '" + std::string(control) + "' shows no field to filter");
       }
@@ -765,7 +768,7 @@ public:
       if (page_ == nullptr) { return std::nullopt; }
       for (const ControlTrigger<P> &trigger : PageTraits<P>::kControlTriggers) {
         if (!SameWord_(trigger.control, control)) { continue; }
-        ::agiru::Boolean (P::*compute)() = trigger.*state;
+        const auto compute = trigger.*state;
         if (compute == nullptr) { return std::nullopt; }
         return (page_->*compute)();
       }
@@ -1151,6 +1154,32 @@ private:
     return nullptr;
   }
 
+  [[nodiscard]] static const FieldDef *RelationColumn_(const TableDef &table,
+                                                       std::string_view name) {
+    const FieldDef *column = nullptr;
+    for (const FieldDef &candidate : table.fields) {
+      if (name.empty() ? (!table.keys.empty() && !table.keys[0].fields.empty() &&
+                          candidate.no == table.keys[0].fields[0])
+                       : SameWord_(candidate.name, name)) {
+        column = &candidate;
+      }
+    }
+    return column;
+  }
+
+  static void FilterRelatedRecord_(void *record,
+                                   const TableDef &table,
+                                   std::span<const detail::RelationFilter> filters) {
+    detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(record)->Ensure();
+    for (const detail::RelationFilter &filter : filters) {
+      for (const FieldDef &candidate : table.fields) {
+        if (SameWord_(candidate.name, filter.field)) {
+          detail::Narrow(state, candidate.no, filter.text);
+        }
+      }
+    }
+  }
+
   /// AL `TestField.Lookup()` on a control with no `OnLookup` of its own opens the RELATED table's
   /// lookup page through the test's ModalPageHandler, and `LookupOK` puts the picked record's
   /// related field into the control (`devenv-tablerelation-property.md`, `FindLookupPage`).
@@ -1168,26 +1197,9 @@ private:
       if (target == nullptr) { return false; }
       const PageEntry *lookup = FindLookupPage(*target->table);
       if (lookup == nullptr) { return false; }
-      const FieldDef *column = nullptr;
-      for (const FieldDef &candidate : target->table->fields) {
-        if (resolved->field.empty()
-                ? (!target->table->keys.empty() && !target->table->keys[0].fields.empty() &&
-                   candidate.no == target->table->keys[0].fields[0])
-                : SameWord_(candidate.name, resolved->field)) {
-          column = &candidate;
-        }
-      }
+      const FieldDef *column = RelationColumn_(*target->table, resolved->field);
       void *related = target->make();
-      {
-        detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(related)->Ensure();
-        for (const detail::RelationFilter &filter : resolved->filters) {
-          for (const FieldDef &candidate : target->table->fields) {
-            if (SameWord_(candidate.name, filter.field)) {
-              detail::Narrow(state, candidate.no, filter.text);
-            }
-          }
-        }
-      }
+      FilterRelatedRecord_(related, *target->table, resolved->filters);
       try {
         if (lookup->run(true, related, target->table, true) == ::agiru::Action::LookupOK &&
             column != nullptr) {
@@ -1205,37 +1217,41 @@ private:
     }
   }
 
-  void RunTrigger_(std::string_view control, ControlTriggerKind kind, bool optional) {
-    if constexpr (requires { PageTraits<P>::kControlTriggers; }) {
-      for (const ControlTrigger<P> &trigger : PageTraits<P>::kControlTriggers) {
-        if (!SameWord_(trigger.control, control)) { continue; }
-        if (kind == ControlTriggerKind::Lookup && trigger.lookup != nullptr) {
-          ::agiru::Text<0> text(ControlText(control));
-          if constexpr (kHasRecord) {
-            const auto before = Record_();
-            const std::size_t taken = detail::BeforeImagesTaken();
-            if ((Page_().*trigger.lookup)(text)) {
-              SetControlText(control, text.Value());
-            } else {
-              SaveIfValidated_(before, taken);
-            }
-          } else {
-            if ((Page_().*trigger.lookup)(text)) { SetControlText(control, text.Value()); }
-          }
-          return;
-        }
-        void (P::*run)() = Trigger_(trigger, kind);
-        if (run != nullptr) {
-          if (kind == ControlTriggerKind::DrillDown || kind == ControlTriggerKind::AssistEdit) {
-            RunSavingIfValidated_([this, run] { (Page_().*run)(); });
-          } else {
-            (Page_().*run)();
-          }
-          return;
-        }
-        break;
+  void RunLookupTrigger_(std::string_view control, const ControlTrigger<P> &trigger) {
+    ::agiru::Text<0> text(ControlText(control));
+    if constexpr (kHasRecord) {
+      const auto before = Record_();
+      const std::size_t taken = detail::BeforeImagesTaken();
+      if (std::invoke(trigger.lookup, Page_(), text)) {
+        SetControlText(control, text.Value());
+      } else {
+        SaveIfValidated_(before, taken);
       }
+    } else {
+      if (std::invoke(trigger.lookup, Page_(), text)) { SetControlText(control, text.Value()); }
     }
+  }
+
+  bool RunDeclaredTrigger_(std::string_view control,
+                           ControlTriggerKind kind,
+                           const ControlTrigger<P> &trigger) {
+    if (kind == ControlTriggerKind::Lookup && trigger.lookup != nullptr) {
+      RunLookupTrigger_(control, trigger);
+      return true;
+    }
+    const auto run = Trigger_(trigger, kind);
+    if (run == nullptr) { return false; }
+    if (kind == ControlTriggerKind::DrillDown || kind == ControlTriggerKind::AssistEdit) {
+      RunSavingIfValidated_([this, run] { (Page_().*run)(); });
+    } else {
+      (Page_().*run)();
+    }
+    return true;
+  }
+
+  void RunTrigger_(std::string_view control, ControlTriggerKind kind, bool optional) {
+    const ControlTrigger<P> *trigger = TriggerRow_(control);
+    if (trigger != nullptr && RunDeclaredTrigger_(control, kind, *trigger)) { return; }
     if (kind == ControlTriggerKind::Lookup && LookupThroughRelation_(control)) { return; }
     if (!optional) {
       throw Error("the control '" + std::string(control) + "' declares no such trigger");

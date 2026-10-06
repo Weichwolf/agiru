@@ -23,6 +23,8 @@ namespace {
 
 class CommandPage : public agiru::Page<CommandPage> {
 public:
+  CommandPage() = default;
+
   void Set(std::string_view text) { text_ = text; }
 
   [[nodiscard]] std::string Read() const { return text_; }
@@ -152,6 +154,8 @@ template <typename T>
 concept HasTestTrap = requires(T &page) { page.Trap(); };
 
 static_assert(!std::is_copy_constructible_v<agiru::PageSession<CommandPage>>);
+static_assert(!std::is_default_constructible_v<agiru::Page<CommandPage>>);
+static_assert(std::is_default_constructible_v<CommandPage>);
 static_assert(!std::is_move_constructible_v<agiru::PageSession<CommandPage>>);
 static_assert(!HasTestTrap<agiru::PageSession<CommandPage>>);
 static_assert(HasTestTrap<agiru::TestPage<CommandPage>>);

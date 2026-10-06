@@ -18,6 +18,8 @@ namespace {
 
 class SourcePage : public agiru::Page<SourcePage> {
 public:
+  SourcePage() = default;
+
   agiru::Text<0> Read() { return std::to_string(++reads_); }
 
   agiru::Text<0> Amount() { return "999999999999999.99"; }

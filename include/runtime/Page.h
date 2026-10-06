@@ -77,7 +77,10 @@ public:
 
   /// \brief A call chained on the answer answers the same. \tparam A The arguments.
   /// \return Another absent answer.
-  template <typename... A> AbsentControlValue operator()(const A &...) const { return {}; }
+  template <typename... A> AbsentControlValue operator()(const A &...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return {};
+  }
 
   /// \brief AL `if Control.X() then`: false. \return False.
   explicit operator bool() const { return false; }
@@ -243,8 +246,8 @@ void RaisePageRecordEvent(P &page, std::string_view event, std::string_view elem
 /// \param property The property text, empty where AL declares none.
 /// \return True only for `false`.
 [[nodiscard]] constexpr bool SaysFalse(std::string_view property) {
-  if (property.size() != 5) { return false; }
   constexpr std::string_view kFalse = "false";
+  if (property.size() != kFalse.size()) { return false; }
   for (std::size_t i = 0; i < kFalse.size(); ++i) {
     const char c = property[i];
     const char lower = c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
@@ -282,18 +285,6 @@ void ApplyPageView(void *record, const TableDef &table, std::string_view view);
 ///       cases and flipped two number series (board:0696, chain 123).
 void SeedNewPageRecord(void *record, const TableDef &table, std::string_view view, bool allFields);
 
-/// \brief Applies a `SubPageLink` -- `Field = field(Other)`, `= const(Value)`, `= filter(...)` --
-///        as filters on the subpage's record, read from the parent's current record.
-/// \param sub The subpage's record.
-/// \param subTable Its declaration.
-/// \param parent The parent page's record.
-/// \param parentTable Its declaration.
-/// \param link The property text as the page declares it.
-void ApplySubPageLink(void *sub,
-                      const TableDef &subTable,
-                      const void *parent,
-                      const TableDef &parentTable,
-                      std::string_view link);
 }
 
 template <typename P> class PartRef {
@@ -402,6 +393,67 @@ template <typename P> [[nodiscard]] constexpr bool StartsBlankWhenEmpty() {
   }
 }
 
+/// \brief Initializes a new source record, or applies its declared view before opening.
+/// \tparam P The generated page class.
+/// \param page The page after `OnInit`.
+/// \param isNew Whether to initialize a new source record.
+template <typename P> void PreparePageRecord(P &page, bool isNew) {
+  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
+    using Source = std::remove_cvref_t<decltype(page.Rec)>;
+    auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
+    if (isNew) {
+      platform.Init();
+      if constexpr (requires { PageTraits<P>::kPage; }) {
+        detail::SeedNewPageRecord(static_cast<void *>(&page.Rec),
+                                  TableTraits<Source>::kTable,
+                                  PageTraits<P>::kPage.sourceTableView,
+                                  true);
+      }
+      StartNewRecord(page, false);
+    } else if constexpr (requires { PageTraits<P>::kPage; }) {
+      detail::ApplyPageView(static_cast<void *>(&page.Rec),
+                            TableTraits<Source>::kTable,
+                            PageTraits<P>::kPage.sourceTableView);
+    }
+  }
+}
+
+/// \brief The source record selected after the page's open trigger has run.
+struct OpenedPageRecord {
+  bool found = false; ///< An existing row was selected.
+  bool blank = false; ///< An editable empty page initialized a new row.
+};
+
+/// \brief Positions on the supplied row, then the first row, or an allowed blank row.
+/// \tparam P The generated page class.
+/// \param page The page after its open trigger and event.
+/// \param editable Whether the effective mode allows initializing a blank row.
+/// \param isNew Whether the page already owns a new row.
+/// \return The selected record state.
+template <typename P> OpenedPageRecord PositionOpenedPage(P &page, bool editable, bool isNew) {
+  OpenedPageRecord selected;
+  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
+    if (!isNew) {
+      using Source = std::remove_cvref_t<decltype(page.Rec)>;
+      auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
+      selected.found =
+          static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst());
+      if (!selected.found && editable && StartsBlankWhenEmpty<P>()) {
+        platform.Init();
+        if constexpr (requires { PageTraits<P>::kPage; }) {
+          detail::SeedNewPageRecord(static_cast<void *>(&page.Rec),
+                                    TableTraits<Source>::kTable,
+                                    PageTraits<P>::kPage.sourceTableView,
+                                    true);
+        }
+        StartNewRecord(page, false);
+        selected.blank = true;
+      }
+    }
+  }
+  return selected;
+}
+
 /// \brief Opens a page the way the platform does: `OnInit`, the record positioned (or a new one
 ///        with `OnNewRecord`), `OnOpenPage`, then the after-get triggers.
 /// \note THE RECORD `Page.Run(Rec)` PASSED IS THE ONE SHOWN, when it exists in the set:
@@ -424,50 +476,12 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
   }
   page.OpenedAs(opensEditable);
   if constexpr (requires { page.OnInit(); }) { page.OnInit(); }
-  bool found = false;
-  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
-    using Source = std::remove_cvref_t<decltype(page.Rec)>;
-    auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
-    if (isNew) {
-      platform.Init();
-      if constexpr (requires { PageTraits<P>::kPage; }) {
-        detail::SeedNewPageRecord(static_cast<void *>(&page.Rec),
-                                  TableTraits<Source>::kTable,
-                                  PageTraits<P>::kPage.sourceTableView,
-                                  true);
-      }
-      StartNewRecord(page, false);
-    } else {
-      if constexpr (requires { PageTraits<P>::kPage; }) {
-        detail::ApplyPageView(static_cast<void *>(&page.Rec),
-                              TableTraits<Source>::kTable,
-                              PageTraits<P>::kPage.sourceTableView);
-      }
-    }
-  }
+  PreparePageRecord(page, isNew);
   if constexpr (requires { page.OnOpenPage(); }) { page.OnOpenPage(); }
   RaisePageRecordEvent(page, "OnOpenPageEvent");
-  bool blank = false;
-  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
-    if (!isNew) {
-      using Source = std::remove_cvref_t<decltype(page.Rec)>;
-      auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
-      found = static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst());
-      if (!found && opensEditable && StartsBlankWhenEmpty<P>()) {
-        platform.Init();
-        if constexpr (requires { PageTraits<P>::kPage; }) {
-          detail::SeedNewPageRecord(static_cast<void *>(&page.Rec),
-                                    TableTraits<Source>::kTable,
-                                    PageTraits<P>::kPage.sourceTableView,
-                                    true);
-        }
-        StartNewRecord(page, false);
-        blank = true;
-      }
-    }
-  }
-  if (found) { page.LandedOnRecord(); }
-  if (found || isNew || blank) { AfterGetRecord(page); }
+  const OpenedPageRecord selected = PositionOpenedPage(page, opensEditable, isNew);
+  if (selected.found) { page.LandedOnRecord(); }
+  if (selected.found || isNew || selected.blank) { AfterGetRecord(page); }
 }
 
 /// \brief Closes a page the way the platform does: `OnQueryClosePage`, then `OnClosePage`.
@@ -674,6 +688,56 @@ template <typename P, PageInstance *(*Make)() = nullptr> struct RegisterPage {
 
 namespace detail {
 
+/// \brief The last usable source record passed to a numbered page run.
+struct PageRunRecord {
+  void *record = nullptr;          ///< Borrowed source record.
+  const TableDef *table = nullptr; ///< Source table declaration.
+  bool writable = false;           ///< Whether the caller accepts record writeback.
+};
+
+/// \brief Adopts a typed record, record reference or record-bearing Variant if usable.
+/// \tparam A The argument's native type, including its const qualification.
+/// \param source The previous selection, retained for unsupported or closed arguments.
+/// \param argument The borrowed argument.
+template <typename A> void TakePageRunRecord(PageRunRecord &source, A &argument) {
+  using Value = std::remove_cvref_t<A>;
+  constexpr bool kConst = std::is_const_v<A>;
+  if constexpr (requires {
+                  argument.operator->();
+                  TableTraits<Value>::kTable;
+                }) {
+    source.record = const_cast<void *>(static_cast<const void *>(argument.operator->()));
+    source.table = &TableTraits<Value>::kTable;
+    source.writable = !kConst;
+  } else if constexpr (requires { TableTraits<Value>::kTable; }) {
+    source.record = const_cast<void *>(static_cast<const void *>(&argument));
+    source.table = &TableTraits<Value>::kTable;
+    source.writable = !kConst;
+  } else if constexpr (std::is_same_v<Value, ::agiru::RecordRef>) {
+    if (argument.IsOpen()) {
+      source.record = const_cast<void *>(argument.RecordPointer());
+      source.table = argument.TableDefinition();
+      source.writable = !kConst;
+    }
+  } else if constexpr (std::is_same_v<Value, ::agiru::Variant>) {
+    if (argument.IsRecordRef()) {
+      const ::agiru::RecordRef &ref = argument;
+      if (ref.IsOpen()) {
+        source.record = const_cast<void *>(ref.RecordPointer());
+        source.table = ref.TableDefinition();
+        source.writable = true;
+      }
+    } else if (const RecordInVariant *held = argument.HeldRecord(); held != nullptr) {
+      const TableEntry *entry = FindTable(held->TableNumber());
+      if (entry != nullptr) {
+        source.record = held->RecordPointer();
+        source.table = entry->table;
+        source.writable = true;
+      }
+    }
+  }
+}
+
 /// \brief `Page.Run(Number)` / `Page.RunModal(Number)`, with or without a record.
 /// \tparam Arguments The record, when one was passed.
 /// \param modal     Whether it is `RunModal`.
@@ -687,48 +751,9 @@ namespace detail {
 ///       `DrillDownPageId` where a table declares only that (16 UT cases, 2026-09-09).
 template <typename... Arguments>
 ::agiru::Action RunPageByNumber(bool modal, ::agiru::Integer id, Arguments &&...arguments) {
-  void *record = nullptr;
-  const TableDef *table = nullptr;
-  bool writable = false;
-  const auto take = [&](auto &argument) {
-    using A = std::remove_cvref_t<decltype(argument)>;
-    constexpr bool kConst = std::is_const_v<std::remove_reference_t<decltype(argument)>>;
-    if constexpr (requires {
-                    argument.operator->();
-                    TableTraits<A>::kTable;
-                  }) {
-      record = const_cast<void *>(static_cast<const void *>(argument.operator->()));
-      table = &TableTraits<A>::kTable;
-      writable = !kConst;
-    } else if constexpr (requires { TableTraits<A>::kTable; }) {
-      record = const_cast<void *>(static_cast<const void *>(&argument));
-      table = &TableTraits<A>::kTable;
-      writable = !kConst;
-    } else if constexpr (std::is_same_v<A, ::agiru::RecordRef>) {
-      if (argument.IsOpen()) {
-        record = const_cast<void *>(argument.RecordPointer());
-        table = argument.TableDefinition();
-        writable = !kConst;
-      }
-    } else if constexpr (std::is_same_v<A, ::agiru::Variant>) {
-      if (argument.IsRecordRef()) {
-        const ::agiru::RecordRef &ref = argument;
-        if (ref.IsOpen()) {
-          record = const_cast<void *>(ref.RecordPointer());
-          table = ref.TableDefinition();
-          writable = true;
-        }
-      } else if (const RecordInVariant *held = argument.HeldRecord(); held != nullptr) {
-        const TableEntry *entry = FindTable(held->TableNumber());
-        if (entry != nullptr) {
-          record = held->RecordPointer();
-          table = entry->table;
-          writable = true;
-        }
-      }
-    }
-  };
-  (take(arguments), ...);
+  PageRunRecord source;
+  (TakePageRunRecord(source, arguments), ...);
+  const TableDef *table = source.table;
   if (id == 0) {
     if (table == nullptr) {
       throw Error("Page.Run(0) needs a record, whose table names the default lookup page");
@@ -744,7 +769,7 @@ template <typename... Arguments>
   if (entry == nullptr) {
     throw Error("Page.Run(" + std::to_string(id) + "): this build carries no page of that number");
   }
-  return entry->run(modal, record, table, writable);
+  return entry->run(modal, source.record, table, source.writable);
 }
 
 }
@@ -1319,11 +1344,13 @@ public:
     }
   }
 
-  /// \note NO PROTECTED DESTRUCTOR AND NO PRIVATE CONSTRUCTOR, for the reason `Table` gives: a
-  ///       generated class has no user-declared constructor, so `pages::X P{}` is aggregate
-  ///       initialisation and both of those make it fail from the caller's context.
-
 private:
+  friend Derived;
+  template <typename> friend class Report;
+  template <typename> friend class XmlPort;
+
+  Page() = default;
+
   bool editable_ = true;
   bool modal_ = false;
   bool byNumber_ = false;

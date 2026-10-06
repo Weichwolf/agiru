@@ -29,6 +29,8 @@ void UserControlsArePageMembers() {
       agiru::gen::WritePage(page, "Test/ControlHost.Page.al", agiru::gen::Objects{});
   CHECK_TRUE("a user control includes its explicit absent contract",
              header.text.find("#include \"absent/Types.h\"") != std::string::npos);
+  CHECK_TRUE("generated pages construct their guarded runtime base from the derived context",
+             header.text.contains("ControlHost_Page() = default;"));
   CHECK_TRUE("CurrPage's user control is a typed page member",
              header.text.find("absent::BusinessChart Chart;") != std::string::npos);
   CHECK_TRUE("a user control contributes its type to the absent contract",
