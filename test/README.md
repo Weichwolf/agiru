@@ -60,6 +60,9 @@ AL tests, complete native behaviour or authentication of authored System fixture
 `runtime/xml-reader.sh` proves shared cursor/close and consuming DOM-load contracts
 in `XmlReaderGate`; separate-state and raw-input reload mutants must fail. It covers
 positioned/ended readers, node ownership, namespaces, DTD retention and whitespace.
+`XmlGate` also checks call-local DOM failure classification, first-error retention
+and qualified UTF-16 positions. Eleven compiled controls reject; the resource/context
+trap checks external-resource requests and process-global error-handler writes.
 DTD/resolver security, encoding and streaming bounds remain open (0035).
 
 `make hashing JOBS=2` proves named MD5/SHA1/SHA256/SHA384/SHA512 byte-array and

@@ -17,6 +17,7 @@
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -294,6 +295,61 @@ void DotNetLocationLoadAndDeclaration() {
   std::filesystem::remove(path);
 }
 
+void DotNetParseFailuresRetainTheirKindAndPosition() {
+  struct InvalidInput {
+    std::string_view text;
+    std::string_view diagnostic;
+  };
+
+  constexpr std::array cases{
+      InvalidInput{.text = "ABC",
+                   .diagnostic = "Data at the root level is invalid. Line 1, position 1."},
+      InvalidInput{.text = " \nABC",
+                   .diagnostic = "Data at the root level is invalid. Line 2, position 1."},
+      InvalidInput{.text = "<?xml version=\"1.0\"?>ABC",
+                   .diagnostic = "Data at the root level is invalid. Line 1, position 22."},
+      InvalidInput{.text = "<root/>ABC",
+                   .diagnostic = "Data at the root level is invalid. Line 1, position 8."},
+      InvalidInput{.text = "雪",
+                   .diagnostic = "Data at the root level is invalid. Line 1, position 1."},
+      InvalidInput{.text = "<r>🙂</r>ABC",
+                   .diagnostic = "Data at the root level is invalid. Line 1, position 10."},
+      InvalidInput{.text = "<!--🙂-->ABC",
+                   .diagnostic = "Data at the root level is invalid. Line 1, position 10."},
+      InvalidInput{.text = {}, .diagnostic = "Root element is missing."},
+      InvalidInput{.text = "", .diagnostic = "Root element is missing."},
+      InvalidInput{.text = " \n\t", .diagnostic = "Root element is missing."},
+      InvalidInput{.text = "<!--only-->", .diagnostic = "Root element is missing."},
+      InvalidInput{.text = "<?xml version=\"1.0\"?>", .diagnostic = "Root element is missing."},
+  };
+  agiru::dotnet::XmlDocument document;
+  document.LoadXml("<previous/>");
+  for (const auto &[text, expected] : cases) {
+    std::string diagnostic;
+    try {
+      document.LoadXml(text);
+    } catch (const Error &error) { diagnostic = error.what(); }
+    CHECK_TEXT(
+        "XML failures keep their own qualified classification and location", diagnostic, expected);
+  }
+  std::string mismatch;
+  try {
+    document.LoadXml("<a><b></a>");
+  } catch (const Error &error) { mismatch = error.what(); }
+  CHECK_TRUE("a tag mismatch is not misreported as invalid root data",
+             mismatch.find("mismatch") != std::string::npos &&
+                 mismatch.find("root level") == std::string::npos);
+  CHECK_TRUE("the first parse failure is not replaced by a cascading end-of-input error",
+             mismatch.find("Premature end") == std::string::npos);
+  XmlDocument typed;
+  CHECK_TRUE("native AL XML still creates the initial typed tree",
+             XmlDocument::ReadFrom("<typed/>", typed));
+  CHECK_TRUE("consumed native AL XML failure returns false", !XmlDocument::ReadFrom("ABC", typed));
+  XmlElement root;
+  CHECK_TRUE("a failed Boolean parse retains its existing output", typed.GetRoot(root));
+  CHECK_TEXT("the retained typed tree is not replaced with a default", root.Name(), "typed");
+}
+
 }
 
 int main() {
@@ -306,5 +362,6 @@ int main() {
     ElementsAreBuiltAndShared();
     DotNetClassesWalkTheSameTree();
     DotNetLocationLoadAndDeclaration();
+    DotNetParseFailuresRetainTheirKindAndPosition();
   });
 }

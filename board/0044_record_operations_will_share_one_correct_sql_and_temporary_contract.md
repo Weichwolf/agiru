@@ -3,7 +3,7 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay shared positions with 0013/0058 on every UT identity;
+Next: replay shared positions and XML diagnostics with 0013/0058 on every UT identity;
 trace Incoming Documents' remaining conversion and invalid-content failures.
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
@@ -61,6 +61,33 @@ seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Useful implementation details
 
+- Incoming Documents invalid-content diagnostic: developer `f928288ee840`
+  `system-getlasterrortext--method.md` / `xmldocument-readfrom-string-xmldocument-method.md`;
+  BCApps `d99152ee35f0` `Modules/System/Xml/XMLDOMManagement.Codeunit.al`
+  LoadXMLDocumentFromInStream and IncomingDocToDataExchUT's invalid-content case;
+  user docs `bf5ffffa9b026` across-exchange-data.md; predecessor 1185/1046.
+  `XmlEngine.{h,cpp}` / `DotNetXml.cpp` now retain the first parser error in an
+  owned call-local context, preserve missing-root versus root-text classification
+  and qualify UTF-16 positions, including supplementary characters. XPath's
+  quiet callback is context-local too, not a process-global setter.
+  Authority: .NET runtime v8.0.0 [XmlTextReaderImpl.cs](https://github.com/dotnet/runtime/blob/v8.0.0/src/libraries/System.Private.Xml/src/System/Xml/Core/XmlTextReaderImpl.cs)
+  and [Strings.resx](https://github.com/dotnet/runtime/blob/v8.0.0/src/libraries/System.Private.Xml/src/Resources/Strings.resx)
+  (resource SHA256 `92daab031fe1`); independent Mono System.Xml hash `aecf9fdea35e`
+  corroborates the qualified English messages. Other syntax errors retain their
+  actual libxml2 diagnostic, not a fabricated root-text message. Full native
+  error wording/localization, streaming-reader diagnostics and partial-tree load
+  semantics remain gaps: .NET XmlDocument.Load clears the old tree before parsing;
+  agiru's earlier tree retention is not native proof and gets no new acceptance assertion.
+  XmlGate retains all 79 earlier checks and adds 18; XmlReader/File/XmlPort retain
+  220/44/41 passes. Existing `test/runtime/xml-reader.sh` proves eleven compiled
+  defects reject, including root classification, first-error, UTF-16 and global-handler
+  controls, plus the resource/context trap. No duplicate script or weakened golden.
+  XmlEngine targeted tidy falls from twelve findings to three `<expected>` provider
+  diagnostics; a standalone strict C++23/libc++ compile plus include-cleaner reproduces
+  the contradictory unused/missing-header diagnostics. They remain counted, not suppressed.
+  Other XML header/source tidy findings remain open; no complete lint or AL gain is claimed.
+  The private header measures 1532.4 ms versus frozen b2a8131 1611.9 ms frontend,
+  three rounds without PCH during concurrent integration; no speedup claim.
 - Shared position repair: developer `f928288ee840`, record/recordref
   `*-getposition-method.md` / `*-setposition-method.md`; BC29 NCL hash `277e35cbdfb8`.
   NavRecord.ALGetPosition RVA `47bdf` defaults to captions. RecordImplementation

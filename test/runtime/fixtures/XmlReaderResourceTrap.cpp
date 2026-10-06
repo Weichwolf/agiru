@@ -4,6 +4,13 @@
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <libxml/xmlerror.h>
+
+extern "C" void xmlSetStructuredErrorFunc([[maybe_unused]] void *ctx,
+                                          [[maybe_unused]] xmlStructuredErrorFunc handler) {
+  std::fputs("xml-reader: fixture global-error-handler-write\n", stderr);
+  std::abort();
+}
 
 namespace {
 

@@ -23,6 +23,47 @@ jq -n --arg directory "$PWD" --arg file "$PWD/$resource_source" \
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
   "${resource_command[@]}" > "$B/fixture-commands/xml-reader-resource.json"
 LD_PRELOAD="$proof/resource-trap.so" "$gate" > "$proof/resource-trap.log" 2>&1
+dom="$B/gate_XmlGate"
+"$dom" > "$proof/dom.log" 2>&1
+LD_PRELOAD="$proof/resource-trap.so" "$dom" > "$proof/dom-context-trap.log" 2>&1
+for control in root-classification first-error utf16-column global-context; do
+  awk -v control="$control" '
+    control == "root-classification" && /const bool rootText =/ {
+      sub(/byte_ !=/, "byte_ =="); changed++
+    }
+    control == "first-error" && /failure->error_.code != XML_ERR_OK/ {
+      sub(/failure->error_.code != XML_ERR_OK/, "false"); changed++
+    }
+    control == "utf16-column" && /return scalarColumn \+ extra;/ {
+      sub(/\+ extra/, "- extra"); changed++
+    }
+    { print }
+    control == "global-context" && /context->sax->serror = &XmlParseFailure::Capture;/ {
+      print "  ::xmlSetStructuredErrorFunc(context.get(), &XmlParseFailure::Capture);"; changed++
+    }
+    END { if (changed != 1) exit 2 }
+  ' src/net/XmlEngine.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "${link_flags[@]}" "$proof/$control.cpp" \
+    $(pkg-config --cflags --libs libxml-2.0) "-L$B" "-Wl,-rpath,$B" \
+    -lagiru_net -o "$proof/$control.so"
+  status=0
+  if [ "$control" = global-context ]; then
+    LD_PRELOAD="$proof/resource-trap.so:$proof/$control.so" "$dom" \
+      > "$proof/$control.log" 2>&1 || status=$?
+    [ "$status" -eq 134 ]
+    rg -q 'fixture global-error-handler-write' "$proof/$control.log"
+  else
+    LD_PRELOAD="$proof/$control.so" "$dom" > "$proof/$control.log" 2>&1 || status=$?
+    [ "$status" -eq 1 ]
+  fi
+  if [ "$control" = first-error ]; then
+    rg -q 'first parse failure is not replaced' "$proof/$control.log"
+  elif [ "$control" != global-context ]; then
+    rg -q 'XML failures keep their own qualified classification and location' "$proof/$control.log"
+  fi
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/dom-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
 for control in cursor-local close-local raw-load unfiltered-policy ignore-policy prohibit-boundary doctype-header; do
   awk -v control="$control" '
     { print }
@@ -87,6 +128,7 @@ for control in cursor-local close-local raw-load unfiltered-policy ignore-policy
   rm -- "$proof/$control.so" "$proof/$control.cpp"
 done
 rm -- "$proof/resource-trap.so" "$proof/resource-trap.o"
-sha256sum src/net/XmlReader.cpp include/dotnet/XmlReader.h test/gate/XmlReaderGate.cpp \
-  "$B/libagiru_net.so" "$gate" > "$proof/inputs.sha256"
-printf 'xml-reader: shared cursor/close/Load and DTD checks pass; seven source controls and resource trap reject; %s\n' "$proof"
+sha256sum src/net/{XmlReader,XmlEngine,DotNetXml}.cpp src/net/XmlEngine.h \
+  include/dotnet/XmlReader.h test/gate/{XmlReader,Xml}Gate.cpp "$resource_source" \
+  "$B/libagiru_net.so" "$gate" "$dom" > "$proof/inputs.sha256"
+printf 'xml-reader: DOM diagnostics, shared cursor/close/Load and DTD checks pass; eleven source controls and resource/context traps reject; %s\n' "$proof"

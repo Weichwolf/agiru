@@ -2,6 +2,7 @@
 
 #include "type/XmlHandle.h"
 
+#include <expected>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -29,6 +30,9 @@ std::string Dump(const XmlHandle &handle);
 std::string DumpChildren(const XmlHandle &handle);
 bool Parse(std::string_view text, bool preserveWhitespace, XmlHandle &into);
 bool ParseLocation(std::string_view location, bool preserveWhitespace, XmlHandle &into);
+std::expected<XmlHandle, std::string> ReadXml(std::string_view text, bool preserveWhitespace);
+std::expected<XmlHandle, std::string> ReadXmlLocation(std::string_view location,
+                                                      bool preserveWhitespace);
 std::vector<XmlHandle> XPath(const XmlHandle &from,
                              std::string_view expression,
                              const std::vector<std::pair<std::string, std::string>> &namespaces);

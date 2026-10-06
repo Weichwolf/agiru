@@ -433,11 +433,9 @@ void XmlDocument::Load(const ::agiru::InStream &stream) {
 }
 
 void XmlDocument::Load(std::string_view filename) {
-  XmlHandle read;
-  if (!::agiru::detail::ParseLocation(filename, preserveWhitespace_, read)) {
-    throw Error("XmlDocument.Load: the file or URL cannot be loaded as XML");
-  }
-  handle_ = read;
+  auto result = ::agiru::detail::ReadXmlLocation(filename, preserveWhitespace_);
+  if (!result.has_value()) { throw Error(result.error()); }
+  handle_ = std::move(*result);
 }
 
 void XmlDocument::Load(const XmlReader &reader) {
@@ -445,12 +443,9 @@ void XmlDocument::Load(const XmlReader &reader) {
 }
 
 void XmlDocument::LoadXml(std::string_view text) {
-  XmlHandle read;
-  if (!::agiru::detail::Parse(text, preserveWhitespace_, read)) {
-    throw Error("XmlDocument.LoadXml: the data at the root level is invalid, or the document is "
-                "not well-formed XML");
-  }
-  handle_ = read;
+  auto result = ::agiru::detail::ReadXml(text, preserveWhitespace_);
+  if (!result.has_value()) { throw Error(result.error()); }
+  handle_ = std::move(*result);
 }
 
 void XmlDocument::Save(const ::agiru::OutStream &stream) {

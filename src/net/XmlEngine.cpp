@@ -4,14 +4,19 @@
 
 #include <algorithm>
 #include <cstring>
+#include <expected>
+#include <limits>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <libxml/globals.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlerror.h>
+#include <libxml/xmlstring.h>
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 
@@ -34,6 +39,7 @@ std::string Owned(xmlChar *text) {
 XmlTree *NewTree(xmlDocPtr doc) {
   auto *tree = new XmlTree{};
   tree->doc = doc;
+  tree->count = 0;
   return tree;
 }
 
@@ -51,17 +57,17 @@ void XmlRelease(XmlTree *tree) noexcept {
 
 XmlHandle EmptyDocument() {
   xmlDocPtr doc = xmlNewDoc(Bytes("1.0"));
-  return XmlHandle(NewTree(doc), doc);
+  return {NewTree(doc), doc};
 }
 
 XmlHandle HandleOf(XmlTree *tree, void *node) {
-  return XmlHandle(tree, node);
+  return {tree, node};
 }
 
 XmlHandle Detached(xmlNodePtr node) {
   xmlDocPtr doc = xmlNewDoc(Bytes("1.0"));
   xmlSetTreeDoc(node, doc);
-  return XmlHandle(NewTree(doc), node);
+  return {NewTree(doc), node};
 }
 
 xmlNodePtr NodeOf(const XmlHandle &handle) {
@@ -97,9 +103,7 @@ std::string Dump(const XmlHandle &handle) {
     return Owned(out);
   }
   if (node->type == XML_ATTRIBUTE_NODE) {
-    auto *attribute = reinterpret_cast<xmlAttrPtr>(node);
-    return QualifiedName(node) + "=\"" + Owned(xmlNodeGetContent(node)) + "\"" +
-           (attribute->ns == nullptr ? "" : "");
+    return QualifiedName(node) + "=\"" + Owned(xmlNodeGetContent(node)) + "\"";
   }
   xmlBufferPtr buffer = xmlBufferCreate();
   xmlNodeDump(buffer, node->doc, node, 0, 0);
@@ -121,35 +125,127 @@ std::string DumpChildren(const XmlHandle &handle) {
   return out;
 }
 
-void Quiet(void *, xmlErrorPtr) {}
+namespace {
 
-void Silence() {
-  static const bool once = [] {
-    xmlSetStructuredErrorFunc(nullptr, Quiet);
-    return true;
-  }();
-  static_cast<void>(once);
+void Quiet([[maybe_unused]] void *context, [[maybe_unused]] xmlErrorPtr error) {}
+
+int Utf16Column(const xmlParserInput &input, int scalarColumn) noexcept {
+  constexpr unsigned char kFourBytePrefixMask = 0xf8;
+  constexpr unsigned char kFourBytePrefix = 0xf0;
+  int extra = 0;
+  for (const xmlChar *at = input.base; at != nullptr && at < input.cur; ++at) {
+    if (*at == '\r' || *at == '\n') {
+      extra = 0;
+    } else if ((*at & kFourBytePrefixMask) == kFourBytePrefix) {
+      ++extra;
+    }
+  }
+  return scalarColumn + extra;
+}
+
+class XmlParseFailure {
+public:
+  XmlParseFailure() = default;
+  XmlParseFailure(const XmlParseFailure &) = delete;
+  XmlParseFailure &operator=(const XmlParseFailure &) = delete;
+
+  ~XmlParseFailure() { xmlResetError(&error_); }
+
+  static void Capture(void *user, xmlErrorPtr error) noexcept {
+    auto *context = static_cast<xmlParserCtxtPtr>(user);
+    if (context == nullptr) { return; }
+    auto *failure = static_cast<XmlParseFailure *>(context->_private);
+    if (failure == nullptr || error == nullptr || error->level < XML_ERR_WARNING ||
+        (failure->error_.code != XML_ERR_OK &&
+         (failure->error_.level >= XML_ERR_ERROR || error->level < XML_ERR_ERROR))) {
+      return;
+    }
+    static_cast<void>(xmlCopyError(error, &failure->error_));
+    if (context->input != nullptr) {
+      failure->error_.int2 = Utf16Column(*context->input, failure->error_.int2);
+    }
+    failure->atEnd_ = context->input == nullptr || context->input->cur == context->input->end;
+    if (!failure->atEnd_) { failure->byte_ = *context->input->cur; }
+  }
+
+  [[nodiscard]] std::string Text() const {
+    if (error_.code == XML_ERR_DOCUMENT_EMPTY && atEnd_) { return "Root element is missing."; }
+    const bool documentBoundary =
+        error_.code == XML_ERR_DOCUMENT_EMPTY || error_.code == XML_ERR_DOCUMENT_END;
+    constexpr unsigned char kFirstXmlTextByte = 0x20;
+    const bool rootText = documentBoundary && !atEnd_ && byte_ >= kFirstXmlTextByte && byte_ != '<';
+    std::string text = rootText                    ? "Data at the root level is invalid."
+                       : error_.message != nullptr ? error_.message
+                                                   : "XML parsing failed.";
+    const auto end = text.find_last_not_of("\r\n");
+    if (end != std::string::npos) { text.resize(end + 1); }
+    if (error_.line > 0 && error_.int2 > 0) {
+      if (!text.empty() && text.back() != '.') { text += '.'; }
+      text += " Line " + std::to_string(error_.line) + ", position " + std::to_string(error_.int2) +
+              '.';
+    }
+    return text;
+  }
+
+private:
+  xmlError error_{};
+  bool atEnd_ = true;
+  unsigned char byte_ = 0;
+};
+
+template <typename Read>
+std::expected<XmlHandle, std::string>
+ReadDocument(bool preserveWhitespace, int options, const Read &read) {
+  XmlParseFailure failure;
+  const std::unique_ptr<xmlParserCtxt, decltype(&xmlFreeParserCtxt)> context(xmlNewParserCtxt(),
+                                                                             &xmlFreeParserCtxt);
+  if (context == nullptr) { return std::unexpected("XML parser context allocation failed."); }
+  context->_private = &failure;
+  context->sax->serror = &XmlParseFailure::Capture;
+  options |= XML_PARSE_NOERROR | XML_PARSE_NOWARNING;
+  if (!preserveWhitespace) { options |= XML_PARSE_NOBLANKS; }
+  std::unique_ptr<xmlDoc, decltype(&xmlFreeDoc)> doc(read(context.get(), options), &xmlFreeDoc);
+  if (doc == nullptr) { return std::unexpected(failure.Text()); }
+  XmlTree *const tree = NewTree(doc.get());
+  return XmlHandle(tree, doc.release());
+}
+
+}
+
+std::expected<XmlHandle, std::string> ReadXml(std::string_view text, bool preserveWhitespace) {
+  if (text.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+    return std::unexpected("XML input exceeds the parser's size limit.");
+  }
+  return ReadDocument(
+      preserveWhitespace, XML_PARSE_NONET, [&](xmlParserCtxtPtr context, int options) {
+        return xmlCtxtReadMemory(context,
+                                 text.empty() ? "" : text.data(),
+                                 static_cast<int>(text.size()),
+                                 "agiru.xml",
+                                 nullptr,
+                                 options);
+      });
+}
+
+std::expected<XmlHandle, std::string> ReadXmlLocation(std::string_view location,
+                                                      bool preserveWhitespace) {
+  const std::string held(location);
+  return ReadDocument(preserveWhitespace, 0, [&](xmlParserCtxtPtr context, int options) {
+    return xmlCtxtReadFile(context, held.c_str(), nullptr, options);
+  });
 }
 
 bool Parse(std::string_view text, bool preserveWhitespace, XmlHandle &into) {
-  Silence();
-  int options = XML_PARSE_NONET | XML_PARSE_NOERROR | XML_PARSE_NOWARNING;
-  if (!preserveWhitespace) { options |= XML_PARSE_NOBLANKS; }
-  xmlDocPtr doc =
-      xmlReadMemory(text.data(), static_cast<int>(text.size()), "agiru.xml", nullptr, options);
-  if (doc == nullptr) { return false; }
-  into = XmlHandle(NewTree(doc), doc);
+  auto result = ReadXml(text, preserveWhitespace);
+  if (!result.has_value()) { return false; }
+  into = std::move(*result);
   return true;
 }
 
 bool ParseLocation(std::string_view location, bool preserveWhitespace, XmlHandle &into) {
-  Silence();
-  int options = XML_PARSE_NOERROR | XML_PARSE_NOWARNING;
-  if (!preserveWhitespace) { options |= XML_PARSE_NOBLANKS; }
-  const std::string held(location);
-  xmlDocPtr doc = xmlReadFile(held.c_str(), nullptr, options);
-  if (doc == nullptr) { return false; }
-  into = XmlHandle(NewTree(doc), doc);
+  auto result = ReadXmlLocation(location, preserveWhitespace);
+  if (!result.has_value()) { return false; }
+  into = std::move(*result);
   return true;
 }
 
@@ -235,9 +331,9 @@ std::vector<XmlHandle> XPath(const XmlHandle &from,
   xmlNodePtr node = NodeOf(from);
   xmlDocPtr doc = DocOf(from);
   if (node == nullptr || doc == nullptr) { return found; }
-  Silence();
   xmlXPathContextPtr context = xmlXPathNewContext(doc);
   if (context == nullptr) { return found; }
+  context->error = &Quiet;
   context->node = node->type == XML_DOCUMENT_NODE ? reinterpret_cast<xmlNodePtr>(doc) : node;
   for (const auto &[prefix, uri] : namespaces) {
     if (!prefix.empty() && !uri.empty()) { xmlXPathRegisterNs(context, Bytes(prefix), Bytes(uri)); }
@@ -305,7 +401,7 @@ std::vector<XmlHandle> Attributes(const XmlHandle &of) {
 
 std::string QualifiedName(xmlNodePtr node) {
   if (node == nullptr) { return {}; }
-  const std::string local = Text(node->name);
+  std::string local = Text(node->name);
   if (node->ns != nullptr && node->ns->prefix != nullptr) {
     return Text(node->ns->prefix) + ":" + local;
   }
@@ -337,7 +433,7 @@ void Adopt(const XmlHandle &parent, const XmlHandle &child) {
   if (!Attachable(target, node)) { return; }
   xmlUnlinkNode(node);
   if (target->type == XML_DOCUMENT_NODE) {
-    xmlDocPtr doc = reinterpret_cast<xmlDocPtr>(target);
+    auto *doc = reinterpret_cast<xmlDocPtr>(target);
     if (node->type == XML_ELEMENT_NODE && xmlDocGetRootElement(doc) == nullptr) {
       xmlDocSetRootElement(doc, node);
     } else {
