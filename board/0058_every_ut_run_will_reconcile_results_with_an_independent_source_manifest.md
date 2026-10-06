@@ -8,35 +8,26 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Latest completed frozen integration: `00c187c` / content `ef6d7cf62468`:
-  slice-check/all pass; test is 148/150 with Cursor/Filter red on Integer SystemRowVersion.
-  AL execution is 2135/2314 passed, 179 failed, eighty codeunits, zero incomplete or
-  duplicate identities (1680 seconds, six workers). Against `9dca232`'s 2173/2314:
-  one observed gain, 39 losses, zero added/missing identities, 37 changed failed errors.
-  Thirty-eight losses and seventy-two current failures concern Integer SystemRowVersion;
-  the other loss is Sales Invoice Aggregate's normal-field count (77 versus 78).
-  The gain is SCM Planning PurchaseReturnWithNegativeQty; this does not close the four
-  missing temporary Inventory Profile rows. Workflow Engine's changed Variant error
-  also needs investigation. The seed remains null/unsealed: diagnostic comparison,
-  not causal A/B or G1. No constant, profile rollback or test removal is authorized.
-  Sorted identity/status/error projection SHA-256:
-  `169d0b39a12dcf340183ac9e18a232a9dac4131451000d82855303b2c52c48d1`.
-- Running frozen integration: `61344f7` / content `0642312188b5`, same BCApps/package
-  pins and complete configured population. It includes declaring-owner customization,
-  shared temporary arrays, Field.Get/property and Table Metadata.Get repairs. Wait for
-  final AL receipts. Its C++/tooling phase is terminal: 147/150 C++ cases pass,
-  Cursor/Filter fail on Integer rowversion and DynamicRecord on missing Resource Cost;
-  all 235 tooling tests pass. A local record-order qualifier briefly overlapped the same
-  gate database before detection; interference is possible, not established as the cause.
-  Current-tree serialized DynamicRecord replay passes 7493 checks; Storage/Temporary/
-  Cursor/Filter pass 71/95/255/129. The frozen red result is not erased and still needs
-  a full integration replay. This snapshot lacks GetBySystemId.
-  It also lacks the later qualified Integer virtual timestamp/SQL alias repair.
-  Shared positive-key Field.Get/live navigation are likewise outside this snapshot.
-  Their native/RecordRef readers pass 418/61 checks and 51 compiled reflection controls;
-  Count/Find/Next use installed declarations, not legacy SQL copies. Timestamp remains
-  reflected but absent from native catalogue rows. Four attributes and authorization
-  remain gaps; the changed tree has no completed full AL replay yet.
+- Latest completed frozen integration: `61344f7` / content `0642312188b5`:
+  slice-check/all pass; C++ test is 147/150. Cursor/Filter fail on Integer rowversion;
+  DynamicRecord fails on missing Resource Cost. A local record-order qualifier briefly
+  overlapped its gate database; interference is possible, not proven as the cause.
+  All 235 tooling tests pass. AL execution: 2171/2314 passed, 143 failed, eighty codeunits,
+  zero incomplete/duplicate identities, 2473 seconds with six workers.
+  Against `00c187c`'s 2135/2314: 36 observed gains, zero losses/added/missing identities,
+  six changed failed errors. Gains span VAT-log pages, table-field metadata, workflow,
+  document aggregates, payment search, assembly and Data Exch. to RapidStart.
+  Seed identity remains null/unsealed: diagnostic comparison, not causal A/B or G1.
+  Sorted `[codeunit_id, method, status, error]` TSV SHA-256:
+  `9f94d7f42bbeee973653314d238a8f092bbd34854840f7a59c844daa75757382`.
+  Previous result projections/remaining losses against `9dca232`: recovery `a554715`.
+- Running frozen integration: `a554715` / content `56a0866bb13c`, same source/package
+  pins and full configured population. Includes shared SQL GetBySystemId, original
+  Integer virtual timestamp/SQL alias and native positive-key Field Get/Find/Next/Count.
+  Wait for terminal target/AL receipts; do not infer gains from local gates.
+  Serialized DynamicRecord/Storage/Temporary/Cursor/Filter pass 7493/71/95/255/129;
+  native Field/FieldCatalogue pass 418/61 checks and 51 compiled reflection controls.
+  Four Field attributes, authorization and full current-tree AL acceptance remain open.
   Current Parser/AlParserGate focused tidy passes after removing three findings without
   suppressions; the Parser gate retains previous checks and adds seventeen (159 total).
   TableWriter.cpp also passes focused tidy after six repairs; GenTable passes 105 checks
@@ -71,8 +62,10 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   live native navigation now excludes timestamp zero without removing FieldRef(0).
   The aggregate UT must establish the expected count; gate success is not that replay.
 - Latest AL failure concentrations: seventy-two Integer rowversion paths,
-  44 Table Metadata provider refusals, four Inventory Profile missing temporary rows
-  and four WorkbookWriter.Create refusals. Fix their shared contracts, not callers.
+  five Page Metadata and two Table Metadata provider refusals, four Inventory Profile
+  missing temporary rows and four WorkbookWriter.Create refusals. The Table Metadata
+  cases are Incoming Doc. To Data Exch.UT's TestProcessWithDataExchSucceeds and
+  TestProcessWithDataExchWithInvalidNamespaceFails. Fix shared contracts, not callers.
 - Raw census: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
   113,111 methods; fifteen approved exclusions leave 113,096 required.
   Zero unmeasured files; seven conditional assignments still refuse.

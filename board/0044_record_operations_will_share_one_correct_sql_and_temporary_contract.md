@@ -7,6 +7,10 @@ Next: replay qualified Integer and live Field repairs with 0013/0058 on every UT
 identity; implement installed Table Metadata filters/order/navigation through shared
 primitives. Complete Field classification, SQLDataType, package provenance, permissions
 and RecordRef.Get result consumption. Investigate StoredImage.
+Latest completed AL replay (`61344f7`) is 2171/2314 with 36 gains and zero losses
+against `00c187c`; two Table Metadata navigation refusals remain in Incoming Doc.
+To Data Exch.UT. Integer/live Field repairs are included only in the running `a554715`
+replay; do not attribute unmeasured gains to them.
 
 ## Implementation
 
