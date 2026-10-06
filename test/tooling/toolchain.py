@@ -3214,6 +3214,33 @@ class AnalysisGate(unittest.TestCase):
         with patch.object(subprocess, 'check_output', side_effect=output):
             self.assertEqual(analysis.select_units(self.root, False)[0], [self.root / 'src/a.cpp'])
 
+    def test_relocated_database_uses_its_own_relative_dependency_graph(self):
+        build = self.root / 'build/podman'
+        build.mkdir(parents=True)
+        database = self.root / 'compile_commands.json'
+        database.rename(build / database.name)
+        database.symlink_to(build / database.name)
+        entries = [{'directory': str(build), 'file': str(self.root / 'src/a.cpp'),
+                    'arguments': ['clang++', '-c', str(self.root / 'src/a.cpp'), '-o', 'a.o']}]
+        (build / database.name).write_text(json.dumps(entries))
+        header = self.root / 'src/indirect.h'
+        header.write_text('#pragma once\n')
+        original = subprocess.check_output
+
+        def output(command, **kwargs):
+            if command[0] == 'ninja':
+                self.assertEqual(command, ['ninja', '-C', str(build), '-t', 'deps'])
+                return 'a.o: #deps 2, deps mtime 1 (VALID)\n    ../../src/indirect.h\n'
+            return original(command, **kwargs)
+
+        with patch.object(subprocess, 'check_output', side_effect=output):
+            self.assertEqual(analysis.select_units(self.root, False)[0], [self.root / 'src/a.cpp'])
+
+        with patch.object(subprocess, 'check_output', side_effect=lambda command, **kwargs:
+                          '' if command[0] == 'ninja' else original(command, **kwargs)):
+            with self.assertRaisesRegex(RuntimeError, 'header has no compiled consumer'):
+                analysis.select_units(self.root, False)
+
     def test_changed_header_without_a_compiled_consumer_is_red(self):
         (self.root / 'src/orphan.h').write_text('#pragma once\n')
         original = subprocess.check_output

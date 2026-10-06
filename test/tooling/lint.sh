@@ -11,6 +11,7 @@ set -eu
 FULL=${FULL:-}
 [ "$FULL" != 0 ] || FULL=
 cd "$(dirname "$0")/../.."
+B=${B:-build}
 
 TIDY=$(command -v clang-tidy-19 || command -v clang-tidy || true)
 FMT=$(command -v clang-format-19 || command -v clang-format || true)
@@ -177,8 +178,8 @@ printf '\n== the AL population ==\n'
 # THE COUNT OF TRANSLATED OBJECTS IS A BASELINE THAT MAY ONLY RISE. It is the one number that says
 # how much of BC this tree can read, and it is measured over the WHOLE population rather than a
 # sample -- 1 545 table objects in the BaseApp, every one of them, on every run of the lint.
-if [ -x build/agirutc ] && [ -d "$AGIRU_BC_SOURCE" ]; then
-  scan=$(build/agirutc "$AGIRU_BC_SOURCE" apps.json)
+if [ -x "$B/agirutc" ] && [ -d "$AGIRU_BC_SOURCE" ]; then
+  scan=$("$B/agirutc" "$AGIRU_BC_SOURCE" apps.json)
   tables=$(printf '%s' "$scan" | awk '/^tables/{print $2}')
   tableTotal=$(printf '%s' "$scan" | awk '/^tables/{print $4}')
   units=$(printf '%s' "$scan" | awk '/^codeunits/{print $2}')

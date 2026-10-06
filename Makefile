@@ -78,7 +78,7 @@ $(B)/CMakeCache.txt:
 	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 lint: lint-config gates tc ## format and analysis over what changed (FULL=1: the whole tree and the baselines)
-	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} JOBS=$(JOBS) FULL=$(FULL) sh $(SELF)/test/tooling/lint.sh
+	@B="$(B)" AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} JOBS=$(JOBS) FULL=$(FULL) sh $(SELF)/test/tooling/lint.sh
 
 lint-config:       ## prove the clang-tidy function line limit at its boundary
 	@B="$(B)" bash "$(SELF)/test/tooling/function-size.sh"

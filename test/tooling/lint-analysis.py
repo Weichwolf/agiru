@@ -10,10 +10,14 @@ import subprocess
 import sys
 
 
+def build_directory(root):
+    database_root = (root / 'compile_commands.json').resolve().parent
+    return database_root if database_root != root else root / 'build'
+
+
 def compile_entries(root):
     entries = json.loads((root / 'compile_commands.json').read_text())
-    database_root = (root / 'compile_commands.json').resolve().parent
-    build = database_root if database_root != root else root / 'build'
+    build = build_directory(root)
     for receipt in sorted((build / 'fixture-commands').glob('*.json')):
         entries.extend(json.loads(receipt.read_text()))
     return entries
@@ -63,8 +67,9 @@ def select_units(root, full, unit=None):
         raise RuntimeError('changed source has no compile command: ' + ', '.join(map(str, sorted(missing))))
     headers = {path for path in changed if path.suffix == '.h'}
     if headers:
+        build = build_directory(root)
         # The compiler's dependency graph includes transitive headers and avoids guessing includes.
-        deps = subprocess.check_output(['ninja', '-C', str(root / 'build'), '-t', 'deps'], text=True)
+        deps = subprocess.check_output(['ninja', '-C', str(build), '-t', 'deps'], text=True)
         objects = {}
         for path, entry in units.items():
             args = entry.get('arguments') or shlex.split(entry['command'])
@@ -75,10 +80,10 @@ def select_units(root, full, unit=None):
         current = None
         for line in deps.splitlines():
             if line and not line.startswith(' '):
-                obj = root / 'build' / line.split(': #deps', 1)[0]
+                obj = build / line.split(': #deps', 1)[0]
                 current = objects.get(obj.resolve())
             elif current is not None and line.strip():
-                dep = (root / 'build' / line.strip()).resolve()
+                dep = (build / line.strip()).resolve()
                 if dep in headers:
                     selected.add(current)
                     matched.add(dep)
