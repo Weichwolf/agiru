@@ -3,8 +3,9 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: qualify installed Table Metadata filters/order/Find/Next/Count through the
-shared record primitives, and investigate the newly exposed StoredImage diagnostic.
+Next: qualify Integer's selected implicit fields with 0013 (72 current UT failures,
+38 lost passing methods), then installed Table Metadata filters/order/Find/Next/Count
+through the shared record primitives; investigate the StoredImage diagnostic.
 Complete Field classification, SQLDataType, package provenance and implicit values;
 then Field navigation and the actual FieldName → catalogue → FieldRef caller.
 
@@ -83,6 +84,27 @@ then Field navigation and the actual FieldName → catalogue → FieldRef caller
 
 ## Acceptance
 
+- SQL `GetBySystemId` now shares one reader and optional-result wrapper for typed
+  records and RecordRef. A consumed miss returns false; a discarded miss raises
+  the searched SystemId diagnostic instead of allowing work on a stale buffer.
+  Storage failures still throw; RecordRef must already be open. Successful reads
+  forget the old cursor and preserve a position for subsequent Next; filters remain
+  unchanged. Temporary and unqualified virtual providers still explicitly refuse.
+  `make gate GATE=SqlRowVersionGate JOBS=2`: 114 checks, including nineteen new
+  identity/Decimal/version/filter/missing/error/navigation checks on an owned database.
+  RecordRef/RecordImage gates retain 147/28 checks. `make rowversions JOBS=2`
+  retains fifteen compiled controls and rejects two new controls: discarded-miss
+  suppression fails four checks; lost positioning fails two. Named/numeric Record
+  and RecordRef AL value/statement fixtures compile in both table/codeunit contexts;
+  `make verify-check VERIFY_CHECKS='' JOBS=2` passes all 235 tooling tests.
+  This is compile qualification plus live C++ SQL proof, not AL workflow acceptance.
+  SqlRowVersionGate/Table.cpp focused tidy retain three/sixteen existing findings;
+  no new test finding or suppression. Full integration replay remains required.
+  Developer `f928288ee840`: methods-auto/{record,recordref}/*-getbysystemid-method.md;
+  BCApps `d99152ee35f0`: System/Workflow/RecordRestrictionMgt.Codeunit.al,
+  PrintGenJnlLineSystemId lookups before Insert/ModifyCheckLedgerEntry.
+  Predecessor 1462 documents discarded misses allowing stale Sales/Purchase/Service
+  line writes; reuse C++ consumption semantics, not Python statement flags.
 - Installed `Table Metadata.Get` now reaches the immutable registry through
   `src/rt/Table.cpp::RuntimeGet`, shared by typed records and RecordRef. It ignores
   ordinary filters without replacing them, preserves optional-missing versus discarded
@@ -197,13 +219,14 @@ then Field navigation and the actual FieldName → catalogue → FieldRef caller
   foundation controls for missing/per-row fences, unsafe minimum/cache, cross-database
   locks, publication races and cancellation leaks. Provider and gate pass focused
   clang-tidy. Reconnect is covered; PostgreSQL server restart/WASM are not.
-- `SqlRowVersionGate` adds 95 checks through the production typed Record/RecordRef,
+- `SqlRowVersionGate` passes 114 checks through the production typed Record/RecordRef,
   query, FlowField and cursor paths. Insert/Modify/Rename return the single physical
   version to every alias; ModifyAll allocates per affected row. Exact Decimal buffers,
   identity/creation audit, rollback/two-session fences and missing-column backfill
   survive; repeated provisioning does not restamp and incompatible storage refuses.
   Seven additional compiled controls detect reused/stale versions, wrong physical
-  column/filter/query/navigation mappings and zero backfill: fifteen controls total.
+  column/filter/query/navigation mappings and zero backfill; two SystemId controls
+  qualify optional results and positioning: seventeen controls total.
   `src/rt/SqlColumn.{h,cpp}` owns field-to-column mapping, including relative/mixed-key
   navigation. Source names/types/AutoIncrement/FlowField collisions refuse before DDL.
   This is an authored selected profile, not original-source/full-tree DML proof;

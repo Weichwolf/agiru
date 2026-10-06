@@ -11,7 +11,7 @@ flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -fPIC -shared 
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_db)
 trap 'find "$proof" -maxdepth 1 -type f \( -name "*.cpp" -o -name "*.so" \) -delete' EXIT
 sha256sum src/rt/RowVersionStorage.cpp src/rt/{Storage,SqlColumn,Table,Query,Where,Selection,Navigate}.cpp \
-  src/rt/SqlColumn.h src/rt/Selection.h src/rt/Rows.h include/runtime/Storage.h test/gate/{RowVersionGate,SqlRowVersionGate}.cpp \
+  src/rt/SqlColumn.h src/rt/Selection.h src/rt/Rows.h include/runtime/{Storage,Table,RecordRef}.h test/gate/{RowVersionGate,SqlRowVersionGate}.cpp \
   test/gate/OwnedDatabase.h "$gate" "$record_gate" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 "$CXX" --version > "$proof/compiler.txt"
 
@@ -202,5 +202,38 @@ build_overlay zero-backfill
 expect_red zero-backfill "migration allocates one nonzero version per existing row"
 
 "$record_gate" > "$proof/sql-record-restored.log" 2>&1
+
+awk '
+  /^bool RuntimeGetBySystemId\(/ { lookup=1 }
+  /^void RuntimeSetRecFilter\(/ { lookup=0 }
+  lookup && /state.positioned = true;/ { matches++; next }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Table.cpp > "$proof/unpositioned-system-id.cpp"
+build_overlay unpositioned-system-id
+expect_red unpositioned-system-id "SystemId lookup records a current position"
+
+mkdir -p "$proof/unchecked-system-id/runtime"
+awk '
+  /return \{found, table, std::move\(key\)\};/ {
+    sub(/\{found,/, "{true,"); matches++
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' include/runtime/Table.h > "$proof/unchecked-system-id/runtime/Table.h"
+"$CXX" -O2 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+  --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+  "-DAGIRU_TEST_DSN=\"${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}\"" \
+  "-I$proof/unchecked-system-id" -Iinclude -Itest/gate \
+  test/gate/SqlRowVersionGate.cpp \
+  "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db \
+  -o "$proof/unchecked-system-id/gate" > "$proof/unchecked-system-id.compile.log" 2>&1
+status=0
+"$proof/unchecked-system-id/gate" > "$proof/unchecked-system-id.log" 2>&1 || status=$?
+[ "$status" -eq 1 ]
+rg -q "FAIL .*discarding a typed missing SystemId result" "$proof/unchecked-system-id.log"
+rg -q "FAIL .*discarding a reflected missing SystemId result" "$proof/unchecked-system-id.log"
+find "$proof/unchecked-system-id" -depth -delete
+
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'rowversions: allocator fences, SQL record/alias paths and fifteen compiled negative controls proved; %s\n' "$proof"
+printf 'rowversions: allocator fences, SQL record/alias/SystemId paths and seventeen compiled negative controls proved; %s\n' "$proof"

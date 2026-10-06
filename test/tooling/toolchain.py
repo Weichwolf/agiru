@@ -3911,7 +3911,7 @@ class TableSourceBindingGate(unittest.TestCase):
             caller = fixture / 'al/fixture/Caller.Codeunit.al'
             text = caller.read_text()
             if numeric:
-                self.assertEqual(text.count('Record "Source Row"'), 1)
+                self.assertEqual(text.count('Record "Source Row"'), 3)
                 text = text.replace('Record "Source Row"', 'Record 50170')
             consumer = fixture / 'Consumer.cpp'
             consumer_text = (fixture / 'Consumer.cpp.in').read_text()

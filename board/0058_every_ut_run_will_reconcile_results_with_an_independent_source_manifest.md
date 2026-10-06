@@ -38,6 +38,13 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Navigation remains refused. TableMetadata.cpp/generated Runner focused tidy pass;
   Table.cpp has sixteen diagnostics and the expanded gate exposes an uninitialized-ID
   StoredImage diagnostic absent from the previous gate. No full tidy/UT gain claim.
+- Shared SQL GetBySystemId passes 114 record checks and all seventeen compiled
+  rowversion/SystemId controls (0044). Typed/RecordRef missing-result consumption,
+  searched diagnostics, exact values, unchanged filters, provider errors and cursor
+  positioning are qualified. Generated AL value/statement forms compile in all four
+  source-binding contexts; these are not executed AL workflow or UT-gain receipts.
+  RecordRef/RecordImage retain 147/28 checks; focused SQL gate/Table.cpp tidy retain
+  three/sixteen findings. Temporary/virtual SystemId providers remain refused.
 - Current tree: `make verify-check VERIFY_CHECKS='' JOBS=2` passes all 235 tooling
   tests. Discovery independently includes system-profile.sh and refuses each missing
   script/binary without shrinking totals. Attribute-census positives use legal Normal

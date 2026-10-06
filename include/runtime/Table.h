@@ -89,6 +89,21 @@ public:
   Found(bool found, std::string_view table, std::string key)
       : found_(found), table_(table), key_(std::move(key)) {}
 
+  /// \brief Preserve optional-result semantics for a SystemId lookup.
+  /// \param found Whether the record exists.
+  /// \param table The table's AL name.
+  /// \param id The searched identity, retained for a discarded missing-result diagnostic.
+  /// \return A consumable answer; a discarded miss raises DB:RecordNotFound.
+  [[nodiscard]] static Found BySystemId(bool found, std::string_view table, const Guid &id) {
+    std::string key;
+    if (!found) {
+      key = "SystemId='";
+      key += id.ToText();
+      key += '\'';
+    }
+    return {found, table, std::move(key)};
+  }
+
   Found(const Found &) = delete;
   Found &operator=(const Found &) = delete;
   Found &operator=(Found &&) = delete;
@@ -1573,9 +1588,13 @@ public:
 
   /// \brief AL `Record.GetBySystemId(...)`. Gets a record by its SystemId.
   /// \param SystemId The id.
-  /// \return True when a row carries it; `record-getbysystemid-method.md`: filters do not apply.
-  Boolean GetBySystemId(const Guid &SystemId) {
-    return Read(detail::RuntimeGetBySystemId(Self(), TableDefinition<Derived>(), SystemId));
+  /// \return True when a row carries it, or consumed false when missing; normal filters do not
+  /// apply.
+  /// \throws Error for a discarded missing result or any provider/storage failure.
+  detail::Found GetBySystemId(const Guid &SystemId) {
+    const TableDef &table = TableDefinition<Derived>();
+    const bool found = Read(detail::RuntimeGetBySystemId(Self(), table, SystemId));
+    return detail::Found::BySystemId(found, table.name, SystemId);
   }
 
   /// \brief AL `Record.GetFilter(Field)`. The filter standing on one field.

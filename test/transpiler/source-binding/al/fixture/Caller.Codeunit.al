@@ -38,4 +38,20 @@ codeunit 50172 Caller
     begin
         Value := Value::D;
     end;
+    procedure ReadIdentity(var Row: Record "Source Row"; Id: Guid): Boolean
+    begin
+        exit(Row.GetBySystemId(Id));
+    end;
+    procedure RequireIdentity(var Row: Record "Source Row"; Id: Guid)
+    begin
+        Row.GetBySystemId(Id);
+    end;
+    procedure ReadRefIdentity(var Row: RecordRef; Id: Guid): Boolean
+    begin
+        exit(Row.GetBySystemId(Id));
+    end;
+    procedure RequireRefIdentity(var Row: RecordRef; Id: Guid)
+    begin
+        Row.GetBySystemId(Id);
+    end;
 }

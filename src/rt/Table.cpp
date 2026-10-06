@@ -819,6 +819,9 @@ bool RuntimeGetBySystemId(void *record, const TableDef &table, const Guid &syste
       GetRowWhere(Session::Current().Database(), table, *column, systemId.ToText());
   if (!row.has_value()) { return false; }
   LoadRow(record, table, *row);
+  RecordState &state = reinterpret_cast<StateHandle *>(record)->Ensure();
+  state.open.Forget();
+  state.positioned = true;
   return true;
 }
 

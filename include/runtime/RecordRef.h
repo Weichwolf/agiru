@@ -1056,11 +1056,12 @@ public:
   /// \brief AL `RecordRef.GetBySystemId(Guid)`. Gets a record based on the ID of the record. The
   /// RecordRef must already be opened.
   /// \param SystemId The AL `Guid`.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean GetBySystemId(::agiru::Guid SystemId) {
-    static_cast<void>(SystemId);
-    throw Error("RecordRef.GetBySystemId(Guid) is declared and not implemented yet (board:0035)");
+  /// \return True when found, or consumed false when missing; normal filters do not apply.
+  /// \throws Error if closed, for a discarded miss or for any provider/storage failure.
+  detail::Found GetBySystemId(::agiru::Guid SystemId) {
+    const TableDef &table = Table();
+    const bool found = detail::RuntimeGetBySystemId(State().record, table, SystemId);
+    return detail::Found::BySystemId(found, table.name, SystemId);
   }
 
   /// \brief AL `RecordRef.GetFilters()` -- every filter standing on the record, as BC shows it.

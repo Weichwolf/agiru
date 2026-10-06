@@ -27,6 +27,7 @@
 #include <array>
 #include <charconv>
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <system_error>
 
@@ -167,6 +168,91 @@ void PhysicalStorageAndWrites() {
   CHECK_TRUE("DELETE does not allocate a new rowversion", read.Delete());
   CHECK_TRUE("last used remains the last INSERT/UPDATE allocation",
              Scalar(connection, "SELECT agiru_platform.last_rowversion_v1()") == 3);
+}
+
+void SystemIdLookupsShareOptionalResultsAndCursorPosition() {
+  const gate::OwnedDatabase database("sql_system_id");
+  const agiru::Session session(database.Dsn());
+  agiru::CreateTable(session.Database(), Declaration());
+  const auto first = Inserted(1);
+  const auto second = Inserted(2);
+  VersionedRow typed;
+  typed.SetRange(typed.ID, 1);
+  CHECK_TRUE("a typed SystemId lookup ignores ordinary filters",
+             typed.GetBySystemId(second.SystemId));
+  CHECK_TRUE("typed lookup loads the requested identity and exact rowversion",
+             typed.ID == 2 && typed.SystemId == second.SystemId && typed.SystemRowVersion == 2);
+  CHECK_TEXT("typed SystemId lookup leaves its filters unchanged", typed.GetFilter(typed.ID), "1");
+  CHECK_TRUE("typed SystemId lookup captures the stored image", typed.StoredImage().ID == 2);
+
+  agiru::RecordRef reference;
+  reference.GetTable(typed);
+  reference.Field(1).SetFilter("2");
+  CHECK_TRUE("RecordRef uses the same SystemId reader", reference.GetBySystemId(first.SystemId));
+  VersionedRow reflected;
+  reference.SetTable(reflected);
+  CHECK_TRUE("RecordRef loads exact identity, primary key and version",
+             reflected.ID == 1 && reflected.SystemId == first.SystemId &&
+                 reflected.SystemRowVersion == 1);
+  CHECK_TEXT("RecordRef SystemId lookup preserves the record's filters",
+             reflected.GetFilter(reflected.ID),
+             "2");
+  typed.GetBySystemId(first.SystemId);
+  CHECK_TEXT("typed and RecordRef SystemId reads agree on exact Decimal data",
+             typed.Amount.ToInvariantString(),
+             reflected.Amount.ToInvariantString());
+  CHECK_TRUE("SystemId lookup records a current position",
+             reflected.State_Block.Peek()->positioned);
+  reflected.SetRange(reflected.ID);
+  CHECK_TRUE("navigation continues after the reflected SystemId position",
+             reflected.Next() == 1 && reflected.ID == 2);
+
+  const agiru::Guid missing;
+  CHECK_TRUE("a consumed typed missing SystemId lookup returns false",
+             !typed.GetBySystemId(missing));
+  CHECK_TRUE("a consumed RecordRef missing SystemId lookup returns false",
+             !reference.GetBySystemId(missing));
+  CHECK_TRUE("a missing typed SystemId read retains the previous record",
+             typed.ID == 1 && typed.SystemId == first.SystemId);
+  reference.SetTable(reflected);
+  CHECK_TRUE("a missing reflected SystemId read retains the previous record",
+             reflected.ID == 1 && reflected.SystemId == first.SystemId);
+  std::string expected =
+      "The Rowversion Record Gate does not exist. Identification fields and values: SystemId='";
+  expected += missing.ToText();
+  expected += '\'';
+  std::string typedError;
+  try {
+    typed.GetBySystemId(missing);
+  } catch (const agiru::Error &error) { typedError = error.what(); }
+  CHECK_TEXT("discarding a typed missing SystemId result raises its searched identity",
+             typedError,
+             expected);
+  std::string reflectedError;
+  try {
+    reference.GetBySystemId(missing);
+  } catch (const agiru::Error &error) { reflectedError = error.what(); }
+  CHECK_TEXT("discarding a reflected missing SystemId result raises the same diagnostic",
+             reflectedError,
+             expected);
+  agiru::RecordRef closed;
+  bool refused = false;
+  try {
+    static_cast<void>(static_cast<bool>(closed.GetBySystemId(first.SystemId)));
+  } catch (const agiru::Error &) { refused = true; }
+  CHECK_TRUE("a SystemId lookup requires an already open RecordRef", refused);
+  session.Database().Run(R"(ALTER TABLE "Rowversion Record Gate" DROP COLUMN "SystemId")");
+  bool typedStorageError = false;
+  try {
+    static_cast<void>(static_cast<bool>(typed.GetBySystemId(first.SystemId)));
+  } catch (const agiru::DatabaseError &) { typedStorageError = true; }
+  CHECK_TRUE("a consumed typed SystemId lookup does not hide a storage failure", typedStorageError);
+  bool reflectedStorageError = false;
+  try {
+    static_cast<void>(static_cast<bool>(reference.GetBySystemId(first.SystemId)));
+  } catch (const agiru::DatabaseError &) { reflectedStorageError = true; }
+  CHECK_TRUE("a consumed reflected SystemId lookup does not hide a storage failure",
+             reflectedStorageError);
 }
 
 void SelectionReflectionAndBulkWrites() {
@@ -409,6 +495,7 @@ void RollbackAndTwoSessions() {
 int main() {
   return gate::Run("SqlRowVersion", [] {
     PhysicalStorageAndWrites();
+    SystemIdLookupsShareOptionalResultsAndCursorPosition();
     SelectionReflectionAndBulkWrites();
     SchemaMigrationAndRefusal();
     QueryAliasesAndLinks();
