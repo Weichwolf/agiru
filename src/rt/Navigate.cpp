@@ -8,6 +8,7 @@
 #include "runtime/Table.h"
 
 #include "Cursor.h"
+#include "FieldMetadata.h"
 #include "RecordChanges.h"
 #include "RecordOrder.h"
 #include "Selection.h"
@@ -175,6 +176,9 @@ bool ReadOne(void *record, const TableDef &table, const Selection &made, const s
 
 bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
   if (TempOf(record) != nullptr) { return TempFind(record, table, which); }
+  if (const auto found = FindInstalledFields(record, table, which); found.has_value()) {
+    return *found;
+  }
   RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
@@ -209,6 +213,9 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
 
 bool RuntimeFindSet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempFindSet(record, table); }
+  if (const auto found = FindInstalledFields(record, table, "-"); found.has_value()) {
+    return *found;
+  }
   RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
@@ -229,6 +236,9 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
 std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps) {
   if (steps == 0) { return 0; }
   if (TempOf(record) != nullptr) { return TempNext(record, table, steps); }
+  if (const auto moved = NextInstalledField(record, table, steps); moved.has_value()) {
+    return *moved;
+  }
   RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
@@ -258,6 +268,7 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
 
 std::int32_t RuntimeCount(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempCount(const_cast<void *>(record), table); }
+  if (const auto count = CountInstalledFields(record, table); count.has_value()) { return *count; }
 
   const Selection made = Select(PeekOf(record), table);
   std::string sql = "SELECT count(*) FROM " + made.from;
@@ -270,6 +281,9 @@ std::int32_t RuntimeCount(const void *record, const TableDef &table) {
 
 bool RuntimeIsEmpty(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempIsEmpty(const_cast<void *>(record), table); }
+  if (const auto count = CountInstalledFields(record, table, true); count.has_value()) {
+    return *count == 0;
+  }
 
   const Selection made = Select(PeekOf(record), table);
   std::string sql = "SELECT 1 FROM " + made.from;

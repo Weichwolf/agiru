@@ -336,13 +336,13 @@ struct RecordState {
   ///        Temporariness is STATE and never type: a `Temporary<T>` installs it, and a `T &`
   ///        parameter bound to one keeps behaving as one (board:0583).
   TempHandle temporary;
-  std::vector<std::size_t> view;        ///< The rows a `Find` selected, sorted, by index.
-  std::size_t at = 0;                   ///< Where in `view` the record stands.
-  std::uint64_t viewVersion = 0;        ///< The `TempTable::version` the view was built at.
+  std::vector<std::size_t> view; ///< The rows a `Find` selected, sorted, by index.
+  std::size_t at = 0;            ///< Position in the temporary view or immutable metadata index.
+  std::uint64_t viewVersion = 0; ///< The `TempTable::version` the view was built at.
   std::vector<FieldFilter> viewFilters; ///< The filters that built it -- a walk keeps its own.
   std::vector<SortField> viewKey;       ///< And the key.
   bool viewAscending = true;            ///< And the direction.
-  bool viewDirty = true;                ///< Selection setters invalidate the cached temporary view.
+  bool viewDirty = true; ///< Selection setters invalidate temporary/metadata cursor views.
 
   std::vector<FieldFilter> filters;       ///< AND across fields and groups.
   std::vector<::agiru::FieldNo> autoCalc; ///< `SetAutoCalcFields`: calculated after every read.

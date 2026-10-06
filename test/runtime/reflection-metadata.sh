@@ -10,6 +10,8 @@ indexed_gate="$B/gate_RecordRefGate"
 "$indexed_gate" > "$proof/indexed-fields.log" 2>&1
 field_gate="$B/gate_PlatformFieldGate"
 "$field_gate" > "$proof/field-names.log" 2>&1
+catalogue_gate="$B/gate_FieldCatalogueGate"
+"$catalogue_gate" > "$proof/field-catalogue.log" 2>&1
 "$B/gate_PlatformSystemFieldsGate" > "$proof/system-profiles.log" 2>&1
 "$B/gate_GenSourceBindingGate" > "$proof/source-binding.log" 2>&1
 if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
@@ -80,6 +82,30 @@ rg -q 'FAIL .*moved read failure retains exact key text' "$proof/$control.log"
 sha256sum "$proof/$control/runtime/Table.h" "$proof/$control/gate" > "$proof/read-controls.sha256"
 find "$proof/$control" -depth -delete
 
+control=empty-provider-write
+mkdir -p "$proof/$control/runtime"
+awk '
+  /detail::RuntimeRequireWritableProvider\(Self\(\), TableDefinition<Derived>\(\)\);/ {
+    changed++; next
+  }
+  { print }
+  END { if (changed != 2) exit 2 }
+' include/runtime/Table.h > "$proof/$control/runtime/Table.h"
+"$CXX" -O2 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+  --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+  "-I$proof/$control" -Iinclude -Itest/gate -Isrc/rt \
+  test/gate/FieldCatalogueGate.cpp \
+  "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db \
+  -o "$proof/$control/gate" > "$proof/$control.compile.log" 2>&1
+if "$proof/$control/gate" > "$proof/$control.log" 2>&1; then
+  printf 'reflection-metadata: empty native write escaped its provider guard\n' >&2
+  exit 1
+fi
+rg -q 'FAIL .*native ModifyAll refuses even when no row matches' "$proof/$control.log"
+rg -q 'FAIL .*native triggered DeleteAll refuses even when no row matches' "$proof/$control.log"
+sha256sum "$proof/$control/runtime/Table.h" "$proof/$control/gate" > "$proof/write-controls.sha256"
+find "$proof/$control" -depth -delete
+
 control=field-value-context
 awk '
   /return Table<Field>::Get\(TableNo, No\);/ {
@@ -128,6 +154,45 @@ for control in field-catalogue-zero field-get-binding; do
   esac
   rg -q "FAIL .*${claim}" "$proof/$control.log"
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/read-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
+
+for control in catalogue-population catalogue-bookmark catalogue-filter catalogue-version catalogue-identity; do
+  unit=src/rt/FieldNavigation.cpp
+  case "$control" in catalogue-version|catalogue-identity) unit=src/rt/written/PlatformField.cpp;; esac
+  awk -v control="$control" '
+    control == "catalogue-population" && /if \(field.no.Value\(\) <= 0\) \{ continue; \}/ {
+      changed++; next
+    }
+    control == "catalogue-bookmark" && /if \(!state.viewDirty && state.at < InstalledFields\(\).size\(\)\)/ {
+      print "  if (false) {"; changed++; next
+    }
+    control == "catalogue-filter" && /return filters_.Matches\(&row\);/ {
+      print "    return true;"; changed++; next
+    }
+    control == "catalogue-version" && /constexpr auto kFrozenCatalogueRowVersion = 1;/ {
+      print "constexpr auto kFrozenCatalogueRowVersion = 0;"; changed++; next
+    }
+    control == "catalogue-identity" && /row.SystemId = MetadataSystemId\(platform::Field::kId, table.id.Value\(\), def.no.Value\(\)\);/ {
+      print "  row.SystemId = Guid{};"; changed++; next
+    }
+    { print } END { if (changed != 1) exit 2 }
+  ' "$unit" > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$catalogue_gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped the live Field catalogue contract\n' "$control" >&2
+    exit 1
+  fi
+  case "$control" in
+    catalogue-population) claim='ordinary-field census excludes timestamp zero';;
+    catalogue-bookmark) claim='buffer key edits do not replace an unchanged native cursor bookmark';;
+    catalogue-filter) claim='native name lookup preserves the reserved identity number';;
+    catalogue-version) claim='native catalogue version is the original frozen value';;
+    catalogue-identity) claim='native catalogue identity follows the original key encoding';;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/catalogue-controls.sha256"
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
 
@@ -515,4 +580,6 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: installed Table Metadata.Get and positive-key Field.Get through typed/RecordRef paths, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; forty-five compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -exec sha256sum {} + > "$proof/disposable.sha256"
+find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -delete
+printf 'reflection-metadata: installed Table Metadata.Get and live positive-key Field Get/Find/Next/Count through typed/RecordRef paths, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; fifty-one compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

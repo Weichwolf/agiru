@@ -10,7 +10,6 @@
 #include "platform/AllProfile.h"
 #include "platform/Company.h"
 #include "platform/Date.h"
-#include "platform/Field.h"
 #include "platform/UserPersonalization.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Codeunit.h"
@@ -24,7 +23,6 @@
 #include "type/FieldClass.h"
 #include "type/Integer.h"
 
-#include "FieldMetadata.h"
 #include "RecordChanges.h"
 #include "Rows.h"
 #include "Selection.h"
@@ -739,19 +737,6 @@ void ProvisionInstalled(const Connection &into) {
            entry->page->caption);
   }
   if (objects != 0) { std::println("{} object(s) written into AllObj", objects); }
-  platform::Field anyField;
-  if (!anyField.FindFirst()) {
-    std::size_t fields = 0;
-    for (const TableEntry *entry : InstalledTables()) {
-      for (const FieldDef &field : entry->table->fields) {
-        platform::Field row;
-        detail::LoadFieldMetadata(row, *entry->table, field);
-        row.Insert();
-        ++fields;
-      }
-    }
-    if (fields != 0) { std::println("{} field(s) written into Field", fields); }
-  }
 }
 
 }

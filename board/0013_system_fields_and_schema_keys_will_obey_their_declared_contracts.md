@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
-Next: replay qualified Integer projection on the unchanged UT population;
-complete Field's live positive-key navigation/counts under 0044.
+Next: replay qualified Integer projection and live Field navigation/counts on the
+unchanged UT population; complete the four remaining Field attributes under 0044.
 Retain the full 2314-case UT population through replay.
 
 ## Implementation
@@ -58,7 +58,7 @@ Retain the full 2314-case UT population through replay.
   ExpenseActivityLogTest; `src/gen/{TableKeys,TableWriter}.cpp`,
   `src/rt/{FieldMetadata,RecordRef,Storage}.cpp`.
 - `make reflection-metadata` passes the source, reflection, RecordRef, Field and
-  system-profile gates plus 40 mutation controls. The canonical profile selects
+  system-profile gates plus 51 mutation controls. The canonical profile selects
   kind/LinkedObject/host presence; all three reflection callers share original names.
   A real Record.FieldName → Field lookup → FieldRef.Value caller detects source-name
   substitution. The narrow identity header's typed-dependency control also passes.
@@ -123,18 +123,23 @@ Retain the full 2314-case UT population through replay.
   provider and reflected field population together, rather than masking field 0.
   Original BC29 FieldDataProvider iterator RVA `2e888c` clamps catalogue field keys
   to 1..2147483647 and starts after the internal timestamp. This differs from
-  RecordRef.Field(0), which remains required. `Storage.cpp::PopulateSystemTables`
-  still inserts timestamp into the legacy SQL Field snapshot. Native Field.Get now
-  excludes nonpositive keys through one ABI-qualified typed/RecordRef reader; temporary
-  zero keys remain valid. Its 418 checks and two new compiled controls qualify Get,
-  not the remaining SQL-backed Count/Find/Next or the aggregate UT. Complete the live
-  catalogue contract and separate native/temporary zero-key behavior; do not remove
-  timestamp from declarations, buffers or reflection to hide the aggregate failure.
+  RecordRef.Field(0), which remains required. Native Field.Get and Find/Next/Count
+  now use the immutable installed declarations, excluding nonpositive catalogue keys;
+  temporary zero keys remain valid. Provisioning no longer inserts SQL Field snapshots;
+  legacy copies are ignored, not deleted. PlatformField/FieldCatalogue retain 418/61
+  checks; the shared qualifier detects population, filter, bookmark, frozen-identity/
+  version and empty-write mutants. The full aggregate UT replay remains required.
+  Original FieldDataProvider.GetFieldRecordBuffer RVA `a4330` constructs
+  MetadataSystemId from `{2000000041, TableNo, No, 0}` and invokes
+  VirtualDataProvider.GetSystemPopulatedVirtualRecordValues RVA `adc1f` →
+  AddSystemFieldValues RVA `adcb0`. Frozen timestamp 1 and blank audits use
+  the original virtual-field initialization above, not PostgreSQL
+  allocation. Keep timestamp in declarations/buffers/reflection; do not hide the failure.
 - Every bound native record now materializes the original Runtime-18 Normal,
   unlinked profile: ten implicit fields, typed offsets/capacities and nonstored
   User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;
   `PlatformSourceGate` passes 3060 source/reflection checks. The existing
-  `make reflection-metadata` qualifier retains all prior controls; 40 mutants reject.
+  `make reflection-metadata` qualifier retains all prior controls; 51 mutants reject.
 - Native fixture assertions now select Runtime 18 explicitly, rather than counting
   the five legacy declarations. PageTableField/ObjectCatalogue/FeatureKey/
   UserPersonalization gates pass 312/345/93/320 checks; all four pass focused tidy.

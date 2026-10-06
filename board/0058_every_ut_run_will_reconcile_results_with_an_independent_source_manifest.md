@@ -24,10 +24,19 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 - Running frozen integration: `61344f7` / content `0642312188b5`, same BCApps/package
   pins and complete configured population. It includes declaring-owner customization,
   shared temporary arrays, Field.Get/property and Table Metadata.Get repairs. Wait for
-  final target receipts; this snapshot does not include the later GetBySystemId increment.
+  final AL receipts. Its C++/tooling phase is terminal: 147/150 C++ cases pass,
+  Cursor/Filter fail on Integer rowversion and DynamicRecord on missing Resource Cost;
+  all 235 tooling tests pass. A local record-order qualifier briefly overlapped the same
+  gate database before detection; interference is possible, not established as the cause.
+  Current-tree serialized DynamicRecord replay passes 7493 checks; Storage/Temporary/
+  Cursor/Filter pass 71/95/255/129. The frozen red result is not erased and still needs
+  a full integration replay. This snapshot lacks GetBySystemId.
   It also lacks the later qualified Integer virtual timestamp/SQL alias repair.
-  Shared positive-key Field.Get is likewise outside this snapshot; its native/RecordRef
-  reader passes 418 checks, while legacy SQL Field counts/navigation remain unqualified.
+  Shared positive-key Field.Get/live navigation are likewise outside this snapshot.
+  Their native/RecordRef readers pass 418/61 checks and 51 compiled reflection controls;
+  Count/Find/Next use installed declarations, not legacy SQL copies. Timestamp remains
+  reflected but absent from native catalogue rows. Four attributes and authorization
+  remain gaps; the changed tree has no completed full AL replay yet.
   Current Parser/AlParserGate focused tidy passes after removing three findings without
   suppressions; the Parser gate retains previous checks and adds seventeen (159 total).
   TableWriter.cpp also passes focused tidy after six repairs; GenTable passes 105 checks
@@ -59,7 +68,8 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   record-order controls and focused tidy (0013/0044). It addresses the observed
   refusal path, but the full unchanged 2314-method replay must establish actual
   gains/losses. Original BC29 Field catalogue starts at positive field numbers;
-  investigate the extra timestamp snapshot row without removing FieldRef(0).
+  live native navigation now excludes timestamp zero without removing FieldRef(0).
+  The aggregate UT must establish the expected count; gate success is not that replay.
 - Latest AL failure concentrations: seventy-two Integer rowversion paths,
   44 Table Metadata provider refusals, four Inventory Profile missing temporary rows
   and four WorkbookWriter.Create refusals. Fix their shared contracts, not callers.

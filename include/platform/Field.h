@@ -400,8 +400,8 @@ public:
   /// \throws Error if a discarded read misses or a declaration cannot be projected.
   ///
   /// \note Typed and RecordRef Get share the immutable installed declarations and ignore
-  ///       ordinary filters without replacing them. Legacy SQL-backed navigation is a separate
-  ///       unqualified provider gap; successful Get does not qualify Find, Next or Count.
+  ///       ordinary filters without replacing them. Find/Next/Count use the same declarations
+  ///       with independent filters and cursor positions, never a database copy.
   detail::Found Get(::agiru::Integer TableNo = 0, ::agiru::Integer No = 0);
 };
 
@@ -492,7 +492,9 @@ inline constexpr TableDef kFieldTable{.id = Field::kId,
                                       .caption = Field::kName,
                                       .fields = kFieldFields,
                                       .keys = kFieldKeys,
-                                      .inherentPermissions = "rX"};
+                                      .inherentPermissions = "rX",
+                                      .providerRefusal =
+                                          "Field is a read-only live catalogue, not SQL storage"};
 
 static_assert(FieldsAreSorted(kFieldTable), "the field table is searched by number");
 static_assert(std::is_standard_layout_v<Field>,

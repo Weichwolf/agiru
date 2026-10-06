@@ -100,13 +100,18 @@ ModifyAllowed policy. View navigation and general command permissions remain ope
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,
-cross-column OR, FlowFilters and owned expression snapshots. Forty-five compiled
+cross-column OR, FlowFilters and owned expression snapshots. Fifty-one compiled
 controls and the narrow system-field header dependency control must reject.
 Installed Table Metadata.Get and positive-key Field.Get share typed/RecordRef readers;
 timestamp zero remains addressable through FieldRef, and temporary zero keys remain valid.
 The Field reader checks the native ABI before accessing its buffer. Typed missing reads
-retain optional-result semantics; ordinary filters stay unchanged. Legacy SQL Field
-navigation/counts and complete metadata providers remain gaps (0044).
+retain optional-result semantics; ordinary filters stay unchanged. Native Field
+Find/FindSet/Next/Count/IsEmpty use a shared immutable positive-key index, never a SQL
+copy or per-session row catalogue. `FieldCatalogueGate` checks independent bookmarks,
+filters/marks/signed navigation, the real name-derived FieldRef caller and exact metadata
+identity/version. Native writes, including empty ModifyAll/DeleteAll(true), refuse; temporary rows
+remain independently writable. Four unprojected attributes refuse filtering/ordering.
+Complete metadata providers, authorization and secondary-order performance remain gaps (0044).
 
 `make record-order JOBS=2` verifies mixed field directions, global reversal,
 primary-key ties, filters, relative searches and cursor/keyset direction changes.

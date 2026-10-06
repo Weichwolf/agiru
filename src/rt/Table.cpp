@@ -748,6 +748,10 @@ bool RuntimeModify(void *record, const TableDef &table) {
   return TakePlatformOwned(record, table, ModifyRow(Session::Current().Database(), table, values));
 }
 
+void RuntimeRequireWritableProvider(const void *record, const TableDef &table) {
+  if (TempOf(record) == nullptr) { RequireTableProvider(table); }
+}
+
 bool RuntimeRename(void *record, const void *before, const TableDef &table) {
   if (TempOf(record) != nullptr) {
     if (!TempDelete(const_cast<void *>(before), table)) { return false; }

@@ -282,6 +282,13 @@ Decimal DeclaredPlaces(const Decimal &value, std::string_view decimalPlaces);
 /// \return True when a row carried that key.
 bool RuntimeModify(void *record, const TableDef &table);
 
+/// \brief Checks the provider before a bulk write can return on an empty selection.
+/// \param record The record and its temporary storage context.
+/// \param table Its declaration.
+/// \throws Error for a non-temporary provider guarded against storage writes.
+/// \note Temporary rows remain writable. This is a provider check, not authorization.
+void RuntimeRequireWritableProvider(const void *record, const TableDef &table);
+
 /// \brief Removes the row this record's primary key selects.
 /// \param record The record.
 /// \param table  Its declaration.
@@ -1552,13 +1559,13 @@ public:
 
   /// \brief AL `Record.DeleteAll(RunTrigger)`.
   /// \param RunTrigger Whether each row's `OnDelete` runs.
-  /// \throws Error when asked to run the triggers, which needs the row-by-row walk this does not
-  ///         do yet (board:0044).
+  /// \throws Error if the native provider is read-only, even when no row matches.
   void DeleteAll(Boolean RunTrigger) {
     if (!RunTrigger) {
       DeleteAll();
       return;
     }
+    detail::RuntimeRequireWritableProvider(Self(), TableDefinition<Derived>());
     while (FindFirst()) { Delete(true); }
   }
 
@@ -1844,6 +1851,7 @@ public:
   ///          (`record-modifyall-method.md`).
   template <typename Field, typename Value>
   void ModifyAll(Field &member, const Value &value, Boolean RunTrigger = false) {
+    detail::RuntimeRequireWritableProvider(Self(), TableDefinition<Derived>());
     const FieldDef *field = ::agiru::Field(TableDefinition<Derived>(), NumberOf(&member));
     Field replacement{};
     replacement = value;

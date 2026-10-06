@@ -6,6 +6,7 @@
 #include "platform/ReflectionOptions.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/Record.h"
 #include "runtime/RecordRef.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
@@ -14,6 +15,7 @@
 #include "type/StringValue.h"
 
 #include "FieldMetadata.h"
+#include "MetadataSystemId.h"
 #include "ReflectionMetadata.h"
 
 #include <algorithm>
@@ -78,6 +80,8 @@ std::string detail::FieldOptionMembers(const FieldDef &def) {
 }
 
 namespace {
+
+constexpr auto kFrozenCatalogueRowVersion = 1;
 
 constexpr std::array kCustomizationValues{
     EnumValueDef{.ordinal = 1, .name = "ToBeClassified", .caption = {}},
@@ -182,14 +186,21 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
   row.OptimizeForTextSearch = def.optimizeForTextSearch;
   row.Access = Option<platform::FieldAccess>{*access};
   row.IsAllowedInCustomizations = *customizable != 0;
+  row.SystemId = MetadataSystemId(platform::Field::kId, table.id.Value(), def.no.Value());
+  row.SystemRowVersion = kFrozenCatalogueRowVersion;
 }
 
-std::optional<bool> detail::GetInstalledFieldMetadata(void *record, const TableDef &table) {
-  if (table.id != platform::Field::kId) { return std::nullopt; }
+bool detail::IsInstalledFieldProvider(const TableDef &table) {
+  if (table.id != platform::Field::kId) { return false; }
   if (table.fields.data() != platform::kFieldFields.data() ||
       table.fields.size() != platform::kFieldFields.size()) {
     throw Error("Field.Get requires the qualified native field binding");
   }
+  return true;
+}
+
+std::optional<bool> detail::GetInstalledFieldMetadata(void *record, const TableDef &table) {
+  if (!IsInstalledFieldProvider(table)) { return std::nullopt; }
   auto &buffer = *static_cast<platform::Field *>(record);
   if (buffer.No <= 0) { return false; }
   const TableEntry *entry = FindTable(TableId{buffer.TableNo});
@@ -197,10 +208,15 @@ std::optional<bool> detail::GetInstalledFieldMetadata(void *record, const TableD
     const auto wanted = std::ranges::find_if(
         entry->table->fields, [&](const FieldDef &def) { return def.no.Value() == buffer.No; });
     if (wanted != entry->table->fields.end()) {
-      LoadFieldMetadata(buffer, *entry->table, *wanted);
+      platform::Field projected;
+      LoadFieldMetadata(projected, *entry->table, *wanted);
+      for (const auto &field : table.fields) {
+        if (Stored(field)) { SetFieldText(record, field, StorageText(&projected, field)); }
+      }
       auto &state = reinterpret_cast<StateHandle *>(record)->Ensure();
       state.open.Forget();
       state.positioned = true;
+      state.viewDirty = true;
       return true;
     }
   }

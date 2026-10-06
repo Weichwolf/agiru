@@ -3,11 +3,10 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay the qualified Integer projection with 0013/0058 (72 previous failures,
-38 lost passes), then implement Field's live positive-key Find/Count/Next and installed
-Table Metadata filters/order/navigation through shared primitives. Investigate StoredImage.
-Complete Field classification, SQLDataType, package provenance and implicit values;
-then Field navigation and the actual FieldName → catalogue → FieldRef caller.
+Next: replay qualified Integer and live Field repairs with 0013/0058 on every UT
+identity; implement installed Table Metadata filters/order/navigation through shared
+primitives. Complete Field classification, SQLDataType, package provenance, permissions
+and RecordRef.Get result consumption. Investigate StoredImage.
 
 ## Implementation
 
@@ -19,8 +18,9 @@ then Field navigation and the actual FieldName → catalogue → FieldRef caller
 2. Preserve source app/version/extension property ownership, Name versus Caption,
    read-only live versus writable temporary behavior, exact field/type/length codes
    and permissions. Source CDS → native CRM; provider kind differs from TableType.
-   Remove legacy SQL Field copies only on disposable schema-qualified databases,
-   after proving persisted-name migration/read behavior. Keep guards until qualified.
+   Field provisioning no longer creates SQL copies; live readers ignore existing copies.
+   No physical rows/tables were deleted. Qualify any later migration independently.
+   Keep storage guards on providers whose navigation is not implemented.
    Field customization defaults belong to the declaring table/extension: an extension's
    AllowInCustomizations affects its new fields, not base fields; field overrides win.
    Retain this origin rather than applying the merged table default to every field.
@@ -155,8 +155,31 @@ then Field navigation and the actual FieldName → catalogue → FieldRef caller
   BCApps `d99152ee35f0`: ConfigPackageField uses consumed/discarded typed reads,
   DataTypeManagement.FindFieldByName uses FieldName → Field.FindFirst → FieldRef.Value.
   Predecessor 1114 requires that actual name-derived caller; 1136 rejects hidden misses.
-  SQL snapshot navigation/counts, complete projection, authorization and full AL replay
-  are not qualified by Get. Do not claim the aggregate UT is repaired yet.
+  Native Find/FindSet/Next/Count/IsEmpty now use `src/rt/FieldNavigation.cpp`: one
+  shared immutable locator index, table-range narrowing and indexed primary navigation;
+  other valid orders use bounded-memory selection scans, not per-session row copies.
+  Existing RecordFilter/RecordOrder preserve groups, marks, mixed order and exact values.
+  Handles retain independent bookmarks even after buffer edits; changed views re-anchor.
+  `FieldCatalogueGate`: 61 checks, including the real FieldName → filtered catalogue →
+  FieldRef.Value caller, source-declared/positive implicit counts, typed/RecordRef parity,
+  signed/extreme Next and temporary zero-key independence. Live DML, empty ModifyAll
+  and empty DeleteAll(true) refuse; temporary bulk writes remain valid. A pre-fix
+  replay fails exactly the new empty triggered-delete claim. The qualifier rejects 51 compiled
+  controls plus the header control; six new controls detect timestamp population, lost
+  bookmarks, ignored filters, zero version/identity and both empty-write guards.
+  Original BC29 FieldDataProvider.GetFieldRecordBuffer RVA `a4330` supplies metadata
+  identity from `{2000000041, TableNo, No, 0}` and frozen version 1 through
+  VirtualDataProvider; original artifact/hash and initialization RVAs are in 0013.
+  DataClassification, SQLDataType, AppPackageID and AppRuntimePackageID are still
+  unprojected; filtering/sorting them refuses instead of trusting default values.
+  Complete projection, authorization, secondary-order performance and full AL replay
+  remain open. Do not claim the aggregate UT is repaired without its executed result.
+  FieldNavigation.cpp, Navigate.cpp, PlatformField.cpp and the new catalogue gate pass
+  focused tidy. Storage.cpp/Table.cpp report eight/sixteen diagnostics outside changed code;
+  no suppression or baseline increase. Full current-tree integration remains required.
+  Serialized `make gate GATE=<name> JOBS=2` replay passes DynamicRecord/Storage/
+  Temporary/Cursor/Filter at 7493/71/95/255/129 checks, including existing SQL and
+  temporary bulk-write behavior. `make slice-check`: 14225 sources, none missing.
 - `AllowInCustomizations` defaults stay on the declaring fields in `src/al/Ast.h` /
   `Parser.cpp`, before extension merging. Extension properties survive parsing;
   explicit field values override that owner's default in `src/gen/TableWriter.cpp`.
