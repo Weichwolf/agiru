@@ -19,7 +19,7 @@ export CCACHE_SLOPPINESS
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
-.PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions control-extensions native-table-ids native-codeunits streams
+.PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
 .PHONY: system-profiles
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
@@ -127,6 +127,11 @@ boolean-expressions: comments db tc ## execute eager ordered Boolean effects and
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_BooleanExpressionGate
 	@"$(B)/gate_BooleanExpressionGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/boolean-expressions.sh"
+
+for-loops: comments db tc ## execute captured AL for-loop bounds and counter/control-transfer contracts
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenCodeunitGate
+	@"$(B)/gate_GenCodeunitGate"
+	@B="$(B)" bash "$(SELF)/test/runtime/for-loops.sh"
 
 native-enums: comments db tc ## execute source-loaded native enum fields, parameters and extensions
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt

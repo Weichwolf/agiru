@@ -3,8 +3,9 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay shared positions and XML diagnostics with 0013/0058 on every UT identity;
-trace Incoming Documents' remaining conversion and invalid-content failures.
+Next: replay shared positions, XML diagnostics and 0073's loop-bound repair with
+0013/0058 on every UT identity; investigate remaining failures in source order,
+including physical-inventory siblings and Incoming Documents conversions.
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
 Complete Field classification, SQLDataType, package provenance and permissions;

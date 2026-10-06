@@ -27,6 +27,27 @@ compile and execute the four accepted overload counterexamples.
 
 ## Useful implementation details and acceptance
 
+- `src/gen/BodyWriter.cpp` captures each `for` end expression once as an owned value,
+  after start evaluation, for ascending/descending and Boolean loops. Fresh lower-case
+  C++ temporaries cannot collide with AL's capitalized identifiers; actual declared
+  global/var counters, nested scopes, break and continue remain intact.
+  Developer `f928288ee840` `devenv-al-control-statements.md` owns conversion and
+  undefined post-loop/body-counter behavior. BCApps main `d99152ee35f0`
+  `Layers/W1/Tests/Physical Inventory/PhysInvtOrderSubformUT.Codeunit.al`
+  enqueues a count followed by typed lot/quantity values and consumes the count in
+  the loop bound. Once-only capture is inferred from this native usage; repeated
+  C++ evaluation consumed a lot Text as Integer in CU 137462's posting UT.
+  User docs `bf5ffffa9b026` `inventory-how-count-inventory-with-documents.md`;
+  predecessor 1192 warns that later Codeunit-isolated siblings inherit earlier
+  failures, and 876 owns the global-counter lesson. Neither is a conversion workaround.
+  `make for-loops JOBS=2`: 49 existing codeunit-generator checks and 32 generated AL checks;
+  table/page generator gates retain 105/40 passes; slice-check retains all 14225 sources.
+  four compiled repeated-bound/borrowed-bound/typed-queue controls must fail.
+  The runner is tidy-clean; BodyWriter findings fall from 21 to 20 after extraction.
+  Bound conversion, terminal overflow, Decimal/Date/Time stepping and full native
+  evaluation-order proof remain gaps. Full UT replay is still required (0058).
+  Verified System package `f59a4e4200af` regeneration emits the repaired native
+  handler; translation still exits 1 with 5683 refused properties, not G1 proof.
 - `~/Git/openerp/scripts/transpiler/generator/codeunit_gen/_metadata.py`:
   declaration/parameter-mode propagation; page/report/XMLport generator context.
   Use existing `src/gen/{BodyWriter,Names,CodeunitWriter}.cpp`, not Python dispatch.

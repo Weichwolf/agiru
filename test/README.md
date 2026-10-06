@@ -28,6 +28,13 @@ controls. Its shared sorting controls require the compiled `gate_CurrentKeyGate`
 values, error/TryFunction boundaries and lazy ternary branches; an operand-order
 source mutant must fail. `make boolean-expressions JOBS=2` is the focused entry point.
 
+`runtime/for-loops.sh` executes owned, once-evaluated bounds for ascending/descending
+Integer and Boolean loops, empty ranges, bound errors, global/var/nested counters,
+Option and exact BigInteger values, hygienic temporaries, break and continue. Four
+compiled controls reintroduce repeated Integer/Boolean/typed-queue evaluation and
+borrowed mutable bounds; all must fail. `make for-loops JOBS=2` is the focused entry point. Bound conversion,
+terminal overflow and Decimal/Date/Time stepping are not qualified by this profile.
+
 `transpiler/control-extensions.sh` executes page/report-request-page control order,
 forward anchors and property overrides across separate declaring/extension apps.
 Application identity, raw AL namespace and MultipleNewLines survive composition;

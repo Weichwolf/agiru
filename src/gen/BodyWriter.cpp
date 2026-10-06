@@ -223,6 +223,36 @@ private:
            value + ";\n" + out + Pad(outer) + "}\n";
   }
 
+  std::string ForStatement(const al::Stmt &statement, int indent) {
+    const std::string counter = Expression(statement.expression.children.front(), 0);
+    const std::string first = Expression(statement.expression.children.back(), 0);
+    const std::string last = Expression(statement.labels.front(), 0);
+    const std::string suffix = std::to_string(++forSequence_);
+    const std::string bound = "agiruForEnd_Block_" + suffix;
+    const std::string step = "agiruForStep_Block_" + suffix;
+    const auto ordinal = [](const std::string &value) {
+      if (value == "true") { return std::string("1"); }
+      if (value == "false") { return std::string("0"); }
+      return "(" + value + " ? 1 : 0)";
+    };
+    const bool overBooleans =
+        ((first == "true" || first == "false") && (last == "true" || last == "false")) ||
+        SameName(scope_.DeclaredType(statement.expression.children.front().text), "Boolean");
+    const int outer = indent;
+    indent += 2;
+    std::string out = Pad(outer) + "{\n";
+    out += overBooleans ? Pad(indent) + "::agiru::Integer " + step + " = " + ordinal(first) + ";\n"
+                        : Pad(indent) + counter + " = " + first + ";\n";
+    out += Pad(indent) + "const auto " + bound + " = " + last + ";\n";
+    const std::string control = overBooleans ? step : counter;
+    out += Pad(indent) + "for (; " + control + (statement.descending ? " >= " : " <= ") +
+           (overBooleans ? ordinal(bound) : bound) + "; " + (statement.descending ? "--" : "++") +
+           control + ") {\n";
+    if (overBooleans) { out += Pad(indent + 2) + counter + " = " + step + " != 0;\n"; }
+    out += Statements(statement.body, indent + 2) + Pad(indent) + "}\n" + Pad(outer) + "}\n";
+    return out;
+  }
+
   std::string Statement(const al::Stmt &statement, int indent) {
     const Deeper nested(depth_);
     std::string out;
@@ -246,33 +276,7 @@ private:
         out = Pad(indent) + "while (" + Expression(statement.expression, 0) + ") {\n" +
               Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
         break;
-      case al::StmtKind::For: {
-        const std::string counter = Expression(statement.expression.children.front(), 0);
-        const std::string first = Expression(statement.expression.children.back(), 0);
-        const std::string last = Expression(statement.labels.front(), 0);
-        const auto ordinal = [](const std::string &bound) {
-          if (bound == "true") { return std::string("1"); }
-          if (bound == "false") { return std::string("0"); }
-          return "(" + bound + " ? 1 : 0)";
-        };
-        const bool overBooleans =
-            ((first == "true" || first == "false") && (last == "true" || last == "false")) ||
-            SameName(scope_.DeclaredType(statement.expression.children.front().text), "Boolean");
-        if (overBooleans) {
-          const std::string step = "Step_Block";
-          out = Pad(indent) + "for (::agiru::Integer " + step + " = " + ordinal(first) + "; " +
-                step + (statement.descending ? " >= " : " <= ") + ordinal(last) + "; " +
-                (statement.descending ? "--" : "++") + step + ") {\n" + Pad(indent + 2) + counter +
-                " = " + step + " != 0;\n" + Statements(statement.body, indent + 2) + Pad(indent) +
-                "}\n";
-          break;
-        }
-        out = Pad(indent) + "for (" + counter + " = " + first + "; " + counter +
-              (statement.descending ? " >= " : " <= ") + last + "; " +
-              (statement.descending ? "--" : "++") + counter + ") {\n" +
-              Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
-        break;
-      }
+      case al::StmtKind::For: out = ForStatement(statement, indent); break;
       case al::StmtKind::ForEach: {
         const std::string element = Expression(statement.expression, 0);
         const std::string over = Expression(statement.labels.front(), 0);
@@ -1631,6 +1635,7 @@ private:
   const Names &scope_;
   int depth_ = 0;
   std::size_t caseSequence_ = 0;
+  std::size_t forSequence_ = 0;
 };
 
 }
