@@ -43,10 +43,13 @@ const std::set<std::string> &BaseMembers() {
       if (entry.path().extension() == ".h") { whole += TextOf(entry.path()); }
     }
     std::set<std::string> found;
-    static const std::regex declared(
-        R"([\w>&*:\s]\s(?:::)?(?:[A-Za-z_][A-Za-z0-9_]*::)*([A-Z][A-Za-z0-9]*)\s*\()");
-    for (std::sregex_iterator at(whole.begin(), whole.end(), declared), end; at != end; ++at) {
-      found.insert((*at)[1].str());
+    static const std::array declarations{
+        std::regex{R"([\w>&*:\s]\s([A-Z][A-Za-z0-9]*)\s*\()"},
+        std::regex{R"(\boperator\s+(?:::)?(?:[A-Za-z_][A-Za-z0-9_]*::)*([A-Z][A-Za-z0-9]*)\s*\()"}};
+    for (const std::regex &declared : declarations) {
+      for (std::sregex_iterator at(whole.begin(), whole.end(), declared), end; at != end; ++at) {
+        found.insert((*at)[1].str());
+      }
     }
     if (found.empty()) { throw std::runtime_error("the object bases declare no members"); }
     return found;
@@ -506,8 +509,8 @@ std::string RuntimeIncludes(std::string_view text, ObjectKind kind) {
     default: break;
   }
   for (const std::string &type : RuntimeTypes()) {
-    if (!Mentions(text, type)) { continue; }
     const std::size_t bare = type.starts_with("agiru::") ? std::string_view{"agiru::"}.size() : 0;
+    if (!Mentions(text, std::string_view{type}.substr(bare))) { continue; }
     headers.insert("type/" + type.substr(bare) + ".h");
   }
   for (const auto &[member, family] : kFamilies) {
