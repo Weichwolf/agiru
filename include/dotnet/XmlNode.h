@@ -102,15 +102,15 @@ public:
   [[nodiscard]] XmlNode SelectSingleNode(std::string_view xpath,
                                          const XmlNamespaceManager &manager) const;
   /// \brief `XmlNode.NodeType`, compared against an `XmlNodeType` this runtime has not rebuilt.
-  ::agiru::dotnet::Refused NodeType{{.type = "XmlNode", .member = "NodeType"}};
+  static constexpr ::agiru::dotnet::Refused NodeType{{.type = "XmlNode", .member = "NodeType"}};
   /// \brief `XmlNode.WriteTo(XmlWriter)`, over a writer this runtime has not rebuilt.
-  ::agiru::dotnet::Refused WriteTo{{.type = "XmlNode", .member = "WriteTo"}};
+  static constexpr ::agiru::dotnet::Refused WriteTo{{.type = "XmlNode", .member = "WriteTo"}};
   /// \brief `XmlNode.Clone()` and `CloneNode`, not rebuilt.
-  ::agiru::dotnet::Refused CloneNode{{.type = "XmlNode", .member = "CloneNode"}};
+  static constexpr ::agiru::dotnet::Refused CloneNode{{.type = "XmlNode", .member = "CloneNode"}};
   /// \brief `XmlNode.RemoveAll()`, not rebuilt.
-  ::agiru::dotnet::Refused RemoveAll{{.type = "XmlNode", .member = "RemoveAll"}};
+  static constexpr ::agiru::dotnet::Refused RemoveAll{{.type = "XmlNode", .member = "RemoveAll"}};
   /// \brief `XmlNode.Normalize()`, not rebuilt.
-  ::agiru::dotnet::Refused Normalize{{.type = "XmlNode", .member = "Normalize"}};
+  static constexpr ::agiru::dotnet::Refused Normalize{{.type = "XmlNode", .member = "Normalize"}};
 
   /// \brief Becomes an absent .NET type a wrapper stores it in: an empty stub (board:0035).
   /// \tparam T The stub.

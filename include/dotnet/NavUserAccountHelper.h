@@ -164,19 +164,19 @@ public:
     return false;
   }
 
-  Refused CreateUserFromAzureADObjectId{
+  static constexpr Refused CreateUserFromAzureADObjectId{
       {.type = "NavUserAccountHelper", .member = "CreateUserFromAzureADObjectId"}};
-  Refused CreateUserFromAAdGroupObjectId{
+  static constexpr Refused CreateUserFromAAdGroupObjectId{
       {.type = "NavUserAccountHelper", .member = "CreateUserFromAAdGroupObjectId"}};
-  Refused GetWindowsGroupMembersByName{
+  static constexpr Refused GetWindowsGroupMembersByName{
       {.type = "NavUserAccountHelper", .member = "GetWindowsGroupMembersByName"}};
-  Refused GetTokenAuthorityEndpointServerSetting{
+  static constexpr Refused GetTokenAuthorityEndpointServerSetting{
       {.type = "NavUserAccountHelper", .member = "GetTokenAuthorityEndpointServerSetting"}};
-  Refused GetLocalWindowsGroups{
+  static constexpr Refused GetLocalWindowsGroups{
       {.type = "NavUserAccountHelper", .member = "GetLocalWindowsGroups"}};
-  Refused GetPermissionSetRelations{
+  static constexpr Refused GetPermissionSetRelations{
       {.type = "NavUserAccountHelper", .member = "GetPermissionSetRelations"}};
-  Refused CreateApplicationRegistration{
+  static constexpr Refused CreateApplicationRegistration{
       {.type = "NavUserAccountHelper", .member = "CreateApplicationRegistration"}};
 
 private:

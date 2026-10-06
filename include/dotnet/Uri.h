@@ -197,10 +197,10 @@ public:
   }
 
   /// \brief `Uri.Segments`, a .NET string array; not rebuilt (board:0035).
-  Refused Segments{{.type = "Uri", .member = "Segments"}};
+  static constexpr Refused Segments{{.type = "Uri", .member = "Segments"}};
 
   /// \brief `Uri.LocalPath`, a Windows file path; not rebuilt (board:0035).
-  Refused LocalPath{{.type = "Uri", .member = "LocalPath"}};
+  static constexpr Refused LocalPath{{.type = "Uri", .member = "LocalPath"}};
 
   /// \brief Fills this URI from a text, which is what the binder and `TryCreate` share.
   /// \param uriString The text. \param uriKind What it may be.

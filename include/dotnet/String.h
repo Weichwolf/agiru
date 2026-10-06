@@ -243,10 +243,10 @@ public:
 
   /// \brief `String.Format(...)` with a culture, which `Type Helper` calls to format a date and
   ///        a decimal; not rebuilt (board:0035).
-  Refused Format{{.type = "String", .member = "Format"}};
+  static constexpr Refused Format{{.type = "String", .member = "Format"}};
 
   /// \brief `String.GetType()`; not rebuilt (board:0035).
-  Refused GetType{{.type = "String", .member = "GetType"}};
+  static constexpr Refused GetType{{.type = "String", .member = "GetType"}};
 
   /// \brief Two strings compare by text. \param other The other. \return Whether equal.
   [[nodiscard]] bool operator==(const class String &other) const {

@@ -71,11 +71,11 @@ public:
   [[nodiscard]] std::string ToText() const { return name_; }
 
   /// \brief `CultureInfo.DateTimeFormat`: the culture's date and time patterns, not rebuilt.
-  Refused DateTimeFormat{{.type = "CultureInfo", .member = "DateTimeFormat"}};
+  static constexpr Refused DateTimeFormat{{.type = "CultureInfo", .member = "DateTimeFormat"}};
   /// \brief `CultureInfo.NumberFormat`: the culture's number patterns, not rebuilt.
-  Refused NumberFormat{{.type = "CultureInfo", .member = "NumberFormat"}};
+  static constexpr Refused NumberFormat{{.type = "CultureInfo", .member = "NumberFormat"}};
   /// \brief `CultureInfo.TextInfo`: the culture's casing rules, not rebuilt.
-  Refused TextInfo{{.type = "CultureInfo", .member = "TextInfo"}};
+  static constexpr Refused TextInfo{{.type = "CultureInfo", .member = "TextInfo"}};
 
   /// \brief `Culture := AbsentType.Member()`: the call refused before the assignment.
   /// \tparam R The refusal. \param refused It. \return This.

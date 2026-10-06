@@ -88,51 +88,62 @@ public:
   /// \brief .NET `BinaryReader.Codeunit`, named by the BaseApp's wrapper codeunit and not rebuilt:
   /// a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused Codeunit{{.type = "BinaryReader", .member = "Codeunit"}};
+  static constexpr ::agiru::dotnet::Refused Codeunit{
+      {.type = "BinaryReader", .member = "Codeunit"}};
   /// \brief .NET `BinaryReader.Dispose`, named by the BaseApp's wrapper codeunit and not rebuilt: a
   /// refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused Dispose{{.type = "BinaryReader", .member = "Dispose"}};
+  static constexpr ::agiru::dotnet::Refused Dispose{{.type = "BinaryReader", .member = "Dispose"}};
   /// \brief .NET `BinaryReader.ReadBoolean`, named by the BaseApp's wrapper codeunit and not
   /// rebuilt: a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadBoolean{{.type = "BinaryReader", .member = "ReadBoolean"}};
+  static constexpr ::agiru::dotnet::Refused ReadBoolean{
+      {.type = "BinaryReader", .member = "ReadBoolean"}};
   /// \brief .NET `BinaryReader.ReadByte`, named by the BaseApp's wrapper codeunit and not rebuilt:
   /// a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadByte{{.type = "BinaryReader", .member = "ReadByte"}};
+  static constexpr ::agiru::dotnet::Refused ReadByte{
+      {.type = "BinaryReader", .member = "ReadByte"}};
   /// \brief .NET `BinaryReader.ReadBytes`, named by the BaseApp's wrapper codeunit and not rebuilt:
   /// a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadBytes{{.type = "BinaryReader", .member = "ReadBytes"}};
+  static constexpr ::agiru::dotnet::Refused ReadBytes{
+      {.type = "BinaryReader", .member = "ReadBytes"}};
   /// \brief .NET `BinaryReader.ReadChar`, named by the BaseApp's wrapper codeunit and not rebuilt:
   /// a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadChar{{.type = "BinaryReader", .member = "ReadChar"}};
+  static constexpr ::agiru::dotnet::Refused ReadChar{
+      {.type = "BinaryReader", .member = "ReadChar"}};
   /// \brief .NET `BinaryReader.ReadChars`, named by the BaseApp's wrapper codeunit and not rebuilt:
   /// a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadChars{{.type = "BinaryReader", .member = "ReadChars"}};
+  static constexpr ::agiru::dotnet::Refused ReadChars{
+      {.type = "BinaryReader", .member = "ReadChars"}};
   /// \brief .NET `BinaryReader.ReadDecimal`, named by the BaseApp's wrapper codeunit and not
   /// rebuilt: a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadDecimal{{.type = "BinaryReader", .member = "ReadDecimal"}};
+  static constexpr ::agiru::dotnet::Refused ReadDecimal{
+      {.type = "BinaryReader", .member = "ReadDecimal"}};
   /// \brief .NET `BinaryReader.ReadInt16`, named by the BaseApp's wrapper codeunit and not rebuilt:
   /// a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadInt16{{.type = "BinaryReader", .member = "ReadInt16"}};
+  static constexpr ::agiru::dotnet::Refused ReadInt16{
+      {.type = "BinaryReader", .member = "ReadInt16"}};
   /// \brief .NET `BinaryReader.ReadInt32`, named by the BaseApp's wrapper codeunit and not rebuilt:
   /// a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadInt32{{.type = "BinaryReader", .member = "ReadInt32"}};
+  static constexpr ::agiru::dotnet::Refused ReadInt32{
+      {.type = "BinaryReader", .member = "ReadInt32"}};
   /// \brief .NET `BinaryReader.ReadUInt16`, named by the BaseApp's wrapper codeunit and not
   /// rebuilt: a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadUInt16{{.type = "BinaryReader", .member = "ReadUInt16"}};
+  static constexpr ::agiru::dotnet::Refused ReadUInt16{
+      {.type = "BinaryReader", .member = "ReadUInt16"}};
   /// \brief .NET `BinaryReader.ReadUInt32`, named by the BaseApp's wrapper codeunit and not
   /// rebuilt: a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused ReadUInt32{{.type = "BinaryReader", .member = "ReadUInt32"}};
+  static constexpr ::agiru::dotnet::Refused ReadUInt32{
+      {.type = "BinaryReader", .member = "ReadUInt32"}};
 
 private:
   InStream *input_ = nullptr;

@@ -391,13 +391,14 @@ public:
   }
 
   /// \brief `XmlDocument.ImportNode`, not rebuilt.
-  ::agiru::dotnet::Refused ImportNode{{.type = "XmlDocument", .member = "ImportNode"}};
+  static constexpr ::agiru::dotnet::Refused ImportNode{
+      {.type = "XmlDocument", .member = "ImportNode"}};
   /// \brief `XmlDocument.Schemas`, not rebuilt.
-  ::agiru::dotnet::Refused Schemas{{.type = "XmlDocument", .member = "Schemas"}};
+  static constexpr ::agiru::dotnet::Refused Schemas{{.type = "XmlDocument", .member = "Schemas"}};
   /// \brief `XmlDocument.Validate`, not rebuilt.
-  ::agiru::dotnet::Refused Validate{{.type = "XmlDocument", .member = "Validate"}};
+  static constexpr ::agiru::dotnet::Refused Validate{{.type = "XmlDocument", .member = "Validate"}};
   /// \brief `XmlDocument.ValidationEventHandler`, not rebuilt.
-  ::agiru::dotnet::Refused ValidationEventHandler{
+  static constexpr ::agiru::dotnet::Refused ValidationEventHandler{
       {.type = "XmlDocument", .member = "ValidationEventHandler"}};
 
 private:

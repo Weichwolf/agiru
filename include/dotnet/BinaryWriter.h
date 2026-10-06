@@ -74,23 +74,25 @@ public:
   /// \brief .NET `BinaryWriter.Codeunit`, named by the BaseApp's wrapper codeunit and not rebuilt:
   /// a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused Codeunit{{.type = "BinaryWriter", .member = "Codeunit"}};
+  static constexpr ::agiru::dotnet::Refused Codeunit{
+      {.type = "BinaryWriter", .member = "Codeunit"}};
   /// \brief .NET `BinaryWriter.Dispose`, named by the BaseApp's wrapper codeunit and not rebuilt: a
   /// refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused Dispose{{.type = "BinaryWriter", .member = "Dispose"}};
+  static constexpr ::agiru::dotnet::Refused Dispose{{.type = "BinaryWriter", .member = "Dispose"}};
   /// \brief .NET `BinaryWriter.Flush`, named by the BaseApp's wrapper codeunit and not rebuilt: a
   /// refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused Flush{{.type = "BinaryWriter", .member = "Flush"}};
+  static constexpr ::agiru::dotnet::Refused Flush{{.type = "BinaryWriter", .member = "Flush"}};
   /// \brief .NET `BinaryWriter.Seek`, named by the BaseApp's wrapper codeunit and not rebuilt: a
   /// refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused Seek{{.type = "BinaryWriter", .member = "Seek"}};
+  static constexpr ::agiru::dotnet::Refused Seek{{.type = "BinaryWriter", .member = "Seek"}};
   /// \brief .NET `BinaryWriter.BaseStream`, named by the BaseApp's wrapper codeunit and not
   /// rebuilt: a refusal
   ///        that says so when it is called (board:0035).
-  ::agiru::dotnet::Refused BaseStream{{.type = "BinaryWriter", .member = "BaseStream"}};
+  static constexpr ::agiru::dotnet::Refused BaseStream{
+      {.type = "BinaryWriter", .member = "BaseStream"}};
 
 private:
   OutStream *output_ = nullptr;

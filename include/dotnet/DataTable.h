@@ -247,7 +247,7 @@ public:
   [[nodiscard]] bool IsNull() const { return held_ == nullptr; }
 
   /// \brief `Row.SetParentRow(...)`: relations this runtime does not carry.
-  Refused SetParentRow{{.type = "DataRow", .member = "SetParentRow"}};
+  static constexpr Refused SetParentRow{{.type = "DataRow", .member = "SetParentRow"}};
 
   /// \brief `Row := AbsentType.Member()`: the call refused before the assignment.
   /// \tparam R The refusal. \param refused It. \return This.
@@ -391,7 +391,7 @@ public:
   [[nodiscard]] bool IsNull() const { return held_ == nullptr; }
 
   /// \brief `DataTable.WriteXml(stream)`: the DiffGram-less XML form, not rebuilt.
-  Refused WriteXml{{.type = "DataTable", .member = "WriteXml"}};
+  static constexpr Refused WriteXml{{.type = "DataTable", .member = "WriteXml"}};
 
   /// \brief `Table := AbsentType.Member()`: the call refused before the assignment.
   /// \tparam R The refusal. \param refused It. \return This.

@@ -75,9 +75,9 @@ public:
   }
 
   /// \brief `Type.GetField(name)`: reflection this runtime does not carry.
-  Refused GetField{{.type = "Type", .member = "GetField"}};
+  static constexpr Refused GetField{{.type = "Type", .member = "GetField"}};
   /// \brief `Type.MakeGenericType(...)`: reflection this runtime does not carry.
-  Refused MakeGenericType{{.type = "Type", .member = "MakeGenericType"}};
+  static constexpr Refused MakeGenericType{{.type = "Type", .member = "MakeGenericType"}};
 
 private:
   std::string fullName_;
