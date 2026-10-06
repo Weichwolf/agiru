@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: create one marked BC customer from a template, validate/change/reopen it,
-then reproduce that sequence through external CMD/MCP and sample the agiru browser.
+Next: reproduce the captured template → customer → edit → reopen sequence through
+external CMD/MCP and sample the agiru browser; expand the remaining master-data cases.
 
 ## Processes and implementation
 
@@ -25,8 +25,15 @@ then reproduce that sequence through external CMD/MCP and sample the agiru brows
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,
   `purchasing-how-register-new-vendors.md`, `inventory-how-register-new-items.md`,
   `finance-setup-finance.md`, `ui-create-number-series.md`, `finance-dimensions.md`.
-- 2026-10-06 sandbox access and Customers page 22 are verified; no process is accepted
-  yet. Captures/screenshots stay privately under `~/.local/share/agiru/bc-reference/`.
+- BC reference, 2026-10-06, company CRONUS CH: Customers 22 → New → three-template
+  selection → DEBITOR MANDANT → Customer Card 21 creates own C00060. Saved Name
+  `AGIRU 261006 - Customer`, Address `AGIRU Testweg 6`, Country CH and Credit Limit
+  1234.56. A fresh bookmarked navigation defaults to View, not Edit; its five exact
+  field values independently match, with displayed limit `1,234.56` and zero balance.
+  Keep accepted machine values distinct from localized display text. Own customer
+  remains for subsequent sales reference; unrelated customers/setup were unchanged.
+  No agiru replay, posting or independent SQL proof is accepted yet. Eight screenshots
+  and state captures stay privately under `~/.local/share/agiru/bc-reference/2026-10-06/`.
 - Mark all own records/documents; record company/version/work date, inputs, chosen
   template, saved IDs and defaults. Never alter unrelated setup or send real email/payments.
 - Reopen independently and verify exact stored values, no unintended ledger entries,
