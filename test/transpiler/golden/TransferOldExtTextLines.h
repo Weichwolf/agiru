@@ -26,6 +26,7 @@ class TransferOldExtTextLines_Codeunit;
 
 class TransferOldExtTextLines_Codeunit : public Codeunit<TransferOldExtTextLines_Codeunit> {
 public:
+  TransferOldExtTextLines_Codeunit() = default;
   using Codeunit<TransferOldExtTextLines_Codeunit>::operator=;
 
   void OnRun();

@@ -26,6 +26,7 @@ namespace {
 
 constexpr agiru::CodeunitId kManual{50124};
 constexpr agiru::CodeunitId kAutomatic{50126};
+constexpr agiru::CodeunitId kPublisher{50125};
 constexpr std::array<std::string_view, 1> kNames{"Seen"};
 
 class Listener : public agiru::Codeunit<Listener> {
@@ -42,7 +43,7 @@ public:
 
 constexpr std::array<agiru::Subscription, 1> kSubscriptions{
     {{.kind = agiru::EventObject::Codeunit,
-      .objectId = 50125,
+      .objectId = kPublisher.Value(),
       .objectName = "Binding Publisher",
       .event = "Observe",
       .element = "",
@@ -67,8 +68,12 @@ const agiru::SubscriptionCatalogue kAutomaticCatalogue{
 
 agiru::Integer Raise() {
   agiru::Integer seen = 0;
-  agiru::detail::RaiseEvent(
-      agiru::EventObject::Codeunit, 50125, "Binding Publisher", "Observe", kNames, seen);
+  agiru::detail::RaiseEvent(agiru::EventObject::Codeunit,
+                            kPublisher.Value(),
+                            "Binding Publisher",
+                            "Observe",
+                            kNames,
+                            seen);
   return seen;
 }
 

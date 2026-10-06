@@ -2576,6 +2576,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += found->second.identifier;
   }
   out += " {\npublic:\n";
+  out += "  " + unitClass + "() = default;\n";
   out += "  using Codeunit<" + unitClass + ">::operator=;\n";
   {
     std::set<std::string> unhidden;

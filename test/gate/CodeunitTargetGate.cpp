@@ -1,4 +1,5 @@
 #include "meta/Ids.h"
+#include "runtime/Codeunit.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Table.h"
 #include "type/Integer.h"
@@ -22,6 +23,12 @@ constexpr int kAlNumber = 379;
 static_assert(agiru::CodeunitTraits<TransferOldExtTextLines>::kId == CodeunitId{kAlNumber});
 static_assert(agiru::CodeunitTraits<TransferOldExtTextLines>::kName ==
               "Transfer Old Ext. Text Lines");
+static_assert(std::is_default_constructible_v<TransferOldExtTextLines>);
+static_assert(std::is_copy_constructible_v<TransferOldExtTextLines>);
+static_assert(std::is_move_constructible_v<TransferOldExtTextLines>);
+static_assert(!std::is_default_constructible_v<agiru::Codeunit<TransferOldExtTextLines>>);
+static_assert(!std::is_copy_constructible_v<agiru::Codeunit<TransferOldExtTextLines>>);
+static_assert(!std::is_move_constructible_v<agiru::Codeunit<TransferOldExtTextLines>>);
 static_assert(std::is_standard_layout_v<LineNumberBuffer>,
               "a temporary record is the SAME table, so it must stay addressable by offsetof");
 

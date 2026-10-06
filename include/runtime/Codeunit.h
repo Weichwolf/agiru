@@ -411,7 +411,6 @@ template <typename C, typename Index>
   return (*held)[index];
 }
 
-// NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see runtime/Table.h.
 template <typename Derived = void> class Codeunit {
 public:
   /// \brief The install and upgrade triggers the platform runs on a codeunit, named while
@@ -447,9 +446,6 @@ public:
   /// \return The number AL declared.
   [[nodiscard]] static constexpr CodeunitId Id() { return CodeunitTraits<Derived>::kId; }
 
-  Codeunit() = default;
-  Codeunit(const Codeunit &) = default;
-  Codeunit(Codeunit &&) noexcept = default;
   Codeunit &operator=(const Codeunit &) = default;
   Codeunit &operator=(Codeunit &&) noexcept = default;
 
@@ -553,6 +549,10 @@ public:
 
 private:
   friend Derived;
+
+  Codeunit() = default;
+  Codeunit(const Codeunit &) = default;
+  Codeunit(Codeunit &&) noexcept = default;
 
   struct NoGlobals {};
 

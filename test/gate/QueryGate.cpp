@@ -15,6 +15,7 @@
 #include <array>
 #include <cstddef>
 #include <string>
+#include <type_traits>
 
 using agiru::CreateTable;
 using agiru::Decimal;
@@ -67,6 +68,7 @@ extern const QueryDef kPairsQuery;
 
 class Pairs_Query : public agiru::Query<Pairs_Query> {
 public:
+  Pairs_Query() = default;
   [[maybe_unused]] static constexpr agiru::QueryId kId{50100};
   [[maybe_unused]] static constexpr std::string_view kName{"Pairs"};
   agiru::detail::QueryHandle State_Block;
@@ -80,6 +82,7 @@ extern const QueryDef kInnerPairsQuery;
 
 class InnerPairs_Query : public agiru::Query<InnerPairs_Query> {
 public:
+  InnerPairs_Query() = default;
   [[maybe_unused]] static constexpr agiru::QueryId kId{50101};
   [[maybe_unused]] static constexpr std::string_view kName{"Inner Pairs"};
   agiru::detail::QueryHandle State_Block;
@@ -91,6 +94,7 @@ extern const QueryDef kTotalsQuery;
 
 class Totals_Query : public agiru::Query<Totals_Query> {
 public:
+  Totals_Query() = default;
   [[maybe_unused]] static constexpr agiru::QueryId kId{50102};
   [[maybe_unused]] static constexpr std::string_view kName{"Totals"};
   agiru::detail::QueryHandle State_Block;
@@ -98,6 +102,14 @@ public:
   decltype(ResourceCost::DirectUnitCost) Sum_Cost{};
   Integer Rows{};
 };
+
+static_assert(std::is_standard_layout_v<Pairs_Query>);
+static_assert(std::is_default_constructible_v<Pairs_Query>);
+static_assert(std::is_copy_constructible_v<Pairs_Query>);
+static_assert(std::is_move_constructible_v<Pairs_Query>);
+static_assert(!std::is_default_constructible_v<agiru::Query<Pairs_Query>>);
+static_assert(!std::is_copy_constructible_v<agiru::Query<Pairs_Query>>);
+static_assert(!std::is_move_constructible_v<agiru::Query<Pairs_Query>>);
 
 constexpr std::array<QueryLink, 1> kPairLinks{{
     QueryLink{.field = ResourceCost::Field_No::Code,
@@ -358,7 +370,7 @@ void FiltersAndTheRowLimitApply() {
 
   // THE NEGATIVE CONTROL for the member rule: a member of ANOTHER object is no column of this one.
   said.clear();
-  Integer stranger = 0;
+  const Integer stranger = 0;
   try {
     query.SetRange(stranger, 1);
   } catch (const Error &e) { said = e.what(); }

@@ -157,6 +157,13 @@ template <typename T> struct QueryTraits;
 ///       member of another object refuses rather than filtering the wrong column.
 template <typename Derived = void> class Query {
 public:
+  /// \brief Assigns the empty runtime base; the derived query owns its filters and columns.
+  /// \return This base.
+  Query &operator=(const Query &) = default;
+  /// \brief Moves the empty runtime base; the derived query moves its owned state.
+  /// \return This base.
+  Query &operator=(Query &&) noexcept = default;
+
   /// \brief The trigger a query owes (board:0299).
   ///
   /// \warning `OnBeforeOpen` is the only one a query declares (`triggers-auto/`), and it runs
@@ -338,6 +345,12 @@ public:
   }
 
 private:
+  friend Derived;
+
+  Query() = default;
+  Query(const Query &) = default;
+  Query(Query &&) noexcept = default;
+
   [[nodiscard]] Derived *Self() {
     static_assert(offsetof(Derived, State_Block) == 0,
                   "a query's State_Block is its first member: the runtime reaches the state at "

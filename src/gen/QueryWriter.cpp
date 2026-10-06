@@ -396,6 +396,7 @@ std::string QueryHeader(const QueryEmission &frame) {
   h += "class " + className + ";\n\n";
   h += "extern const QueryDef " + symbol + ";\n\n";
   h += "class " + className + " : public ::agiru::Query<" + className + "> {\npublic:\n";
+  h += "  " + className + "() = default;\n";
   h += "  static constexpr QueryId kId{" + number + "};\n";
   h += "  static constexpr std::string_view kName{" + Literal(query.name) + "};\n";
   h += "  detail::QueryHandle State_Block;\n";
