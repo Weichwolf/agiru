@@ -391,6 +391,14 @@ bool WordAt(std::string_view text, std::size_t at, std::string_view word) {
   return startsWord && endsWord;
 }
 
+std::size_t DotNetIdentifierEnd(std::string_view source, std::size_t at) {
+  while (at < source.size() && (std::isalnum(static_cast<unsigned char>(source[at])) != 0 ||
+                                source[at] == '_' || source[at] == '.')) {
+    ++at;
+  }
+  return at;
+}
+
 }
 
 void NoteDotNetSpellings(std::string_view source) {
@@ -409,11 +417,7 @@ void NoteDotNetSpellings(std::string_view source) {
       if (close == std::string_view::npos) { break; }
       spelled = std::string(source.substr(next + 1, close - next - 1));
     } else {
-      std::size_t end = next;
-      while (end < source.size() && (std::isalnum(static_cast<unsigned char>(source[end])) != 0 ||
-                                     source[end] == '_' || source[end] == '.')) {
-        ++end;
-      }
+      const std::size_t end = DotNetIdentifierEnd(source, next);
       spelled = std::string(source.substr(next, end - next));
     }
     if (spelled.empty()) { continue; }

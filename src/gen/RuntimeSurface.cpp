@@ -572,7 +572,7 @@ const std::map<std::string, std::string> &PlatformMembers(std::string_view table
     while (std::getline(file, line)) {
       std::smatch matched;
       if (!std::regex_match(line, matched, member)) { continue; }
-      std::string name = matched[1].str();
+      const std::string name = matched[1].str();
       std::string bare = name;
       if (bare.ends_with("_")) { bare.pop_back(); }
       declared.insert_or_assign(LowerKey(bare), name);
@@ -610,6 +610,8 @@ const std::set<std::string> &TableMembers() {
 bool HiddenByABaseMember(std::string_view name) {
   return BaseMembers().contains(std::string(name));
 }
+
+namespace {
 
 std::set<std::string> ClassMembersOf(const std::filesystem::path &path, std::string_view stem) {
   const std::string whole = TextOf(path);
@@ -652,6 +654,8 @@ const std::set<std::string> &MembersOfBase(std::string_view header) {
     found.insert(page.begin(), page.end());
   }
   return perHeader.emplace(key, std::move(found)).first->second;
+}
+
 }
 
 bool DeclaredByBase(std::string_view header, std::string_view name) {

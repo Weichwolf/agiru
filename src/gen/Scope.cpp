@@ -1,5 +1,7 @@
 #include "Scope.h"
 
+#include "ObjectKind.h"
+
 #include <cctype>
 #include <cstddef>
 #include <filesystem>

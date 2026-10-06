@@ -168,6 +168,36 @@ std::string ImplementationFor(std::string_view text, std::string_view face) {
 
 namespace {
 
+std::vector<std::pair<std::string, std::string>>
+KnownImplementations(const al::EnumObject &object, std::string_view face, const Objects &objects) {
+  std::vector<std::pair<std::string, std::string>> known;
+  for (const al::EnumValueDecl &value : object.values) {
+    const al::Property *bound = al::Find(value.properties, "Implementation");
+    if (bound == nullptr) { continue; }
+    const std::string named = ImplementationFor(bound->text, face);
+    if (named.empty()) { continue; }
+    const auto unit = objects.codeunits.find(LowerKey(named));
+    if (unit == objects.codeunits.end()) { continue; }
+    known.emplace_back(EnumeratorName(value.name), unit->second.identifier);
+  }
+  return known;
+}
+
+std::string
+DefaultImplementation(const al::EnumObject &object, std::string_view face, const Objects &objects) {
+  for (const char *property : {"DefaultImplementation", "UnknownValueImplementation"}) {
+    const al::Property *given = al::Find(object.properties, property);
+    if (given == nullptr) { continue; }
+    const std::string named = ImplementationFor(given->text, face);
+    if (named.empty()) { continue; }
+    const auto unit = objects.codeunits.find(LowerKey(named));
+    if (unit != objects.codeunits.end() && !unit->second.identifier.empty()) {
+      return unit->second.identifier;
+    }
+  }
+  return {};
+}
+
 std::string ImplementationBodies(const al::EnumObject &object,
                                  const std::string &identifier,
                                  const std::string &space,
@@ -184,39 +214,25 @@ std::string ImplementationBodies(const al::EnumObject &object,
     out += " value, ";
     out += faceType;
     out += " *) {\n  switch (value) {\n";
-    std::vector<std::pair<std::string, std::string>> cloneable;
-    for (const al::EnumValueDecl &value : object.values) {
-      const al::Property *bound = al::Find(value.properties, "Implementation");
-      if (bound == nullptr) { continue; }
-      const std::string named = ImplementationFor(bound->text, face);
-      if (named.empty()) { continue; }
-      const auto unit = objects.codeunits.find(LowerKey(named));
-      if (unit == objects.codeunits.end()) { continue; }
+    const auto cloneable = KnownImplementations(object, face, objects);
+    for (const auto &[enumerator, unit] : cloneable) {
       out += "    case ";
       out += identifier;
       out += "::";
-      out += EnumeratorName(value.name);
+      out += enumerator;
       out += ":\n      return new ";
-      out += unit->second.identifier;
+      out += unit;
       out += "{};\n";
-      cloneable.emplace_back(EnumeratorName(value.name), unit->second.identifier);
     }
-    std::string fallback;
-    for (const char *property : {"DefaultImplementation", "UnknownValueImplementation"}) {
-      if (!fallback.empty()) { break; }
-      const al::Property *given = al::Find(object.properties, property);
-      if (given == nullptr) { continue; }
-      const std::string named = ImplementationFor(given->text, face);
-      if (named.empty()) { continue; }
-      const auto unit = objects.codeunits.find(LowerKey(named));
-      if (unit != objects.codeunits.end()) { fallback = unit->second.identifier; }
-    }
+    const std::string fallback = DefaultImplementation(object, face, objects);
     const std::string registered = "::agiru::detail::FindImplementation(" + Literal(object.name) +
                                    ", static_cast<std::int32_t>(value), " + Literal(face) + ")";
     out += "    default: break;\n  }\n";
-    out += "  if (const ::agiru::detail::ForeignImplementation *foreign = " + registered +
-           ";\n      foreign != nullptr) {\n    return static_cast<" + faceType +
-           " *>(foreign->make());\n  }\n";
+    out += "  if (const ::agiru::detail::ForeignImplementation *foreign = ";
+    out += registered;
+    out += ";\n      foreign != nullptr) {\n    return static_cast<";
+    out += faceType;
+    out += " *>(foreign->make());\n  }\n";
     if (!fallback.empty()) { out += "  return new " + fallback + "{};\n"; }
     out += "  throw agiru::Error(\"this value of ";
     out += object.name;
@@ -224,18 +240,41 @@ std::string ImplementationBodies(const al::EnumObject &object,
     out += face;
     out += "\");\n}\n\n";
     const auto cloner = [&faceType](const std::string &unit) {
-      return "[](const " + faceType + " *held) -> " + faceType + " * { return new " + unit +
-             "(*dynamic_cast<const " + unit + " *>(held)); }";
+      std::string expression = "[](const ";
+      expression += faceType;
+      expression += " *held) -> ";
+      expression += faceType;
+      expression += " * { return new ";
+      expression += unit;
+      expression += "(*dynamic_cast<const ";
+      expression += unit;
+      expression += " *>(held)); }";
+      return expression;
     };
-    out += "auto CloneOf(" + identifier + " value, " + faceType + " *) -> " + faceType +
-           " *(*)(const " + faceType + " *) {\n  switch (value) {\n";
+    out += "auto CloneOf(";
+    out += identifier;
+    out += " value, ";
+    out += faceType;
+    out += " *) -> ";
+    out += faceType;
+    out += " *(*)(const ";
+    out += faceType;
+    out += " *) {\n  switch (value) {\n";
     for (const auto &[enumerator, unit] : cloneable) {
-      out += "    case " + identifier + "::" + enumerator + ": return " + cloner(unit) + ";\n";
+      out += "    case " + identifier + "::";
+      out += enumerator;
+      out += ": return " + cloner(unit) + ";\n";
     }
     out += "    default: break;\n  }\n";
-    out += "  if (" + registered + " != nullptr) {\n    return [](const " + faceType +
-           " *held) -> " + faceType + " * {\n      return static_cast<" + faceType +
-           " *>(::agiru::detail::CloneForeign(typeid(*held), " + Literal(face) +
+    out += "  if (";
+    out += registered;
+    out += " != nullptr) {\n    return [](const ";
+    out += faceType;
+    out += " *held) -> ";
+    out += faceType;
+    out += " * {\n      return static_cast<";
+    out += faceType;
+    out += " *>(::agiru::detail::CloneForeign(typeid(*held), " + Literal(face) +
            ", held));\n    };\n  }\n";
     out += fallback.empty() ? "  return nullptr;\n" : "  return " + cloner(fallback) + ";\n";
     out += "}\n\n}\n";
@@ -295,11 +334,20 @@ std::string WriteEnumExtensionSource(const al::EnumExtensionObject &extension,
       bodies += "    " + Literal(extension.extends) + ",\n    " + std::to_string(value.ordinal) +
                 ",\n    " + Literal(faceRef.name.empty() ? faceKey : faceRef.name) +
                 ",\n    typeid(" + unitType + "),\n";
-      bodies += "    {.make = []() -> void * { return static_cast<" + faceType + " *>(new " +
-                unitType + "{}); },\n";
-      bodies += "     .clone = [](const void *held) -> void * {\n       return static_cast<" +
-                faceType + " *>(new " + unitType + "(*dynamic_cast<const " + unitType +
-                " *>(static_cast<const " + faceType + " *>(held))));\n     }}};\n\n";
+      bodies += "    {.make = []() -> void * { return static_cast<";
+      bodies += faceType;
+      bodies += " *>(new ";
+      bodies += unitType;
+      bodies += "{}); },\n";
+      bodies += "     .clone = [](const void *held) -> void * {\n       return static_cast<";
+      bodies += faceType;
+      bodies += " *>(new ";
+      bodies += unitType;
+      bodies += "(*dynamic_cast<const ";
+      bodies += unitType;
+      bodies += " *>(static_cast<const ";
+      bodies += faceType;
+      bodies += " *>(held))));\n     }}};\n\n";
       registered.push_back(key);
     }
   }

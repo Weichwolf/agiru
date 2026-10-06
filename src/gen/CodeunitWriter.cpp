@@ -239,11 +239,12 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
 }
 
 bool IsIsolatedPublisher(const al::ProcedureDecl &procedure) {
-  for (const std::string_view attribute : {"IntegrationEvent", "BusinessEvent", "InternalEvent"}) {
-    const std::vector<std::string> arguments = al::AttributeArguments(procedure, attribute);
-    if (arguments.size() >= 3 && LowerKey(arguments[2]) == "true") { return true; }
-  }
-  return false;
+  return std::ranges::any_of(std::array{"IntegrationEvent", "BusinessEvent", "InternalEvent"},
+                             [&procedure](std::string_view attribute) {
+                               const std::vector<std::string> arguments =
+                                   al::AttributeArguments(procedure, attribute);
+                               return arguments.size() >= 3 && LowerKey(arguments[2]) == "true";
+                             });
 }
 
 namespace {
@@ -695,9 +696,10 @@ std::string Qualified(const std::string &type, const std::set<std::string> &name
 }
 
 std::string Unsized(const std::string &type) {
+  constexpr std::string_view kArray = "AlArray<";
   const std::size_t at = type.rfind(", ");
-  if (type.starts_with("AlArray<") && type.ends_with(">") && at != std::string::npos) {
-    std::string element = type.substr(8, at - 8);
+  if (type.starts_with(kArray) && type.ends_with(">") && at != std::string::npos) {
+    std::string element = type.substr(kArray.size(), at - kArray.size());
     if (element.starts_with("AlArray<")) { return "AlArray<" + element + ", 0>"; }
     constexpr std::string_view kTemporary = "Temporary<";
     if (element.starts_with(kTemporary) && element.ends_with(">")) {
@@ -1628,11 +1630,8 @@ public:
   }
 
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
-    for (const al::VarDecl &declared : procedure_.variables) {
-      if (SameName(declared.name, name)) { return Identifier(declared.name); }
-    }
-    for (const al::VarDecl &declared : procedure_.parameters) {
-      if (SameName(declared.name, name)) { return Identifier(declared.name); }
+    if (const al::VarDecl *declared = Local(name); declared != nullptr) {
+      return Identifier(declared->name);
     }
     if (!procedure_.returnName.empty() && SameName(procedure_.returnName, name)) {
       return Identifier(procedure_.returnName);
@@ -2470,18 +2469,11 @@ InterfaceOutput WriteInterface(const al::InterfaceObject &object,
   const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
   out += "class " + faceClass + ";\n\n";
   std::string bases;
-  std::set<std::string> brought;
   for (const std::string &wider : object.extends) {
     const auto found = objects.interfaces.find(LowerKey(wider));
     if (found == objects.interfaces.end()) { continue; }
     bases += bases.empty() ? " : public virtual " : ", public virtual ";
     bases += found->second.identifier;
-    for (const al::ProcedureDecl &procedure : object.procedures) {
-      if (!found->second.procedures.contains(LowerKey(procedure.name))) { continue; }
-      const std::string named = Identifier(procedure.name);
-      if (!brought.insert(named).second) { continue; }
-      bases += "";
-    }
   }
   out += "class " + faceClass + bases + " {\n";
   out += "public:\n";
@@ -2580,7 +2572,8 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   for (const std::string &face : unit.implements) {
     const auto found = objects.interfaces.find(LowerKey(face));
     if (found == objects.interfaces.end()) { continue; }
-    out += ", public virtual " + found->second.identifier;
+    out += ", public virtual ";
+    out += found->second.identifier;
   }
   out += " {\npublic:\n";
   out += "  using Codeunit<" + unitClass + ">::operator=;\n";
@@ -2589,7 +2582,9 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     for (const al::ProcedureDecl &procedure : unit.procedures) {
       const std::string named = Identifier(procedure.name);
       if (!DeclaredByBase("Codeunit.h", named) || !unhidden.insert(named).second) { continue; }
-      out += "  using Codeunit<" + unitClass + ">::" + named + ";\n";
+      out += "  using Codeunit<" + unitClass + ">::";
+      out += named;
+      out += ";\n";
     }
   }
   out += "\n";
