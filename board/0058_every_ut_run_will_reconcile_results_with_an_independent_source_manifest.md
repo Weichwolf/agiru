@@ -8,6 +8,11 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
+- Frozen `feff11f` / content `2ba8b347ffe5`: slice-check/all/test pass;
+  153/153 C++/specialist cases, including source-owned Page Metadata and native source IDs.
+  AL execution is still running. The newer scalar catalogue CalcFields repair is not
+  included; its 67 native/SQL checks, generated AL and 77 compiled metadata controls
+  are local contract evidence only (0044), not a new UT total or causal gain.
 - Latest completed frozen integration: `a554715` / content `56a0866bb13c`:
   slice-check/all/test pass; C++/specialist test is 151/151.
   AL execution: 2210/2314 passed, 104 failed, eighty codeunits,
@@ -78,9 +83,10 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   four Inventory Profile missing temporary rows and four WorkbookWriter.Create refusals.
   The two Table Metadata cases are Incoming Doc. To Data Exch.UT's
   TestPEPPOLInvoiceToGenJnlLineFailsNoMapping and TestPeppolImportMultipleFails.
-  Native metadata FlowField lookups in BaseApp/System/DataExchange/
-  DataExchFieldMapping.Table.al are a concrete next probe, not an established root cause.
-  Fix shared contracts, not callers.
+  Native scalar CalcFields previously sent Field/Table/Page Metadata to the guarded SQL
+  storage path. The shared catalogue calculation now has direct native and generated-AL
+  caption lookup probes from DataExchFieldMapping.Table.al (0044). Replay every identity
+  before attributing any UT gain; correlated native predicates and full providers remain gaps.
 - Raw census: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
   113,111 methods; fifteen approved exclusions leave 113,096 required.
   Zero unmeasured files; seven conditional assignments still refuse.

@@ -16,6 +16,10 @@ class TableMetadata_Table;
 
 namespace detail {
 
+struct CatalogueScan;
+
+[[nodiscard]] bool ScanInstalledTableMetadata(const TableDef &table, const CatalogueScan &scan);
+
 [[nodiscard]] platform::TableMetadata_Table ProjectTableMetadata(const TableDef &source);
 
 [[nodiscard]] std::optional<platform::TableMetadata_Table> InstalledTableMetadata(TableId id);

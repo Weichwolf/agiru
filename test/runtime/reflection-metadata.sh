@@ -16,6 +16,8 @@ metadata_gate="$B/gate_TableMetadataCatalogueGate"
 "$metadata_gate" > "$proof/table-metadata-catalogue.log" 2>&1
 page_gate="$B/gate_PageMetadataCatalogueGate"
 "$page_gate" > "$proof/page-metadata-catalogue.log" 2>&1
+flowfield_gate="$B/gate_CatalogueFlowFieldGate"
+"$flowfield_gate" > "$proof/catalogue-flowfield.log" 2>&1
 "$B/gate_GenPageGate" > "$proof/page-source-binding.log" 2>&1
 "$B/gate_PlatformSystemFieldsGate" > "$proof/system-profiles.log" 2>&1
 "$B/gate_GenSourceBindingGate" > "$proof/source-binding.log" 2>&1
@@ -617,7 +619,7 @@ for control in filter-union filter-flowfilter filter-empty; do
       sub(/ParseFilter\(filter.text\)/, "ParseFilter(\"\")"); changed++
     }
     { print }
-    END { if (changed != 1) exit 2 }
+    END { if (changed != (control == "filter-flowfilter" ? 2 : 1)) exit 2 }
   ' src/rt/RecordFilter.cpp > "$proof/$control.cpp"
   "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
     -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
@@ -737,6 +739,66 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
+for control in flow-native-route flow-literal-reparse flow-filter-erasure flow-key-hole flow-early-stop flow-count flow-total flow-round flow-stale flow-projection-default; do
+  case "$control" in
+    flow-native-route|flow-literal-reparse) unit=src/rt/Table.cpp;;
+    flow-filter-erasure) unit=src/rt/RecordFilter.cpp;;
+    flow-key-hole|flow-early-stop) unit=src/rt/CatalogueNavigation.cpp;;
+    *) unit=src/rt/CatalogueFlowField.cpp;;
+  esac
+  awk -v control="$control" '
+    control == "flow-native-route" && /if \(IsCatalogueFlowFieldTarget\(target\)\) \{/ {
+      print "  if (false && IsCatalogueFlowFieldTarget(target)) {"; changed++; next
+    }
+    control == "flow-literal-reparse" && /consume\(\*at, Equal\(\*text\)\);/ {
+      print "          consume(*at, detail::ParseFilter(*text));"; changed++; next
+    }
+    control == "flow-filter-erasure" && /\.expression = filter.expression/ {
+      sub(/filter.expression/, "Expression{}"); changed++
+    }
+    control == "flow-key-hole" && /if \(!keys.Matches\(reader.candidate\)\) \{ continue; \}/ {
+      print "    static_cast<void>(keys);"; changed++; next
+    }
+    control == "flow-early-stop" && /if \(!scan.visit\(scan.context, reader.candidate\)\) \{ break; \}/ {
+      print "    static_cast<void>(scan.visit(scan.context, reader.candidate));"; changed++; next
+    }
+    control == "flow-count" && changed == 0 && /case FlowFormula::Kind::Count:/ {
+      print; print "        ++count_;"; changed++; next
+    }
+    control == "flow-total" && /total_ \+= Decimal::FromInvariantString/ {
+      sub(/total_ \+= /, "static_cast<void>("); sub(/;$/, ");"); changed++
+    }
+    control == "flow-round" && /result = Round\(result, Decimal\{1\}\);/ {
+      print "        result = -result;"; changed++; next
+    }
+    control == "flow-stale" && /if \(count_ == 0\) \{ return FlowFieldZero\(asked_\); \}/ {
+      print "        if (count_ == 0) { return \"stale\"; }"; changed++; next
+    }
+    control == "flow-projection-default" && /if \(IsInstalledFieldProvider\(target\)\) \{ RequireFieldMetadataProjection\(field.no\); \}/ {
+      changed++; next
+    }
+    { print } END { if (changed != 1) exit 2 }
+  ' "$unit" > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  control_status=0
+  LD_PRELOAD="$proof/$control.so" "$flowfield_gate" > "$proof/$control.log" 2>&1 || control_status=$?
+  [ "$control_status" -eq 1 ]
+  case "$control" in
+    flow-native-route) claim='read-only live catalogue';;
+    flow-literal-reparse) claim='ordinary FIELD values never become wildcard/union expressions';;
+    flow-filter-erasure|flow-key-hole) claim='FIELD on FlowFilter applies its union';;
+    flow-early-stop) claim='Lookup chooses the first matching primary-key identity';;
+    flow-count) claim='native Count retains every matching identity';;
+    flow-total) claim='native Sum includes all three declared lengths';;
+    flow-round) claim='whole-number Average rounds the half away from zero';;
+    flow-stale) claim='missing native lookups clear stale values';;
+    flow-projection-default) claim='unprojected Field result attributes refuse';;
+  esac
+  rg -q "$claim" "$proof/$control.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/flowfield-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -exec sha256sum {} + > "$proof/disposable.sha256"
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -delete
-printf 'reflection-metadata: shared live Table/Page Metadata and positive-key Field Get/Find/Next/Count through typed/RecordRef paths, optional RecordRef.Get consumption, qualified page declarations, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; sixty-seven compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: shared live Table/Page Metadata and positive-key Field Get/Find/Next/Count, typed/RecordRef CalcFields with exact predicates and bounded scans, optional Get consumption, original declarations, current User lookups, read-only assignment, stable identities, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; seventy-seven compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

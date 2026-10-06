@@ -15,6 +15,10 @@ class PageMetadata_Table;
 
 namespace detail {
 
+struct CatalogueScan;
+
+[[nodiscard]] bool ScanInstalledPageMetadata(const TableDef &table, const CatalogueScan &scan);
+
 [[nodiscard]] platform::PageMetadata_Table ProjectPageMetadata(const PageDef &source);
 
 [[nodiscard]] bool IsInstalledPageMetadataProvider(const TableDef &table);

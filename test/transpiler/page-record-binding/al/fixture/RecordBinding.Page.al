@@ -172,6 +172,33 @@ page 50179 "Record Binding"
         exit(true);
     end;
 
+    procedure InstalledCatalogueFlowFields(): Boolean
+    var
+        Mapping: Record "Catalogue Calculations";
+        Ref: RecordRef;
+        CaptionField: FieldRef;
+    begin
+        Mapping."Table ID" := Database::"Catalogue Calculations";
+        Mapping."Field ID" := 2;
+        Mapping."Page ID" := Page::"Record Binding";
+        Mapping.CalcFields("Table Caption", "Field Caption", "Page Caption");
+        if (Mapping."Table Caption" <> 'Independent calculation source') or
+           (Mapping."Field Caption" <> 'Field identity') or
+           (Mapping."Page Caption" <> 'Independent list caption') then
+            Error('Native catalogue FlowFields changed source declarations');
+        Ref.GetTable(Mapping);
+        CaptionField := Ref.Field(Mapping.FieldNo("Field Caption"));
+        CaptionField.CalcField();
+        if Format(CaptionField.Value) <> 'Field identity' then
+            Error('FieldRef calculation differs from typed CalcFields');
+        Mapping."Field ID" := 0;
+        Mapping."Field Caption" := 'Stale caption';
+        Mapping.CalcFields("Field Caption");
+        if Mapping."Field Caption" <> '' then
+            Error('Missing native metadata retained a stale FlowField');
+        exit(true);
+    end;
+
     procedure Read(var Target: Text)
     begin
         Target := Rec.TableName;

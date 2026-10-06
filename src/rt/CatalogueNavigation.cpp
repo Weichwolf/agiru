@@ -68,7 +68,7 @@ void CopyValues(void *into, const void *from, const TableDef &table) {
 }
 
 std::pair<std::size_t, std::size_t>
-Window(const RecordState *state, const TableDef &table, const CatalogueReader &reader) {
+Window(const TableDef &table, const CatalogueReader &reader, const auto &visit) {
   if (table.keys.empty() || table.keys[0].fields.empty()) {
     throw Error("Catalogue navigation requires a declared primary key");
   }
@@ -78,14 +78,19 @@ Window(const RecordState *state, const TableDef &table, const CatalogueReader &r
   }
   std::int64_t low = 1;
   std::int64_t high = std::numeric_limits<std::int32_t>::max();
-  for (const auto &filter : Filters(state)) {
-    if (filter.field != field->no || filter.group == kCrossColumnGroup) { continue; }
-    const auto intervals = IntegerIntervals(ParseFilter(filter.text), {.low = low, .high = high});
-    if (!intervals) { continue; }
-    if (intervals->empty()) { return {0, 0}; }
+  visit([&](FieldNo no, const Expression &expression) {
+    if (no != field->no || low > high) { return; }
+    const auto intervals = IntegerIntervals(expression, {.low = low, .high = high});
+    if (!intervals) { return; }
+    if (intervals->empty()) {
+      low = 1;
+      high = 0;
+      return;
+    }
     low = std::max(low, std::ranges::min(*intervals, {}, &Interval::low).low);
     high = std::min(high, std::ranges::max(*intervals, {}, &Interval::high).high);
-  }
+  });
+  if (low > high) { return {0, 0}; }
   const auto key = [&](std::size_t index) {
     reader.key(reader.candidate, index);
     return *reinterpret_cast<const std::int32_t *>(
@@ -93,6 +98,15 @@ Window(const RecordState *state, const TableDef &table, const CatalogueReader &r
   };
   return {Boundary(0, reader.size, [&](std::size_t index) { return key(index) < low; }),
           Boundary(0, reader.size, [&](std::size_t index) { return key(index) <= high; })};
+}
+
+std::pair<std::size_t, std::size_t>
+Window(const RecordState *state, const TableDef &table, const CatalogueReader &reader) {
+  return Window(table, reader, [&](const auto &consume) {
+    for (const auto &filter : Filters(state)) {
+      if (filter.group != kCrossColumnGroup) { consume(filter.field, ParseFilter(filter.text)); }
+    }
+  });
 }
 
 class CatalogueSelection {
@@ -281,6 +295,31 @@ std::int32_t NextCatalogue(void *record,
     ++state.stepped;
   }
   return static_cast<std::int32_t>(backwards ? -moved : moved);
+}
+
+void ScanCatalogue(const TableDef &table,
+                   const CatalogueReader &reader,
+                   const CatalogueScan &scan) {
+  const auto window = Window(table, reader, [&](const auto &consume) {
+    for (const auto &filter : scan.filters) { consume(filter.field, filter.expression); }
+  });
+  std::vector<ColumnPredicate> keyFilters;
+  for (const auto &filter : scan.filters) {
+    if (reader.require != nullptr) { reader.require(filter.field); }
+    if (KeyField(table, filter.field)) { keyFilters.push_back(filter); }
+  }
+  const auto keys = RecordFilter::FromPredicates(keyFilters, table);
+  const auto filters = RecordFilter::FromPredicates(scan.filters, table);
+  const bool project = scan.project || keyFilters.size() != scan.filters.size();
+  for (auto index = window.first; index < window.second; ++index) {
+    reader.key(reader.candidate, index);
+    if (!keys.Matches(reader.candidate)) { continue; }
+    if (project) {
+      reader.project(reader.candidate, index);
+      if (!filters.Matches(reader.candidate)) { continue; }
+    }
+    if (!scan.visit(scan.context, reader.candidate)) { break; }
+  }
 }
 
 std::int32_t CountCatalogue(const void *record,

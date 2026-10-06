@@ -2,8 +2,11 @@
 
 #include "meta/Ids.h"
 
+#include "Filter.h"
+
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace agiru {
@@ -21,6 +24,15 @@ struct CatalogueReader {
   void (*project)(void *row, std::size_t index);
   void (*require)(FieldNo no) = nullptr;
 };
+
+struct CatalogueScan {
+  std::span<const ColumnPredicate> filters;
+  bool project;
+  void *context;
+  bool (*visit)(void *context, void *row);
+};
+
+void ScanCatalogue(const TableDef &table, const CatalogueReader &reader, const CatalogueScan &scan);
 
 bool FindCatalogue(void *record,
                    const TableDef &table,

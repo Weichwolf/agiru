@@ -31,8 +31,10 @@
 #include "type/Time.h"
 
 #include "BuiltinsWritten.h"
+#include "CatalogueFlowField.h"
 #include "FieldMetadata.h"
 #include "Filter.h"
+#include "FlowFormula.h"
 #include "PageMetadata.h"
 #include "RenameCascade.h"
 #include "Rows.h"
@@ -1066,28 +1068,8 @@ const TableDef &TableNamed(std::string_view name, const FieldDef &asked) {
   return *found;
 }
 
-struct FlowTerm {
-  enum class How : std::uint8_t {
-    Const,
-    Filter,
-    Field,
-    FieldFilter,
-    FieldUpperLimit,
-    FieldUpperLimitFilter
-  };
-  std::string target;
-  How how = How::Const;
-  std::string value;
-};
-
-struct FlowFormula {
-  enum class Kind : std::uint8_t { Sum, Average, Exist, Count, Min, Max, Lookup };
-  Kind kind = Kind::Sum;
-  bool reverseSign = false;
-  std::string table;
-  std::string field;
-  std::vector<FlowTerm> terms;
-};
+using detail::FlowFormula;
+using detail::FlowTerm;
 
 class FormulaReader {
 public:
@@ -1390,6 +1372,54 @@ detail::Expression AtMost(std::string value) {
   return detail::Expression{detail::All{atom}};
 }
 
+struct FlowInputs {
+  const void *record;
+  const TableDef &table;
+  const detail::RecordState *state;
+  const FieldDef &asked;
+};
+
+void VisitFlowFilters(const FlowFormula &formula,
+                      const TableDef &target,
+                      const FlowInputs &input,
+                      const auto &consume) {
+  for (const FlowTerm &term : formula.terms) {
+    const FieldDef *at = FieldNamed(target, term.target);
+    if (at == nullptr) {
+      throw Error("the CalcFormula of " + std::string(input.asked.name) + " filters " +
+                  std::string(target.name) + " on " + term.target + ", which it does not declare");
+    }
+    switch (term.how) {
+      case FlowTerm::How::Const: consume(*at, Equal(TableNumberOrValue(term.value))); break;
+      case FlowTerm::How::Filter: consume(*at, detail::ParseFilter(term.value)); break;
+      default: {
+        const FieldDef *source = FieldNamed(input.table, term.value);
+        if (source == nullptr) {
+          throw Error("the CalcFormula of " + std::string(input.asked.name) + " reads " +
+                      term.value + ", which " + std::string(input.table.name) +
+                      " does not declare");
+        }
+        const bool fromFilter = term.how == FlowTerm::How::FieldFilter ||
+                                term.how == FlowTerm::How::FieldUpperLimitFilter ||
+                                source->fieldClass == FieldClass::FlowFilter;
+        std::optional<std::string> text =
+            fromFilter ? FilterOn(input.state, source->no)
+                       : std::optional(detail::StorageText(input.record, *source));
+        if (!text.has_value()) { break; }
+        if (term.how == FlowTerm::How::FieldUpperLimit ||
+            term.how == FlowTerm::How::FieldUpperLimitFilter) {
+          const std::optional<std::string> upper = UpperOf(*text);
+          if (upper.has_value()) { consume(*at, AtMost(*upper)); }
+        } else if (fromFilter) {
+          consume(*at, detail::ParseFilter(*text));
+        } else {
+          consume(*at, Equal(*text));
+        }
+      }
+    }
+  }
+}
+
 Predicate PredicateOf(const FlowFormula &formula,
                       const TableDef &target,
                       const void *record,
@@ -1397,59 +1427,13 @@ Predicate PredicateOf(const FlowFormula &formula,
                       const detail::RecordState *state,
                       const FieldDef &asked) {
   Predicate made;
-  for (const FlowTerm &term : formula.terms) {
-    const FieldDef *at = FieldNamed(target, term.target);
-    if (at == nullptr) {
-      throw Error("the CalcFormula of " + std::string(asked.name) + " filters " +
-                  std::string(target.name) + " on " + term.target + ", which it does not declare");
-    }
-    const std::size_t first = made.binds.size() + 1;
-    switch (term.how) {
-      case FlowTerm::How::Const:
-        Add(made, TermClause(target, *at, Equal(TableNumberOrValue(term.value)), first));
-        break;
-      case FlowTerm::How::Filter:
-        Add(made, TermClause(target, *at, detail::ParseFilter(term.value), first));
-        break;
-      default: {
-        const FieldDef *source = FieldNamed(table, term.value);
-        if (source == nullptr) {
-          throw Error("the CalcFormula of " + std::string(asked.name) + " reads " + term.value +
-                      ", which " + std::string(table.name) + " does not declare");
-        }
-        const bool fromFilter = term.how == FlowTerm::How::FieldFilter ||
-                                term.how == FlowTerm::How::FieldUpperLimitFilter ||
-                                source->fieldClass == FieldClass::FlowFilter;
-        std::optional<std::string> text = fromFilter
-                                              ? FilterOn(state, source->no)
-                                              : std::optional(detail::StorageText(record, *source));
-        if (!text.has_value()) { break; }
-        if (term.how == FlowTerm::How::FieldUpperLimit ||
-            term.how == FlowTerm::How::FieldUpperLimitFilter) {
-          const std::optional<std::string> upper = UpperOf(*text);
-          if (upper.has_value()) { Add(made, TermClause(target, *at, AtMost(*upper), first)); }
-        } else if (fromFilter) {
-          Add(made, TermClause(target, *at, detail::ParseFilter(*text), first));
-        } else {
-          Add(made, TermClause(target, *at, Equal(*text), first));
-        }
-      }
-    }
-  }
+  VisitFlowFilters(formula,
+                   target,
+                   {.record = record, .table = table, .state = state, .asked = asked},
+                   [&](const FieldDef &at, const detail::Expression &expression) {
+                     Add(made, TermClause(target, at, expression, made.binds.size() + 1));
+                   });
   return made;
-}
-
-std::string ZeroText(const FieldDef &def) {
-  switch (def.type) {
-    case FieldType::Decimal:
-    case FieldType::Integer:
-    case FieldType::BigInteger:
-    case FieldType::Duration:
-    case FieldType::Option:
-    case FieldType::Enum: return "0";
-    case FieldType::Boolean: return "f";
-    default: return {};
-  }
 }
 
 std::string OrderByPrimaryKey(const TableDef &target) {
@@ -1486,7 +1470,8 @@ std::string Aggregate(const FlowFormula &formula, const FieldDef &def, const std
 }
 
 void Store(void *record, const FieldDef &def, const std::optional<std::string_view> &value) {
-  detail::SetFieldText(record, def, value.has_value() ? std::string(*value) : ZeroText(def));
+  detail::SetFieldText(
+      record, def, value.has_value() ? std::string(*value) : detail::FlowFieldZero(def));
 }
 
 }
@@ -1510,6 +1495,17 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
   if (def->fieldClass != FieldClass::FlowField) { return; }
   const FlowFormula formula = FormulaReader(def->calcFormula, *def).Read();
   const TableDef &target = TableNamed(formula.table, *def);
+  if (IsCatalogueFlowFieldTarget(target)) {
+    std::vector<ColumnPredicate> filters;
+    VisitFlowFilters(formula,
+                     target,
+                     {.record = record, .table = table, .state = state, .asked = *def},
+                     [&](const FieldDef &at, detail::Expression expression) {
+                       filters.push_back({.field = at.no, .expression = std::move(expression)});
+                     });
+    CalcCatalogueFlowField(record, *def, target, formula, filters);
+    return;
+  }
   std::string column;
   if (formula.kind != FlowFormula::Kind::Count && formula.kind != FlowFormula::Kind::Exist) {
     const FieldDef *of = FieldNamed(target, formula.field);

@@ -103,7 +103,7 @@ ModifyAllowed policy. View navigation and general command permissions remain ope
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,
-cross-column OR, FlowFilters and owned expression snapshots. Sixty-seven compiled
+cross-column OR, FlowFilters and owned expression snapshots. Seventy-seven compiled
 controls and the narrow system-field header dependency control must reject.
 Installed Table Metadata.Get and positive-key Field.Get share typed/RecordRef readers;
 timestamp zero remains addressable through FieldRef, and temporary zero keys remain valid.
@@ -123,6 +123,16 @@ typed/RecordRef parity. Shared bookmark/filter/key-hole mutants fail all applica
 catalogue gates; page-specific controls detect wrong projections and fabricated
 defaults. `PageRecordBindingGate` executes generated AL list-to-card Get and
 navigation in named/numeric forms without copying native source declarations.
+`CatalogueFlowFieldGate` exercises scalar CalcFields/FieldRef calculations over all
+three native catalogues: exact typed lookups, seven aggregate kinds, six operand modes,
+duplicate predicates, empty values, refusal boundaries and unchanged source views.
+Resolved expressions are not reparsed as filters; SQL/native literal semantics stay shared.
+Catalogue scans borrow provider scratch rows, bound the leading-key window and stop
+Lookup/Exist early, never copying the installed population. Native calculations do not
+remove storage write guards or create Field SQL copies. The AL page fixture executes
+the native caption CalcFormulas through the generator as well as FieldRef.CalcField.
+Native calculated predicates and SQL-correlated native columns remain counted gaps;
+scalar execution is not proof of the full provider or a complete UT milestone.
 Canonical views, caption expressions/field lists, masks, dynamic properties, compiled
 API formats/defaults, absent-source contracts and non-English captions still explicitly
 refuse; key-only counts retain their identities. Native writes, including

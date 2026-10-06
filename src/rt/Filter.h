@@ -34,6 +34,11 @@ using All = std::vector<Atom>;
 
 using Expression = std::vector<All>;
 
+struct ColumnPredicate {
+  FieldNo field;
+  Expression expression;
+};
+
 [[nodiscard]] Expression ParseFilter(std::string_view text);
 
 [[nodiscard]] std::string RangeBoundOf(std::string_view filter, bool upper);

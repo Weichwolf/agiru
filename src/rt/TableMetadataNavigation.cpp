@@ -44,6 +44,13 @@ struct TableReader {
 
 }
 
+bool ScanInstalledTableMetadata(const TableDef &table, const CatalogueScan &scan) {
+  if (!IsInstalledTableMetadataProvider(table)) { return false; }
+  TableReader rows;
+  ScanCatalogue(table, rows.Borrow(), scan);
+  return true;
+}
+
 std::optional<bool>
 FindInstalledTableMetadata(void *record, const TableDef &table, std::string_view which) {
   if (!IsInstalledTableMetadataProvider(table)) { return std::nullopt; }

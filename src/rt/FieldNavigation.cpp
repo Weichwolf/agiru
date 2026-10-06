@@ -54,12 +54,7 @@ std::span<const LocatedField> InstalledFields() {
 }
 
 void RequireProjected(FieldNo no) {
-  using No = FieldRow::Field_No;
-  if (no == No::DataClassification || no == No::SQLDataType || no == No::AppPackageID ||
-      no == No::AppRuntimePackageID) {
-    throw Error("Field catalogue filter/order requires an unqualified metadata attribute: " +
-                std::to_string(no.Value()));
-  }
+  RequireFieldMetadataProjection(no);
 }
 
 void LoadKey(void *record, std::size_t index) {
@@ -92,6 +87,22 @@ struct FieldReader {
   }
 };
 
+}
+
+void RequireFieldMetadataProjection(FieldNo no) {
+  using No = FieldRow::Field_No;
+  if (no == No::DataClassification || no == No::SQLDataType || no == No::AppPackageID ||
+      no == No::AppRuntimePackageID) {
+    throw Error("Field catalogue filter/order requires an unqualified metadata attribute: " +
+                std::to_string(no.Value()));
+  }
+}
+
+bool ScanInstalledFields(const TableDef &table, const CatalogueScan &scan) {
+  if (!IsInstalledFieldProvider(table)) { return false; }
+  FieldReader rows;
+  ScanCatalogue(table, rows.Borrow(), scan);
+  return true;
 }
 
 std::optional<bool>

@@ -3,11 +3,12 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: replay current Field/Table/Page Metadata and RecordRef repairs with 0013/0058 on
-every UT identity. Investigate the new Incoming Documents Field-provider regression.
+Next: replay current Field/Table/Page Metadata, scalar catalogue CalcFields and RecordRef
+repairs with 0013/0058 on every UT identity; trace the Incoming Documents regression.
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
-Complete Field classification, SQLDataType, package provenance and permissions.
+Complete Field classification, SQLDataType, package provenance and permissions;
+qualify calculated catalogue predicates and Unicode blank-caption fallback.
 Investigate StoredImage; qualify remaining virtual SystemId and diagnostic/localization contracts.
 Latest completed AL replay (`a554715`) is 2210/2314: forty gains and one loss against
 `61344f7`, no missing/added/duplicate identities, zero incomplete codeunits. Build and
@@ -91,6 +92,34 @@ identity prevents causal A/B proof. No newer provider gain or full G1 is claimed
 
 ## Acceptance
 
+- Scalar `CalcFields` uses `CatalogueFlowField.cpp` for qualified native Field/Table/Page
+  targets; it no longer sends them to SQL storage. The shared CalcFormula resolver emits
+  typed predicates, preserving literal apostrophes, whitespace, at-signs, range/wildcard
+  punctuation and repeated-column intersections. SQL consumes the same expressions.
+  `ScanCatalogue` borrows each existing provider, bounds the leading-key window and visits
+  each candidate once; Lookups/Exists stop early. Count can retain unqualified identities
+  without fabricating properties. Sum/Average use Decimal; Min/Max compare typed columns.
+  Empty results clear stale values; source buffers/views stay independent and writes refuse.
+  Native gates and generated `page-record-binding` AL exercise the three caption lookups
+  used by `BaseApp/System/DataExchange/DataExchFieldMapping.Table.al`, plus FieldRef.CalcField.
+  This is a reproduced scalar SQL-routing defect, not yet causal proof for any UT failure.
+  Native calculated predicates refuse instead of reading stale FlowField defaults;
+  SQL-correlated native columns, complete metadata and authorization remain gaps.
+  Developer `f928288ee840`: record-calcfields-method.md and devenv-calcformula-property.md;
+  BCApps `d99152ee35f0`: the mapping fields 12/14; user docs `bf5ffffa9b026`:
+  across-exchange-data.md. Predecessor 1404/1550: never drop unavailable predicates or
+  bind Boolean measures as text; their missing-table-as-zero policy is not adopted.
+  SQL scale 20 is the existing StorageGate contract, distinct from calculating scale 28;
+  this increment changes neither storage policy nor its golden expectations.
+  `CatalogueFlowFieldGate`: 67 checks, including SQL Get/SetAutoCalcFields and counted
+  scan/projection/early-stop bounds; generated AL passes named/numeric source bindings.
+  `make reflection-metadata JOBS=2` retains all 67 earlier controls and adds ten compiled
+  routing/literal/filter/key-hole/stop/count/total/round/stale/projection controls: 77 plus
+  the typed-header control reject. Six affected runtime units pass focused tidy;
+  Table.cpp retains sixteen earlier findings and the gate inherits two earlier Table.h
+  constness findings. No new diagnostic, suppression or golden/baseline increase.
+  Frozen `feff11f` / content `2ba8b347ffe5` passes build and 153/153 C++/specialist cases;
+  its AL replay is running and excludes this scalar calculation. Full G1 remains open.
 - `PageMetadata.{h,cpp}` and `PageMetadataNavigation.cpp` activate native
   Get/Find/FindSet/Next/Count/IsEmpty for qualified English declaration rows over
   `InstalledPages()`. They reuse CatalogueNavigation with three call-scoped scratch
