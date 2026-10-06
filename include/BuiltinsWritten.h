@@ -818,68 +818,127 @@ template <typename T>
   return true;
 }
 
+/// \brief Reads signed integral text with the existing Evaluate conversion policy.
+/// \tparam T The integral destination type.
+/// \param into Destination, unchanged on lexical failure.
+/// \param text Decimal text; empty means zero.
+/// \return Whether the complete input was consumed.
+template <typename T>
+[[nodiscard]] ::agiru::Boolean EvaluatedInteger(T &into, std::string_view text) {
+  if (text.empty()) {
+    into = 0;
+    return true;
+  }
+  const std::string held(text);
+  char *end = nullptr;
+  const long long read = std::strtoll(held.c_str(), &end, kDecimal);
+  if (end == nullptr || *end != '\0') { return false; }
+  into = static_cast<T>(read);
+  return true;
+}
+
+/// \brief Reads Duration as signed milliseconds, sharing the integral reader.
+/// \param into Destination, unchanged on lexical failure.
+/// \param text Decimal milliseconds; empty means zero.
+/// \return Whether the input was read.
+[[nodiscard]] inline ::agiru::Boolean EvaluatedDuration(::agiru::Duration &into,
+                                                        std::string_view text) {
+  std::int64_t milliseconds{};
+  if (!EvaluatedInteger(milliseconds, text)) { return false; }
+  into = ::agiru::Duration{milliseconds};
+  return true;
+}
+
+/// \brief Reads an untyped Option ordinal without inventing member metadata.
+/// \param into Destination, unchanged on lexical failure.
+/// \param text An ordinal; empty means zero.
+/// \return Whether the input was read.
+[[nodiscard]] inline ::agiru::Boolean EvaluatedOption(::agiru::Option<void> &into,
+                                                      std::string_view text) {
+  if (text.empty()) {
+    into = ::agiru::Option<void>::FromInteger(0);
+    return true;
+  }
+  const std::string held(text);
+  char *end = nullptr;
+  const long read = std::strtol(held.c_str(), &end, kDecimal);
+  if (end == nullptr || *end != '\0') { return false; }
+  into = ::agiru::Option<void>::FromInteger(static_cast<std::int32_t>(read));
+  return true;
+}
+
+/// \brief Reads a value through its refusal-returning FromText factory.
+/// \tparam T Guid or DateFormula.
+/// \param into Destination, unchanged when the factory refuses.
+/// \param text The factory's input.
+/// \return Whether the factory produced a value.
+template <typename T>
+[[nodiscard]] ::agiru::Boolean EvaluatedFactory(T &into, std::string_view text) {
+  const auto read = T::FromText(text);
+  if (!read.has_value()) { return false; }
+  into = *read;
+  return true;
+}
+
+/// \brief Reads Decimal with exact precision/scale and the existing blank policy.
+/// \param into Destination, unchanged on numeric refusal.
+/// \param text Invariant decimal text; spaces alone mean zero.
+/// \return Whether the decimal was read.
+[[nodiscard]] inline ::agiru::Boolean EvaluatedDecimal(::agiru::Decimal &into,
+                                                       std::string_view text) {
+  if (text.find_first_not_of(' ') == std::string_view::npos) {
+    into = ::agiru::Decimal{};
+    return true;
+  }
+  try {
+    into = ::agiru::Decimal::FromInvariantString(text);
+  } catch (const ::agiru::DecimalError &) { return false; }
+  return true;
+}
+
+/// \brief Reads a declared Option/Enum name, caption or ordinal with its own factory.
+/// \tparam T The declared ordinal wrapper.
+/// \param into Destination, unchanged when no member can be read.
+/// \param text Member text or ordinal.
+/// \return Whether the declared ordinal reader succeeded.
+template <typename T>
+[[nodiscard]] ::agiru::Boolean EvaluatedOrdinal(T &into, std::string_view text) {
+  const std::optional<std::int32_t> ordinal =
+      MemberOrdinalOf(std::span<const EnumValueDef>(T::Traits::kValues), text);
+  if (!ordinal.has_value()) { return false; }
+  if constexpr (std::same_as<decltype(T::FromInteger(std::int32_t{})), T>) {
+    into = T::FromInteger(*ordinal);
+  } else {
+    into = T(*ordinal);
+  }
+  return true;
+}
+
+/// \brief Selects the existing AL Evaluate reader from the destination's type.
+/// \tparam T The destination type.
+/// \param into Destination; failure mutation follows the selected reader's contract.
+/// \param text Input for that reader.
+/// \return False for unsupported types or when the selected reader refuses.
 template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::string_view text) {
-  if constexpr (std::is_same_v<T, ::agiru::Boolean> || std::is_same_v<T, bool>) {
+  if constexpr (std::is_same_v<T, ::agiru::Boolean>) {
     return EvaluatedBoolean(into, text);
   } else if constexpr (std::is_same_v<T, ::agiru::Time>) {
     return EvaluatedTime(into, text);
   } else if constexpr (std::is_same_v<T, ::agiru::DateTime>) {
     return EvaluatedDateTime(into, text);
   } else if constexpr (std::is_same_v<T, ::agiru::Duration>) {
-    if (text.empty()) {
-      into = ::agiru::Duration{};
-      return true;
-    }
-    const std::string held(text);
-    char *end = nullptr;
-    const long long read = std::strtoll(held.c_str(), &end, kDecimal);
-    if (end == nullptr || *end != '\0') { return false; }
-    into = ::agiru::Duration{static_cast<std::int64_t>(read)};
-    return true;
+    return EvaluatedDuration(into, text);
   } else if constexpr (std::is_same_v<T, ::agiru::Option<void>>) {
-    if (text.empty()) {
-      into = ::agiru::Option<void>::FromInteger(0);
-      return true;
-    }
-    const std::string held(text);
-    char *end = nullptr;
-    const long read = std::strtol(held.c_str(), &end, kDecimal);
-    if (end == nullptr || *end != '\0') { return false; }
-    into = ::agiru::Option<void>::FromInteger(static_cast<std::int32_t>(read));
-    return true;
-  } else if constexpr (std::is_same_v<T, ::agiru::Guid>) {
-    const std::expected<::agiru::Guid, ::agiru::Refusal> read = ::agiru::Guid::FromText(text);
-    if (!read.has_value()) { return false; }
-    into = *read;
-    return true;
+    return EvaluatedOption(into, text);
+  } else if constexpr (std::is_same_v<T, ::agiru::Guid> ||
+                       std::is_same_v<T, ::agiru::DateFormula>) {
+    return EvaluatedFactory(into, text);
   } else if constexpr (std::is_same_v<T, ::agiru::Decimal>) {
-    if (text.find_first_not_of(' ') == std::string_view::npos) {
-      into = ::agiru::Decimal{};
-      return true;
-    }
-    try {
-      into = ::agiru::Decimal::FromInvariantString(text);
-    } catch (const ::agiru::DecimalError &) { return false; }
-    return true;
+    return EvaluatedDecimal(into, text);
   } else if constexpr (std::is_same_v<T, ::agiru::Date>) {
     return EvaluatedDate(into, text);
-  } else if constexpr (std::is_same_v<T, ::agiru::DateFormula>) {
-    const std::expected<::agiru::DateFormula, ::agiru::Refusal> read =
-        ::agiru::DateFormula::FromText(text);
-    if (!read.has_value()) { return false; }
-    into = *read;
-    return true;
   } else if constexpr (std::is_integral_v<T>) {
-    if (text.empty()) {
-      into = 0;
-      return true;
-    }
-    const std::string held(text);
-    char *end = nullptr;
-    const long long read = std::strtoll(held.c_str(), &end, 10);
-    if (end == nullptr || *end != '\0') { return false; }
-    into = static_cast<T>(read);
-    return true;
+    return EvaluatedInteger(into, text);
   } else if constexpr (std::derived_from<T, ::agiru::StringValue>) {
     into = text;
     return true;
@@ -888,15 +947,7 @@ template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::str
                          T::Traits::kValues;
                          T::FromInteger(std::int32_t{});
                        }) {
-    const std::optional<std::int32_t> ordinal =
-        MemberOrdinalOf(std::span<const EnumValueDef>(T::Traits::kValues), text);
-    if (!ordinal.has_value()) { return false; }
-    if constexpr (std::same_as<decltype(T::FromInteger(std::int32_t{})), T>) {
-      into = T::FromInteger(*ordinal);
-    } else {
-      into = T(*ordinal);
-    }
-    return true;
+    return EvaluatedOrdinal(into, text);
   } else {
     static_cast<void>(into);
     static_cast<void>(text);

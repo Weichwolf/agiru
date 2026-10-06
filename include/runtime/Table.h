@@ -1998,7 +1998,7 @@ public:
     Derived was = before;
     TableEvent("OnBeforeRenameEvent", true, was);
     {
-      detail::BeforeImage image(&was, Self());
+      const detail::BeforeImage image(&was, Self());
       if constexpr (requires(Derived &record) { record.OnRename(); }) {
         static_cast<Derived *>(this)->OnRename();
       }
@@ -2343,7 +2343,7 @@ public:
   ///       control trigger runs after this, in the page.
   void ValidateText(::agiru::FieldNo no, std::string_view text) {
     Derived before = static_cast<Derived &>(*this);
-    detail::BeforeImage image(&before, Self());
+    const detail::BeforeImage image(&before, Self());
     try {
       detail::EvaluateInto(Self(), TableDefinition<Derived>(), no, text);
       detail::CheckRelation(Self(), TableDefinition<Derived>(), no);

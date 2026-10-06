@@ -87,10 +87,16 @@ seed prevents causal A/B proof; full G1 remains open (0058).
   `devenv-format-property.md` requires `<Closing>` outside XML format 9.
   Regional Decimal/date/time rendering and localized field lookup remain unqualified;
   this is not full native position-format conformance or AL replay evidence.
-  Targeted MetadataText tidy passes; RecordPosition's four failures are existing
-  BuiltinsWritten complexity and Codeunit header declarations/self-assignment.
-  SelectionChange tidy passes; RecordPositionGate has only the two existing
-  Table.h BeforeImage constness findings. No defect/suppression baseline changed.
+  Targeted MetadataText and SelectionChange tidy pass. Shared Evaluate dispatch now
+  delegates existing scalar/ordinal/factory readers instead of one complexity-42 body;
+  BeforeImage scopes in Rename/ValidateText are const. OptionGate covers 51 checks;
+  RecordPosition/RecordRef/Variant/Format/TargetImage/RecordImage retain
+  67/159/58/36/21/28 passes. OptionGate and RecordPosition tidy retain only three
+  existing Codeunit/header declaration/self-assignment findings. No reader range,
+  culture, error or refusal policy, production dependency, golden or suppression baseline changed.
+  Three-round standalone frontend measurements under the concurrent integration build
+  are BuiltinsWritten/Table 5137.3/4230.3 ms versus frozen b2a8131 4884.0/3502.2 ms;
+  these noisy measurements establish no build-speed improvement.
   BCApps `d99152ee35f0` DeltaAssert.Codeunit.al consumes SetPosition without Get;
   user docs `bf5ffffa9b026` ui-enter-criteria-filters.md distinguish literals from
   filter operators. Predecessor 1229/1609 motivates filter-preserving key-relative
@@ -146,7 +152,8 @@ seed prevents causal A/B proof; full G1 remains open (0058).
   128 checks fail; after the repair, all 128 pass. `make reflection-metadata JOBS=2`
   retains the 77 earlier controls and adds ASCII-only/zero-width-as-whitespace controls:
   all 79 plus the typed-header control reject. MetadataText.cpp, PageMetadata.cpp and
-  the expanded gate pass focused tidy. This repair is not included in the completed AL replay.
+  the expanded gate pass focused tidy. Completed replay 51831ed includes this repair;
+  its 2218/2314 result does not isolate the repair's individual effect.
 - Scalar `CalcFields` uses `CatalogueFlowField.cpp` for qualified native Field/Table/Page
   targets; it no longer sends them to SQL storage. The shared CalcFormula resolver emits
   typed predicates, preserving literal apostrophes, whitespace, at-signs, range/wildcard

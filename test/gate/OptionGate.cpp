@@ -1,11 +1,25 @@
 #include "meta/EnumDef.h"
+#include "type/BigInteger.h"
+#include "type/Boolean.h"
+#include "type/Code.h"
+#include "type/Date.h"
+#include "type/DateFormula.h"
+#include "type/DateTime.h"
+#include "type/Decimal.h"
+#include "type/Duration.h"
+#include "type/Guid.h"
+#include "type/Integer.h"
 #include "type/Option.h"
+#include "type/StringValue.h"
+#include "type/Time.h"
 
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -101,6 +115,84 @@ void EvaluateReadsAMemberByNameCaptionOrOrdinal() {
   CHECK_TRUE("and the value stays where it was", held == ResourceCostType::Resource);
 }
 
+void ScalarEvaluationKeepsItsExistingReaders() {
+  agiru::Boolean truth{};
+  CHECK_TRUE("Boolean evaluation selects the shared spelling reader",
+             agiru::Evaluate(truth, "YES") && truth);
+  CHECK_TRUE("invalid Boolean input keeps its prior value",
+             !agiru::Evaluate(truth, "unknown") && truth);
+  agiru::Integer number{};
+  CHECK_TRUE("integral evaluation reads a signed value", agiru::Evaluate(number, "-1234"));
+  CHECK_TRUE("integral evaluation does not substitute a default", number == -1234);
+  CHECK_TRUE("invalid integral input keeps the value",
+             !agiru::Evaluate(number, "3junk") && number == -1234);
+  agiru::BigInteger large{};
+  CHECK_TRUE("BigInteger evaluation keeps the full signed width",
+             agiru::Evaluate(large, "9223372036854775807") &&
+                 large == std::numeric_limits<agiru::BigInteger>::max());
+  agiru::Duration duration;
+  CHECK_TRUE("Duration evaluation uses signed milliseconds",
+             agiru::Evaluate(duration, "-1234") && duration.Milliseconds() == -1234);
+  CHECK_TRUE("empty Duration input retains the zero-value contract",
+             agiru::Evaluate(duration, "") && duration.Milliseconds() == 0);
+  agiru::Option<void> raw;
+  CHECK_TRUE("untyped Option evaluation reads ordinals",
+             agiru::Evaluate(raw, "7") && raw.AsInteger() == 7);
+  CHECK_TRUE("untyped Option refuses names rather than inventing metadata",
+             !agiru::Evaluate(raw, "Resource") && raw.AsInteger() == 7);
+  CHECK_TRUE("empty untyped Option input means ordinal zero",
+             agiru::Evaluate(raw, "") && raw.AsInteger() == 0);
+  agiru::Decimal exact;
+  constexpr std::string_view digits = "0.1234567890123456789012345678";
+  CHECK_TRUE("Decimal evaluation reads all 28 decimal places", agiru::Evaluate(exact, digits));
+  CHECK_TEXT("Decimal evaluation is exact rather than binary floating point",
+             exact.ToInvariantString(),
+             digits);
+  CHECK_TRUE("a refused decimal does not clear the destination",
+             !agiru::Evaluate(exact, "invalid"));
+  CHECK_TEXT(
+      "Decimal refusal leaves the previous scale and value", exact.ToInvariantString(), digits);
+  agiru::Text<0> text;
+  CHECK_TRUE("Text evaluation preserves Unicode and literal operators",
+             agiru::Evaluate(text, "雪🙂 |*"));
+  CHECK_TEXT("Text is not interpreted as a filter", std::string_view(text), "雪🙂 |*");
+  constexpr std::size_t kCodeLength = 20;
+  agiru::Code<kCodeLength> code;
+  CHECK_TRUE("Code evaluation retains its assignment normalization",
+             agiru::Evaluate(code, " code "));
+  CHECK_TEXT("Code still normalizes case and surrounding spaces", std::string_view(code), "CODE");
+
+  struct Unreadable {
+    int value = 1;
+  } unsupported;
+
+  CHECK_TRUE("unknown types keep explicit evaluation failure",
+             !agiru::Evaluate(unsupported, "1") && unsupported.value == 1);
+}
+
+void FactoryAndTemporalEvaluationKeepsItsExistingReaders() {
+  agiru::Guid identity;
+  constexpr std::string_view guid = "{01234567-89AB-CDEF-0123-456789ABCDEF}";
+  CHECK_TRUE("Guid evaluation selects the declared factory", agiru::Evaluate(identity, guid));
+  CHECK_TEXT("the parsed identity is not a default or truncated value", identity.ToText(), guid);
+  CHECK_TRUE("invalid Guid input returns the factory refusal", !agiru::Evaluate(identity, "bad"));
+  CHECK_TEXT("factory refusal leaves the destination unchanged", identity.ToText(), guid);
+  agiru::DateFormula formula;
+  CHECK_TRUE("DateFormula evaluation selects its own factory", agiru::Evaluate(formula, "<1M>"));
+  CHECK_TEXT("DateFormula retains its canonical typed expression", formula.ToText(), "1M");
+  agiru::Date date;
+  CHECK_TRUE("Date dispatch retains the existing invariant reader",
+             agiru::Evaluate(date, "2028-01-25"));
+  CHECK_TEXT("Date dispatch retains the full date", date.ToInvariantString(), "2028-01-25");
+  agiru::Time time;
+  CHECK_TRUE("Time dispatch retains milliseconds", agiru::Evaluate(time, "12:34:56.789"));
+  CHECK_TEXT("Time is not evaluated as an integer", time.ToInvariantString(), "12:34:56.789");
+  agiru::DateTime instant;
+  CHECK_TRUE("DateTime dispatch retains its own reader",
+             agiru::Evaluate(instant, "2028-01-25T12:34:56.789Z"));
+  CHECK_TRUE("DateTime retains both date and time", instant == agiru::DateTime::Create(date, time));
+}
+
 } // namespace
 
 int main() {
@@ -111,5 +203,7 @@ int main() {
     AnUndeclaredOrdinalIsHeldRatherThanRefused();
     OptionsOrderByOrdinal();
     EvaluateReadsAMemberByNameCaptionOrOrdinal();
+    ScalarEvaluationKeepsItsExistingReaders();
+    FactoryAndTemporalEvaluationKeepsItsExistingReaders();
   });
 }
