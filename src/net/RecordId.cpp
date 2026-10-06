@@ -1,10 +1,11 @@
 #include "type/RecordId.h"
 
 #include "type/Integer.h"
+#include "type/Outcome.h"
+#include "type/Refusal.h"
 
 #include <cstddef>
 #include <cstdint>
-#include <expected>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -46,7 +47,7 @@ bool IsSqlServersBlank(std::string_view text) {
 
 }
 
-std::expected<RecordId, Refusal> RecordId::FromStorageText(std::string_view text) {
+Outcome<RecordId, Refusal> RecordId::FromStorageText(std::string_view text) {
   if (text.empty() || IsSqlServersBlank(text)) { return RecordId{}; }
   std::vector<std::string> parts;
   std::size_t at = 0;
@@ -56,10 +57,10 @@ std::expected<RecordId, Refusal> RecordId::FromStorageText(std::string_view text
     if (next == std::string_view::npos) { break; }
     at = next + 1;
   }
-  if (parts.size() < 3) { return std::unexpected(Refusal{.what = kNotAnId}); }
+  if (parts.size() < 3) { return Failed(Refusal{.what = kNotAnId}); }
   const std::string &number = parts.front();
   if (number.empty() || number.find_first_not_of("0123456789") != std::string::npos) {
-    return std::unexpected(Refusal{.what = kNotAnId});
+    return Failed(Refusal{.what = kNotAnId});
   }
   std::vector<std::string> key(parts.begin() + 2, parts.end());
   return RecordId{TableId{static_cast<std::int32_t>(std::stol(number))}, parts[1], std::move(key)};

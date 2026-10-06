@@ -1,5 +1,8 @@
 #include "type/Guid.h"
 
+#include "type/Outcome.h"
+#include "type/Refusal.h"
+
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -96,7 +99,7 @@ Guid Guid::CreateSequentialGuid() {
   return Guid{bytes};
 }
 
-std::expected<Guid, Refusal> Guid::FromText(std::string_view text) {
+Outcome<Guid, Refusal> Guid::FromText(std::string_view text) {
   if (!text.empty() && text.front() == '{' && text.back() == '}') {
     text.remove_prefix(1);
     text.remove_suffix(1);
@@ -111,14 +114,12 @@ std::expected<Guid, Refusal> Guid::FromText(std::string_view text) {
     }
     const int high = HexValue(text[cursor]);
     const int low = HexValue(text[cursor + 1]);
-    if (high < 0 || low < 0) {
-      return std::unexpected(Refusal{.what = kNotHexadecimal, .at = cursor + 1});
-    }
+    if (high < 0 || low < 0) { return Failed(Refusal{.what = kNotHexadecimal, .at = cursor + 1}); }
     bytes[at] = static_cast<std::uint8_t>((high << kBitsPerNibble) | low);
     ++at;
     cursor += kHexPerByte;
   }
-  if (at != kSize) { return std::unexpected(Refusal{.what = kWrongLength}); }
+  if (at != kSize) { return Failed(Refusal{.what = kWrongLength}); }
   return Guid{bytes};
 }
 

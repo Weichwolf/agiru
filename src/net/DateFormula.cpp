@@ -3,7 +3,10 @@
 #include "type/Date.h"
 #include "type/Integer.h"
 #include "type/Language.h"
+#include "type/Outcome.h"
+#include "type/Refusal.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
@@ -38,9 +41,21 @@ struct Letters {
   std::string_view weekday;
 };
 
-constexpr Letters kInvariant{"C", "D", "W", "M", "Q", "Y", "WD"};
+constexpr Letters kInvariant{.current = "C",
+                             .day = "D",
+                             .week = "W",
+                             .month = "M",
+                             .quarter = "Q",
+                             .year = "Y",
+                             .weekday = "WD"};
 
-constexpr Letters kPacked{"\x01", "\x02", "\x04", "\x05", "\x06", "\x07", "\x03"};
+constexpr Letters kPacked{.current = "\x01",
+                          .day = "\x02",
+                          .week = "\x04",
+                          .month = "\x05",
+                          .quarter = "\x06",
+                          .year = "\x07",
+                          .weekday = "\x03"};
 
 constexpr Integer kPrimaryLanguageMask = 0x3FF;
 constexpr Integer kGerman = 0x07;
@@ -57,13 +72,62 @@ struct LanguageLetters {
 };
 
 constexpr std::array<LanguageLetters, 7> kByLanguage{{
-    {kGerman, {"L", "T", "W", "M", "Q", "J", "WT"}},
-    {kDanish, {"L", "D", "U", "M", "K", "Å", "UD"}},
-    {kDutch, {"H", "D", "W", "M", "K", "J", "WD"}},
-    {kFrench, {"C", "J", "S", "M", "T", "A", "WD"}},
-    {kSpanish, {"C", "D", "S", "M", "T", "A", "WD"}},
-    {kSwedish, {"L", "D", "V", "M", "K", "Å", "VD"}},
-    {kNorwegian, {"L", "D", "U", "M", "K", "Å", "UD"}},
+    {.primary = kGerman,
+     .letters = {.current = "L",
+                 .day = "T",
+                 .week = "W",
+                 .month = "M",
+                 .quarter = "Q",
+                 .year = "J",
+                 .weekday = "WT"}},
+    {.primary = kDanish,
+     .letters = {.current = "L",
+                 .day = "D",
+                 .week = "U",
+                 .month = "M",
+                 .quarter = "K",
+                 .year = "Å",
+                 .weekday = "UD"}},
+    {.primary = kDutch,
+     .letters = {.current = "H",
+                 .day = "D",
+                 .week = "W",
+                 .month = "M",
+                 .quarter = "K",
+                 .year = "J",
+                 .weekday = "WD"}},
+    {.primary = kFrench,
+     .letters = {.current = "C",
+                 .day = "J",
+                 .week = "S",
+                 .month = "M",
+                 .quarter = "T",
+                 .year = "A",
+                 .weekday = "WD"}},
+    {.primary = kSpanish,
+     .letters = {.current = "C",
+                 .day = "D",
+                 .week = "S",
+                 .month = "M",
+                 .quarter = "T",
+                 .year = "A",
+                 .weekday = "WD"}},
+    {.primary = kSwedish,
+     .letters = {.current = "L",
+                 .day = "D",
+                 .week = "V",
+                 .month = "M",
+                 .quarter = "K",
+                 .year = "Å",
+                 .weekday = "VD"}},
+    {.primary = kNorwegian,
+     .letters = {.current = "L",
+                 .day = "D",
+                 .week = "U",
+                 .month = "M",
+                 .quarter = "K",
+                 .year = "Å",
+                 .weekday = "UD"}},
 }};
 
 const Letters &LettersOf(Integer language) {
@@ -105,16 +169,24 @@ bool DigitAt(std::string_view text, std::size_t at) {
   return at < text.size() && (std::isdigit(static_cast<unsigned char>(text[at])) != 0);
 }
 
+std::size_t PrefixLength(std::string_view text,
+                         std::size_t at,
+                         std::string_view localized,
+                         std::string_view invariant) {
+  if (TokenAt(text, at, localized)) { return localized.size(); }
+  return TokenAt(text, at, invariant) ? invariant.size() : 0;
+}
+
 struct UnitLetter {
   char unit;
   std::string_view Letters::*letter;
 };
 
-constexpr std::array<UnitLetter, 5> kUnits{{{'D', &Letters::day},
-                                            {'W', &Letters::week},
-                                            {'M', &Letters::month},
-                                            {'Q', &Letters::quarter},
-                                            {'Y', &Letters::year}}};
+constexpr std::array<UnitLetter, 5> kUnits{{{.unit = 'D', .letter = &Letters::day},
+                                            {.unit = 'W', .letter = &Letters::week},
+                                            {.unit = 'M', .letter = &Letters::month},
+                                            {.unit = 'Q', .letter = &Letters::quarter},
+                                            {.unit = 'Y', .letter = &Letters::year}}};
 
 std::string_view Letter(const Letters &letters, char unit) {
   for (const UnitLetter &entry : kUnits) {
@@ -162,7 +234,7 @@ std::string TakeDigits(std::string_view text, std::size_t &at) {
   return digits;
 }
 
-std::expected<std::vector<Token>, Refusal> Tokens(std::string_view text, const Letters &localized) {
+Outcome<std::vector<Token>, Refusal> Tokens(std::string_view text, const Letters &localized) {
   std::vector<Token> out;
   std::size_t at = 0;
   char sign = 0;
@@ -177,24 +249,14 @@ std::expected<std::vector<Token>, Refusal> Tokens(std::string_view text, const L
       ++at;
       continue;
     }
-    std::size_t length = 0;
-    if (TokenAt(text, at, localized.weekday)) {
-      length = localized.weekday.size();
-    } else if (TokenAt(text, at, kInvariant.weekday)) {
-      length = kInvariant.weekday.size();
-    }
+    std::size_t length = PrefixLength(text, at, localized.weekday, kInvariant.weekday);
     if (length != 0 && DigitAt(text, at + length)) {
       at += length;
       out.push_back(Token{.piece = Piece::Weekday, .sign = sign, .number = TakeDigits(text, at)});
       sign = 0;
       continue;
     }
-    length = 0;
-    if (TokenAt(text, at, localized.current)) {
-      length = localized.current.size();
-    } else if (TokenAt(text, at, kInvariant.current)) {
-      length = kInvariant.current.size();
-    }
+    length = PrefixLength(text, at, localized.current, kInvariant.current);
     if (length != 0) {
       const std::optional<UnitAt> unit = UnitAtEither(text, at + length, localized);
       if (unit.has_value()) {
@@ -224,7 +286,7 @@ std::expected<std::vector<Token>, Refusal> Tokens(std::string_view text, const L
       sign = 0;
       continue;
     }
-    return std::unexpected(Refusal{.what = kNotAFormula, .at = at + 1});
+    return Failed(Refusal{.what = kNotAFormula, .at = at + 1});
   }
   return out;
 }
@@ -269,11 +331,10 @@ constexpr unsigned char kFirstPackedUnit = 1;
 constexpr unsigned char kLastPackedUnit = 7;
 
 bool IsPacked(std::string_view text) {
-  for (const char c : text) {
+  return std::ranges::any_of(text, [](char c) {
     const auto byte = static_cast<unsigned char>(c);
-    if (byte >= kFirstPackedUnit && byte <= kLastPackedUnit) { return true; }
-  }
-  return false;
+    return byte >= kFirstPackedUnit && byte <= kLastPackedUnit;
+  });
 }
 
 std::string Unpacked(std::string_view text) {
@@ -362,7 +423,7 @@ Date Weekday(const Date &d, int target, bool backwards) {
 
 }
 
-std::expected<DateFormula, Refusal> DateFormula::FromText(std::string_view text) {
+Outcome<DateFormula, Refusal> DateFormula::FromText(std::string_view text) {
   DateFormula formula;
   bool invariantOnly = false;
   if (!text.empty() && text.front() == '<' && text.back() == '>') {
@@ -377,8 +438,8 @@ std::expected<DateFormula, Refusal> DateFormula::FromText(std::string_view text)
     invariantOnly = true;
   }
   const Letters &localized = invariantOnly ? kInvariant : LettersOf(Language::Current());
-  const std::expected<std::vector<Token>, Refusal> tokens = Tokens(text, localized);
-  if (!tokens.has_value()) { return std::unexpected(tokens.error()); }
+  const Outcome<std::vector<Token>, Refusal> tokens = Tokens(text, localized);
+  if (!tokens.has_value()) { return Failed(tokens.error()); }
   for (const Token &token : *tokens) {
     const bool negative = token.sign == '-';
     switch (token.piece) {
@@ -417,13 +478,13 @@ std::expected<DateFormula, Refusal> DateFormula::FromText(std::string_view text)
 std::string DateFormula::ToText() const {
   const Letters &letters = LettersOf(Language::Current());
   if (&letters == &kInvariant) { return text_; }
-  const std::expected<std::vector<Token>, Refusal> tokens = Tokens(text_, kInvariant);
+  const Outcome<std::vector<Token>, Refusal> tokens = Tokens(text_, kInvariant);
   if (!tokens.has_value()) { return text_; }
   return Rendered(*tokens, letters);
 }
 
 std::string DateFormula::ToStorageText() const {
-  const std::expected<std::vector<Token>, Refusal> tokens = Tokens(text_, kInvariant);
+  const Outcome<std::vector<Token>, Refusal> tokens = Tokens(text_, kInvariant);
   if (!tokens.has_value()) { return text_; }
   return Rendered(*tokens, kPacked);
 }

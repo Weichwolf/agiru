@@ -1,10 +1,10 @@
 #include "XmlEngine.h"
 
+#include "type/Outcome.h"
 #include "type/XmlHandle.h"
 
 #include <algorithm>
 #include <cstring>
-#include <expected>
 #include <limits>
 #include <memory>
 #include <string>
@@ -194,27 +194,27 @@ private:
 };
 
 template <typename Read>
-std::expected<XmlHandle, std::string>
+Outcome<XmlHandle, std::string>
 ReadDocument(bool preserveWhitespace, int options, const Read &read) {
   XmlParseFailure failure;
   const std::unique_ptr<xmlParserCtxt, decltype(&xmlFreeParserCtxt)> context(xmlNewParserCtxt(),
                                                                              &xmlFreeParserCtxt);
-  if (context == nullptr) { return std::unexpected("XML parser context allocation failed."); }
+  if (context == nullptr) { return Failed("XML parser context allocation failed."); }
   context->_private = &failure;
   context->sax->serror = &XmlParseFailure::Capture;
   options |= XML_PARSE_NOERROR | XML_PARSE_NOWARNING;
   if (!preserveWhitespace) { options |= XML_PARSE_NOBLANKS; }
   std::unique_ptr<xmlDoc, decltype(&xmlFreeDoc)> doc(read(context.get(), options), &xmlFreeDoc);
-  if (doc == nullptr) { return std::unexpected(failure.Text()); }
+  if (doc == nullptr) { return Failed(failure.Text()); }
   XmlTree *const tree = NewTree(doc.get());
   return XmlHandle(tree, doc.release());
 }
 
 }
 
-std::expected<XmlHandle, std::string> ReadXml(std::string_view text, bool preserveWhitespace) {
+Outcome<XmlHandle, std::string> ReadXml(std::string_view text, bool preserveWhitespace) {
   if (text.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-    return std::unexpected("XML input exceeds the parser's size limit.");
+    return Failed("XML input exceeds the parser's size limit.");
   }
   return ReadDocument(
       preserveWhitespace, XML_PARSE_NONET, [&](xmlParserCtxtPtr context, int options) {
@@ -227,8 +227,8 @@ std::expected<XmlHandle, std::string> ReadXml(std::string_view text, bool preser
       });
 }
 
-std::expected<XmlHandle, std::string> ReadXmlLocation(std::string_view location,
-                                                      bool preserveWhitespace) {
+Outcome<XmlHandle, std::string> ReadXmlLocation(std::string_view location,
+                                                bool preserveWhitespace) {
   const std::string held(location);
   return ReadDocument(preserveWhitespace, 0, [&](xmlParserCtxtPtr context, int options) {
     return xmlCtxtReadFile(context, held.c_str(), nullptr, options);
