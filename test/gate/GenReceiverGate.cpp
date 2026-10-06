@@ -23,7 +23,10 @@ void NativeAliasesRemainRebuiltTypes() {
                            "JValue",
                            "BinaryReader",
                            "BinaryWriter",
-                           "CultureInfo"}) {
+                           "CultureInfo",
+                           "String",
+                           "Regex",
+                           "TimeSpan"}) {
     declaration.subtype = name;
     CHECK_TRUE("an AL type alias remains implemented", types.contains(name));
     CHECK_TRUE("the alias does not emit an absent CLR stub",

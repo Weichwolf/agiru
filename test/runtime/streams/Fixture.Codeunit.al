@@ -2,6 +2,30 @@ namespace Microsoft.Fixture;
 
 codeunit 50261 "Stream Alias Consumer"
 {
+    procedure ClrString(Value: Text): Text
+    var
+        StringValue: DotNet String;
+    begin
+        StringValue := StringValue.String(Value);
+        exit(StringValue.ToString());
+    end;
+
+    procedure ClrRegex(Value: Text): Text
+    var
+        Pattern: DotNet Regex;
+    begin
+        Pattern := Pattern.Regex('(?<word>[a-z]+)-(\d+)');
+        exit(Pattern.Replace(Value, '${word}=$2'));
+    end;
+
+    procedure ClrTimeSpan(): BigInteger
+    var
+        Span: DotNet TimeSpan;
+    begin
+        Span := Span.TimeSpan(1, 2, 3);
+        exit(Span.Ticks);
+    end;
+
     procedure CultureName(CultureId: Integer): Text
     var
         Culture: DotNet CultureInfo;

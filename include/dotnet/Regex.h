@@ -4,7 +4,7 @@
 #include "dotnet/TimeSpan.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include <cstddef>
@@ -16,6 +16,10 @@
 #include <vector>
 
 namespace agiru::dotnet {
+
+class RegexValue;
+/// \brief The AL name of the native Regex value.
+using Regex = RegexValue;
 
 /// \brief .NET `System.Array` as the BaseApp walks one: what `Regex.Split`, `GetGroupNames` and
 ///        `GetGroupNumbers` answer, read by a `foreach` and by `Length` / `GetValue`.
@@ -40,8 +44,10 @@ public:
 
   /// \brief `Array.CreateInstance(type, length)`: an array of `length` empty values.
   /// \tparam Type The .NET `Type`, which decides nothing here: every cell holds a `Variant`.
-  /// \param length How many cells. \return The array.
-  template <typename Type> [[nodiscard]] static Array CreateInstance(const Type &, Integer length) {
+  /// \param type The erased element type. \param length How many cells. \return The array.
+  template <typename Type>
+  [[nodiscard]] static Array CreateInstance(const Type &type, Integer length) {
+    static_cast<void>(type);
     Array out;
     out.items_.resize(static_cast<std::size_t>(length < 0 ? 0 : length));
     return out;
@@ -306,27 +312,27 @@ private:
 ///       `RightToLeft`, `ECMAScript` and `CultureInvariant` change nothing here; `Compiled` and
 ///       `IgnorePatternWhitespace` are refused, since a pattern written for them would read
 ///       differently. The timeout is carried and not enforced.
-class Regex {
+class RegexValue {
 public:
   /// \brief The binder behind `R := R.Regex(pattern[, options[, timeout]])`.
   struct Binder {
     /// \brief `new Regex(pattern)`. \param pattern The pattern. \return The regex.
-    [[nodiscard]] class Regex operator()(std::string_view pattern) const;
+    [[nodiscard]] class RegexValue operator()(std::string_view pattern) const;
 
     /// \brief `new Regex(pattern, options)`. \param pattern The pattern. \param options The
     ///        options. \return The regex.
-    [[nodiscard]] class Regex operator()(std::string_view pattern,
-                                         const RegexOptions &options) const;
+    [[nodiscard]] class RegexValue operator()(std::string_view pattern,
+                                              const RegexOptions &options) const;
 
     /// \brief `new Regex(pattern, options, timeout)`. \param pattern The pattern. \param options
     ///        The options. \param timeout The match timeout, carried. \return The regex.
-    [[nodiscard]] class Regex operator()(std::string_view pattern,
-                                         const RegexOptions &options,
-                                         const TimeSpan &timeout) const;
+    [[nodiscard]] class RegexValue operator()(std::string_view pattern,
+                                              const RegexOptions &options,
+                                              const TimeSpan &timeout) const;
   };
 
   /// \brief `R.Regex(...)`, the constructor as AL calls it.
-  Binder Regex;
+  static constexpr Binder Regex{};
 
   /// \brief `Regex.IsMatch(input)`. \param input The text. \return Whether the pattern matches
   ///        somewhere in it.

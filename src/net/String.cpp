@@ -1,6 +1,11 @@
 #include "dotnet/String.h"
 
+#include "dotnet/Refused.h"
+#include "dotnet/Regex.h"
 #include "runtime/ErrorValue.h"
+#include "type/Char.h"
+#include "type/Integer.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include <cctype>
@@ -12,6 +17,10 @@
 namespace agiru::dotnet {
 
 namespace {
+
+constexpr unsigned char kUtf8FourByteLead = 0xF0U;
+constexpr unsigned char kUtf8ThreeByteLead = 0xE0U;
+constexpr unsigned char kUtf8TwoByteLead = 0xC0U;
 
 std::vector<std::string> TextsOf(const Array &chars) {
   std::vector<std::string> out;
@@ -56,11 +65,11 @@ std::vector<std::string> EachCharacter(std::string_view text) {
   while (at < text.size()) {
     const auto lead = static_cast<unsigned char>(text[at]);
     std::size_t length = 1;
-    if (lead >= 0xF0U) {
+    if (lead >= kUtf8FourByteLead) {
       length = 4;
-    } else if (lead >= 0xE0U) {
+    } else if (lead >= kUtf8ThreeByteLead) {
       length = 3;
-    } else if (lead >= 0xC0U) {
+    } else if (lead >= kUtf8TwoByteLead) {
       length = 2;
     }
     if (at + length > text.size()) { length = text.size() - at; }

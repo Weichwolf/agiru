@@ -5,13 +5,14 @@
 #include "type/Boolean.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <regex>
 #include <string>
@@ -31,9 +32,10 @@ namespace {
 
 constexpr std::int64_t kTicksPerMillisecond = 10000;
 constexpr std::int64_t kMillisecondsPerSecond = 1000;
+constexpr Integer kDefaultRegexCacheSize = 15;
 
 Integer &CacheSizeHeld() {
-  static Integer size = 15;
+  static Integer size = kDefaultRegexCacheSize;
   return size;
 }
 
@@ -95,9 +97,17 @@ Match MatchOf(const std::smatch &found, std::size_t offset, const std::vector<st
         found[g].matched,
         name);
   }
-  return Match(static_cast<Integer>(found.position(0) + static_cast<std::ptrdiff_t>(offset)),
-               found[0].str(),
-               std::move(groups));
+  return {static_cast<Integer>(found.position(0) + static_cast<std::ptrdiff_t>(offset)),
+          found[0].str(),
+          std::move(groups)};
+}
+
+std::string NamedReplacement(const std::vector<Group> &groups, std::string_view name) {
+  std::string out;
+  for (const Group &group : groups) {
+    if (group.Name().Value() == name) { out += group.Value().Value(); }
+  }
+  return out;
 }
 
 }
@@ -118,20 +128,20 @@ std::int64_t TicksOf(std::int64_t days,
 }
 }
 
-class TimeSpan TimeSpan::Binder::operator()(::agiru::Integer hours,
+class TickSpan TimeSpan::Binder::operator()(::agiru::Integer hours,
                                             ::agiru::Integer minutes,
                                             ::agiru::Integer seconds) const {
   return (*this)(TicksOf(0, hours, minutes, seconds, 0));
 }
 
-class TimeSpan TimeSpan::Binder::operator()(::agiru::Integer days,
+class TickSpan TimeSpan::Binder::operator()(::agiru::Integer days,
                                             ::agiru::Integer hours,
                                             ::agiru::Integer minutes,
                                             ::agiru::Integer seconds) const {
   return (*this)(TicksOf(days, hours, minutes, seconds, 0));
 }
 
-class TimeSpan TimeSpan::Binder::operator()(::agiru::Integer days,
+class TickSpan TimeSpan::Binder::operator()(::agiru::Integer days,
                                             ::agiru::Integer hours,
                                             ::agiru::Integer minutes,
                                             ::agiru::Integer seconds,
@@ -139,21 +149,21 @@ class TimeSpan TimeSpan::Binder::operator()(::agiru::Integer days,
   return (*this)(TicksOf(days, hours, minutes, seconds, milliseconds));
 }
 
-class TimeSpan TimeSpan::Binder::operator()(std::int64_t ticks) const {
+class TickSpan TimeSpan::Binder::operator()(std::int64_t ticks) const {
   return TimeSpan::FromTicks(ticks);
 }
 
-class TimeSpan TimeSpan::FromTicks(std::int64_t ticks) {
-  class TimeSpan span;
+class TickSpan TimeSpan::FromTicks(std::int64_t ticks) {
+  class TickSpan span;
   span.ticks_ = ticks;
   return span;
 }
 
-class TimeSpan TimeSpan::FromSeconds(const Decimal &seconds) {
+class TickSpan TimeSpan::FromSeconds(const Decimal &seconds) {
   return FromMilliseconds(seconds * Decimal{kMillisecondsPerSecond});
 }
 
-class TimeSpan TimeSpan::FromMilliseconds(const Decimal &milliseconds) {
+class TickSpan TimeSpan::FromMilliseconds(const Decimal &milliseconds) {
   const Decimal whole = Round(milliseconds, Decimal{1}, RoundDirection::Nearest);
   return FromTicks(std::stoll(whole.ToInvariantString()) * kTicksPerMillisecond);
 }
@@ -200,9 +210,7 @@ GroupCollection Match::Groups() const {
       const std::size_t end = replacement.find('}', i + 2);
       if (end != std::string_view::npos) {
         const std::string_view name = replacement.substr(i + 2, end - i - 2);
-        for (const Group &group : groups_) {
-          if (group.Name().Value() == name) { out += std::string(group.Value().Value()); }
-        }
+        out += NamedReplacement(groups_, name);
         i = end;
         continue;
       }
@@ -253,18 +261,19 @@ const Match &MatchCollection::Item(Integer index) const {
   return matches_[static_cast<std::size_t>(index)];
 }
 
-class Regex Regex::Binder::operator()(std::string_view pattern) const {
+class RegexValue Regex::Binder::operator()(std::string_view pattern) const {
   return (*this)(pattern, RegexOptions{}, TimeSpan{});
 }
 
-class Regex Regex::Binder::operator()(std::string_view pattern, const RegexOptions &options) const {
+class RegexValue Regex::Binder::operator()(std::string_view pattern,
+                                           const RegexOptions &options) const {
   return (*this)(pattern, options, TimeSpan{});
 }
 
-class Regex Regex::Binder::operator()(std::string_view pattern,
-                                      const RegexOptions &options,
-                                      const TimeSpan &timeout) const {
-  class Regex out;
+class RegexValue Regex::Binder::operator()(std::string_view pattern,
+                                           const RegexOptions &options,
+                                           const TimeSpan &timeout) const {
+  class RegexValue out;
   Translated translated = WithoutNamedGroups(pattern);
   try {
     out.compiled_ = std::make_shared<const Compiled>(translated.pattern, FlagsOf(options));
@@ -427,7 +436,8 @@ Integer Regex::GroupNumberFromName(std::string_view name) const {
 }
 
 Integer Regex::GetHashCode() const {
-  return static_cast<Integer>(std::hash<std::string>{}(pattern_) & 0x7fffffff);
+  return static_cast<Integer>(std::hash<std::string>{}(pattern_) &
+                              static_cast<std::size_t>(std::numeric_limits<Integer>::max()));
 }
 
 ::agiru::Text<0> Regex::Escape(std::string_view text) {

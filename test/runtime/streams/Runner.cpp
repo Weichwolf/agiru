@@ -1,3 +1,4 @@
+#include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/File.h"
 #include "type/Integer.h"
@@ -13,6 +14,15 @@
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
     agiru::Fixture::StreamAliasConsumer_Codeunit consumer;
+    CHECK_TEXT("generated CLR string factories preserve Unicode",
+               consumer.ClrString("hällo").Value(),
+               "hällo");
+    CHECK_TEXT("generated CLR regex factories preserve named/numbered replacements",
+               consumer.ClrRegex("item-42 and other-7").Value(),
+               "item=42 and other=7");
+    constexpr agiru::BigInteger kOneHourTwoMinutesThreeSecondsTicks = 37230000000;
+    CHECK_TRUE("generated CLR TimeSpan factories retain exact Int64 ticks",
+               consumer.ClrTimeSpan() == kOneHourTwoMinutesThreeSecondsTicks);
     constexpr agiru::Integer kWindowsEnglishUnitedStatesLcid = 1033;
     CHECK_TEXT("generated immutable culture factories retain their AL name",
                consumer.CultureName(kWindowsEnglishUnitedStatesLcid).Value(),

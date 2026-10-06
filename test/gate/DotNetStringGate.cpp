@@ -2,18 +2,21 @@
 #include "dotnet/String.h"
 #include "runtime/ErrorValue.h"
 #include "type/Char.h"
-#include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include "Check.h"
 
 #include <string>
+#include <string_view>
+#include <type_traits>
 
 using agiru::dotnet::Array;
 using agiru::dotnet::String;
 
 namespace {
+
+static_assert(std::is_const_v<decltype(String::String)>);
 
 std::string Joined(const Array &pieces) {
   std::string out;
@@ -74,14 +77,14 @@ void AStringSplitsTrimsPadsAndSlicesTheWayDotNetDoes() {
   CHECK_TRUE("Contains", repeated.Contains("-") && !repeated.Contains("z"));
   CHECK_TRUE("Chars is zero-based", repeated.Chars(2) == agiru::Char{'-'});
   String made;
-  made = made.String(word.ToCharArray());
+  made = String::String(word.ToCharArray());
   CHECK_TEXT("the constructor over a char array joins the characters",
              std::string(std::string_view(made)),
              "abc");
   CHECK_TEXT("ToCharArray keeps a multi-byte character whole",
-             Joined(String{}.String("ä-b").ToCharArray()),
+             Joined(String::String("ä-b").ToCharArray()),
              "[ä][-][b]");
-  agiru::Text<0> asText = agiru::Text<0>{std::string_view(word)};
+  const agiru::Text<0> asText = agiru::Text<0>{std::string_view(word)};
   CHECK_TEXT("it reads back as Text", std::string(std::string_view(asText)), "abc");
   // THE NEGATIVE CONTROL: an index outside the string refuses, as .NET does, rather than
   // answering an empty slice.

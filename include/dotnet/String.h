@@ -5,13 +5,19 @@
 #include "type/Boolean.h"
 #include "type/Char.h"
 #include "type/Integer.h"
+#include "type/StringValue.h"
 #include "type/Text.h"
 
 #include <concepts>
+#include <cstddef>
 #include <string>
 #include <string_view>
 
 namespace agiru::dotnet {
+
+class ClrString;
+/// \brief The AL name of the native String value.
+using String = ClrString;
 
 /// \brief .NET `System.String`, rebuilt as the BaseApp uses it: a text a `DotNet String` variable
 ///        is assigned from, whose members split, trim, pad, search and slice it, and which reads
@@ -31,41 +37,41 @@ namespace agiru::dotnet {
 /// \note `Normalize` IS THE IDENTITY. Unicode normalisation is a table this runtime does not
 ///       carry (ICU would be the dependency); the BaseApp normalises file names before comparing
 ///       them, and an identity keeps every comparison that held before.
-class String {
+class ClrString {
 public:
   /// \brief The binder behind `DotNetString := DotNetString.String(...)`, the constructor as AL
   ///        spells it.
   struct Binder {
     /// \brief `new String(chars)`: the characters, in order. \param chars An array of `Char`s.
     /// \return The string.
-    [[nodiscard]] class String operator()(const Array &chars) const;
+    [[nodiscard]] class ClrString operator()(const Array &chars) const;
     /// \brief `new String(text)`. \param text The text. \return The string.
-    [[nodiscard]] class String operator()(std::string_view text) const;
+    [[nodiscard]] class ClrString operator()(std::string_view text) const;
     /// \brief `new String(x)` over a value this runtime does not carry. \param refused The value.
     /// \return Never.
     /// \throws Error naming the refused member.
-    [[nodiscard]] class String operator()(const Refused &refused) const;
+    [[nodiscard]] class ClrString operator()(const Refused &refused) const;
   };
 
   /// \brief `String.String(...)`, the constructor as AL calls it.
-  Binder String;
+  static constexpr Binder String{};
 
   /// \brief AL `DotNetString := Text`. \param text The text. \return This string.
-  class String &operator=(std::string_view text) {
+  class ClrString &operator=(std::string_view text) {
     value_ = text;
     return *this;
   }
 
   /// \brief AL `DotNetString := Text`, from a `Text` or `Code` of any length.
   /// \tparam N The declared length. \param text The text. \return This string.
-  template <std::size_t N> class String &operator=(const ::agiru::Text<N> &text) {
+  template <std::size_t N> class ClrString &operator=(const ::agiru::Text<N> &text) {
     value_ = std::string_view(text);
     return *this;
   }
 
   /// \brief AL `DotNetString := Text`, from a literal. \param text The literal.
   /// \return This string.
-  class String &operator=(const char *text) {
+  class ClrString &operator=(const char *text) {
     value_ = text == nullptr ? std::string_view{} : std::string_view(text);
     return *this;
   }
@@ -73,7 +79,7 @@ public:
   /// \brief AL `DotNetString := Absent.Member`, from a value this runtime does not carry.
   /// \param refused The value. \return Never.
   /// \throws Error naming the refused member.
-  class String &operator=(const Refused &refused) {
+  class ClrString &operator=(const Refused &refused) {
     static_cast<void>(refused());
     return *this;
   }
@@ -135,37 +141,37 @@ public:
   /// \brief `String.Replace(oldValue, newValue)`: every occurrence. \param oldValue What to find.
   /// \param newValue What to put. \return The new string.
   /// \throws Error when `oldValue` is empty, as .NET does.
-  [[nodiscard]] class String Replace(std::string_view oldValue, std::string_view newValue) const;
+  [[nodiscard]] class ClrString Replace(std::string_view oldValue, std::string_view newValue) const;
 
   /// \brief `String.Trim()`: white space off both ends. \return The new string.
-  [[nodiscard]] class String Trim() const;
+  [[nodiscard]] class ClrString Trim() const;
 
   /// \brief `String.Trim(chars)`. \param chars The characters to take off. \return The new string.
-  [[nodiscard]] class String Trim(const Array &chars) const;
+  [[nodiscard]] class ClrString Trim(const Array &chars) const;
 
   /// \brief `String.TrimStart()`. \return The new string.
-  [[nodiscard]] class String TrimStart() const;
+  [[nodiscard]] class ClrString TrimStart() const;
 
   /// \brief `String.TrimStart(chars)`. \param chars The characters to take off.
   /// \return The new string.
-  [[nodiscard]] class String TrimStart(const Array &chars) const;
+  [[nodiscard]] class ClrString TrimStart(const Array &chars) const;
 
   /// \brief `String.TrimEnd()`. \return The new string.
-  [[nodiscard]] class String TrimEnd() const;
+  [[nodiscard]] class ClrString TrimEnd() const;
 
   /// \brief `String.TrimEnd(chars)`. \param chars The characters to take off.
   /// \return The new string.
-  [[nodiscard]] class String TrimEnd(const Array &chars) const;
+  [[nodiscard]] class ClrString TrimEnd(const Array &chars) const;
 
   /// \brief `String.PadLeft(totalWidth [, paddingChar])`. \param totalWidth The width.
   /// \param paddingChar The filler, a space by default. \return The new string.
-  [[nodiscard]] class String PadLeft(::agiru::Integer totalWidth,
-                                     ::agiru::Char paddingChar = ::agiru::Char{' '}) const;
+  [[nodiscard]] class ClrString PadLeft(::agiru::Integer totalWidth,
+                                        ::agiru::Char paddingChar = ::agiru::Char{' '}) const;
 
   /// \brief `String.PadRight(totalWidth [, paddingChar])`. \param totalWidth The width.
   /// \param paddingChar The filler, a space by default. \return The new string.
-  [[nodiscard]] class String PadRight(::agiru::Integer totalWidth,
-                                      ::agiru::Char paddingChar = ::agiru::Char{' '}) const;
+  [[nodiscard]] class ClrString PadRight(::agiru::Integer totalWidth,
+                                         ::agiru::Char paddingChar = ::agiru::Char{' '}) const;
 
   /// \brief `String.IndexOf(value [, startIndex])`. \param value The text to find.
   /// \param startIndex Where to start, zero-based. \return The position, or -1.
@@ -196,12 +202,13 @@ public:
 
   /// \brief `String.Substring(startIndex)`. \param startIndex Zero-based. \return The rest.
   /// \throws Error when the index is outside the string.
-  [[nodiscard]] class String Substring(::agiru::Integer startIndex) const;
+  [[nodiscard]] class ClrString Substring(::agiru::Integer startIndex) const;
 
   /// \brief `String.Substring(startIndex, length)`. \param startIndex Zero-based.
   /// \param length How many. \return The slice.
   /// \throws Error when the range is outside the string.
-  [[nodiscard]] class String Substring(::agiru::Integer startIndex, ::agiru::Integer length) const;
+  [[nodiscard]] class ClrString Substring(::agiru::Integer startIndex,
+                                          ::agiru::Integer length) const;
 
   /// \brief `String.StartsWith(value)`. \param value The prefix. \return Whether it starts so.
   [[nodiscard]] ::agiru::Boolean StartsWith(std::string_view value) const {
@@ -222,7 +229,7 @@ public:
   /// \tparam Arguments The normalisation form, when given.
   /// \param arguments Read only to be discarded. \return The same string.
   template <typename... Arguments>
-  [[nodiscard]] class String Normalize(const Arguments &...arguments) const {
+  [[nodiscard]] class ClrString Normalize(const Arguments &...arguments) const {
     (static_cast<void>(arguments), ...);
     return *this;
   }
@@ -249,7 +256,7 @@ public:
   static constexpr Refused GetType{{.type = "String", .member = "GetType"}};
 
   /// \brief Two strings compare by text. \param other The other. \return Whether equal.
-  [[nodiscard]] bool operator==(const class String &other) const {
+  [[nodiscard]] bool operator==(const class ClrString &other) const {
     return std::string_view(value_) == std::string_view(other.value_);
   }
 
