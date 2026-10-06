@@ -509,8 +509,8 @@ std::string RuntimeIncludes(std::string_view text, ObjectKind kind) {
     default: break;
   }
   for (const std::string &type : RuntimeTypes()) {
+    if (!Mentions(text, type)) { continue; }
     const std::size_t bare = type.starts_with("agiru::") ? std::string_view{"agiru::"}.size() : 0;
-    if (!Mentions(text, std::string_view{type}.substr(bare))) { continue; }
     headers.insert("type/" + type.substr(bare) + ".h");
   }
   for (const auto &[member, family] : kFamilies) {

@@ -136,13 +136,16 @@ void QualifiedConversionNamesRemainHiddenByRuntimeMembers() {
              !agiru::gen::HiddenByABaseMember("NoRuntimeMemberFixture"));
   CHECK_TRUE("a qualified function-pointer result is not a member name",
              !agiru::gen::HiddenByABaseMember("Action"));
-  for (const auto *spelling : {"Boolean Flag;", "::agiru::Boolean Flag;"}) {
-    CHECK_TRUE("qualified and unqualified scalar names retain their direct provider",
+  for (const auto *spelling : {"agiru::Boolean Flag;", "::agiru::Boolean Flag;"}) {
+    CHECK_TRUE("runtime-qualified scalar names retain their direct provider",
                agiru::gen::RuntimeIncludes(spelling, agiru::gen::ObjectKind::Codeunit)
                    .contains("#include \"type/Boolean.h\""));
   }
   CHECK_TRUE("identifier substrings do not introduce scalar dependencies",
              !agiru::gen::RuntimeIncludes("BooleanCarrier Value;", agiru::gen::ObjectKind::Codeunit)
+                  .contains("#include \"type/Boolean.h\""));
+  CHECK_TRUE("a caller's unqualified scalar name does not introduce a runtime dependency",
+             !agiru::gen::RuntimeIncludes("Boolean Flag;", agiru::gen::ObjectKind::Codeunit)
                   .contains("#include \"type/Boolean.h\""));
 }
 
