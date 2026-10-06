@@ -302,6 +302,39 @@ void LocalizedCaptionsRemainCounted() {
              refusal.contains("localized Caption"));
 }
 
+void UnicodeBlankCaptions() {
+  constexpr std::array<std::string_view, 25> whitespace{
+      "\t",     "\n",     "\v",     "\f",     "\r",     " ",      "\u0085", "\u00A0", "\u1680",
+      "\u2000", "\u2001", "\u2002", "\u2003", "\u2004", "\u2005", "\u2006", "\u2007", "\u2008",
+      "\u2009", "\u200A", "\u2028", "\u2029", "\u202F", "\u205F", "\u3000"};
+  auto source = kFirst;
+  std::string mixed;
+  for (const auto character : whitespace) {
+    source.caption = character;
+    CHECK_TEXT("every .NET whitespace caption falls back to its original name",
+               agiru::detail::ProjectPageMetadata(source).Caption.Value(),
+               source.name);
+    mixed += character;
+  }
+  source.caption = mixed;
+  CHECK_TEXT("mixed Unicode whitespace captions retain the name fallback",
+             agiru::detail::ProjectPageMetadata(source).Caption.Value(),
+             source.name);
+  constexpr std::array<std::string_view, 9> nonblank{
+      "\u180E", "\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF", "\b", "😀", "中"};
+  for (const auto character : nonblank) {
+    const auto padded = std::string("\u00A0") + std::string(character) + "\u3000";
+    source.caption = padded;
+    CHECK_TEXT("non-whitespace Unicode captions preserve every original byte",
+               agiru::detail::ProjectPageMetadata(source).Caption.Value(),
+               source.caption);
+  }
+  source.caption = std::string_view("\0", 1);
+  CHECK_TEXT("embedded NUL is caption data rather than whitespace",
+             agiru::detail::ProjectPageMetadata(source).Caption.Value(),
+             source.caption);
+}
+
 void ProjectionBoundsAndIntegrity() {
   auto source = kSecond;
   const std::string name(Row::kCaptionLength + 1, 'n');
@@ -467,6 +500,7 @@ int main() {
     QualifiedTextAndRefusals();
     DeclaredPoliciesDoNotBecomeDefaults();
     LocalizedCaptionsRemainCounted();
+    UnicodeBlankCaptions();
     ProjectionBoundsAndIntegrity();
     ViewsAndReadOnlyBoundaries();
   });

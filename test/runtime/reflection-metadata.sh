@@ -268,13 +268,16 @@ for control in catalogue-population catalogue-bookmark catalogue-filter catalogu
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
 
-for control in page-name-width page-caption-name page-source-table page-card-id page-temporary-source page-null-owner page-system-provider page-zero-version page-unqualified-default page-language-fallback; do
+for control in page-name-width page-caption-name page-ascii-blank page-source-table page-card-id page-temporary-source page-null-owner page-system-provider page-zero-version page-unqualified-default page-language-fallback; do
   awk -v control="$control" '
     control == "page-name-width" && /row.Name = MetadataText\(source.name, Row::kNameLength\);/ {
       sub(/Row::kNameLength/, "Row::kNameLength - 1"); changed++
     }
     control == "page-caption-name" && /row.Caption = MetadataText\(caption, Row::kCaptionLength\);/ {
       sub(/MetadataText\(caption,/, "MetadataText((static_cast<void>(caption), source.name),"); changed++
+    }
+    control == "page-ascii-blank" && /const auto caption = MetadataBlank\(source.caption\)/ {
+      sub(/MetadataBlank\(source.caption\)/, "TrimText(source.caption, TrimSides::Both, {}).empty()"); changed++
     }
     control == "page-source-table" && /row.SourceTable = source.source.Value\(\);/ {
       $0 = "  row.SourceTable = 0;"; changed++
@@ -310,6 +313,7 @@ for control in page-name-width page-caption-name page-source-table page-card-id 
   case "$control" in
     page-name-width) claim='Name truncation uses the original name width';;
     page-caption-name) claim='declared Caption remains independent';;
+    page-ascii-blank) claim='every .NET whitespace caption falls back to its original name';;
     page-source-table|page-card-id) claim='declared source and card page IDs remain exact';;
     page-temporary-source) claim='native SourceTableTemporary includes the underlying table type';;
     page-null-owner) claim='App ID borrows the original declaring application';;
@@ -321,6 +325,22 @@ for control in page-name-width page-caption-name page-source-table page-card-id 
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/page-controls.sha256"
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
+
+awk '
+  /"\\u0085"/ {
+    sub(/\\u0085/, "\\u200B"); changed++
+  }
+  {print} END {if (changed != 1) exit 2}
+' src/rt/MetadataText.cpp > "$proof/page-zero-width-blank.cpp"
+"$CXX" "${flags[@]}" "$proof/page-zero-width-blank.cpp" -L"$B" -Wl,-rpath,"$B" \
+  -lagiru_rt -lagiru_net -lagiru_db -o "$proof/page-zero-width-blank.so"
+page_status=0
+LD_PRELOAD="$proof/page-zero-width-blank.so" "$page_gate" \
+  > "$proof/page-zero-width-blank.log" 2>&1 || page_status=$?
+[ "$page_status" -eq 1 ]
+rg -q 'FAIL .*non-whitespace Unicode captions preserve every original byte' "$proof/page-zero-width-blank.log"
+sha256sum "$proof/page-zero-width-blank.cpp" "$proof/page-zero-width-blank.so" >> "$proof/page-controls.sha256"
+rm -- "$proof/page-zero-width-blank.cpp" "$proof/page-zero-width-blank.so"
 
 awk '
   /const auto result = value.substr\(0, ByteOfUnit\(value, length \+ 1\)\);/ {
@@ -801,4 +821,4 @@ for control in flow-native-route flow-literal-reparse flow-filter-erasure flow-k
 done
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -exec sha256sum {} + > "$proof/disposable.sha256"
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -delete
-printf 'reflection-metadata: shared live Table/Page Metadata and positive-key Field Get/Find/Next/Count, typed/RecordRef CalcFields with exact predicates and bounded scans, optional Get consumption, original declarations, current User lookups, read-only assignment, stable identities, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; seventy-seven compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: shared live Table/Page Metadata and positive-key Field Get/Find/Next/Count, typed/RecordRef CalcFields with exact predicates and bounded scans, Unicode blank-caption fallback, optional Get consumption, original declarations, current User lookups, read-only assignment, stable identities, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; seventy-nine compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

@@ -119,7 +119,9 @@ identity/version. `TableMetadataCatalogueGate` adds raw-identity counts, sparse 
 native option/mixed ordering, Get/Next anchoring, RecordRef parity and ownership/binding
 refusals. `PageMetadataCatalogueGate` covers native source/card IDs, Name/Caption,
 policy flags, original app identity, UTF-16 widths, bookmark/filter/mark/order and
-typed/RecordRef parity. Shared bookmark/filter/key-hole mutants fail all applicable
+typed/RecordRef parity. Page caption fallback recognizes the 25 .NET whitespace
+characters without trimming nonblank caption data; ASCII-only and zero-width-as-blank
+mutants reject. Shared bookmark/filter/key-hole mutants fail all applicable
 catalogue gates; page-specific controls detect wrong projections and fabricated
 defaults. `PageRecordBindingGate` executes generated AL list-to-card Get and
 navigation in named/numeric forms without copying native source declarations.

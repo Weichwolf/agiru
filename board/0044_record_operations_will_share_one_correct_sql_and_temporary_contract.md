@@ -8,7 +8,7 @@ repairs with 0013/0058 on every UT identity; trace the Incoming Documents regres
 Complete Page Metadata canonical views, caption expressions/field lists, static dynamic-property
 resolution, localization, source-object presence, API versions, masks, SystemId reads and permissions.
 Complete Field classification, SQLDataType, package provenance and permissions;
-qualify calculated catalogue predicates and Unicode blank-caption fallback.
+qualify calculated catalogue predicates.
 Investigate StoredImage; qualify remaining virtual SystemId and diagnostic/localization contracts.
 Latest completed AL replay (`a554715`) is 2210/2314: forty gains and one loss against
 `61344f7`, no missing/added/duplicate identities, zero incomplete codeunits. Build and
@@ -92,6 +92,24 @@ identity prevents causal A/B proof. No newer provider gain or full G1 is claimed
 
 ## Acceptance
 
+- Page caption fallback uses `MetadataBlank`, a borrowed, allocation-free UTF-8 scan
+  of the 25 .NET whitespace characters, not the ASCII-only Trim default. Empty/blank
+  captions use the original name before truncation; nonblank text is not trimmed.
+  Authority: BC 29 `NCL.dll` Page Metadata provider calls `String.IsNullOrWhiteSpace`
+  (platform hash `277e35cbdfb8`); the character set is Microsoft Learn's
+  [Char.IsWhiteSpace remarks](https://learn.microsoft.com/en-us/dotnet/api/system.char.iswhitespace?view=net-8.0).
+  Developer `f928288ee840` `devenv-caption-property.md` defines caption purpose but
+  does not specify blank classification; `text-trim-method.md` supplies no character list.
+  BCApps `d99152ee35f0` `BaseApp/Utilities/PageManagement.Codeunit.al::GetPageCaption`
+  consumes this catalogue value. User docs `bf5ffffa9b026` `ui-search-data.md` describe
+  discovery, not classification; predecessor 1781's whitespace split policy is explicitly
+  unverified and is not copied. This changes neither Text.Trim/Split nor other providers.
+  `PageMetadataCatalogueGate` covers all 25 characters, mixed whitespace, NUL,
+  non-BMP data and zero-width/BOM/non-whitespace padding; before the repair, 20 of
+  128 checks fail; after the repair, all 128 pass. `make reflection-metadata JOBS=2`
+  retains the 77 earlier controls and adds ASCII-only/zero-width-as-whitespace controls:
+  all 79 plus the typed-header control reject. MetadataText.cpp, PageMetadata.cpp and
+  the expanded gate pass focused tidy. This repair is not included in the running AL replay.
 - Scalar `CalcFields` uses `CatalogueFlowField.cpp` for qualified native Field/Table/Page
   targets; it no longer sends them to SQL storage. The shared CalcFormula resolver emits
   typed predicates, preserving literal apostrophes, whitespace, at-signs, range/wildcard

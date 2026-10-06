@@ -12,7 +12,6 @@
 #include "runtime/Table.h"
 #include "type/Guid.h"
 #include "type/Language.h"
-#include "type/StringValue.h"
 
 #include "MetadataSystemId.h"
 #include "MetadataText.h"
@@ -90,8 +89,7 @@ platform::PageMetadata_Table ProjectPageMetadata(const PageDef &source) {
   Row row;
   row.ID = source.id.Value();
   row.Name = MetadataText(source.name, Row::kNameLength);
-  const auto caption =
-      TrimText(source.caption, TrimSides::Both, {}).empty() ? source.name : source.caption;
+  const auto caption = MetadataBlank(source.caption) ? source.name : source.caption;
   row.Caption = MetadataText(caption, Row::kCaptionLength);
   row.Editable = StaticBoolean(source.editable, "Editable", source);
   row.PageType = *type;

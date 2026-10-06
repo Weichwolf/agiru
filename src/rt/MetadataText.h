@@ -6,5 +6,6 @@
 namespace agiru::detail {
 
 [[nodiscard]] std::string_view MetadataText(std::string_view value, std::size_t length);
+[[nodiscard]] bool MetadataBlank(std::string_view value);
 
 }
