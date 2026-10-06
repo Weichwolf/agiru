@@ -10,6 +10,7 @@
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Guid.h"
+#include "type/RecordId.h"
 
 #include "Check.h"
 #include "TableMetadata.h"
@@ -212,6 +213,31 @@ void ReflectedReadsAndWritableTemporaryRowsStaySeparate() {
   CHECK_TRUE("installed metadata survives temporary writes", row.Count() == kQualifiedCount);
 }
 
+void ReflectedRecordIdReadsPreserveOptionalResults() {
+  TableMetadata row;
+  row.ID = kFirstId;
+  const auto existing = row.RecordId();
+  row.ID = 0;
+  const auto missing = row.RecordId();
+  agiru::RecordRef reflected;
+  CHECK_TRUE("RecordRef.Get can open a native catalogue from its identity",
+             reflected.Get(existing));
+  reflected.SetTable(row);
+  CHECK_TRUE("RecordRef.Get reads the native provider's exact app identity",
+             row.ID == kFirstId && row.AppID == agiru::Guid(kModule.id));
+  CHECK_TRUE("consumed native RecordRef.Get misses remain false", !reflected.Get(missing));
+  const auto discarded = Failure([&] { reflected.Get(missing); });
+  CHECK_TRUE("discarded native RecordRef.Get misses retain the searched ID",
+             discarded ==
+                 "The Table Metadata does not exist. Identification fields and values: ID='0'");
+  row.ID = kUnownedId;
+  const auto unqualified = row.RecordId();
+  CHECK_TRUE("consumed RecordRef.Get does not suppress malformed provider reads",
+             Failure([&] {
+               static_cast<void>(static_cast<bool>(reflected.Get(unqualified)));
+             }).contains("original module"));
+}
+
 }
 
 int main() {
@@ -220,5 +246,6 @@ int main() {
     CountsAndNavigationUseTheInstalledRegistry();
     FiltersMarksOrderingAndBookmarksShareTheRecordContract();
     ReflectedReadsAndWritableTemporaryRowsStaySeparate();
+    ReflectedRecordIdReadsPreserveOptionalResults();
   });
 }

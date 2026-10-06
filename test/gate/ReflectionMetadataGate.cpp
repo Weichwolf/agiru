@@ -148,7 +148,7 @@ void InstalledTableGetUsesTheSharedProjectionWithoutSQL() {
   } catch (const agiru::Error &error) { missing = error.what(); }
   CHECK_TEXT("a discarded metadata Get retains its searched key diagnostic",
              missing,
-             "The Table Metadata does not exist. Identification fields and values: 50175");
+             "The Table Metadata does not exist. Identification fields and values: ID='50175'");
   std::string unowned;
   try {
     static_cast<void>(static_cast<bool>(row.Get(kUnownedSourceTable.id.Value())));

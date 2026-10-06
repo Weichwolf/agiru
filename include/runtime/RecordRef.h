@@ -1047,11 +1047,12 @@ public:
 
   /// \brief AL `RecordRef.Get(RecordId)`. Gets a record based on the ID of the record.
   /// \param RecordID The AL `RecordId`.
-  /// \return The AL `Boolean`.
-  /// \throws Error when the id is blank, or names a table this build does not carry.
-  /// \note IT OPENS THE RECORDREF ON THE ID'S TABLE when it is not open there already, which
-  ///       is what `recordref-get-method.md` describes: the id carries the table and the key.
-  ::agiru::Boolean Get(::agiru::RecordId RecordID);
+  /// \return True when found; a consumed missing result is false. Ordinary filters/key survive.
+  /// \throws Error for a discarded miss, malformed identity or provider/storage failure.
+  /// \note Opens the identity's table when not already open there; an existing temporary
+  ///       binding to that table keeps its independent store. Security-filter enforcement
+  ///       remains unqualified (0044).
+  detail::Found Get(::agiru::RecordId RecordID);
 
   /// \brief AL `RecordRef.GetBySystemId(Guid)`. Gets a record based on the ID of the record. The
   /// RecordRef must already be opened.

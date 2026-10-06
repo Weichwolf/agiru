@@ -4,12 +4,12 @@ Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
 Next: replay qualified Integer, Field and Table Metadata repairs with 0013/0058 on every UT
-identity. Complete Field classification, SQLDataType, package provenance, permissions
-and RecordRef.Get result consumption. Investigate StoredImage.
+identity. Complete Field classification, SQLDataType, package provenance and permissions.
+Investigate StoredImage; qualify remaining virtual SystemId and diagnostic/localization contracts.
 Latest completed AL replay (`61344f7`) is 2171/2314 with 36 gains and zero losses
 against `00c187c`; two Table Metadata navigation refusals remain in Incoming Doc.
 To Data Exch.UT. Integer/live Field repairs are included only in the running `a554715`
-replay; the new shared Table Metadata navigation is not in that snapshot.
+replay; shared Table Metadata navigation and RecordRef.Get consumption are not in that snapshot.
 Do not attribute unmeasured gains to either increment.
 
 ## Implementation
@@ -132,7 +132,7 @@ Do not attribute unmeasured gains to either increment.
   ReflectionMetadataGate passes 294 checks, including exact typed/RecordRef agreement
   on all 29 stored fields. Generated source execution passes 115 checks.
   `make reflection-metadata JOBS=2` retains false-missing, zero-version and
-  stored-FlowField controls within the current 53 compiled controls plus header control.
+  stored-FlowField controls within the current 55 compiled controls plus header control.
   TableMetadata.cpp and generated Runner focused tidy pass. Table.cpp still reports
   sixteen diagnostics; the expanded gate exposes a StoredImage uninitialized-ID
   diagnostic not reported by the previous gate. No suppression or baseline increase.
@@ -145,7 +145,7 @@ Do not attribute unmeasured gains to either increment.
   call-scoped. Primary ID ranges narrow by binary search, other valid orders use
   bounded-memory selection scans. Key-only counts retain unqualified identities;
   projected reads refuse missing original module ownership before changing the caller.
-  `TableMetadataCatalogueGate`: 48 checks for sparse keys, exact options, mixed sorts,
+  `TableMetadataCatalogueGate`: 53 checks for sparse keys, exact options, mixed sorts,
   marks/group -1, signed/extreme Next, independent bookmarks, filter-blind Get followed
   by Next, typed/RecordRef parity, malformed bindings and live/temporary write separation.
   Existing ReflectionMetadataGate retains all 294 checks. Shared bookmark/full-filter
@@ -167,8 +167,8 @@ Do not attribute unmeasured gains to either increment.
   trailing keys still default to zero. Timestamp remains addressable by FieldRef(0),
   positive reserved fields remain catalogued, and temporary zero-key rows stay writable
   and readable through both paths. Typed consumed/discarded misses preserve false versus
-  searched-key errors; projection errors throw and filters survive. RecordRef.Get's
-  own discarded-result wrapper and security-filter enforcement remain separate gaps.
+  searched-key errors; projection errors throw and filters survive. RecordRef.Get now
+  preserves the same consumed/discarded result contract; security enforcement remains open.
   `PlatformFieldGate`: 418 checks, including stored-value parity and qualified binding
   refusal. Runtime mapper and gate focused tidy pass after adding the named Record.h
   dependency; Table.cpp retains sixteen findings, without suppressions/baseline increases.
@@ -189,7 +189,7 @@ Do not attribute unmeasured gains to either increment.
   FieldRef.Value caller, source-declared/positive implicit counts, typed/RecordRef parity,
   signed/extreme Next and temporary zero-key independence. Live DML, empty ModifyAll
   and empty DeleteAll(true) refuse; temporary bulk writes remain valid. A pre-fix
-  replay fails exactly the new empty triggered-delete claim. The qualifier rejects 53 compiled
+  replay fails exactly the new empty triggered-delete claim. The qualifier rejects 55 compiled
   controls plus the header control; Field controls detect timestamp population, lost
   bookmarks, ignored filters, zero version/identity and both empty-write guards.
   Original BC29 FieldDataProvider.GetFieldRecordBuffer RVA `a4330` supplies metadata
@@ -261,9 +261,35 @@ Do not attribute unmeasured gains to either increment.
   Focused tidy remains red: twelve existing TemporaryGate/header findings and
   fourteen AlArrayGate/header findings; the false noexcept overloads are removed.
   No new helper/test finding, suppression or baseline increase; full tidy is open.
+- `RecordRef.Get(RecordId)` now returns the existing `detail::Found` wrapper: consumed
+  misses are false, discarded misses raise DB:RecordNotFound; malformed identities
+  and provider/storage failures still throw. An existing temporary binding retains
+  its store; ordinary filters/key remain unchanged. SQL/native/temporary readers stay shared.
+  `RecordKeyText` in Table.cpp supplies one captioned key diagnostic to typed records
+  and RecordRef; the prior value-only typed diagnostic was wrong. Expected strings
+  now follow declared field captions and the original developer error example, not
+  regenerated observed output. Existing moved-error ownership assertions are unchanged.
+  RecordRefGate retains 147 checks and adds twelve; TableMetadataCatalogueGate adds
+  five to its 48, including missing/consumed/project-error native reads.
+  SqlRowVersionGate retains 114 and adds nine on an owned database: exact identity,
+  version/Decimal, filters, read-only SQL effects, missing/malformed/storage-error results.
+  Source-binding fixtures execute successful/missing consumed and statement Get through
+  generated AL in named/numeric record and table/codeunit contexts. Two new compiled
+  controls remove assertion consumption/key diagnostics and fail both temporary and
+  native gates; the reflection qualifier retains all prior controls (55 total).
+  Developer `f928288ee840`: recordref-get-method.md and
+  `dev-itpro/webservices/dynamics-error-codes.md` (named, quoted identification values).
+  BCApps `d99152ee35f0`: WorkflowRecordChange.FormatValue uses statement Get;
+  WorkflowStepInstance.EnableWorkflow uses optional Get. Predecessor 1695 found the
+  same swallowed statement miss; reuse C++ consumption, not emitter `_al_bare` flags.
+  Focused tidy: native metadata/Field gates pass. RecordRef.cpp/Table.cpp retain
+  5/16 diagnostics; RecordRef/SQL gates retain 2/3 header diagnostics. Independently
+  rerun against frozen `a554715`: normalized diagnostic messages match in all four
+  units, with no additions/suppressions. Resolve these findings before full tidy acceptance.
+  Detailed BC message/localization equivalence and current-tree full AL replay remain open.
 - Record boxes expose borrowing accessors, not writable ownership/table/identity slots.
   `RecordRefGate` qualifies independent snapshots, typed writes, SetTable and clearing
-  one copied slot, plus state self-assignment versus explicit Copy; 147 checks pass.
+  one copied slot, plus state self-assignment versus explicit Copy; 159 checks pass.
   `reflection-metadata.sh` rejects public-owner and assignment-state mutants.
   This is ownership/API evidence, not live link-storage or complete business proof.
   Developer `f928288ee840`: recordref gettable/settable/copylinks/haslinks and

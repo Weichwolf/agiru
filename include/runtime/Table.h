@@ -301,6 +301,11 @@ bool RuntimeDelete(const void *record, const TableDef &table);
 /// \return True when a row carried that key.
 bool RuntimeGet(void *record, const TableDef &table);
 
+/// \brief Render the current primary-key values for typed and reflected Get diagnostics.
+/// \param record The qualified record buffer. \param table Its declaration.
+/// \return Caption='display value' entries in primary-key order, separated by comma and space.
+[[nodiscard]] std::string RecordKeyText(const void *record, const TableDef &table);
+
 /// \brief Opens a server-side cursor over the rows this record's filters and key select, and reads
 ///        the first one into the record.
 ///
@@ -2490,17 +2495,7 @@ protected:
   /// \note Shared with the temporary store, which assigns the key the same way and then searches
   ///       its own rows rather than the database. Doing it twice was the alternative.
   [[nodiscard]] std::string PrimaryKeyText() const {
-    const TableDef &table = TableDefinition<Derived>();
-    if (table.keys.empty()) { return {}; }
-    std::string out;
-    for (const ::agiru::FieldNo no : table.keys[0].fields) {
-      const auto found = std::ranges::find_if(
-          table.fields, [no](const FieldDef &field) { return field.no == no; });
-      if (found == table.fields.end()) { continue; }
-      if (!out.empty()) { out += ", "; }
-      out += ::agiru::FieldText(Self(), *found);
-    }
-    return out;
+    return detail::RecordKeyText(Self(), TableDefinition<Derived>());
   }
 
   template <typename... Keys> void AssignPrimaryKey(const Keys &...keys) {

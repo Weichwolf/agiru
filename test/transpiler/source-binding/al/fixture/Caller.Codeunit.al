@@ -54,4 +54,12 @@ codeunit 50172 Caller
     begin
         Row.GetBySystemId(Id);
     end;
+    procedure ReadRefRecord(var Row: RecordRef; Id: RecordId): Boolean
+    begin
+        exit(Row.Get(Id));
+    end;
+    procedure RequireRefRecord(var Row: RecordRef; Id: RecordId)
+    begin
+        Row.Get(Id);
+    end;
 }

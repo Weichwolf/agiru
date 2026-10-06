@@ -790,6 +790,21 @@ void LoadRow(void *record, const TableDef &table, const FieldValues &row) {
 
 }
 
+std::string RecordKeyText(const void *record, const TableDef &table) {
+  if (table.keys.empty()) { return {}; }
+  std::string result;
+  for (const FieldNo no : table.keys[0].fields) {
+    const auto *field = Field(table, no);
+    if (field == nullptr) { continue; }
+    if (!result.empty()) { result += ", "; }
+    result += field->caption.empty() ? field->name : field->caption;
+    result += "='";
+    result += FieldText(record, *field);
+    result += '\'';
+  }
+  return result;
+}
+
 bool RuntimeGet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempGet(record, table); }
   if (const auto found = GetInstalledFieldMetadata(record, table); found.has_value()) {

@@ -100,7 +100,7 @@ ModifyAllowed policy. View navigation and general command permissions remain ope
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,
-cross-column OR, FlowFilters and owned expression snapshots. Fifty-three compiled
+cross-column OR, FlowFilters and owned expression snapshots. Fifty-five compiled
 controls and the narrow system-field header dependency control must reject.
 Installed Table Metadata.Get and positive-key Field.Get share typed/RecordRef readers;
 timestamp zero remains addressable through FieldRef, and temporary zero keys remain valid.
@@ -117,6 +117,13 @@ refusals; shared bookmark/filter mutants fail both gates. Native writes, includi
 empty ModifyAll/DeleteAll(true), refuse; temporary rows
 remain independently writable. Four unprojected attributes refuse filtering/ordering.
 Complete metadata providers, authorization and secondary-order performance remain gaps (0044).
+
+RecordRef.Get shares typed Get consumption and captioned primary-key diagnostics:
+consumed misses return false, discarded misses raise, malformed/provider failures still
+throw. RecordRef/native metadata gates exercise temporary/live reads; SqlRowVersionGate
+adds owned SQL exact-value/filter/read-only/error checks. Two compiled controls must fail
+both temporary and native paths. `make verify-check VERIFY_CHECKS=TableSourceBindingGate`
+executes both AL Get forms in named/numeric and table/codeunit fixture contexts.
 
 `make record-order JOBS=2` verifies mixed field directions, global reversal,
 primary-key ties, filters, relative searches and cursor/keyset direction changes.

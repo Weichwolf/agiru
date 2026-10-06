@@ -159,6 +159,35 @@ for control in field-catalogue-zero field-get-binding; do
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
 
+for control in recordref-get-consumption recordref-get-key; do
+  awk -v control="$control" '
+    /found, table.name, found \? std::string\{\} : detail::RecordKeyText\(State\(\).record, table\)\};/ {
+      if (control == "recordref-get-consumption") sub(/found, table.name/, "true, table.name")
+      else sub(/found \? std::string\{\} : detail::RecordKeyText\(State\(\).record, table\)/, "std::string{}")
+      changed++
+    }
+    { print } END { if (changed != 1) exit 2 }
+  ' src/rt/RecordRef.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$indexed_gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped RecordRef.Get consumption\n' "$control" >&2
+    exit 1
+  fi
+  claim='discarded RecordRef.Get raises a missing-record diagnostic'
+  if [ "$control" = recordref-get-key ]; then
+    claim='discarded RecordRef.Get retains the typed searched-key diagnostic'
+  fi
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+  if LD_PRELOAD="$proof/$control.so" "$metadata_gate" > "$proof/$control.metadata.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped native RecordRef.Get consumption\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'FAIL .*discarded native RecordRef.Get misses retain the searched ID' "$proof/$control.metadata.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/read-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
+
 for control in catalogue-population catalogue-bookmark catalogue-filter catalogue-version catalogue-identity catalogue-key-filter metadata-get-position; do
   unit=src/rt/FieldNavigation.cpp
   case "$control" in
@@ -608,4 +637,4 @@ fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -exec sha256sum {} + > "$proof/disposable.sha256"
 find "$proof" -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.so' \) -delete
-printf 'reflection-metadata: shared live Table Metadata and positive-key Field Get/Find/Next/Count through typed/RecordRef paths, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; fifty-three compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: shared live Table Metadata and positive-key Field Get/Find/Next/Count through typed/RecordRef paths, optional RecordRef.Get consumption, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; fifty-five compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

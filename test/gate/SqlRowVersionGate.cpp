@@ -20,6 +20,7 @@
 #include "type/FieldClass.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/RecordId.h"
 
 #include "Check.h"
 #include "OwnedDatabase.h"
@@ -253,6 +254,51 @@ void SystemIdLookupsShareOptionalResultsAndCursorPosition() {
   } catch (const agiru::DatabaseError &) { reflectedStorageError = true; }
   CHECK_TRUE("a consumed reflected SystemId lookup does not hide a storage failure",
              reflectedStorageError);
+}
+
+void RecordIdReadsPreserveOptionalResultsOnSql() {
+  const gate::OwnedDatabase database("sql_record_id");
+  const agiru::Session session(database.Dsn());
+  agiru::CreateTable(session.Database(), Declaration());
+  const auto first = Inserted(1);
+  VersionedRow typed;
+  typed.SetRange(typed.ID, 2);
+  agiru::RecordRef reference;
+  reference.GetTable(typed);
+  CHECK_TRUE("RecordRef.Get ignores normal SQL filters", reference.Get(first.RecordId()));
+  reference.SetTable(typed);
+  CHECK_TRUE("RecordRef.Get preserves exact SQL identity and rowversion",
+             typed.ID == 1 && typed.SystemId == first.SystemId && typed.SystemRowVersion == 1);
+  CHECK_TEXT("RecordRef.Get preserves exact SQL Decimal values",
+             typed.Amount.ToInvariantString(),
+             "0.33333333333333333333");
+  CHECK_TEXT("RecordRef.Get leaves the SQL filter unchanged", typed.GetFilter(typed.ID), "2");
+  constexpr agiru::Integer kAbsentId = 999;
+  VersionedRow absent;
+  absent.ID = kAbsentId;
+  const auto missing = absent.RecordId();
+  CHECK_TRUE("consumed SQL RecordRef.Get misses return false", !reference.Get(missing));
+  std::string diagnostic;
+  try {
+    reference.Get(missing);
+  } catch (const agiru::Error &error) { diagnostic = error.what(); }
+  CHECK_TEXT(
+      "discarded SQL RecordRef.Get misses identify the searched key",
+      diagnostic,
+      "The Rowversion Record Gate does not exist. Identification fields and values: ID='999'");
+  CHECK_TRUE("RecordRef.Get is independently read-only in SQL",
+             Scalar(session.Database(), "SELECT count(*) FROM \"Rowversion Record Gate\"") == 1);
+  bool malformed = false;
+  try {
+    static_cast<void>(static_cast<bool>(reference.Get(agiru::RecordId{})));
+  } catch (const agiru::Error &) { malformed = true; }
+  CHECK_TRUE("consumed RecordRef.Get does not hide a malformed identity", malformed);
+  session.Database().Run(R"(ALTER TABLE "Rowversion Record Gate" DROP COLUMN "Amount")");
+  bool storageFailure = false;
+  try {
+    static_cast<void>(static_cast<bool>(reference.Get(first.RecordId())));
+  } catch (const agiru::DatabaseError &) { storageFailure = true; }
+  CHECK_TRUE("consumed RecordRef.Get does not hide a SQL provider failure", storageFailure);
 }
 
 void SelectionReflectionAndBulkWrites() {
@@ -496,6 +542,7 @@ int main() {
   return gate::Run("SqlRowVersion", [] {
     PhysicalStorageAndWrites();
     SystemIdLookupsShareOptionalResultsAndCursorPosition();
+    RecordIdReadsPreserveOptionalResultsOnSql();
     SelectionReflectionAndBulkWrites();
     SchemaMigrationAndRefusal();
     QueryAliasesAndLinks();

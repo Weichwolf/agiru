@@ -18,6 +18,7 @@
 #include "type/Integer.h"
 #include "type/KeyRef.h"
 #include "type/Option.h"
+#include "type/RecordId.h"
 #include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Variant.h"
@@ -107,6 +108,54 @@ void RecordAssignmentPreservesTheExistingState() {
              target.Peek() == original && target.Peek()->group == 1);
   target.CopyStateFrom(other);
   CHECK_TRUE("explicit Copy still transfers the source state", target.Peek()->group == 2);
+}
+
+void RecordIdReadsRetainOptionalResultsAndTemporaryStorage() {
+  agiru::Temporary<ResourceCost> row;
+  row.Type = ResourceCostType::Resource;
+  row.Code = "FOUND";
+  row.WorkTypeCode = "WT";
+  row.UnitCost = agiru::Decimal::FromInvariantString("12.34567890123456789012345678");
+  row.Insert();
+  const auto existing = row.RecordId();
+  row.Code = "MISSING";
+  const auto missing = row.RecordId();
+  row.SetRange(row.Code, "OTHER");
+  RecordRef ref;
+  ref.GetTable(row);
+  CHECK_TRUE("RecordRef.Get retains its existing temporary store", ref.IsTemporary());
+  CHECK_TRUE("RecordRef.Get ignores ordinary filters on temporary rows", ref.Get(existing));
+  ref.SetTable(row);
+  CHECK_TEXT("RecordRef.Get projects exact temporary Decimal values",
+             row.UnitCost.ToInvariantString(),
+             "12.34567890123456789012345678");
+  CHECK_TEXT("RecordRef.Get preserves existing filters", row.GetFilter(row.Code), "OTHER");
+  CHECK_TRUE("a consumed missing RecordRef.Get returns false", !ref.Get(missing));
+  ref.SetTable(row);
+  CHECK_TRUE("missing RecordRef.Get retains data beyond the searched key",
+             row.Code.Value() == "MISSING" &&
+                 row.UnitCost.ToInvariantString() == "12.34567890123456789012345678");
+  std::string typedError;
+  try {
+    row.Get(missing);
+  } catch (const Error &error) { typedError = error.what(); }
+  std::string reflectedError;
+  try {
+    ref.Get(missing);
+  } catch (const Error &error) { reflectedError = error.what(); }
+  CHECK_TRUE("discarded RecordRef.Get raises a missing-record diagnostic", !reflectedError.empty());
+  CHECK_TEXT("discarded RecordRef.Get retains the typed searched-key diagnostic",
+             reflectedError,
+             typedError);
+  CHECK_TRUE("RecordRef.Get missing diagnostics include every searched key",
+             reflectedError.ends_with("Type='Resource', Code='MISSING', Work Type Code='WT'"));
+  auto deferred = ref.Get(missing);
+  ref.Close();
+  CHECK_TRUE("consuming a deferred missing RecordRef.Get survives closing the handle", !deferred);
+  CHECK_TRUE("closing the reflected handle does not delete temporary rows", row.Count() == 0);
+  row.SetRange(row.Code);
+  CHECK_TRUE("temporary rows remain independently available",
+             row.Count() == 1 && row.Get(existing));
 }
 
 /// A RecordRef REACHES A RECORD BY NUMBER RATHER THAN BY NAME, which is the same address the field
@@ -708,6 +757,7 @@ int main() {
   return gate::Run("RecordRef", [] {
     ARecordVariantOwnsAnIndependentWritableSnapshot();
     RecordAssignmentPreservesTheExistingState();
+    RecordIdReadsRetainOptionalResultsAndTemporaryStorage();
     ACopyIsASecondHandleOnTheSameObject();
     AVariantRetainsTheRecordRefBeyondItsSourceVariable();
     ItReachesTheTableWithoutNamingIt();

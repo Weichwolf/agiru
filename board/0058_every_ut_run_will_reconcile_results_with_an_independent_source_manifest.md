@@ -35,16 +35,24 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   reports the existing BodyWriter.h adjacent-parameter finding. These are local receipts,
   not current-tree full build/lint or AL execution proof.
 - Shared native Table Metadata.Get retains 294 reflection checks and 115 generated
-  checks; live navigation now adds 48 TableMetadataCatalogue checks (0044).
+  checks; live navigation/RecordId reads now have 53 TableMetadataCatalogue checks (0044).
   Typed/RecordRef agreement covers all 29 stored fields; missing results, projection
   errors, unchanged filters and writable temporary isolation are qualified.
-  Field/Table Metadata share one filter/order/bookmark kernel, with 53 compiled
+  Field/Table Metadata share one filter/order/bookmark kernel, with 55 compiled
   reflection controls plus the header control. Shared filter/bookmark mutants fail
   both gates; key-hole/Get-position controls fail the new gate. This increment is
   not in the running `a554715` snapshot and still needs full AL replay.
   Kernel/adapters/TableMetadata.cpp/new gate/generated Runner focused tidy pass;
   Table.cpp has sixteen diagnostics and the expanded gate exposes an uninitialized-ID
   StoredImage diagnostic absent from the previous gate. No full tidy/UT gain claim.
+- RecordRef.Get now shares consumed/discarded missing-result semantics and owned
+  captioned-key diagnostics with typed Get (0044). Native/temporary gates pass 53/159;
+  owned SQL gate adds nine to 114 checks. Generated AL Get forms execute in all four
+  source-binding contexts. This repair/diagnostic change is not in `a554715`; reconcile
+  every identity/error after full activation, including any newly exposed seed gaps.
+  Focused RecordRef/Table source and RecordRef/SQL gate tidy retain 5/16/2/3 findings,
+  identical normalized messages to independent `a554715` analysis. Native metadata/
+  Field gates pass; no diagnostics are suppressed. Full tidy remains red.
 - Shared SQL GetBySystemId passes 114 record checks and all seventeen compiled
   rowversion/SystemId controls (0044). Typed/RecordRef missing-result consumption,
   searched diagnostics, exact values, unchanged filters, provider errors and cursor

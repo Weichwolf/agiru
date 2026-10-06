@@ -81,16 +81,18 @@ void MetadataGetPreservesOptionalFailureContext() {
              !row.Get(kMissingMetadataTable, 1));
   const ReadFailure missingField =
       CaptureReadFailure([&] { row.Get(kMetadataFixtureId.Value(), kMissingMetadataField); });
-  CHECK_TEXT("a discarded native missing-field Get carries its searched key",
-             missingField.message,
-             "The Field does not exist. Identification fields and values: 50151, 99");
+  CHECK_TEXT(
+      "a discarded native missing-field Get carries its searched key",
+      missingField.message,
+      "The Field does not exist. Identification fields and values: TableNo='50151', No.='99'");
   CHECK_TEXT("a discarded native missing-field Get carries the record error code",
              missingField.code,
              "DB:RecordNotFound");
   const ReadFailure missingTable = CaptureReadFailure([&] { row.Get(kMissingMetadataTable, 1); });
-  CHECK_TEXT("a discarded native missing-table Get carries its searched key",
-             missingTable.message,
-             "The Field does not exist. Identification fields and values: 50155, 1");
+  CHECK_TEXT(
+      "a discarded native missing-table Get carries its searched key",
+      missingTable.message,
+      "The Field does not exist. Identification fields and values: TableNo='50155', No.='1'");
   CHECK_TEXT("a discarded native missing-table Get carries the record error code",
              missingTable.code,
              "DB:RecordNotFound");
@@ -120,9 +122,10 @@ void MetadataGetDefaultsAndTemporaryReadsShareTheContract() {
   CHECK_TRUE("the omitted native key retains its searched zero value", native.No == 0);
   const ReadFailure zero =
       CaptureReadFailure([&] { native.Get(agiru::platform::Company::kId.Value(), 0); });
-  CHECK_TEXT("a discarded native timestamp catalogue lookup names its searched key",
-             zero.message,
-             "The Field does not exist. Identification fields and values: 2000000006, 0");
+  CHECK_TEXT(
+      "a discarded native timestamp catalogue lookup names its searched key",
+      zero.message,
+      "The Field does not exist. Identification fields and values: TableNo='2000000006', No.='0'");
   CHECK_TEXT("a discarded native timestamp catalogue lookup retains its error code",
              zero.code,
              "DB:RecordNotFound");
@@ -130,7 +133,7 @@ void MetadataGetDefaultsAndTemporaryReadsShareTheContract() {
   const ReadFailure empty = CaptureReadFailure([&] { native.Get(); });
   CHECK_TEXT("a discarded native default-key read names zero keys",
              empty.message,
-             "The Field does not exist. Identification fields and values: 0, 0");
+             "The Field does not exist. Identification fields and values: TableNo='0', No.='0'");
 
   Temporary<Field> rows;
   rows.TableNo = kMetadataFixtureId.Value();
@@ -147,9 +150,10 @@ void MetadataGetDefaultsAndTemporaryReadsShareTheContract() {
              !rows.Get(kMetadataFixtureId.Value(), kMissingMetadataField));
   const ReadFailure missing =
       CaptureReadFailure([&] { rows.Get(kMetadataFixtureId.Value(), kMissingMetadataField); });
-  CHECK_TEXT("a discarded temporary missing-field Get carries the searched key",
-             missing.message,
-             "The Field does not exist. Identification fields and values: 50151, 99");
+  CHECK_TEXT(
+      "a discarded temporary missing-field Get carries the searched key",
+      missing.message,
+      "The Field does not exist. Identification fields and values: TableNo='50151', No.='99'");
   CHECK_TEXT("a discarded temporary missing-field Get carries the record error code",
              missing.code,
              "DB:RecordNotFound");

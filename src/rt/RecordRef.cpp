@@ -249,33 +249,18 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
   return detail::RuntimeCount(State().record, Table());
 }
 
-namespace {
-
-std::string KeyTextOf(const void *record, const TableDef &table) {
-  if (table.keys.empty()) { return {}; }
-  std::string out;
-  for (const FieldNo no : table.keys[0].fields) {
-    const FieldDef *def = Field(table, no);
-    if (def == nullptr) { continue; }
-    if (!out.empty()) { out += ", "; }
-    out += std::string(def->caption) + "='" + ::agiru::FieldText(record, *def) + "'";
-  }
-  return out;
-}
-
-}
-
 detail::Found RecordRef::Find(std::string_view Which) {
   const std::string_view which = Which.empty() ? "=" : Which;
   const bool found = detail::RuntimeFind(State().record, Table(), which);
   if (which == "=") {
-    return detail::Found{
-        found, Table().name, found ? std::string{} : KeyTextOf(State().record, Table())};
+    return detail::Found{found,
+                         Table().name,
+                         found ? std::string{} : detail::RecordKeyText(State().record, Table())};
   }
   return detail::Found{found, Table().name};
 }
 
-::agiru::Boolean RecordRef::Get(::agiru::RecordId RecordID) {
+detail::Found RecordRef::Get(::agiru::RecordId RecordID) {
   if (RecordID.IsEmpty()) { throw Error("RecordRef.Get: the RecordId names no record"); }
   if (State().table == nullptr || State().table->id.Value() != RecordID.TableNo()) {
     Open(RecordID.TableNo());
@@ -294,7 +279,9 @@ detail::Found RecordRef::Find(std::string_view Which) {
     }
     detail::SetFieldText(State().record, *def, values[at]);
   }
-  return detail::RuntimeGet(State().record, table);
+  const bool found = detail::RuntimeGet(State().record, table);
+  return detail::Found{
+      found, table.name, found ? std::string{} : detail::RecordKeyText(State().record, table)};
 }
 
 ::agiru::Integer RecordRef::Next(::agiru::Integer Steps) {

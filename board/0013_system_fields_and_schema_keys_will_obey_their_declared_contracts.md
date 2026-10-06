@@ -58,7 +58,7 @@ Retain the full 2314-case UT population through replay.
   ExpenseActivityLogTest; `src/gen/{TableKeys,TableWriter}.cpp`,
   `src/rt/{FieldMetadata,RecordRef,Storage}.cpp`.
 - `make reflection-metadata` passes the source, reflection, RecordRef, Field and
-  system-profile and both catalogue gates plus 53 mutation controls. The canonical profile selects
+  system-profile and both catalogue gates plus 55 mutation controls. The canonical profile selects
   kind/LinkedObject/host presence; all three reflection callers share original names.
   A real Record.FieldName → Field lookup → FieldRef.Value caller detects source-name
   substitution. The narrow identity header's typed-dependency control also passes.
@@ -130,7 +130,7 @@ Retain the full 2314-case UT population through replay.
   checks; the shared qualifier detects population, filter, bookmark, frozen-identity/
   version and empty-write mutants. The full aggregate UT replay remains required.
   Native Table Metadata now shares the same filter/order/bookmark kernel, borrowing
-  InstalledTables directly; 48 local checks retain raw identities, exact projected
+  InstalledTables directly; 53 local checks retain raw identities, exact projected
   values and temporary isolation. GetBySystemId, authorization, full AL execution
   and secondary-order performance remain gaps (0044); no SQL catalogue is installed.
   Original FieldDataProvider.GetFieldRecordBuffer RVA `a4330` constructs
@@ -143,7 +143,7 @@ Retain the full 2314-case UT population through replay.
   unlinked profile: ten implicit fields, typed offsets/capacities and nonstored
   User lookups. `PlatformSystemFieldsGate` passes 3117 checks across all eighteen;
   `PlatformSourceGate` passes 3060 source/reflection checks. The existing
-  `make reflection-metadata` qualifier retains all prior controls; 53 mutants reject.
+  `make reflection-metadata` qualifier retains all prior controls; 55 mutants reject.
 - Native fixture assertions now select Runtime 18 explicitly, rather than counting
   the five legacy declarations. PageTableField/ObjectCatalogue/FeatureKey/
   UserPersonalization gates pass 312/345/93/320 checks; all four pass focused tidy.

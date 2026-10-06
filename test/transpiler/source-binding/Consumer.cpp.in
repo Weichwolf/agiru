@@ -1,12 +1,35 @@
 #include "fixture/codeunit/Caller.h"
+#include "fixture/table/SourceRow.h"
+#include "runtime/ErrorValue.h"
+#include "runtime/RecordRef.h"
+#include "runtime/Table.h"
 
 #include <cstdio>
 #include <exception>
+#include <string_view>
 
 int main() {
   try {
     agiru::Fixture::Caller_Codeunit caller;
-    return caller.Run() ? 0 : 1;
+    if (!caller.Run()) { return 1; }
+    agiru::Temporary<agiru::Fixture::SourceRow_Table> row;
+    row.ID = 1;
+    row.Insert();
+    agiru::RecordRef reflected;
+    reflected.GetTable(row);
+    const auto existing = row.RecordId();
+    if (!caller.ReadRefRecord(reflected, existing)) { return 1; }
+    caller.RequireRefRecord(reflected, existing);
+    row.ID = 2;
+    const auto missing = row.RecordId();
+    if (caller.ReadRefRecord(reflected, missing)) { return 1; }
+    bool refused = false;
+    try {
+      caller.RequireRefRecord(reflected, missing);
+    } catch (const agiru::Error &error) {
+      refused = std::string_view(error.what()).ends_with("Identification fields and values: ID='2'");
+    }
+    return refused ? 0 : 1;
   } catch (const std::exception &error) {
     std::fputs(error.what(), stderr);
     return 1;
