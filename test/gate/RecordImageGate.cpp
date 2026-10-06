@@ -7,6 +7,7 @@
 #include "type/Decimal.h"
 
 #include "Check.h"
+#include "LineNumberBuffer.h"
 #include "ResourceCost.h"
 #include "options/Types.h"
 
@@ -98,6 +99,27 @@ void AFailedStateCopyKeepsItsLiveImageOwner() {
   CHECK_TRUE("failed Copy retains the original live image owner",
              destination.Ensure().image.Get() == address);
   CHECK_TRUE("failed Copy keeps the previous filter state", destination.Ensure().group == 1);
+}
+
+void FreshImagesAreValueInitialized() {
+  agiru::app::tables::LineNumberBuffer row;
+  row.OldLineNumber = 10;
+  row.NewLineNumber = 100;
+  const auto &blank = row.StoredImage();
+  CHECK_TRUE("fresh xRec initializes every scalar independently of the buffer",
+             blank.OldLineNumber == 0 && blank.NewLineNumber == 0);
+  CHECK_TRUE("fresh xRec retains its owned address", &blank == &row.StoredImage());
+
+  ResourceCost cost;
+  cost.Code = "UNWRITTEN";
+  cost.UnitCost = agiru::Decimal{10};
+  const ResourceCost &image = cost.StoredImage();
+  CHECK_TEXT("fresh xRec initializes owned text", std::string_view(image.Code), "");
+  CHECK_TRUE("fresh xRec initializes exact amounts", image.UnitCost == agiru::Decimal{});
+  CHECK_TRUE("fresh xRec initializes option ordinals", image.Type == ResourceCostType::Resource);
+  cost.Init();
+  CHECK_TRUE("Init keeps the blank image address", &image == &cost.StoredImage());
+  CHECK_TRUE("Init leaves the exact amount initialized", image.UnitCost == agiru::Decimal{});
 }
 
 void CopyKeepsALiveXRecReference() {
@@ -195,6 +217,7 @@ int main() {
     AFailedCloneRetainsThePreviousImage();
     AFailedStateCopyKeepsItsLiveImageOwner();
     const agiru::Session session(AGIRU_TEST_DSN);
+    FreshImagesAreValueInitialized();
     CopyKeepsALiveXRecReference();
     CopyAndInsertUpdateTheStableImage();
     GetAndModifyKeepTheLiveImage<agiru::Temporary<ResourceCost>>();

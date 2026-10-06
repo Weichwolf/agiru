@@ -1718,9 +1718,9 @@ public:
     if (const void *before = detail::OutermostBefore(Self()); before != nullptr) {
       return *const_cast<Derived *>(static_cast<const Derived *>(before));
     }
-    const detail::RecordState *state = Filtered();
-    if (state == nullptr || state->image.Get() == nullptr) { BlankImage(); }
-    return *static_cast<Derived *>(State().image.Get());
+    detail::RecordState &state = State();
+    if (state.image.Get() == nullptr) { state.image.Hold(new Derived()); }
+    return *static_cast<Derived *>(state.image.Get());
   }
 
   /// \brief AL `Record.IsTemporary(...)`. Determines whether a record refers to a temporary table.
@@ -2363,7 +2363,7 @@ public:
   template <typename Field, typename Value> void Validate(Field &member, const Value &value) {
     const ::agiru::FieldNo no = NumberOf(&member);
     Derived before = static_cast<Derived &>(*this);
-    detail::BeforeImage image(&before, Self());
+    const detail::BeforeImage image(&before, Self());
     if constexpr (requires { member = value; }) {
       member = value;
     } else if constexpr (requires { member = Field::FromInteger(value.AsInteger()); }) {
@@ -2394,7 +2394,7 @@ public:
   template <typename Field> void Validate(Field &member) {
     const ::agiru::FieldNo no = NumberOf(&member);
     Derived before = static_cast<Derived &>(*this);
-    detail::BeforeImage image(&before, Self());
+    const detail::BeforeImage image(&before, Self());
     detail::CheckRelation(Self(), TableDefinition<Derived>(), no);
     RunOnValidate(no);
   }
@@ -2597,7 +2597,7 @@ private:
   /// A record that was Init'd or Cleared has a BLANK image and not a mirror of itself, which is
   /// openerp WI-1078: a mirror makes every `Rec.F <> xRec.F` trivially false.
   void BlankImage() {
-    State().image.Hold(new Derived{}); // NOLINT(cppcoreguidelines-owning-memory)
+    State().image.Hold(new Derived()); // NOLINT(cppcoreguidelines-owning-memory)
   }
 
   [[nodiscard]] detail::RecordState &State() {
