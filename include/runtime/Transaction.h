@@ -15,6 +15,7 @@ namespace agiru {
 class Error;
 
 class Connection;
+class SessionCommand;
 
 /// \brief The nested boundaries a session is inside, innermost last.
 ///
@@ -142,6 +143,9 @@ public:
   }
 
 private:
+  friend class SessionCommand;
+  void ClearCommand() noexcept;
+
   struct Boundary {
     std::string name;
     std::vector<std::string> inconsistentBefore;
@@ -172,7 +176,10 @@ namespace agiru::detail {
 class Scope {
 public:
   Scope();
-  ~Scope();
+  /// \brief Rolls back abandoned work; normal cleanup failure propagates.
+  /// During another exception, cleanup failure is diagnosed without replacing that error.
+  /// The outer host transaction must still fail or be discarded, never silently committed.
+  ~Scope() noexcept(false);
 
   Scope(const Scope &) = delete;
   Scope(Scope &&) = delete;

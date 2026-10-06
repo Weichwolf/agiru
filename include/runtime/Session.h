@@ -18,6 +18,8 @@
 
 namespace agiru {
 
+class SessionCommand;
+
 namespace detail {
 /// \brief Session-owned runtime storage, defined privately by the runtime.
 struct SessionState;
@@ -29,24 +31,17 @@ public:
   using Error::Error;
 };
 
-/// \brief One AL session: a database connection and the state that belongs to it.
-///
-/// AL CODE NEVER NAMES A SESSION AND NEVER NAMES A CONNECTION. `Rec.Insert()` takes no argument and
-/// no BaseApp line mentions where the row goes. So the session is ambient: the host opens one, and
-/// every record operation inside it finds it without being handed it.
-///
-/// The current session is thread-local, which is what a server with many sessions needs and what
-/// the predecessor arrived at the hard way -- openerp rebuilt its whole session model onto
-/// `ContextVar` for exactly this reason, after fork-based isolation proved unaffordable.
-///
-/// \note Constructing a session makes it current and destroying it restores the previous one, so
-///       nesting works and nothing has to be unwound by hand.
 /// \brief The Windows language id a session runs in until something moves it.
 ///
 /// 1033 is `en-US`, which is the language the BaseApp's own captions are written in and the one
 /// every AL test compares its error texts against.
 constexpr ::agiru::Integer kEnglishUnitedStates = 1033;
 
+/// \brief Private AL state, current on one worker while executing a command.
+/// DSN constructors own a connection and activate immediately for harness compatibility.
+/// The Guid constructor stays detached; SessionCommand borrows an exclusive connection.
+/// The host must keep a detached session alive until all its commands and pages close,
+/// and access its mutable state only while exclusively active or otherwise idle.
 class Session {
 public:
   /// \brief Opens an unaccounted harness session with SYSTEM/blank user identity.
@@ -66,6 +61,14 @@ public:
   ///       Failure restores the previous thread-local session and language.
   Session(const std::string &connectionInfo, const Guid &authenticatedUser);
 
+  /// \brief Creates detached AL state without opening a database or changing the current session.
+  /// \param authenticatedUser Nonblank user GUID established by the trusted host.
+  /// \throws SessionError for a blank GUID.
+  /// \note Every SessionCommand resolves the account name/status from PostgreSQL again.
+  ///       Does not authenticate credentials or grant permissions. No UserId is resolved
+  ///       until the first accepted command; pages and SingleInstances survive detachment.
+  explicit Session(const Guid &authenticatedUser);
+
   ~Session();
 
   Session(const Session &) = delete;
@@ -82,8 +85,9 @@ public:
   /// \return True when this thread has a session open.
   [[nodiscard]] static bool HasCurrent();
 
-  /// \return The session's database connection.
-  [[nodiscard]] const Connection &Database() const { return connection_; }
+  /// \return The session's owned or currently borrowed database connection.
+  /// \throws SessionError for an idle detached session.
+  [[nodiscard]] const Connection &Database() const;
 
   /// \brief AL `UserSecurityId()`.
   ///
@@ -103,16 +107,13 @@ public:
   ///       `system-globallanguage-method.md` calls it "the current global language setting", and a
   ///       service tier runs ten thousand sessions in one process. A global here would be one
   ///       session's language answering for every other.
-  void Language(::agiru::Integer id) {
-    language_ = id;
-    ::agiru::Language::MakeCurrent(id);
-  }
+  void Language(::agiru::Integer id);
 
   /// \brief AL `UserId()`.
   ///
   /// \return The name of the user this session runs as.
   ///
-  /// \note A construction-time snapshot of User."User Name", or SYSTEM in a harness session.
+  /// \note A snapshot of User."User Name" at the last accepted activation, or SYSTEM in a harness.
   [[nodiscard]] std::string_view UserId() const { return userId_; }
 
   /// \brief AL `WorkDate()` -- the date a session posts under.
@@ -187,10 +188,16 @@ public:
 
 private:
   friend struct detail::SessionState;
+  friend class SessionCommand;
+  void ResolveUser(const Guid &authenticatedUser);
+  void Attach(Connection &connection);
+  void Detach() noexcept;
+  void RestoreCurrent() noexcept;
   mutable std::unique_ptr<detail::SessionState> state_;
-  Connection connection_;
+  std::unique_ptr<Connection> ownedConnection_;
+  const Connection *connection_ = nullptr;
   Boundaries boundaries_;
-  Session *previous_;
+  Session *previous_ = nullptr;
   Guid userSecurityId_;
   std::string userId_{"SYSTEM"};
   Date workDate_;

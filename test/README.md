@@ -18,8 +18,11 @@ Retain original notices.
 integration slice, not the AL test denominator.
 
 `make session-identity JOBS=2` qualifies host-supplied user GUIDs against the system
-User table, committed audit ownership and three compiled defects. Each run creates
-disposable databases. It is not credential authentication or page/table authorization;
+User table, committed audit ownership and persistent AL state across exclusive
+per-command SQL leases. Seven compiled defects test identity, rollback, durable
+completion and cursor ownership/invalidation. Disposable databases also check idle
+contexts, worker reuse, revocation, deferred failures and broken-connection cleanup.
+This is not credential authentication, a connection pool or page/table authorization;
 container qualifiers need `AGIRU_TEST_DSN` pointing at container-local PostgreSQL.
 
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
@@ -149,6 +152,9 @@ production save errors propagate while AL test error collection remains explicit
 Generated TestPage copy/move rebinding and request-page fields/filter accept/cancel
 paths retain adapter behaviour. The installed catalogue creates closed production
 instances, not headless page runs; mode/cursor/RecordId paths use the same kernel.
+Generated list/card instances also retain selection across detached SessionCommand
+leases; validation/save is verified by independent SQL value and modifier-GUID reads.
+Its authored permission allowlist does not establish production authorization or HTTP parity.
 AL controls Open/Move/Declaration retain their names. Missing/null/mismatched factories
 refuse. Eleven execution mutants and a control-shadowing compile refusal must reject;
 the narrow PageInstance interface must not pull in typed page/control/record headers.

@@ -29,6 +29,7 @@ Cursor::Cursor(const Connection &connection,
                const std::string &select,
                std::vector<std::optional<std::string>> binds)
     : connection_(&connection),
+      session_(Session::HasCurrent() ? &Session::Current() : nullptr),
       name_(NextName()),
       epoch_(Session::HasCurrent() ? Session::Current().Transaction().CursorEpoch() : 0),
       block_(nullptr) {
@@ -36,8 +37,14 @@ Cursor::Cursor(const Connection &connection,
 }
 
 Cursor::~Cursor() {
-  if (!Session::HasCurrent() || &Session::Current().Database() != connection_) { return; }
-  if (!connection_->InTransaction() || connection_->InFailedTransaction()) { return; }
+  if (!Session::HasCurrent() || &Session::Current() != session_ ||
+      &Session::Current().Database() != connection_) {
+    return;
+  }
+  if (!connection_->IsOpen() || !connection_->InTransaction() ||
+      connection_->InFailedTransaction()) {
+    return;
+  }
   try {
     if (Session::Current().Transaction().CursorEpoch() != epoch_) {
       const std::vector<std::optional<std::string>> bindings{name_};
@@ -57,8 +64,10 @@ Cursor::~Cursor() {
 }
 
 bool Cursor::Current() const {
-  return Session::HasCurrent() && &Session::Current().Database() == connection_ &&
-         Session::Current().Transaction().CursorEpoch() == epoch_ && connection_->InTransaction();
+  return Session::HasCurrent() && &Session::Current() == session_ &&
+         &Session::Current().Database() == connection_ &&
+         Session::Current().Transaction().CursorEpoch() == epoch_ && connection_->IsOpen() &&
+         connection_->InTransaction();
 }
 
 bool Cursor::Fetch() {

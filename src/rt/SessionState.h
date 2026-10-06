@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -16,6 +17,8 @@ namespace agiru::detail {
 class RecordChanges;
 
 struct SessionState {
+  std::atomic_flag commandActive = ATOMIC_FLAG_INIT;
+
   struct Binding {
     CodeunitId id;
     const SubscriptionCatalogue *catalogue;

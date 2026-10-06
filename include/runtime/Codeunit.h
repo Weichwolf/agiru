@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/Subtype.h"
 #include "runtime/Error.h"
+#include "runtime/SingleInstance.h"
 #include "runtime/Subscriptions.h"
 #include "runtime/Transaction.h"
 #include "type/Integer.h"
@@ -74,28 +75,6 @@ void RegisterCodeunitEntry(const CodeunitEntry *entry);
 /// \return The entry, or `nullptr` when this build carries no codeunit of that number.
 /// \throws std::logic_error if any installed table/page/codeunit kind has duplicate IDs.
 [[nodiscard]] const CodeunitEntry *FindCodeunit(CodeunitId id);
-
-namespace detail {
-
-/// \brief The ONE instance a `SingleInstance` codeunit has in this session, made on the first
-///        call and kept until the session closes (`devenv-singleinstance-property.md`: "all
-///        codeunit variables that use this codeunit use the same instance ... The codeunit
-///        remains instantiated until you close the company").
-/// \param id   The codeunit's number.
-/// \param make Makes the instance, when this call is the first.
-/// \param free Frees it, when the session closes.
-/// \return The instance.
-/// \throws SessionError when no session is active; Error when the factory is invalid or returns
-///         no instance. Construction failure does not install an instance.
-/// \note Storage belongs to the active Session, not its worker thread. Nested sessions have
-///       separate instances and child close preserves the parent's state. Company-close
-///       invalidation remains part of the company lifecycle contract (WI 0006).
-[[nodiscard]] void *SingleInstanceOf(CodeunitId id, void *(*make)(), void (*free)(void *));
-
-/// \brief Frees every single instance this session made; the session's close calls it.
-void ReleaseSingleInstances();
-
-}
 
 /// \brief One codeunit held by another, created the first time it is used.
 ///

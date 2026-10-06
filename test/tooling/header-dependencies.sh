@@ -145,6 +145,27 @@ if reject_dependency "$proof/forced-PageCore.h.d" PageCore.h \
   exit 1
 fi
 
+compile_header runtime/SessionCommand.h "$proof/SessionCommand.h.d"
+for forbidden in Session.h Database.h Transaction.h vector memory mutex thread; do
+  reject_dependency "$proof/SessionCommand.h.d" "$forbidden"
+done
+compile_header runtime/SessionCommand.h "$proof/forced-Session.h.d" -include runtime/Session.h
+if reject_dependency "$proof/forced-Session.h.d" Session.h \
+  > "$proof/forced-Session.h.log" 2>&1; then
+  printf 'header-dependencies: ambient session state escaped the command boundary\n' >&2
+  exit 1
+fi
+compile_header runtime/SingleInstance.h "$proof/SingleInstance.h.d"
+for forbidden in Codeunit.h Table.h Record.h vector memory mutex; do
+  reject_dependency "$proof/SingleInstance.h.d" "$forbidden"
+done
+compile_header runtime/SingleInstance.h "$proof/forced-Codeunit.h.d" -include runtime/Codeunit.h
+if reject_dependency "$proof/forced-Codeunit.h.d" Codeunit.h \
+  > "$proof/forced-Codeunit.h.log" 2>&1; then
+  printf 'header-dependencies: generated codeunit machinery escaped session storage\n' >&2
+  exit 1
+fi
+
 compile_header runtime/HttpServer.h "$proof/HttpServer.h.d"
 for forbidden in microhttpd.h Database.h Session.h Page.h thread condition_variable mutex deque; do
   reject_dependency "$proof/HttpServer.h.d" "$forbidden"
@@ -164,4 +185,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: seventeen standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP controls refused\n'
+printf 'header-dependencies: nineteen standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session controls refused\n'

@@ -1,13 +1,14 @@
+#include "runtime/SingleInstance.h"
+
 #include "meta/Ids.h"
-#include "runtime/Codeunit.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 
 #include "SessionState.h"
 
-#include <algorithm>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace agiru::detail {
 

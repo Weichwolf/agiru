@@ -1,6 +1,8 @@
 #include "meta/Ids.h"
 #include "meta/PageDef.h"
+#include "platform/User.h"
 #include "runtime/Database.h"
+#include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/PageCore.h"
 #include "runtime/PageDispatcher.h"
@@ -9,15 +11,18 @@
 #include "runtime/PageSession.h"
 #include "runtime/PageValue.h"
 #include "runtime/Session.h"
+#include "runtime/SessionCommand.h"
 #include "runtime/Storage.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/TestPage.h"
 #include "runtime/test/TestRequestPage.h"
 #include "type/Action.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/RecordId.h"
 
 #include "Check.h"
+#include "OwnedDatabase.h"
 #include "fixture/page/NavigationBlockedList.h"
 #include "fixture/page/NavigationCard.h"
 #include "fixture/page/NavigationDelayed.h"
@@ -26,6 +31,7 @@
 #include "fixture/report/NavigationReport.h"
 #include "fixture/table/NavigationRow.h"
 
+#include <memory>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -53,6 +59,20 @@ public:
   }
 
   int calls = 0;
+};
+
+class CommandAuthorization final : public agiru::PageAuthorization {
+public:
+  void Require(agiru::PageId page, const agiru::PageControlCommand &command) override {
+    if (agiru::Session::Current().UserSecurityId().ToStorageText() !=
+            "00000000-0000-0000-0000-000000000001" ||
+        page != agiru::PageTraits<Card>::kId ||
+        (command.operation != agiru::PageControlOperation::ReadValue &&
+         command.operation != agiru::PageControlOperation::Inspect &&
+         command.operation != agiru::PageControlOperation::Set)) {
+      throw agiru::Error("unexpected authenticated fixture command", "FixturePermission");
+    }
+  }
 };
 
 void Prepare() {
@@ -325,6 +345,76 @@ void RequestPageAdaptersRetainFieldsAndFilters() {
   }
 }
 
+void PagesSurviveSeparateClientCommands() {
+  const gate::OwnedDatabase database("persistent_pages");
+  const agiru::Guid principal("00000000-0000-0000-0000-000000000001");
+  {
+    const agiru::Session seed(database.Dsn());
+    agiru::CreateTable(seed.Database(), agiru::TableTraits<agiru::platform::User>::kTable);
+    agiru::platform::User user;
+    user.UserSecurityID = principal;
+    user.UserName = "Page user";
+    user.Insert();
+    Prepare();
+    agiru::Commit();
+  }
+  agiru::Session persistent(principal);
+  auto list = agiru::MakeInstalledPage(agiru::PageTraits<List>::kId);
+  auto card = agiru::MakeInstalledPage(agiru::PageTraits<Card>::kId);
+  CommandAuthorization authorization;
+  {
+    agiru::Connection connection(database.Dsn());
+    agiru::SessionCommand command(persistent, connection);
+    list->Open(agiru::PageOpenMode::View);
+    CHECK_TRUE("persistent list positions on its first SQL row",
+               list->Move(agiru::PagePosition::First));
+    CHECK_TRUE("persistent list selects the next SQL row", list->Move(agiru::PagePosition::Next));
+    const agiru::RecordId selected = list->CurrentRecord();
+    card->Open(agiru::PageOpenMode::Edit);
+    CHECK_TRUE("a persistent card selects the list's exact record", card->SelectRecord(selected));
+    command.Keep();
+  }
+  {
+    agiru::Connection connection(database.Dsn());
+    agiru::SessionCommand command(persistent, connection);
+    CHECK_TRUE("both generated production instances remain open between commands",
+               list->IsOpen() && card->IsOpen());
+    CHECK_TEXT("the card retains its selected row", card->Controls().ControlText("ID"), "2");
+    agiru::PageDispatcher dispatcher(card->Declaration(), card->Controls(), authorization);
+    static_cast<void>(dispatcher.Execute(
+        {.operation = agiru::PageControlOperation::Set, .control = "Value", .text = "55"}));
+    CHECK_TEXT("typed dispatch reads the validated value on the persistent card",
+               dispatcher.Execute({agiru::PageControlOperation::ReadValue, "Value", ""}).text,
+               "55");
+    command.Keep();
+  }
+  const agiru::Connection observer(database.Dsn());
+  const auto stored = observer.Execute(
+      R"(SELECT "Value", "SystemModifiedBy"::text FROM "Navigation Row" WHERE "ID" = 2)");
+  CHECK_TRUE("the page edit is committed independently of the next browser command",
+             stored.Rows() == 1);
+  CHECK_TEXT("independent SQL sees the shared kernel's saved value",
+             stored.Value(0, 0).value_or(""),
+             "55");
+  CHECK_TEXT("independent SQL attributes the page edit to its authenticated user",
+             stored.Value(0, 1).value_or(""),
+             principal.ToStorageText());
+  {
+    agiru::Connection connection(database.Dsn());
+    agiru::SessionCommand command(persistent, connection);
+    CHECK_TRUE("a committed cursor is safely reopened for later list navigation",
+               list->Move(agiru::PagePosition::Previous));
+    CHECK_TEXT("later list navigation preserves filtered key order",
+               list->Controls().ControlText("ID"),
+               "1");
+    card->Close();
+    list->Close();
+    command.Keep();
+  }
+  CHECK_TRUE("client page closure does not retain an active database lease",
+             persistent.Transaction().Depth() == 0);
+}
+
 }
 
 int main(int argc, char **argv) {
@@ -341,5 +431,6 @@ int main(int argc, char **argv) {
     ProductionLifecycleAndTestErrorPolicy();
     TestHandlesRebindTheirGeneratedControls();
     RequestPageAdaptersRetainFieldsAndFilters();
+    PagesSurviveSeparateClientCommands();
   });
 }

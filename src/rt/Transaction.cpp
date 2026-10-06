@@ -6,11 +6,14 @@
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
 #include "type/CommitBehavior.h"
+#include "type/TransactionType.h"
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <optional>
 #include <print>
 #include <string>
@@ -42,12 +45,21 @@ std::string NextName(std::size_t issued) {
 std::size_t Boundaries::Open(const Connection &connection) {
   if (isolationFloor_ > names_.size()) { throw Error(kLostIsolation); }
   ++issued_;
-  Boundary next{NextName(issued_), inconsistent_};
+  Boundary next{.name = NextName(issued_), .inconsistentBefore = inconsistent_};
   names_.reserve(names_.size() + 1);
   if (!connection.InTransaction()) { connection.Run("BEGIN"); }
   connection.Run("SAVEPOINT " + next.name);
   names_.push_back(std::move(next));
   return names_.size();
+}
+
+void Boundaries::ClearCommand() noexcept {
+  names_.clear();
+  inconsistent_.clear();
+  isolationFloor_ = 0;
+  autoRollbackTest_ = false;
+  type_ = TransactionType::UpdateNoLocks;
+  ++cursorEpoch_;
 }
 
 void Boundaries::Release(const Connection &connection, std::size_t depth) {
@@ -93,7 +105,7 @@ void Boundaries::Commit(const Connection &connection) {
   renewed.reserve(names_.size() - isolationFloor_);
   for (std::size_t i = isolationFloor_; i < names_.size(); ++i) {
     ++issued_;
-    renewed.push_back(Boundary{NextName(issued_), inconsistent_});
+    renewed.push_back(Boundary{.name = NextName(issued_), .inconsistentBefore = inconsistent_});
   }
   try {
     if (isolationFloor_ == 0) {
@@ -127,8 +139,22 @@ namespace agiru::detail {
 
 Scope::Scope() : depth_(Session::Current().Transaction().Open(Session::Current().Database())) {}
 
-Scope::~Scope() {
-  if (open_) { Session::Current().Transaction().Rollback(Session::Current().Database(), depth_); }
+Scope::~Scope() noexcept(false) {
+  if (!open_) { return; }
+  const auto rollback = [this] {
+    Session::Current().Transaction().Rollback(Session::Current().Database(), depth_);
+  };
+  if (std::uncaught_exceptions() == 0) {
+    rollback();
+    return;
+  }
+  try {
+    rollback();
+  } catch (const std::exception &error) {
+    std::fputs("agiru: scope rollback failed while unwinding: ", stderr);
+    std::fputs(error.what(), stderr);
+    std::fputc('\n', stderr);
+  }
 }
 
 void Scope::Keep() {

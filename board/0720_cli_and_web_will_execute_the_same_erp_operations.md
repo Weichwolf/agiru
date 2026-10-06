@@ -31,7 +31,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   transport records, static assets, forged headers, ambiguous framing, error/limit
   refusals, body release and bounded admission while workers block.
   `HttpServerGate`: eleven checks; existing `PageHtmlGate`: 157, zero red.
-  Seventeen standalone-header/forced-dependency controls pass; HTTP source and gate
+  Nineteen standalone-header/forced-dependency controls pass; HTTP source and gate
   targeted tidy pass without new suppressions. Public transport header has no native
   backend/DB/session/thread includes; measured frontend cost is 764.9 ms over three
   no-PCH rounds, not a build-performance improvement or generated-app requirement.
@@ -40,12 +40,26 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   the typed GUID/name from PostgreSQL's system User table and refuses blank/missing,
   unnamed, disabled/unknown-state or expired users, without a license gate. The host
   must authenticate first; this constructor does not verify credentials or permissions.
-  `make session-identity`: 75 checks and three compiled status/GUID/name defects reject;
+  `make session-identity`: 75 identity and 49 command checks; seven compiled
+  status/GUID/name/rollback/commit/epoch/cursor-owner defects reject;
   independent SQL verifies committed creator/modifier ownership. Nested failures and
   worker reuse restore private identity/language; the SYSTEM/blank harness stays compatible.
-  Persistent-session revocation, credential verification and page/table authorization
-  remain pending. Existing Session still owns a resident DB connection: add transaction
-  leases before admitting persistent users, not a thread/connection per user.
+  Detached `Session(Guid)` retains private AL state without a DB connection or worker;
+  `SessionCommand` borrows an exclusive connection, rechecks the system User account,
+  commits successful completion and rolls back unfinished work. Explicit AL Commit
+  survives a later failure. Five hundred idle contexts add no PostgreSQL connections;
+  SingleInstances, temporary rows, language and workdate survive worker/lease changes.
+  Session/epoch-bound cursors cannot poison another user's reused connection. Closed
+  connections and nested-scope cleanup preserve the original AL error; normal cleanup
+  failure propagates instead of terminating the process. DSN constructors remain harness
+  adapters. Pool/admission/settings reset, credential verification, in-flight revocation,
+  company-close invalidation and page/table authorization remain pending.
+  Eleven existing session/transaction/cursor gates retain 1,107 passing checks.
+  Session/command/cursor/SingleInstance and new fixture targeted tidy pass. Connection
+  retains three existing Execute complexity/trace findings; Transaction retains one
+  existing unsafe trace-environment finding. No baseline or suppression was raised.
+  Narrow SessionCommand/SingleInstance headers measure 0.8/40.7 ms frontend over three
+  standalone no-PCH rounds; no build/runtime performance or scale claim.
   Unicode data is preserved; existing Code uppercasing is ASCII-only and remains a gap.
   Blocking-handler cancellation, durable command reconciliation and WASM transport
   remain unqualified. Preserve these limits in the next real page/SQL increment.
@@ -90,14 +104,18 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   This is not a list window, part/dialog implementation, BC-styled UI or HTTP parity.
   Failed-new-row retry recovery, non-delayed primary-key insertion and complete lifecycle
   semantics are not qualified by extraction.
-  Container verification: 105 dispatcher checks and 70 generated navigation/lifecycle/
-  handle/request-page checks pass. Direct SQL confirms saved identity/value and missing
-  refused inserts. Eleven execution mutants and the AL-control shadowing compile
-  control reject. Scalar 34, semantic HTML 157 and codec 102 checks pass; nine additional
+  Container verification: 105 dispatcher checks and 82 generated navigation/lifecycle/
+  handle/request-page checks pass. Generated production list/card instances now retain
+  selection across separate command leases; typed field validation/save is committed
+  before the next command. Independent SQL confirms exact value and modifier GUID;
+  later list navigation reopens the committed cursor safely. This authored fixture's
+  allowlist is not SQL-backed authorization or actual HTTP/client ERP parity.
+  Direct SQL also confirms missing refused inserts. Eleven execution mutants and the
+  AL-control shadowing compile control reject. Scalar 34, semantic HTML 157 and codec 102 checks pass; nine additional
   scalar/HTML execution mutants reject. Generated controls also retain ControlValue
   without colliding with the new typed-value primitive. Generator page 42/report 27,
   catalogue 54 and isolation 17 checks passed on the preceding factory increment.
-  Sixteen standalone header probes and forced dependencies pass. Targeted dispatcher,
+  Targeted dispatcher,
   scalar, HTML, default-adapter sources, both new gates and generated-fixture runner
   tidy pass; the dispatcher gate retains 16 findings in existing Page/PageSession/
   Table/Codeunit implementations. Codec-source tidy retains four existing Encoding/
@@ -328,7 +346,15 @@ BCApps `Modules/System/User/UserCard.Page.al` (State/Expiry Date) and
 user `business-central/ui-how-users-permissions.md` (disable/revoke); predecessor WIs
 1449/1792 retain typed-ID/sign-in findings, not its deferred-authentication policy.
 Revisions are those above. Implementation: `src/rt/Session.cpp`, `include/runtime/Session.h`;
-proof: `test/gate/SessionIdentityGate.cpp`, `test/runtime/session-identity.sh`.
+proof: `test/gate/{SessionIdentity,SessionCommand}Gate.cpp`, `test/runtime/session-identity.sh`.
+Persistent commands: developer `properties/devenv-singleinstance-property.md` and
+`methods-auto/database/database-commit-method.md`; user
+`business-central/ui-change-basic-settings.md`, at the revisions above. Predecessor
+WI 1743 and `openerp/web/client/session.py::{acquire,release,release_after_call}` show
+idle-connection exhaustion and per-call release, not an actor/thread architecture to port.
+Implementation: `include/runtime/{SessionCommand,SingleInstance}.h`,
+`src/rt/{SessionCommand,SingleInstance,Cursor,Transaction}.cpp`;
+generated list/card lease proof: `test/runtime/page-navigation/Runner.cpp`.
 Shared-kernel extraction: developer `triggers-auto/page/devenv-onopenpage-page-trigger.md`,
 `properties/devenv-delayedinsert-property.md`,
 `methods-auto/testpage/testpage-getvalidationerror-method.md` and

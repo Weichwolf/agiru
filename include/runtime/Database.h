@@ -66,8 +66,8 @@ private:
 
 /// \brief A connection to PostgreSQL.
 ///
-/// One connection is one session's private state. It is not shared and not copied, which is why the
-/// type is move-only.
+/// Exclusively owned or borrowed for one active command, never concurrently shared.
+/// Ownership is move-only; the lease provider resets PostgreSQL state before reuse.
 class Connection {
 public:
   /// \brief Opens a connection.
@@ -75,6 +75,12 @@ public:
   /// \throws DatabaseError when the connection cannot be established.
   explicit Connection(const std::string &conninfo);
   ~Connection();
+
+  /// \brief Releases the native handle; a failed lease must not return to a connection pool.
+  void Close() noexcept;
+
+  /// \return Whether the native connection is open and reports a healthy transport.
+  [[nodiscard]] bool IsOpen() const noexcept;
 
   Connection(const Connection &) = delete;
   Connection &operator=(const Connection &) = delete;

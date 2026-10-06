@@ -8,6 +8,10 @@
 #include <string_view>
 #include <vector>
 
+namespace agiru {
+class Session;
+}
+
 namespace agiru::detail {
 
 class Cursor {
@@ -35,6 +39,7 @@ private:
   bool Fetch();
 
   const Connection *connection_;
+  const Session *session_;
   std::string name_;
   std::size_t epoch_;
   Result block_;

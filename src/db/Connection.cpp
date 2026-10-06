@@ -77,7 +77,16 @@ Connection::Connection(const std::string &conninfo) : handle_(PQconnectdb(connin
 }
 
 Connection::~Connection() {
+  Close();
+}
+
+void Connection::Close() noexcept {
   if (handle_ != nullptr) { PQfinish(Conn(handle_)); }
+  handle_ = nullptr;
+}
+
+bool Connection::IsOpen() const noexcept {
+  return handle_ != nullptr && PQstatus(Conn(handle_)) == CONNECTION_OK;
 }
 
 Connection::Connection(Connection &&o) noexcept : handle_(std::exchange(o.handle_, nullptr)) {}
@@ -154,11 +163,13 @@ void Connection::Run(std::string_view sql,
 namespace agiru {
 
 bool Connection::InTransaction() const {
+  if (handle_ == nullptr) { throw DatabaseError("the connection is closed"); }
   const PGTransactionStatusType status = PQtransactionStatus(static_cast<PGconn *>(handle_));
   return status == PQTRANS_INTRANS || status == PQTRANS_INERROR;
 }
 
 bool Connection::InFailedTransaction() const {
+  if (handle_ == nullptr) { throw DatabaseError("the connection is closed"); }
   return PQtransactionStatus(static_cast<PGconn *>(handle_)) == PQTRANS_INERROR;
 }
 

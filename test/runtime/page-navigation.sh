@@ -12,6 +12,8 @@ sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/run
   src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
   include/runtime/Page.h src/gen/BodyWriter.cpp \
   include/runtime/PageSession.h include/runtime/test/TestPage.h \
+  include/runtime/Session.h include/runtime/SessionCommand.h src/rt/Session.cpp \
+  src/rt/SessionCommand.cpp src/rt/Cursor.cpp src/rt/Transaction.cpp \
   test/gate/PageDispatcherGate.cpp test/runtime/page-navigation/Runner.cpp \
   test/runtime/page-navigation/*.al test/runtime/page-navigation.sh > "$proof/dispatcher-inputs.sha256"
 mkdir -p "$proof/source"
@@ -20,6 +22,7 @@ cp test/transpiler/native-enums/source/app.json "$proof/source/app.json"
 printf '%s\n' '{"apps":[{"name":"fixture","source":"source"}]}' > "$proof/apps.json"
 printf '%s\n' '{"include":["Microsoft"],"exclude":[],"product_exclude":[]}' > "$proof/scope.json"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate
+  "-DAGIRU_TEST_DSN=\"$dsn\""
   "-I$proof/generated/fixture" "-I$proof/generated/absent" "-I$proof/generated/shared")
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
