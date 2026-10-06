@@ -209,14 +209,19 @@ for control in cursor-generation surviving-portal released-portal one-row-fetch;
       skip = 1; changed++; next
     }
     skip { if (/^    }$/) skip = 0; next }
-    control == "released-portal" && /if \(!connection_->InTransaction\(\) \|\| connection_->InFailedTransaction\(\)\)/ {
-      print "  if (Session::Current().Transaction().Depth() == 0) { return; }"; changed++
+    control == "released-portal" && /if \(!connection_->IsOpen\(\) \|\| !connection_->InTransaction\(\) \|\|/ {
+      print "  if (Session::Current().Transaction().Depth() == 0) {";
+      continuation = 1; changed++; next
+    }
+    continuation {
+      if (!/connection_->InFailedTransaction\(\)\) \{/) exit 2;
+      continuation = 0; next
     }
     control == "one-row-fetch" && /std::to_string\(kFetchBlock\)/ {
       sub(/std::to_string\(kFetchBlock\)/, "std::to_string(std::size_t{1})"); changed++
     }
     { print }
-    END { if (changed != 1 || skip) exit 2 }
+    END { if (changed != 1 || skip || continuation) exit 2 }
   ' "$source" > "$proof/$control.cpp"
   "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
     -lagiru_rt -lagiru_db -lagiru_net -o "$proof/$control.so"
