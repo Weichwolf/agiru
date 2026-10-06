@@ -2,6 +2,24 @@ namespace Microsoft.Fixture;
 
 codeunit 50261 "Stream Alias Consumer"
 {
+    procedure ReadDecodedLines(var Store: Blob): Text
+    var
+        Input: InStream;
+        Reader: DotNet StreamReader;
+        Value: Text;
+    begin
+        Store.CreateInStream(Input);
+        Reader := Reader.StreamReader(Input);
+        if Reader.EndOfStream then
+            exit('empty');
+        Value := Reader.ReadLine();
+        if not Reader.EndOfStream then
+            Value += '|' + Reader.ReadToEnd();
+        if not Reader.EndOfStream then
+            Error('Decoded reader did not reach its end.');
+        exit(Value);
+    end;
+
     procedure ClrEncodingPages(): Integer
     var
         Base: DotNet Encoding;

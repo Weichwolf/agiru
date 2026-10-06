@@ -1,5 +1,7 @@
 #include "dotnet/BinaryReader.h"
 #include "dotnet/BinaryWriter.h"
+#include "dotnet/Encoding.h"
+#include "dotnet/StreamReader.h"
 #include "runtime/ErrorValue.h"
 #include "type/Blob.h"
 #include "type/Code.h"
@@ -27,6 +29,42 @@ namespace {
 
 static_assert(std::is_const_v<decltype(agiru::dotnet::BinaryReader::BinaryReader)>);
 static_assert(std::is_const_v<decltype(agiru::dotnet::BinaryWriter::BinaryWriter)>);
+static_assert(std::is_const_v<decltype(agiru::dotnet::StreamReader::StreamReader)>);
+
+void DecodedReadersOwnTheirEndPositionAcrossCopiesAndMoves() {
+  using agiru::dotnet::StreamReader;
+  Blob blob;
+  static_cast<void>(blob.CreateOutStream().WriteBytes("first\r\nsecond\n"));
+  auto input = blob.CreateInStream();
+  auto reader = StreamReader::StreamReader(input);
+  CHECK_TRUE("a decoded reader starts before its end", !reader.EndOfStream());
+  CHECK_TRUE("Peek does not advance the decoded position", reader.Peek() == 'f');
+  CHECK_TEXT("ReadLine removes CRLF", reader.ReadLine().Value(), "first");
+  auto copied = reader;
+  CHECK_TEXT("the original reader takes its next line", reader.ReadLine().Value(), "second");
+  CHECK_TRUE("the original reaches its own end", reader.EndOfStream());
+  CHECK_TRUE("a copied reader retains its own position", !copied.EndOfStream());
+  reader.Close();
+  CHECK_TRUE("Close resets this instance to its empty end", reader.EndOfStream());
+  auto moved = std::move(copied);
+  CHECK_TRUE("moving retains the selected decoded position", !moved.EndOfStream());
+  reader = std::move(moved);
+  CHECK_TEXT("move assignment retains the remaining text", reader.ReadToEnd().Value(), "second\n");
+  CHECK_TRUE("ReadToEnd reaches the receiving instance's end", reader.EndOfStream());
+  CHECK_TRUE("Read at the end returns the existing sentinel", reader.Read() == -1);
+  CHECK_TRUE("Peek at the end returns the existing sentinel", reader.Peek() == -1);
+  CHECK_TEXT("ReadLine at the end is empty", reader.ReadLine().Value(), "");
+  const StreamReader empty;
+  CHECK_TRUE("a default reader is already at its end", empty.EndOfStream());
+  Blob windows;
+  static_cast<void>(windows.CreateOutStream().WriteBytes("h\xe4llo\n"));
+  auto windowsInput = windows.CreateInStream();
+  auto decoded = StreamReader::StreamReader(windowsInput, agiru::dotnet::Encoding::GetEncoding(0));
+  CHECK_TEXT("the reader still decodes the supplied Windows encoding",
+             decoded.ReadLine().Value(),
+             "hällo");
+  CHECK_TRUE("the decoded reader reaches its own end", decoded.EndOfStream());
+}
 
 /// A STREAM WRITES INTO THE BLOB IT WAS GIVEN, and does not own a copy of it. That is what makes
 /// `Rec.Blob.CreateOutStream(Out); Out.WriteText(x)` leave the value in the record -- and a stream
@@ -341,5 +379,6 @@ int main() {
     InputAliasesShareOneCursorButNewBindingsAreIndependent();
     StreamsRetainTheirProviderAfterItsWrapperEnds();
     ABinaryWriterAndReaderRoundTripANote();
+    DecodedReadersOwnTheirEndPositionAcrossCopiesAndMoves();
   });
 }

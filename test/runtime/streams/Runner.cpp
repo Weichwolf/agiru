@@ -14,6 +14,15 @@
 int main() {
   return gate::Run("Generated Stream Aliases", [] {
     agiru::Fixture::StreamAliasConsumer_Codeunit consumer;
+    agiru::Blob lines;
+    static_cast<void>(lines.CreateOutStream().WriteBytes("hällo\r\nworld\n"));
+    CHECK_TEXT("generated CLR reader factory and end property retain AL spelling",
+               consumer.ReadDecodedLines(lines).Value(),
+               "hällo|world\n");
+    agiru::Blob empty;
+    CHECK_TEXT("generated CLR reader end property recognizes an empty stream",
+               consumer.ReadDecodedLines(empty).Value(),
+               "empty");
     constexpr agiru::Integer kEncodingFactoryCodePageSum = 65001 + 65001 + 1200 + 20127;
     CHECK_TRUE("generated CLR encoding factories retain all four AL constructor names",
                consumer.ClrEncodingPages() == kEncodingFactoryCodePageSum);

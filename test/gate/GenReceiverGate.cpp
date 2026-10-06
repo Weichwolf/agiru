@@ -30,7 +30,8 @@ void NativeAliasesRemainRebuiltTypes() {
                            "Encoding",
                            "UTF8Encoding",
                            "UnicodeEncoding",
-                           "ASCIIEncoding"}) {
+                           "ASCIIEncoding",
+                           "StreamReader"}) {
     declaration.subtype = name;
     CHECK_TRUE("an AL type alias remains implemented", types.contains(name));
     CHECK_TRUE("the alias does not emit an absent CLR stub",

@@ -5,7 +5,7 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 
 #include <concepts>
 #include <cstddef>
@@ -18,26 +18,26 @@ namespace agiru::dotnet {
 ///        at construction and decoded with the encoding given (UTF-8 by default), and
 ///        `ReadLine` hands the lines back one at a time, the way the test libraries read an
 ///        export back.
-class StreamReader {
+class DecodedStreamReader {
 public:
   /// \brief The binder behind `R := R.StreamReader(InStream [, Encoding])`.
   struct Binder {
     /// \brief `new StreamReader(stream)`: UTF-8. \param stream The stream. \return The reader.
-    [[nodiscard]] class StreamReader operator()(InStream &stream) const;
+    [[nodiscard]] DecodedStreamReader operator()(InStream &stream) const;
 
     /// \brief `new StreamReader(stream, encoding)`. \param stream The stream.
     /// \param encoding The bytes' encoding. \return The reader.
-    [[nodiscard]] class StreamReader operator()(InStream &stream, const Encoding &encoding) const;
+    [[nodiscard]] DecodedStreamReader operator()(InStream &stream, const Encoding &encoding) const;
 
     /// \brief `new StreamReader(stream, detectEncodingFromByteOrderMarks)`.
     /// \param stream The stream. \param detect Whether a byte-order mark decides the encoding.
     /// \return The reader.
-    [[nodiscard]] class StreamReader operator()(InStream &stream, Boolean detect) const;
+    [[nodiscard]] DecodedStreamReader operator()(InStream &stream, Boolean detect) const;
 
     /// \brief `new StreamReader(stream, encoding, detectEncodingFromByteOrderMarks)`.
     /// \param stream The stream. \param encoding The encoding.
     /// \param detect Whether a byte-order mark overrides it. \return The reader.
-    [[nodiscard]] class StreamReader
+    [[nodiscard]] DecodedStreamReader
     operator()(InStream &stream, const Encoding &encoding, Boolean detect) const;
 
     /// \brief `new StreamReader(x [, ...])` over anything else AL hands it -- a .NET stream this
@@ -54,7 +54,7 @@ public:
     template <typename First, typename... Rest>
       requires(!std::convertible_to<First &, InStream &> &&
                !std::convertible_to<First, std::string_view>)
-    [[nodiscard]] class StreamReader operator()(First &&first, Rest &&...rest) const {
+    [[nodiscard]] DecodedStreamReader operator()(First &&first, Rest &&...rest) const {
       static_cast<void>(first);
       (static_cast<void>(rest), ...);
       throw ::agiru::Error(
@@ -64,11 +64,11 @@ public:
 
     /// \brief `new StreamReader(path)`: the file read whole. \param path The file.
     /// \return The reader.
-    [[nodiscard]] class StreamReader operator()(std::string_view path) const;
+    [[nodiscard]] DecodedStreamReader operator()(std::string_view path) const;
   };
 
   /// \brief The constructor AL calls as a member.
-  Binder StreamReader;
+  static constexpr Binder StreamReader{};
 
   /// \brief `ReadLine()`, which AL writes as a statement too. \return The next line without its
   ///        line end, empty at the end.
@@ -83,32 +83,9 @@ public:
   /// \brief `Peek()`. \return The next character's code point without reading it, -1 at the end.
   [[nodiscard]] Integer Peek() const;
 
-  /// \brief `EndOfStream`, which .NET spells as a property and AL reads without parentheses.
-  ///
-  /// \note IT HOLDS NOTHING AND FINDS ITS READER BY ITS OWN OFFSET, because `StreamReader`
-  ///       carries a member named after the class -- the constructor AL calls -- and a class with
-  ///       such a member may declare no constructor of its own, so a slot that stored a pointer
-  ///       could not be repaired when the reader is copied (`R := R.StreamReader(...)` copies).
-  class EndOfStreamSlot {
-  public:
-    /// \brief `if R.EndOfStream then`. \return Whether everything was read.
-    operator Boolean() const { return Read_(); } // NOLINT(*-explicit-constructor)
-
-    /// \brief `R.EndOfStream()`. \return Whether everything was read.
-    Boolean operator()() const { return Read_(); }
-
-  private:
-    [[nodiscard]] Boolean Read_() const;
-  };
-
-  /// \brief `EndOfStream`.
-  EndOfStreamSlot EndOfStream;
-
-  /// \brief Where the slot sits inside the reader, which is how it finds it.
-  static const std::size_t kEndOfStreamOffset;
-
-  /// \brief Whether everything was read. \return The answer the slot hands on.
-  [[nodiscard]] Boolean AtEnd_() const { return at_ >= text_.size(); }
+  /// \brief The AL property getter reads this instance's current position.
+  /// \return Whether everything was read.
+  [[nodiscard]] Boolean EndOfStream() const { return at_ >= text_.size(); }
 
   /// \brief `CurrentEncoding`. \return The encoding the reader decoded with.
   [[nodiscard]] Encoding CurrentEncoding() const { return encoding_; }
@@ -124,5 +101,8 @@ private:
   std::size_t at_ = 0;
   Encoding encoding_;
 };
+
+/// \brief Preserves the AL name while its immutable factory has the same spelling.
+using StreamReader = DecodedStreamReader;
 
 }

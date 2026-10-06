@@ -2,30 +2,20 @@
 
 #include "dotnet/Encoding.h"
 #include "runtime/ErrorValue.h"
+#include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
+#include <ios>
 #include <iterator>
 #include <string>
 #include <string_view>
 
 namespace agiru::dotnet {
-
-namespace {
-const class StreamReader kProbeForEndOfStream{};
-}
-
-const std::size_t StreamReader::kEndOfStreamOffset =
-    static_cast<std::size_t>(reinterpret_cast<const char *>(&kProbeForEndOfStream.EndOfStream) -
-                             reinterpret_cast<const char *>(&kProbeForEndOfStream));
-
-Boolean StreamReader::EndOfStreamSlot::Read_() const {
-  const auto *reader = reinterpret_cast<const class StreamReader *>(
-      reinterpret_cast<const char *>(this) - kEndOfStreamOffset);
-  return reader->AtEnd_();
-}
 
 namespace {
 
@@ -52,35 +42,34 @@ std::string WithoutMark(std::string text, const Encoding &encoding) {
 
 }
 
-class StreamReader StreamReader::Binder::operator()(InStream &stream, Boolean detect) const {
+StreamReader StreamReader::Binder::operator()(InStream &stream, Boolean detect) const {
   return (*this)(stream, Encoding::Made(Encoding::kUtf8, static_cast<bool>(detect)));
 }
 
-class StreamReader
+StreamReader
 StreamReader::Binder::operator()(InStream &stream, const Encoding &encoding, Boolean detect) const {
   static_cast<void>(detect);
   return (*this)(stream, encoding);
 }
 
-class StreamReader StreamReader::Binder::operator()(std::string_view path) const {
+StreamReader StreamReader::Binder::operator()(std::string_view path) const {
   std::ifstream file{std::string(path), std::ios::binary};
   if (!file) { throw Error("StreamReader(" + std::string(path) + "): the file cannot be opened"); }
   const std::string bytes{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
   const Encoding encoding = Encoding::Made(Encoding::kUtf8, false);
-  class StreamReader out;
+  DecodedStreamReader out;
   out.text_ = encoding.Decode(WithoutMark(bytes, encoding));
   out.at_ = 0;
   out.encoding_ = encoding;
   return out;
 }
 
-class StreamReader StreamReader::Binder::operator()(InStream &stream) const {
+StreamReader StreamReader::Binder::operator()(InStream &stream) const {
   return (*this)(stream, Encoding::Made(Encoding::kUtf8, false));
 }
 
-class StreamReader StreamReader::Binder::operator()(InStream &stream,
-                                                    const Encoding &encoding) const {
-  class StreamReader out;
+StreamReader StreamReader::Binder::operator()(InStream &stream, const Encoding &encoding) const {
+  DecodedStreamReader out;
   out.text_ = encoding.Decode(WithoutMark(Whole(stream), encoding));
   out.at_ = 0;
   out.encoding_ = encoding;
