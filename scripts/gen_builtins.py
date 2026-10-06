@@ -29,7 +29,7 @@ def settle(path, text):
     blind (board:0698). The generator's output is what the tree will hold, or it is not comparable
     with anything, including itself.
     """
-    formatted = subprocess.run(["clang-format", f"--assume-filename={path.name}"],
+    formatted = subprocess.run(["clang-format-19", f"--assume-filename={path.name}"],
                                input=text, capture_output=True, text=True, check=True)
     if formatted.returncode == 0:
         text = formatted.stdout
