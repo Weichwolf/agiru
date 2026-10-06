@@ -788,6 +788,9 @@ void LoadRow(void *record, const TableDef &table, const FieldValues &row) {
 
 bool RuntimeGet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempGet(record, table); }
+  if (const auto found = GetInstalledFieldMetadata(record, table); found.has_value()) {
+    return *found;
+  }
   if (const auto found = GetInstalledTableMetadata(record, table); found.has_value()) {
     return *found;
   }

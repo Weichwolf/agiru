@@ -82,8 +82,8 @@ find "$proof/$control" -depth -delete
 
 control=field-value-context
 awk '
-  /return \{false, kName, PrimaryKeyText\(\)\};/ {
-    print "  detail::Found missing{false, kName, PrimaryKeyText()};";
+  /return Table<Field>::Get\(TableNo, No\);/ {
+    print "  auto missing = Table<Field>::Get(TableNo, No);";
     print "  static_cast<void>(static_cast<bool>(missing));";
     print "  return missing;"; changed++; next
   }
@@ -99,6 +99,37 @@ fi
 rg -q 'FAIL .*a discarded native missing-field Get carries its searched key' "$proof/$control.log"
 sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/read-controls.sha256"
 rm -- "$proof/$control.cpp" "$proof/$control.so"
+
+for control in field-catalogue-zero field-get-binding; do
+  awk -v control="$control" '
+    control == "field-catalogue-zero" && /if \(buffer.No <= 0\) \{ return false; \}/ {
+      changed++; next
+    }
+    control == "field-get-binding" &&
+      /if \(table.fields.data\(\) != platform::kFieldFields.data\(\) \|\|/ {
+      print "  if (false) {"; skipping=1; changed++; next
+    }
+    skipping {
+      if ($0 !~ /table.fields.size\(\) != platform::kFieldFields.size\(\)\) \{/) exit 2
+      skipping=0; next
+    }
+    { print }
+    END { if (changed != 1 || skipping) exit 2 }
+  ' src/rt/written/PlatformField.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$field_gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped the native Field.Get contract\n' "$control" >&2
+    exit 1
+  fi
+  case "$control" in
+    field-catalogue-zero) claim='native Get defaults an omitted field number to an absent zero key';;
+    field-get-binding) claim='native Get refuses an unqualified field binding before accessing its buffer';;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/read-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
 
 for control in field-access-default field-search-default field-customization-default field-customization-editable; do
   awk -v control="$control" '
@@ -484,4 +515,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: installed Table Metadata.Get through typed/RecordRef paths, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; forty-three compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: installed Table Metadata.Get and positive-key Field.Get through typed/RecordRef paths, source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; forty-five compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

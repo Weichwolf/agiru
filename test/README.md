@@ -100,9 +100,13 @@ ModifyAllowed policy. View navigation and general command permissions remain ope
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL
 field indices and shared compiled record filters, including group intersections,
-cross-column OR, FlowFilters and owned expression snapshots. Twenty-three compiled
+cross-column OR, FlowFilters and owned expression snapshots. Forty-five compiled
 controls and the narrow system-field header dependency control must reject.
-Temporary operations use the same predicate; live metadata providers stay guarded (0044).
+Installed Table Metadata.Get and positive-key Field.Get share typed/RecordRef readers;
+timestamp zero remains addressable through FieldRef, and temporary zero keys remain valid.
+The Field reader checks the native ABI before accessing its buffer. Typed missing reads
+retain optional-result semantics; ordinary filters stay unchanged. Legacy SQL Field
+navigation/counts and complete metadata providers remain gaps (0044).
 
 `make record-order JOBS=2` verifies mixed field directions, global reversal,
 primary-key ties, filters, relative searches and cursor/keyset direction changes.

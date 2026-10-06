@@ -7,6 +7,7 @@
 #include "platform/ReflectionOptions.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/Record.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/FieldClass.h"
@@ -114,13 +115,17 @@ void MovedReadFailuresPreserveOwnedKeyText() {
 
 void MetadataGetDefaultsAndTemporaryReadsShareTheContract() {
   Field native;
-  CHECK_TRUE("native Get defaults an omitted field number to zero",
-             native.Get(agiru::platform::Company::kId.Value()));
-  CHECK_TRUE("the omitted native key selects timestamp rather than the previous key",
-             native.No == 0);
-  CHECK_TEXT("the omitted native key reads the original timestamp spelling",
-             native.FieldName.Value(),
-             "timestamp");
+  CHECK_TRUE("native Get defaults an omitted field number to an absent zero key",
+             !native.Get(agiru::platform::Company::kId.Value()));
+  CHECK_TRUE("the omitted native key retains its searched zero value", native.No == 0);
+  const ReadFailure zero =
+      CaptureReadFailure([&] { native.Get(agiru::platform::Company::kId.Value(), 0); });
+  CHECK_TEXT("a discarded native timestamp catalogue lookup names its searched key",
+             zero.message,
+             "The Field does not exist. Identification fields and values: 2000000006, 0");
+  CHECK_TEXT("a discarded native timestamp catalogue lookup retains its error code",
+             zero.code,
+             "DB:RecordNotFound");
   CHECK_TRUE("native Get defaults all omitted keys to zero", !native.Get());
   const ReadFailure empty = CaptureReadFailure([&] { native.Get(); });
   CHECK_TEXT("a discarded native default-key read names zero keys",
@@ -148,6 +153,79 @@ void MetadataGetDefaultsAndTemporaryReadsShareTheContract() {
   CHECK_TEXT("a discarded temporary missing-field Get carries the record error code",
              missing.code,
              "DB:RecordNotFound");
+}
+
+void TypedAndReflectedGetShareInstalledFields() {
+  Field typed;
+  typed.SetRange(typed.No, kMissingMetadataField);
+  CHECK_TRUE("typed installed metadata is readable without a database session",
+             typed.Get(kMetadataFixtureId.Value(), 1));
+  RecordRef reference;
+  reference.GetTable(typed);
+  const auto originalView = reference.GetView();
+  typed.Init();
+  typed.TableNo = kMetadataFixtureId.Value();
+  typed.No = 2;
+  CHECK_TRUE("RecordRef Get reads installed fields rather than a SQL copy",
+             reference.Get(typed.RecordId()));
+  reference.SetTable(typed);
+  CHECK_TRUE("RecordRef Get lands on the searched field", typed.No == 2);
+  CHECK_TEXT("RecordRef Get retains the installed source name", typed.FieldName, "Flow filter");
+  CHECK_TEXT("RecordRef Get preserves the caller's filters", reference.GetView(), originalView);
+
+  Field expected;
+  CHECK_TRUE("typed Get reads the same source field", expected.Get(kMetadataFixtureId.Value(), 2));
+  const auto &definition = agiru::TableTraits<Field>::kTable;
+  for (const auto &field : definition.fields) {
+    if (!agiru::Stored(field)) { continue; }
+    CHECK_TEXT("typed and RecordRef Get preserve the same exact field values",
+               agiru::detail::StorageText(&typed, field),
+               agiru::detail::StorageText(&expected, field));
+  }
+
+  typed.TableNo = agiru::platform::Company::kId.Value();
+  typed.No = 0;
+  CHECK_TRUE("RecordRef Get excludes timestamp from the native catalogue",
+             !reference.Get(typed.RecordId()));
+  CHECK_TRUE("typed Get excludes negative catalogue field keys",
+             !typed.Get(agiru::platform::Company::kId.Value(), -1));
+  const auto identity = agiru::SystemFieldNumbers::SystemId.Value();
+  CHECK_TRUE("positive reserved system fields remain in the native catalogue",
+             typed.Get(agiru::platform::Company::kId.Value(), identity));
+  CHECK_TEXT("native system identity retains its reflected name", typed.FieldName, "$systemId");
+
+  agiru::platform::Company company;
+  reference.GetTable(company);
+  CHECK_TRUE("timestamp zero remains directly addressable through FieldRef",
+             reference.Field(0).Number() == 0);
+
+  Temporary<Field> rows;
+  rows.TableNo = kMetadataFixtureId.Value();
+  rows.No = 0;
+  rows.FieldName = "Stored zero key";
+  rows.Insert();
+  reference.GetTable(rows);
+  CHECK_TRUE("RecordRef temporary Get retains its zero-key row", reference.Get(rows.RecordId()));
+  reference.SetTable(rows);
+  CHECK_TEXT("RecordRef temporary Get does not substitute installed metadata",
+             rows.FieldName,
+             "Stored zero key");
+}
+
+void NativeGetRequiresItsQualifiedFieldBinding() {
+  Field row;
+  auto definition = agiru::TableTraits<Field>::kTable;
+  definition.fields = {};
+  const ReadFailure unqualified = CaptureReadFailure([&] {
+    const auto found = agiru::detail::GetInstalledFieldMetadata(&row, definition);
+    CHECK_TRUE("an unqualified binding does not become a missing row", !found.has_value());
+  });
+  CHECK_TEXT("native Get refuses an unqualified field binding before accessing its buffer",
+             unqualified.message,
+             "Field.Get requires the qualified native field binding");
+  const auto ordinary = agiru::detail::GetInstalledFieldMetadata(
+      nullptr, agiru::TableTraits<agiru::platform::Company>::kTable);
+  CHECK_TRUE("the Field reader leaves ordinary table providers unchanged", !ordinary.has_value());
 }
 
 struct TypeNameCase {
@@ -690,6 +768,8 @@ int main() {
     MetadataGetPreservesOptionalFailureContext();
     MovedReadFailuresPreserveOwnedKeyText();
     MetadataGetDefaultsAndTemporaryReadsShareTheContract();
+    TypedAndReflectedGetShareInstalledFields();
+    NativeGetRequiresItsQualifiedFieldBinding();
     ATemporaryFieldIsAContainerAndNeedsNoPlatform();
     ItIsTheTableTheBaseAppReadsFrom();
     TheCompatibilityTypeKeepsItsExistingOptionVocabulary();

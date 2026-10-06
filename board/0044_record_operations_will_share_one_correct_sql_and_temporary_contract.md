@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
 Next: replay the qualified Integer projection with 0013/0058 (72 previous failures,
-38 lost passes), then qualify Field's positive-key catalogue and installed Table
-Metadata filters/order/Find/Next/Count through shared primitives. Investigate StoredImage.
+38 lost passes), then implement Field's live positive-key Find/Count/Next and installed
+Table Metadata filters/order/navigation through shared primitives. Investigate StoredImage.
 Complete Field classification, SQLDataType, package provenance and implicit values;
 then Field navigation and the actual FieldName → catalogue → FieldRef caller.
 
@@ -136,26 +136,27 @@ then Field navigation and the actual FieldName → catalogue → FieldRef caller
   BCApps `d99152ee35f0`: System/Workflow/WorkflowEvent.Table.al uses optional Get.
   Predecessor 1229 distinguishes filter-blind Get from filter-aware Find.
   Current-tree AL replay is still required; no UT gains are claimed.
-- Native/temporary `Field.Get` preserves optional-result semantics, searched keys,
-  unchanged filters and zero-default omitted trailing keys. Non-missing projection
-  errors still throw when the result is consumed. Moving `detail::Found` retains
-  owned key text. Search flags and all four compile-time Access members preserve
-  declarations, default Public and case-insensitive spelling; unknown Access refuses.
-  One private ordinal decoder serves Field and Table Metadata without adding public
-  dependencies or a second mapper. `PlatformFieldGate`: 372 checks; PlatformField.cpp
-  and gate focused tidy pass. ReflectionMetadata.cpp retains four existing
-  std::expected include-cleaner diagnostics; no suppression or baseline increase.
-  `make reflection-metadata JOBS=2`: all 43 compiled controls plus the header control
-  pass, including dropped-key, silent-miss, forced-Public and false-search mutants.
-  The shared fallback mutant also fails unknown Field access/customization checks.
-  Developer `f928288ee840`: `methods-auto/record/record-get-method.md`;
-  BCApps `d99152ee35f0`: `System/RapidStart/ConfigPackageField.Table.al`
-  uses both contexts. Predecessor 1136 warns against weakening strict reads to
-  hide upstream faults. Properties `devenv-{access,optimizefortextsearch,allowincustomizations}-property.md`
-  establish field defaults and declaring-extension customization inheritance.
-  BCApps Item.Table.al declares optimized No./Description; TableWriter.cpp and
-  meta/Declare.h already retain these flags. This is not an implemented text-search
-  index, authorization, live navigation, complete projection or full AL replay.
+- Native `Field.Get` uses `RuntimeGet` / `GetInstalledFieldMetadata` for typed and
+  RecordRef reads, with the original positive-key catalogue domain and checked native
+  field-span ABI. It never reads a SQL copy. Native zero/negative keys miss; omitted
+  trailing keys still default to zero. Timestamp remains addressable by FieldRef(0),
+  positive reserved fields remain catalogued, and temporary zero-key rows stay writable
+  and readable through both paths. Typed consumed/discarded misses preserve false versus
+  searched-key errors; projection errors throw and filters survive. RecordRef.Get's
+  own discarded-result wrapper and security-filter enforcement remain separate gaps.
+  `PlatformFieldGate`: 418 checks, including stored-value parity and qualified binding
+  refusal. Runtime mapper and gate focused tidy pass after adding the named Record.h
+  dependency; Table.cpp retains sixteen findings, without suppressions/baseline increases.
+  Reflection qualifier retains its 43 compiled controls and adds catalogue-zero and
+  unchecked-binding controls (four/two failed checks). Field Access/search/customization
+  policies, unknown-value refusal and owned moved-error keys remain qualified.
+  Original BC29 authority: FieldDataProvider iterator RVA `2e888c`, source/hash in 0013.
+  Developer `f928288ee840`: record-get, recordref-get/field and devenv-virtual-tables;
+  BCApps `d99152ee35f0`: ConfigPackageField uses consumed/discarded typed reads,
+  DataTypeManagement.FindFieldByName uses FieldName → Field.FindFirst → FieldRef.Value.
+  Predecessor 1114 requires that actual name-derived caller; 1136 rejects hidden misses.
+  SQL snapshot navigation/counts, complete projection, authorization and full AL replay
+  are not qualified by Get. Do not claim the aggregate UT is repaired yet.
 - `AllowInCustomizations` defaults stay on the declaring fields in `src/al/Ast.h` /
   `Parser.cpp`, before extension merging. Extension properties survive parsing;
   explicit field values override that owner's default in `src/gen/TableWriter.cpp`.

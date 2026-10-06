@@ -7,6 +7,7 @@
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Integer.h"
 #include "type/Option.h"
@@ -19,6 +20,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -182,19 +184,31 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
   row.IsAllowedInCustomizations = *customizable != 0;
 }
 
-detail::Found platform::Field::Get(::agiru::Integer TableNo, ::agiru::Integer No) {
-  if (IsTemporary()) { return Table<Field>::Get(TableNo, No); }
-  AssignPrimaryKey(TableNo, No);
-  const TableEntry *entry = FindTable(TableId{TableNo});
+std::optional<bool> detail::GetInstalledFieldMetadata(void *record, const TableDef &table) {
+  if (table.id != platform::Field::kId) { return std::nullopt; }
+  if (table.fields.data() != platform::kFieldFields.data() ||
+      table.fields.size() != platform::kFieldFields.size()) {
+    throw Error("Field.Get requires the qualified native field binding");
+  }
+  auto &buffer = *static_cast<platform::Field *>(record);
+  if (buffer.No <= 0) { return false; }
+  const TableEntry *entry = FindTable(TableId{buffer.TableNo});
   if (entry != nullptr) {
     const auto wanted = std::ranges::find_if(
-        entry->table->fields, [No](const FieldDef &def) { return def.no.Value() == No; });
+        entry->table->fields, [&](const FieldDef &def) { return def.no.Value() == buffer.No; });
     if (wanted != entry->table->fields.end()) {
-      detail::LoadFieldMetadata(*this, *entry->table, *wanted);
-      return {true, kName};
+      LoadFieldMetadata(buffer, *entry->table, *wanted);
+      auto &state = reinterpret_cast<StateHandle *>(record)->Ensure();
+      state.open.Forget();
+      state.positioned = true;
+      return true;
     }
   }
-  return {false, kName, PrimaryKeyText()};
+  return false;
+}
+
+detail::Found platform::Field::Get(::agiru::Integer TableNo, ::agiru::Integer No) {
+  return Table<Field>::Get(TableNo, No);
 }
 
 }

@@ -393,19 +393,15 @@ public:
   ///
   /// \param TableNo The table, defaulting to zero when omitted.
   /// \param No      The field within it, defaulting to zero when omitted.
-  /// \return True when this installation carries that field. Consumed missing reads
+  /// \return True when this installation carries a positive-numbered catalogue field.
+  ///         Timestamp zero remains addressable through FieldRef, not through this catalogue.
+  ///         Temporary records read their own keys, including zero. Consumed missing reads
   ///         return false; discarded missing reads raise `DB:RecordNotFound`.
   /// \throws Error if a discarded read misses or a declaration cannot be projected.
   ///
-  /// \note IT READS THE CATALOGUE AND NOT THE DATABASE, which is what makes `Field` VIRTUAL.
-  ///       There is no `Field` table in PostgreSQL and there must not be: every row it could hold
-  ///       is already `constexpr` data in `.rodata`, emitted beside the table it describes. Asking
-  ///       SQL for it produced `relation "Field" does not exist`, which is the right error for the
-  ///       wrong question.
-  ///
-  /// \warning IT HIDES `Table<Field>::Get` RATHER THAN OVERRIDING IT, because `Table` is CRTP and
-  ///          has no virtuals -- that is the point of it. A `Field` reached through a `RecordRef`
-  ///          therefore retains the live-provider guard until common navigation is qualified.
+  /// \note Typed and RecordRef Get share the immutable installed declarations and ignore
+  ///       ordinary filters without replacing them. Legacy SQL-backed navigation is a separate
+  ///       unqualified provider gap; successful Get does not qualify Find, Next or Count.
   detail::Found Get(::agiru::Integer TableNo = 0, ::agiru::Integer No = 0);
 };
 

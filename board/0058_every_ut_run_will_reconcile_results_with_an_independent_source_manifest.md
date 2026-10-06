@@ -26,6 +26,8 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   shared temporary arrays, Field.Get/property and Table Metadata.Get repairs. Wait for
   final target receipts; this snapshot does not include the later GetBySystemId increment.
   It also lacks the later qualified Integer virtual timestamp/SQL alias repair.
+  Shared positive-key Field.Get is likewise outside this snapshot; its native/RecordRef
+  reader passes 418 checks, while legacy SQL Field counts/navigation remain unqualified.
   Current Parser/AlParserGate focused tidy passes after removing three findings without
   suppressions; the Parser gate retains previous checks and adds seventeen (159 total).
   TableWriter.cpp also passes focused tidy after six repairs; GenTable passes 105 checks

@@ -4,7 +4,7 @@ Status: queued | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
 Next: replay qualified Integer projection on the unchanged UT population;
-qualify Field catalogue's positive-key domain and activation under 0044.
+complete Field's live positive-key navigation/counts under 0044.
 Retain the full 2314-case UT population through replay.
 
 ## Implementation
@@ -124,8 +124,10 @@ Retain the full 2314-case UT population through replay.
   Original BC29 FieldDataProvider iterator RVA `2e888c` clamps catalogue field keys
   to 1..2147483647 and starts after the internal timestamp. This differs from
   RecordRef.Field(0), which remains required. `Storage.cpp::PopulateSystemTables`
-  currently inserts timestamp into the SQL Field snapshot, and native Field.Get
-  incorrectly returns it for omitted trailing keys. Qualify the complete live
+  still inserts timestamp into the legacy SQL Field snapshot. Native Field.Get now
+  excludes nonpositive keys through one ABI-qualified typed/RecordRef reader; temporary
+  zero keys remain valid. Its 418 checks and two new compiled controls qualify Get,
+  not the remaining SQL-backed Count/Find/Next or the aggregate UT. Complete the live
   catalogue contract and separate native/temporary zero-key behavior; do not remove
   timestamp from declarations, buffers or reflection to hide the aggregate failure.
 - Every bound native record now materializes the original Runtime-18 Normal,
