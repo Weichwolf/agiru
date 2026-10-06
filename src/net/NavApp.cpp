@@ -1,5 +1,6 @@
 #include "type/NavApp.h"
 
+#include "meta/ModuleDef.h"
 #include "type/Boolean.h"
 #include "type/Guid.h"
 #include "type/ModuleInfo.h"

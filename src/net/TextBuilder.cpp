@@ -2,7 +2,7 @@
 
 #include "type/Boolean.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 
 #include <algorithm>
 #include <cstddef>

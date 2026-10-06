@@ -1,3 +1,4 @@
+#include "dotnet/Path.h"
 #include "dotnet/XmlDocument.h"
 #include "dotnet/XmlNode.h"
 #include "dotnet/XmlReader.h"
@@ -20,6 +21,18 @@ constexpr std::size_t kXmlReadCapacity = 1024;
 constexpr std::size_t kNativeDeclaredTextLimit = 2048;
 constexpr char kTerminatedPayload[] = "abc\0tail";
 constexpr std::string_view kTerminatedBytes{kTerminatedPayload, sizeof(kTerminatedPayload) - 1};
+
+void DotNetTempPathCreatesAnEmptyClosedFile() {
+  const auto name = agiru::dotnet::Path::GetTempFileName();
+  CHECK_TRUE("the CLR temporary name identifies a real file", agiru::File::Exists(name));
+  CHECK_TRUE("the CLR temporary file is under the temporary path",
+             agiru::File::IsPathTemporary(name));
+  agiru::File reopened;
+  CHECK_TRUE("the CLR temporary file can be reopened", reopened.Open(name));
+  CHECK_TRUE("the CLR temporary file starts empty", reopened.Len() == 0);
+  reopened.Close();
+  CHECK_TRUE("the CLR temporary file can be removed after closing", agiru::File::Erase(name));
+}
 
 /// AL'S `File` IS A FILE, and every one of its methods used to be a stub that threw: 46 UT cases
 /// stopped at `File.CreateTempFile()` alone. `file-createtempfile-method.md` says it "creates a
@@ -212,6 +225,7 @@ void DeclaredCapacityAndClosedFileRefusalsRemainVisible() {
 
 int main() {
   return gate::Run("File", [] {
+    DotNetTempPathCreatesAnEmptyClosedFile();
     ATempFileIsMadeOpenedAndWritten();
     AStreamOverAFileReadsIt();
     BinaryTextReadsDoNotSplitLines();

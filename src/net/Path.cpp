@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <random>
 #include <string>
 #include <string_view>
@@ -103,7 +104,7 @@ std::string Path::GetTempFileName() {
   for (int attempt = 0; attempt < 100; ++attempt) {
     const std::filesystem::path made = directory / ("tmp" + Random(kRandomStem) + ".tmp");
     if (std::filesystem::exists(made)) { continue; }
-    std::ofstream file(made, std::ios::binary);
+    const std::ofstream file(made, std::ios::binary);
     if (file) { return made.string(); }
   }
   throw Error("Path.GetTempFileName: no file could be made under " + directory.string());

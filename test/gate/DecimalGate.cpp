@@ -1,3 +1,4 @@
+#include "dotnet/Math.h"
 #include "type/Decimal.h"
 
 #include "Check.h"
@@ -11,6 +12,18 @@ using agiru::Round;
 using agiru::RoundDirection;
 
 namespace {
+
+void NativeMathRenderingClampsTheDecimalScale() {
+  using agiru::dotnet::Math;
+  CHECK_TRUE("native Math keeps large integral values at scale zero",
+             Math::Pow(Decimal{10}, Decimal{20}) ==
+                 Decimal::FromInvariantString("100000000000000000000"));
+  CHECK_TRUE("native Math caps the scale of small representable values",
+             Math::Pow(Decimal{10}, Decimal{-20}) ==
+                 Decimal::FromInvariantString("0.00000000000000000001"));
+  CHECK_TRUE("native Math rounds below the maximum decimal scale",
+             Math::Pow(Decimal{10}, Decimal{-30}) == Decimal{0});
+}
 
 std::string T(const Decimal &d) {
   return d.ToInvariantString();
@@ -275,6 +288,7 @@ void FailuresAreLoud() {
 
 int main() {
   return gate::Run("Decimal", [] {
+    NativeMathRenderingClampsTheDecimalScale();
     TextRoundTrip();
     Arithmetic();
     RemainderDoesNotRequireARepresentableQuotient();

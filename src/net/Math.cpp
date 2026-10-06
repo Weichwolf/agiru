@@ -5,6 +5,7 @@
 #include "type/Decimal.h"
 #include "type/Integer.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <format>
@@ -25,9 +26,7 @@ double AsDouble(const ::agiru::Decimal &value) {
   if (!std::isfinite(value)) { throw Error("Math: the result is not a number"); }
   if (value == 0.0) { return ::agiru::Decimal{0}; }
   const int magnitude = static_cast<int>(std::floor(std::log10(std::fabs(value))));
-  int scale = kSignificantDigits - 1 - magnitude;
-  if (scale < 0) { scale = 0; }
-  if (scale > kMaximumScale) { scale = kMaximumScale; }
+  const int scale = std::clamp(kSignificantDigits - 1 - magnitude, 0, kMaximumScale);
   std::string text = std::format("{:.{}f}", value, scale);
   if (text.find('.') != std::string::npos) {
     while (text.ends_with('0')) { text.pop_back(); }
