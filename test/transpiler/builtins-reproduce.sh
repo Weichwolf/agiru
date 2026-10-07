@@ -9,7 +9,7 @@
 set -eu
 cd "$(dirname "$0")/../.."
 
-candidate=$(mktemp -d)
+candidate=$(mktemp -d /tmp/agiru-builtin-reproduction.XXXXXX)
 trap 'rm -rf "$candidate"' EXIT HUP INT TERM
 python3 scripts/gen_builtins.py --output-root "$candidate" >/dev/null
 for file in include/Builtins.h src/rt/Builtins.cpp; do

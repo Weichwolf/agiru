@@ -1,7 +1,8 @@
-import re, pathlib, sys, collections
+import re, pathlib, sys, collections, os
 
-DOC = pathlib.Path.home()/"Git/dynamics365smb-devitpro-pb/dev-itpro/developer/methods-auto"
-ROOT = pathlib.Path("/home/cosmo/Git/agiru")
+DOC = pathlib.Path(os.environ.get("AGIRU_DEV_DOC_ROOT", str(
+    pathlib.Path.home()/"Git/dynamics365smb-devitpro-pb/dev-itpro/developer")))/"methods-auto"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 SCALAR = {
  "Integer":"Integer","BigInteger":"BigInteger","Decimal":"Decimal","Boolean":"Boolean",

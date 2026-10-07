@@ -53,6 +53,8 @@ before web search. Update their clean tracking branches with `git pull --ff-only
 current upstream evidence is needed; preserve local edits and never reset or force a
 merge. Record the revisions used, and keep frozen verification inputs unchanged.
 Use web search only when the required reference is missing locally or local access fails.
+For relocated/container tooling, `AGIRU_DEV_DOC_ROOT` selects the verified developer
+directory containing `methods-auto/`; a missing explicit path must not fall back.
 
 Read the relevant overload, trigger or property in this order:
 

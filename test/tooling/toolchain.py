@@ -2852,6 +2852,54 @@ class ProvisioningScopeGate(unittest.TestCase):
 class NativeToolchainGate(unittest.TestCase):
     root = Path(__file__).resolve().parents[2]
 
+    @staticmethod
+    def surface_tool(script):
+        specification = importlib.util.spec_from_file_location('surface_reference_probe', script)
+        module = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(module)
+        return module
+
+    def test_builtin_reference_root_is_explicit_and_checkout_relative(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            script = root / 'relocated/scripts/door.py'
+            script.parent.mkdir(parents=True)
+            shutil.copyfile(self.root / 'scripts/door.py', script)
+            developer = root / 'developer'
+            integer = developer / 'methods-auto/integer'
+            integer.mkdir(parents=True)
+            (integer / 'integer-data-type.md').write_text('# Integer Data Type\n')
+            with patch.dict(os.environ, AGIRU_DEV_DOC_ROOT=str(developer)):
+                surface = self.surface_tool(script)
+                self.assertEqual(surface.ROOT, script.parent.parent)
+                self.assertEqual(surface.DOC, developer / 'methods-auto')
+                self.assertEqual(surface.canonical_names(), {'integer': 'Integer'})
+
+    def test_builtin_reference_default_uses_the_local_developer_repository(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            developer = home / 'Git/dynamics365smb-devitpro-pb/dev-itpro/developer'
+            integer = developer / 'methods-auto/integer'
+            integer.mkdir(parents=True)
+            (integer / 'integer-data-type.md').write_text('# Integer Data Type\n')
+            with patch.dict(os.environ), patch('pathlib.Path.home', return_value=home):
+                os.environ.pop('AGIRU_DEV_DOC_ROOT', None)
+                surface = self.surface_tool(self.root / 'scripts/door.py')
+                self.assertEqual(surface.DOC, developer / 'methods-auto')
+                self.assertEqual(surface.canonical_names(), {'integer': 'Integer'})
+
+    def test_missing_explicit_builtin_reference_never_falls_back(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            local = home / 'Git/dynamics365smb-devitpro-pb/dev-itpro/developer/methods-auto'
+            local.mkdir(parents=True)
+            missing = home / 'absent-developer'
+            with patch.dict(os.environ, AGIRU_DEV_DOC_ROOT=str(missing)), \
+                    patch('pathlib.Path.home', return_value=home):
+                surface = self.surface_tool(self.root / 'scripts/door.py')
+                with self.assertRaises(FileNotFoundError):
+                    surface.canonical_names()
+
     def test_only_clang_builds_are_advertised(self):
         result = subprocess.run(['make', '--no-print-directory', 'help'], cwd=self.root,
                                 capture_output=True, text=True, timeout=10)
