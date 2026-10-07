@@ -67,9 +67,15 @@ Tests: `test/gate/{RecordRefresh,GenReceiver}Gate.cpp`,
 Existing DynamicRecord 7,493, CursorLifecycle 313, SelectionChange 364, Transaction 12
 and RequiredTestIsolation 430 checks pass. Six affected compiled units pass targeted
 clang-tidy without suppressions; builtin regeneration reproduces exactly. Full native
-build at `f232cfb` exits zero: 14,225 slice sources, 2,717 seconds. Full test/lint and
-the unchanged 2,314-test AL diagnostic are still pending; the running verification
-does not qualify session migration or financial integrity.
+build at `f232cfb` exits zero: 14,225 slice sources, 2,717 seconds. Its full test run
+retains 183 cases and reports two harness failures: the old RecordRead write-revision
+mutation anchor and the missing record-refresh script in the Discovery fixture.
+Both are repaired in `test/runtime/record-order.sh` and `test/tooling/toolchain.py`.
+`make record-order JOBS=2` passes all 37 controls, including the named matching-write
+refusal; cleanup removes mutant inputs/binaries on failure too. All 257 tooling tests
+pass with the native compiler/database environment. The full manifest rerun, full lint
+and unchanged 2,314-test AL diagnostic remain due; these checks do not qualify session
+migration or financial integrity.
 
 Session-state defects observed against the native runtime at `f232cfb`:
 

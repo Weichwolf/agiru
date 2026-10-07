@@ -4,6 +4,7 @@ cd "$(dirname "$0")/../.."
 B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-record-order-controls.XXXXXX)
+trap 'find "$proof" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.so" -o -name "gate" -o -name "*-gate" \) -delete' EXIT
 position="$B/gate_RecordPositionGate"
 "$position" > "$proof/position.log" 2>&1
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
@@ -251,7 +252,7 @@ for control in write-revision insert-notify update-notify delete-notify bulk-del
     /^std::optional<FieldValues> InsertRow/ { inserting = 1 }
     /^std::optional<FieldValues> Updated/ { updating = 1 }
     /^}/ { inserting = 0; updating = 0 }
-    control == "write-revision" && /return observed_ == revision_->second.value;/ {
+    control == "write-revision" && /return observed_ == revision_->second.value &&/ {
       sub(/observed_ == revision_->second.value/, "true"); changed++
     }
     control == "insert-notify" && inserting && /^  detail::RecordWritten/ { changed++; next }
@@ -272,7 +273,12 @@ for control in write-revision insert-notify update-notify delete-notify bulk-del
       sub(/owner_->tables_.erase\(revision_\)/, "static_cast<void>(revision_)"); changed++
     }
     { print }
-    END { if (changed != 1) exit 2 }
+    END {
+      if (changed != 1) {
+        printf "record-order: %s expected one source anchor, found %d\n", control, changed > "/dev/stderr";
+        exit 2
+      }
+    }
   ' "$source" > "$proof/$control.cpp"
   "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
     -lagiru_rt -lagiru_db -lagiru_net -o "$proof/$control.so"
@@ -281,6 +287,9 @@ for control in write-revision insert-notify update-notify delete-notify bulk-del
     exit 1
   fi
   rg -q 'FAIL ' "$proof/$control.log"
+  if [ "$control" = write-revision ]; then
+    rg -q 'FAIL .*a matching session/table write changes the read revision' "$proof/$control.log"
+  fi
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
@@ -394,5 +403,6 @@ sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   test/gate/MixedOrderGate.cpp test/gate/SelectionChangeGate.cpp test/gate/CursorLifecycleGate.cpp \
   test/gate/DynamicRecordGate.cpp src/rt/Rename.cpp test/gate/RenameGate.cpp \
   test/gate/TemporaryGate.cpp test/gate/AlArrayGate.cpp test/gate/{Cursor,Filter}Gate.cpp \
+  test/runtime/record-order.sh \
   "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" "$rename" "$temporary" "$array" "$series" "$filter" > "$proof/inputs.sha256"
 printf 'record-order: order, selections, positions, cursor lifecycle, dynamic writes, rename cascades, temporary arrays and native series pass; thirty-seven controls reject; %s\n' "$proof"
