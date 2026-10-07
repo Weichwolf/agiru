@@ -1,8 +1,8 @@
 #include "runtime/ConnectionInfo.h"
 #include "runtime/ErrorValue.h"
-#include "runtime/HttpServer.h"
+#include "runtime/HttpServerOptions.h"
 #include "runtime/NativeService.h"
-#include "runtime/PageCommandHost.h"
+#include "runtime/PageHostOptions.h"
 
 #include "JsonEngine.h"
 

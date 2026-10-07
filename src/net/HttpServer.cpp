@@ -1,6 +1,7 @@
 #include "runtime/HttpServer.h"
 
 #include "runtime/ErrorValue.h"
+#include "runtime/HttpServerOptions.h"
 
 #include <algorithm>
 #include <atomic>

@@ -2,6 +2,7 @@
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/HttpServer.h"
+#include "runtime/HttpServerOptions.h"
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
 #include "runtime/SessionCommand.h"

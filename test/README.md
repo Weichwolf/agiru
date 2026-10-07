@@ -242,6 +242,9 @@ This is not a Node ERP server or proof of
 production authentication, SQL effects, actual htmx browser behaviour or complete
 page/ERP parity. `AGIRU_PAGE_HTML_GATE` can select an explicitly built host producer.
 Fixtures and disposable mutant modules use `/tmp`; Node stays outside the ERP container.
+`tooling/header-dependencies.sh` checks the native server's narrow options-only headers;
+forcing HTTP or retained page execution into `NativeService.h` must fail. Configuration
+and execution share the same option types, not copied defaults or validation rules.
 
 `make http-test` qualifies the native transport in `agiru-dev`: unmodified Caddy
 on the sole published loopback port, libmicrohttpd on private container loopback and

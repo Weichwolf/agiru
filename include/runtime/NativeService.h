@@ -1,7 +1,7 @@
 #pragma once
 
-#include "runtime/HttpServer.h"
-#include "runtime/PageCommandHost.h"
+#include "runtime/HttpServerOptions.h"
+#include "runtime/PageHostOptions.h"
 
 #include <chrono>
 #include <cstddef>

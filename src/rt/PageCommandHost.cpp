@@ -8,6 +8,7 @@
 #include "runtime/ErrorValue.h"
 #include "runtime/HttpServer.h"
 #include "runtime/PageDispatcher.h"
+#include "runtime/PageHostOptions.h"
 #include "runtime/PageHtml.h"
 #include "runtime/PageInstance.h"
 #include "runtime/SecureToken.h"

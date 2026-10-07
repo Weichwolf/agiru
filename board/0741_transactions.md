@@ -70,9 +70,12 @@ Config gate: 183 checks; AL JSON regression: 250; HTTP gate: 11; zero red.
 TryFunction policy, zero red. Ignoring the policy must fail independent SQL checks;
 removing duplicate rejection must fail five named schema checks. Existing three
 ownership/revision/replay controls remain required. All eight affected C++ units pass
-targeted clang-tidy with no suppression. `make include-cost HEADERS=runtime/NativeService.h`:
-1,151 ms mean frontend, three rounds without PCH; pre-change header at `60f2e40` measured
-1,181 ms against the same dependencies. These samples do not establish a speedup.
+targeted clang-tidy with no suppression. `runtime/{HttpServerOptions,PageHostOptions}.h`
+own the same single options types without transport/execution state. Thirty-one standalone
+header probes pass; forced HTTP/page execution headers must fail the configuration boundary.
+The current native `make all` and Config/HTTP/SessionParallel gates pass. Before/after
+`make include-cost HEADERS=runtime/NativeService.h` samples measure 1,129/986 ms mean
+frontend, three rounds without PCH. These samples are not ERP throughput or general build-speed proof.
 New gates: `test/gate/{TransactionContract,SessionParallel}Gate.cpp`.
 `test/ui/http-server.sh` runs native SessionParallel with a compiled worker-default
 defect from `test/gate/HttpWorkerControl.cpp.in`; it must fail the affinity/ceiling check.
@@ -119,7 +122,7 @@ and a compiled ordering defect fails both empty bulk-write diagnostics. `make re
 passes all 79 compiled controls. PageTableField 312, TransactionContract 106, TablePermissions 29,
 SqlRowVersion 123 and Temporary 95 checks pass; the four source-binding fixture variants
 pass with owned sessions. Targeted clang-tidy reports zero findings in all three changed
-C++ units. Header dependency and builtin-reference repairs and a complete rerun remain due.
+C++ units. Builtin-reference repair and a complete rerun remain due.
 
 ## Remaining documented cases — no completion claim
 

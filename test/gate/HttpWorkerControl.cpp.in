@@ -1,4 +1,4 @@
-#include "runtime/HttpServer.h"
+#include "runtime/HttpServerOptions.h"
 
 std::size_t agiru::DefaultHttpWorkers() {
   return HttpServerOptions::kMaxWorkers + 1;

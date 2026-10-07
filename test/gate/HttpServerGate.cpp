@@ -1,6 +1,7 @@
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/HttpServer.h"
+#include "runtime/HttpServerOptions.h"
 
 #include "Check.h"
 

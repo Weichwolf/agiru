@@ -9,6 +9,7 @@ sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSe
   include/runtime/NativePermissions.h src/rt/{NativePermissions,NativePermissionSnapshot}.cpp \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
   include/runtime/NativeService.h src/rt/{NativeService,NativeServiceConfig}.cpp deploy/dev/agiru.json \
+  include/runtime/{HttpServerOptions,PageHostOptions,SessionOptions}.h \
   src/net/JsonEngine.{h,cpp} test/gate/NativeServiceConfigGate.cpp \
   src/cli/{Main,Services}.cpp src/cli/Services.h test/gate/NativePermissionFixture.h \
   test/ui/page-host.{sh,mjs} test/ui/server-config.mjs test/ui/page-host/Runner.cpp test/runtime/page-navigation.sh \

@@ -64,11 +64,20 @@ compile_header meta/ModuleDef.h "$proof/ModuleDef.h.d"
 for forbidden in ModuleInfo.h Guid.h List.h Text.h Version.h vector; do
   reject_dependency "$proof/ModuleDef.h.d" "$forbidden"
 done
-for header in meta/PermissionSetDef.h runtime/PermissionSets.h runtime/NativePermissions.h runtime/PermissionSetRegistry.h runtime/NativeService.h; do
+for header in meta/PermissionSetDef.h runtime/PermissionSets.h runtime/NativePermissions.h runtime/PermissionSetRegistry.h runtime/NativeService.h runtime/HttpServerOptions.h runtime/PageHostOptions.h; do
   compile_header "$header" "$proof/$(basename "$header").d"
-  for forbidden in Guid.h Session.h Table.h Database.h vector memory mutex functional; do
+  for forbidden in Guid.h Session.h Table.h Database.h HttpServer.h PageCommandHost.h vector memory mutex functional; do
     reject_dependency "$proof/$(basename "$header").d" "$forbidden"
   done
+done
+for execution in HttpServer PageCommandHost; do
+  compile_header runtime/NativeService.h "$proof/forced-service-$execution.d" \
+    -include "runtime/$execution.h"
+  if reject_dependency "$proof/forced-service-$execution.d" "$execution.h" \
+    > "$proof/forced-service-$execution.log" 2>&1; then
+    printf 'header-dependencies: execution state escaped server configuration\n' >&2
+    exit 1
+  fi
 done
 compile_header runtime/PermissionSets.h "$proof/forced-permission-session.h.d" -include runtime/Session.h
 if reject_dependency "$proof/forced-permission-session.h.d" Session.h \
@@ -235,4 +244,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: twenty-nine standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority/permission/temporary controls refused\n'
+printf 'header-dependencies: thirty-one standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority/permission/temporary/service-options controls refused\n'
