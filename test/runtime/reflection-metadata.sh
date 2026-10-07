@@ -661,10 +661,10 @@ for control in ordinal-cast cds-query cds-refusal default-fallback property-fall
       changed++; next
     }
     skipping { if (/;$/) skipping=0; next }
-    control == "default-fallback" && /return std::unexpected\("unknown TableType/ {
+    control == "default-fallback" && /return Failed\("unknown TableType/ {
       $0 = "  return Native::Normal;"; changed++
     }
-    control == "property-fallback" && /return std::unexpected\(std::string\(owner\) \+/ {
+    control == "property-fallback" && /return Failed\(std::string\(owner\) \+/ {
       print "  static_cast<void>(property); static_cast<void>(owner); return 0;";
       changed++; skipping=1; next
     }
