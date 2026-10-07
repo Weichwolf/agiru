@@ -44,7 +44,7 @@ struct ServerHttpResponse {
 
 /// \brief Explicit resource ceilings, not measured production scale guarantees.
 struct HttpServerOptions {
-  static constexpr std::uint16_t kBackendPort = 18080;      ///< Development nginx upstream port.
+  static constexpr std::uint16_t kBackendPort = 18080;      ///< Development Caddy upstream port.
   static constexpr std::size_t kDefaultQueue = 32;          ///< Initial bounded admission profile.
   static constexpr unsigned kDefaultConnections = 256;      ///< Initial native connection ceiling.
   static constexpr unsigned kDefaultTimeoutSeconds = 15;    ///< Initial network inactivity timeout.

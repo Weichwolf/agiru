@@ -79,7 +79,7 @@ test("external client reads actual C++-produced HTML through the native containe
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
 });
 
-test("nginx is the sole published listener; backend is loopback-only and static assets bypass ERP", async () => {
+test("Caddy is the sole published listener; backend is loopback-only and static assets bypass ERP", async () => {
   const listeners = await child("make", ["--no-print-directory", "dev-exec", "COMMAND=ss -H -l -t -n"]);
   assert.equal(listeners.code, 0, listeners.stderr);
   assert.match(listeners.stdout, /127\.0\.0\.1:18080\s/);
@@ -119,17 +119,32 @@ test("proxy preserves raw BC URI and replaces forged forwarding authority", asyn
   assert.equal(headers.Cookie, "fixture=preserved");
 });
 
-test("ambiguous HTTP framing is rejected before any ERP handler SQL effect", async () => {
+test("conflicting lengths and duplicate hosts refuse before any ERP handler SQL effect", async () => {
   const before = await sql("SELECT count(*) FROM agiru_http_transport_fixture");
   const ambiguous = [
     "Content-Length: 1\r\nContent-Length: 2\r\n",
-    "Content-Length: 4\r\nTransfer-Encoding: chunked\r\n",
     "Host: another\r\nContent-Length: 0\r\n"
   ];
   for (const headers of ambiguous) {
     assert.match(await raw(`POST /framing HTTP/1.1\r\nHost: localhost\r\n${headers}Connection: close\r\n\r\n0\r\n\r\n`), /^HTTP\/1.1 400 /);
   }
   assert.equal(await sql("SELECT count(*) FROM agiru_http_transport_fixture"), before);
+});
+
+test("CL/TE normalization forwards only decoded body without a conflicting length or hidden request", async () => {
+  const before = Number(await sql("SELECT count(*) FROM agiru_http_transport_fixture"));
+  const body = "GET /smuggled HTTP/1.1\r\nHost: localhost\r\n\r\n";
+  const chunks = `${Buffer.byteLength(body).toString(16)}\r\n${body}\r\n0\r\n\r\n`;
+  const headers = "Host: localhost\r\nContent-Length: 1\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+  const probe = await raw(`POST /proxy-headers HTTP/1.1\r\n${headers}${chunks}`);
+  assert.match(probe, /^HTTP\/1.1 200 /);
+  assert.match(probe, /Content-Length=\nTransfer-Encoding=chunked\n/);
+  const result = await raw(`POST /framing-normalized HTTP/1.1\r\n${headers}${chunks}${body}`);
+  assert.match(result, /^HTTP\/1.1 200 /);
+  assert.equal((result.match(/HTTP\/1\.1 [0-9]{3} /g) ?? []).length, 1);
+  assert.equal(Number(await sql("SELECT count(*) FROM agiru_http_transport_fixture")), before + 1);
+  const rows = JSON.parse(await sql("SELECT json_agg(t) FROM agiru_http_transport_fixture t WHERE target=$$/framing-normalized$$ OR target=$$/smuggled$$"));
+  assert.deepEqual(rows, [{ method: "POST", target: "/framing-normalized", body }]);
 });
 
 test("shell CMD and MCP each submit one exact command; independent PostgreSQL records raw URI/body", async () => {
@@ -147,7 +162,7 @@ test("shell CMD and MCP each submit one exact command; independent PostgreSQL re
     assert.deepEqual(result.structuredContent.page, page);
   } finally { await mcp.close(); }
   assert.equal(Number(await sql("SELECT count(*) FROM agiru_http_transport_fixture WHERE method=$$POST$$")), initial + 2);
-  const rows = JSON.parse(await sql("SELECT json_agg(t) FROM agiru_http_transport_fixture t WHERE method=$$POST$$"));
+  const rows = JSON.parse(await sql("SELECT json_agg(t) FROM agiru_http_transport_fixture t WHERE method=$$POST$$ AND target=$$/commands$$"));
   const values = rows.map(row => Object.fromEntries(new URLSearchParams(row.body)));
   assert.equal(values[0].text, request.text);
   assert.equal(values[0].revision, "9007199254740993");

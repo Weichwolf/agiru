@@ -23,10 +23,15 @@ case "${1:-}" in
       [[ "$#" = 0 ]] || { printf 'Existing container command cannot be replaced by start\n' >&2; exit 1; }
       exec podman start "$name"
     fi
+    tls_flags=()
+    if [[ -n "${AGIRU_DEV_HTTPS_PORT:-}" ]]; then
+      tls_flags+=(--publish "127.0.0.1:${AGIRU_DEV_HTTPS_PORT}:8443")
+    fi
     exec podman run --detach --name "$name" \
       --label io.agiru.development=true --label "io.agiru.repository=$root" \
       --userns="keep-id:uid=$(id -u),gid=$(id -g)" --user 0 \
       --publish "127.0.0.1:${AGIRU_DEV_HTTP_PORT:-8080}:8080" \
+      "${tls_flags[@]}" --env "AGIRU_HTTP_ADDRESS=${AGIRU_DEV_SITE:-:8080}" \
       --volume "$root:/workspace" --volume "$volume:/var/lib/agiru" "$image" "$@"
     ;;
   stop) owned; exec podman stop --time 30 "$name" ;;

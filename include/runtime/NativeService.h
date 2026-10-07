@@ -12,10 +12,10 @@ namespace agiru {
 
 /// \brief Trusted single-company deployment configuration, never HTTP-controlled authority.
 struct NativeServiceOptions {
-  static constexpr std::uint16_t kBackendPort = 18080; ///< deploy/dev/nginx.conf upstream port.
+  static constexpr std::uint16_t kBackendPort = 18080; ///< deploy/dev/Caddyfile upstream port.
   std::string database; ///< Explicit existing database connection, not a master/template clone.
   std::string company;  ///< Exact sole original Company.Name in the initial flat storage profile.
-  std::string origin;   ///< Trusted public nginx origin used for browser CSRF checks.
+  std::string origin;   ///< Trusted public Caddy origin used for browser CSRF checks.
   std::uint16_t port = kBackendPort; ///< Private loopback upstream, never a public bind.
   std::size_t workers = 2;           ///< Fixed blocking execution workers, not per-session threads.
 };

@@ -84,7 +84,9 @@ public:
                                           "X-Real-IP",
                                           "Forwarded",
                                           "Authorization",
-                                          "Cookie"}) {
+                                          "Cookie",
+                                          "Content-Length",
+                                          "Transfer-Encoding"}) {
         body += name;
         body += '=';
         body += request.Header(name);

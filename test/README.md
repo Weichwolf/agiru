@@ -34,12 +34,12 @@ permission-bypass/partial-write defects must fail. The SQL grant table is an aut
 fixture, not native BC permission-set composition, indirect rights or security filters.
 Authenticated sessions without an authority refuse instead of becoming SUPER.
 
-`make http-test JOBS=2` runs transport and native credential tests through actual nginx,
+`make http-test JOBS=2` runs transport and native credential tests through actual Caddy,
 C++ and PostgreSQL in `agiru-dev`, with CMD/MCP outside. Authentication uses disposable
 users/databases/private auth files and independent SQL checks; these authored static HTML
 fixtures do not qualify production ERP pages, permission sets or posting parity.
 
-`make page-host-test JOBS=2` runs generated List → Card → Validate/Save over nginx,
+`make page-host-test JOBS=2` runs generated List → Card → Validate/Save over Caddy,
 C++ and PostgreSQL with external CMD/MCP. Independent SQL checks typed values,
 modifier identity, write counts, command replay/revisions, rollback and durable AL Commit.
 Generated actions also attempt denied reads/inserts on a second table; HTTP must refuse
@@ -54,8 +54,9 @@ Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 
 `make dev-check` is a host-only Podman packaging check, separate from `make test`:
 it uses owned disposable containers/volumes to verify committed SQL persistence,
-supervisor exits, container ownership refusals and incompatible storage preservation.
-It does not qualify an HTTP server, client parity or the BC seed. Run container C++
+supervisor exits, container ownership refusals, incompatible storage preservation,
+local TLS/redirects and persistent certificate storage with the admin API disabled.
+It does not qualify public ACME, ERP/client parity or the BC seed. Run container C++
 gates through `make dev-exec` with `B=/workspace/build/podman`.
 
 `runtime/test-contexts.sh` executes generated AL call/selection semantics and negative
@@ -201,15 +202,16 @@ production authentication, SQL effects, actual htmx browser behaviour or complet
 page/ERP parity. `AGIRU_PAGE_HTML_GATE` can select an explicitly built host producer.
 Fixtures and disposable mutant modules use `/tmp`; Node stays outside the ERP container.
 
-`make http-test` qualifies the native transport in `agiru-dev`: unmodified nginx
+`make http-test` qualifies the native transport in `agiru-dev`: unmodified Caddy
 on the sole published loopback port, libmicrohttpd on private container loopback and
 PostgreSQL together; actual external CMD and MCP calls preserve the C++ HTML profile.
-Eleven HTTP cases cover raw encoded URLs, exact POST/binary bytes, independent SQL
+Twelve HTTP cases cover raw encoded URLs, exact POST/binary bytes, independent SQL
 transport records, static-file separation, forged forwarding headers, ambiguous
-framing refusals, request/response/header bounds, aggregate upload ownership,
+framing refusals and CL/TE normalization (exact decoded body, no conflicting upstream
+length or hidden SQL request), request/response/header bounds, aggregate upload ownership,
 bounded worker admission and shutdown. SQL records are transport receipts, not AL
 Validate/Save/posting effects. The fixture's short-lived connections do not qualify
-production session leases. TLS, authentication/session authority, modal continuation,
+production session leases. Public ACME/TLS, authentication/session authority, modal continuation,
 actual htmx browser execution and complete ERP parity remain pending.
 
 `runtime/reflection-metadata.sh` verifies declaration projection, timestamp-free AL

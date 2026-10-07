@@ -8,7 +8,7 @@ sha256sum CMakeLists.txt Makefile include/runtime/{HttpServer.h,PageHtml.h,PageC
   include/runtime/{SecureToken,ClientCredentials,Session,SessionCommand}.h \
   test/gate/{HttpServerGate,PageHtmlGate,ClientCredentialsGate}.cpp test/gate/PrivateAuthFile.h \
   test/ui/http-server.{sh,mjs} test/ui/client-authentication.mjs \
-  src/client/*.{mts,json} deploy/dev/{Containerfile,nginx.conf,entrypoint.sh} \
+  src/client/*.{mts,json} deploy/dev/{Containerfile,Caddyfile,entrypoint.sh} \
   scripts/dev_container.sh > "$proof/inputs.sha256"
 make dev-exec COMMAND='findmnt -T /tmp'
 make dev-exec COMMAND='df -h /tmp'
@@ -51,5 +51,5 @@ AGIRU_NATIVE_HTTP_HTML="$native/page.html" AGIRU_AUTH_PROOF="$proof" \
 cat "$proof/authentication.log"
 sha256sum --check "$proof/inputs.sha256" > "$proof/input-integrity.log"
 podman inspect "${AGIRU_DEV_CONTAINER:-agiru-dev}" --format '{{.Image}} {{json .NetworkSettings.Ports}}' > "$proof/container.txt"
-printf 'http-server: nginx, private C++ HTTP transport and PostgreSQL fixture in one container; not production ERP/session parity\n'
+printf 'http-server: Caddy, private C++ HTTP transport and PostgreSQL fixture in one container; not production ERP/session parity\n'
 printf 'http-server: %s\n' "$proof"

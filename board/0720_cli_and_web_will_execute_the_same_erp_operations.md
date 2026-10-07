@@ -62,16 +62,18 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   BCApps `System Application/Test/Permission Sets/src/PermissionRelationTests.Codeunit.al`
   (`TestReduceToIndirectPermissionFromPermissionSet`), at the revisions pinned below.
 
-- Selected transport: unmodified nginx → private loopback libmicrohttpd → C++ handler;
+- Selected transport: unmodified Caddy → private loopback libmicrohttpd → C++ handler;
   no ERP module, custom HTTP/TLS parser or Node ERP server.
   System libmicrohttpd supplies HTTP framing/polling/suspend-resume through a private
-  C API, without a C++ ABI dependency. Library LGPL-2.1+ and nginx BSD-2-Clause notices
-  remain installed under their Debian package copyright paths; owned adapter stays MIT.
-  nginx serves static assets, replaces forwarding headers and disables upstream retries/cache. Development is
-  loopback HTTP; production TLS/configuration remains unqualified. Native transport
+  C API, without a C++ ABI dependency. Library LGPL-2.1+ and Caddy Apache-2.0 notices
+  remain installed under the libmicrohttpd Debian copyright and `/usr/share/doc/caddy/LICENSE`
+  paths respectively; owned adapter stays MIT.
+  Caddy serves static assets, replaces forwarding headers and disables upstream retries/cache. Development is
+  loopback HTTP; local TLS/certificate persistence is qualified by `make dev-check`, while
+  public ACME and production load remain unqualified. Native transport
   uses fixed workers, bounded queue/connections and per-request/aggregate body limits;
   AL/SQL never execute on its network event loop. Stop drains suspended requests.
-  `make http-test`: eleven actual HTTP cases pass, including external shell CMD/SDK
+  `make http-test`: twelve actual HTTP cases pass, including external shell CMD/SDK
   MCP, original encoded BC URI, exact Unicode/form/binary bytes, independent SQL
   transport records, static assets, forged headers, ambiguous framing, error/limit
   refusals, body release and bounded admission while workers block.
@@ -119,7 +121,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   check; neither grants page/table/company permission. The command host below supplies
   page handles/revisions; independent durable reconciliation remains pending.
   `make http-test` passes eleven transport and nine authentication cases through
-  actual nginx/private C++/PostgreSQL, with external CMD and official SDK MCP.
+  actual Caddy/private C++/PostgreSQL, with external CMD and official SDK MCP.
   Independent SQL checks two identities, accepted-call receipts, disable/expiry/
   revocation refusals and no idle DB connection; private fixture credentials are removed.
   Entropy/digest provider failures refuse; compiled counterprobes bypassing expiry,
@@ -144,7 +146,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Navigation/Save and AL fields/actions share the same semantic HTML forms and unchanged
   CMD/MCP adapters. Anonymous AL area/actions containers receive presentation-only IDs,
   not invented AL control names; host/AL action collisions explicitly refuse.
-  `make page-host-test JOBS=2`: twelve actual nginx/C++/PostgreSQL cases with external
+  `make page-host-test JOBS=2`: twelve actual Caddy/C++/PostgreSQL cases with external
   shell CMD and official SDK MCP. Independent SQL checks exact values, modifier GUID,
   update-trigger counts, receipt/revision ownership, revocation, rollback and Commit followed
   by an error. Three compiled ownership/revision/replay defects fail their named HTTP checks.
@@ -345,7 +347,7 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
    Run blocking AL/libpq on a bounded executor, not the event loop. Sessions remain
    private; PostgreSQL owns shared permission revisions, fencing and receipts.
    No connection or transaction during user think time; modal suspension is explicit.
-   Native HTTP uses the adopted libmicrohttpd/nginx boundary; daisyUI/Tailwind remain
+   Native HTTP uses the adopted libmicrohttpd/Caddy boundary; daisyUI/Tailwind remain
    unadopted presentation proposals.
 5. Extend the Node.js/TypeScript HTML-to-ASCII agent client to production HTTP;
    CMD and local stdio MCP share one client library and the same business endpoints.

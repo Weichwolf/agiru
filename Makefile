@@ -31,7 +31,7 @@ client: ## build the external Node agent CMD/MCP client from locked dependencies
 client-test: client ## qualify CMD/MCP transports against a declared HTML/HTTP fixture, not ERP parity
 	@bash "$(SELF)/test/ui/agent-client.sh"
 
-http-test: comments client ## qualify external CMD/MCP over nginx/private C++ HTTP and PostgreSQL, not ERP parity
+http-test: comments client ## qualify external CMD/MCP over Caddy/private C++ HTTP and PostgreSQL, not ERP parity
 	@bash "$(SELF)/test/ui/http-server.sh"
 
 page-host-test: comments client ## execute generated list/card edits over shared native HTTP with external agents
@@ -97,7 +97,7 @@ include-cost:      ## measure standalone header frontend cost without PCH
 dev-image:        ## build the single-container native/PostgreSQL development image
 	@bash "$(SELF)/scripts/dev_container.sh" image
 
-dev-start:        ## start development PostgreSQL/nginx and optional native application COMMAND
+dev-start:        ## start development PostgreSQL/Caddy and optional native application COMMAND
 	@bash "$(SELF)/scripts/dev_container.sh" start $(COMMAND)
 
 dev-stop:         ## stop the development container without deleting its database volume

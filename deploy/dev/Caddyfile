@@ -1,0 +1,49 @@
+{
+	admin off
+	persist_config off
+	skip_install_trust
+	http_port 8080
+	https_port 8443
+	grace_period 10s
+	servers {
+		max_header_size 32KB
+		timeouts {
+			read_header 15s
+			read_body 15s
+			write 125s
+			idle 15s
+		}
+	}
+}
+
+{$AGIRU_HTTP_ADDRESS::8080} {
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+	}
+	request_body {
+		max_size 1MiB
+	}
+	handle_path /assets/* {
+		root * /usr/share/agiru/web
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:18080 {
+			lb_retries 0
+			lb_try_duration 0s
+			header_up -Forwarded
+			header_up X-Real-IP {http.request.remote.host}
+			flush_interval -1
+			transport http {
+				versions 1.1
+				dial_timeout 2s
+				response_header_timeout 120s
+				read_timeout 120s
+				write_timeout 15s
+				max_conns_per_host 256
+				compression off
+			}
+		}
+	}
+}

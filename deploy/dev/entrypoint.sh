@@ -10,7 +10,7 @@ finish() {
     wait "$application_pid" || :
   fi
   if [[ -n "$proxy_pid" ]] && kill -0 "$proxy_pid" 2>/dev/null; then
-    kill -QUIT "$proxy_pid"
+    kill -TERM "$proxy_pid"
     wait "$proxy_pid" || :
   fi
   if [[ -n "$postgres_pid" ]]; then
@@ -60,8 +60,10 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = desired.name) \gexec
 SQL
 printf 'Development PostgreSQL ready; credentials are development-only.\n'
 install -d -m 755 -o agiru -g agiru /run/agiru /usr/share/agiru/web
-runuser -u agiru -- nginx -t -c /etc/agiru/nginx.conf
-setpriv --reuid agiru --regid agiru --init-groups nginx -c /etc/agiru/nginx.conf -g 'daemon off;' &
+install -d -m 700 -o agiru -g agiru "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
+runuser -u agiru -- caddy validate --config /etc/agiru/Caddyfile --adapter caddyfile
+setpriv --reuid agiru --regid agiru --init-groups caddy run --config /etc/agiru/Caddyfile \
+  --adapter caddyfile --pidfile /run/agiru/caddy.pid &
 proxy_pid=$!
 status=0
 finished_pid=

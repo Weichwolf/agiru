@@ -75,4 +75,4 @@ for control in owner revision replay; do
   unlink "$proof/$control.cpp"
 done
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'page-host: generated-page SQL effects over nginx/C++, external CMD/MCP and agiru serve with original SQL permissions; three compiled ownership/revision/replay defects rejected; not full ERP/browser acceptance; %s\n' "$proof"
+printf 'page-host: generated-page SQL effects over Caddy/C++, external CMD/MCP and agiru serve with original SQL permissions; three compiled ownership/revision/replay defects rejected; not full ERP/browser acceptance; %s\n' "$proof"
