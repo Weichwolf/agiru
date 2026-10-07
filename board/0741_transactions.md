@@ -49,6 +49,30 @@ do not defer client construction until all transaction acceptance is complete.
 
 ## Sources and regression ownership
 
+Blocking Confirm/StrMenu now enforce trusted
+`transactions.allow_session_call_suspend_when_write_transaction_started`, default true,
+before native or explicit AL test callbacks. Disabled write-phase interaction refuses
+`UiWriteTransaction` without publishing, discarding or changing caller SQL/boundaries;
+read-only callbacks and nonblocking messages/progress remain allowed. Explicit Commit
+reenables callbacks until the next write; later unwind preserves that Commit. Worker
+migration retains the session policy. `make ui-host JOBS=2`: 154 UI checks, 205 configuration
+checks and eleven compiled defects rejected, including policy bypass, test-handler bypass,
+lost configuration and implicit Commit. Sources: `include/runtime/{SessionOptions,UiHost}.h`,
+`src/rt/{UiHost,NativeServiceConfig,written/BuiltinsWritten}.cpp`, `deploy/dev/agiru.json`,
+`test/gate/{UiHost,NativeServiceConfig}Gate.cpp`, `test/runtime/ui-host.sh`.
+Five changed C++ units pass clang-tidy without suppressions. SessionCommand 49,
+SessionParallel 14, TransactionContract 110, CommitDurability 19 and RequiredTestIsolation
+430 checks pass. `make page-host-test JOBS=2` retains 78 generated-fixture HTTP cases,
+limits 7/40/80, external CMD/MCP and Chromium, plus six compiled defects: zero red.
+Reference: developer `administration/server-instance-settings.md` and
+`methods-auto/dialog/dialog-{confirm,strmenu}-method.md` at the pinned revision below;
+BCApps `Finance/GeneralLedger/Posting/GenJnlPost.Codeunit.al` calls Confirm Management
+before posting. Predecessor `openerp/runtime/ui_host.py` has no corresponding policy;
+its implicit headless answers and session-per-thread transport are not adopted.
+Actual HTTP suspension and modal/report/request-page callbacks remain unimplemented.
+Rebuild production generated consumers after the expanded SessionOptions value ABI;
+these focused gates do not qualify old factories, full AL execution or a client dialog.
+
 `make refresh-records JOBS=2`: 149 C++ checks, 80 generator checks and six compiled
 defects rejected. `runtime/RecordRefresh.h` owns both official overloads;
 `RecordChanges` invalidates active non-locked observations for the exact table/current
@@ -132,7 +156,7 @@ Developer docs at `f928288ee840334be73142e5fc0202c0e19b246d`:
 `methods-auto/record/record-{locktable,readisolation,rename,init,reset}-method.md`,
 `methods-auto/recordref/recordref-init-method.md`.
 `administration/server-instance-settings.md` defines the callback-in-write-transaction
-policy (enabled by default), still unimplemented, and the try-write switch and on-premises
+policy (enabled by default), enforced for Confirm/StrMenu above, and the try-write switch and on-premises
 default true (online allows writes). agiru preserves its previous allow-writes default
 and exposes both policies. Predecessor `openerp/board/1220_*` identifies pending-write
 isolated-event fallback; its Python session/thread machinery is not adopted.

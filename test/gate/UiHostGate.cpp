@@ -18,6 +18,7 @@
 #include "Check.h"
 #include "OwnedDatabase.h"
 
+#include <array>
 #include <cstddef>
 #include <exception>
 #include <functional>
@@ -280,6 +281,127 @@ void QuestionsPreserveTransactions() {
              observer.Execute("SELECT array_agg(value) FROM pending_ui").Value(0, 0) == "{1}");
 }
 
+template <typename Call> void CheckCallback(bool allowed, std::string_view claim, Call call) {
+  bool completed = false;
+  const bool blocked = Refused("UiWriteTransaction", [&] {
+    call();
+    completed = true;
+  });
+  CHECK_TRUE(claim, allowed ? completed && !blocked : !completed && blocked);
+}
+
+void CheckBlockingCallbacks(RecordingHost &host, bool allowed) {
+  host.question.clear();
+  host.menu.clear();
+  host.confirmation = false;
+  host.selection = 0;
+  CheckCallback(allowed, "confirmation enforces the configured callback policy", [] {
+    CHECK_TRUE("permitted confirmation returns an explicit answer, not its default",
+               !agiru::Confirm("Post?", true));
+  });
+  CheckCallback(allowed, "menu enforces the configured callback policy", [] {
+    CHECK_TRUE("permitted menu returns explicit cancellation, not its default",
+               agiru::StrMenu("Post,Preview", 2, "Choose") == 0);
+  });
+  CHECK_TRUE("disabled callback policy refuses before presenting a native question",
+             host.question.empty() == !allowed && host.menu.empty() == !allowed);
+}
+
+void ConfiguredCallbackPolicy(bool allowed) {
+  const gate::OwnedDatabase database(allowed ? "ui_callbacks_allowed" : "ui_callbacks_denied");
+  agiru::Session session(database.Dsn(),
+                         {.allowSessionCallSuspendWhenWriteTransactionStarted = allowed});
+  const auto &writer = session.Database();
+  const agiru::Connection observer(database.Dsn());
+  writer.Run("CREATE TABLE callbacks (value integer)");
+  auto &host = Install(session);
+  CHECK_TRUE("callback policy does not remove the session's actual GUI endpoint",
+             agiru::GuiAllowed());
+  CheckBlockingCallbacks(host, true);
+  {
+    const agiru::detail::Scope boundary;
+    static_cast<void>(writer.Execute("SELECT count(*) FROM callbacks"));
+    CheckBlockingCallbacks(host, true);
+    agiru::detail::RequireWrite();
+    writer.Run("INSERT INTO callbacks VALUES (1)");
+    const auto depth = session.Transaction().Depth();
+    const auto epoch = session.Transaction().CursorEpoch();
+    CheckBlockingCallbacks(host, allowed);
+    CHECK_TRUE("callback checks preserve the write phase and rollback boundary",
+               session.Transaction().IsWriting() && session.Transaction().Depth() == depth &&
+                   session.Transaction().CursorEpoch() == epoch);
+    CHECK_TRUE("callback refusal neither commits nor rolls back caller writes",
+               writer.Execute("SELECT count(*) FROM callbacks").Value(0, 0) == "1" &&
+                   observer.Execute("SELECT count(*) FROM callbacks").Value(0, 0) == "0");
+    agiru::Message("Queued while writing");
+    agiru::Dialog progress;
+    progress.Open("Writing");
+    progress.Update();
+    progress.Close();
+    CHECK_TRUE("nonblocking messages and progress remain allowed during writes",
+               host.messages.size() == 1 && host.windows.empty());
+    {
+      const agiru::detail::Scope nested;
+      CheckBlockingCallbacks(host, allowed);
+    }
+    CheckBlockingCallbacks(host, allowed);
+    agiru::Commit();
+    CHECK_TRUE("explicit Commit ends the write phase without changing immutable callback policy",
+               !session.Transaction().IsWriting() &&
+                   session.Options().allowSessionCallSuspendWhenWriteTransactionStarted == allowed);
+    CheckBlockingCallbacks(host, true);
+    agiru::detail::RequireWrite();
+    writer.Run("INSERT INTO callbacks VALUES (2)");
+    CheckBlockingCallbacks(host, allowed);
+  }
+  CHECK_TRUE("callback boundary unwind retains prior Commit and rolls back only later work",
+             observer.Execute("SELECT array_agg(value) FROM callbacks").Value(0, 0) == "{1}");
+  CheckBlockingCallbacks(host, true);
+}
+
+void TestHandlersObeyCallbackPolicy(bool allowed) {
+  const gate::OwnedDatabase database(allowed ? "ui_test_allowed" : "ui_test_denied");
+  const agiru::Session session(database.Dsn(),
+                               {.allowSessionCallSuspendWhenWriteTransactionStarted = allowed});
+  constexpr std::array handlers{
+      agiru::TestHandler{
+          .name = "Question",
+          .kind = agiru::HandlerKind::Confirm,
+          .object = 0,
+          .invoke =
+              +[](std::string_view, void *reply) { *static_cast<agiru::Boolean *>(reply) = false; },
+          .optional = false},
+      agiru::TestHandler{.name = "Menu",
+                         .kind = agiru::HandlerKind::StrMenu,
+                         .object = 0,
+                         .invoke =
+                             +[](std::string_view, void *reply) {
+                               static_cast<agiru::StrMenuAnswer *>(reply)->choice = 0;
+                             },
+                         .optional = false}};
+  constexpr std::array<std::string_view, 2> declared{"Question", "Menu"};
+  agiru::HandlerTable::Install(handlers, declared);
+  try {
+    const agiru::detail::Scope boundary;
+    agiru::detail::RequireWrite();
+    CheckCallback(allowed, "AL test confirmation obeys the configured callback policy", [] {
+      CHECK_TRUE("permitted AL confirmation handler retains its explicit answer",
+                 !agiru::Confirm("Test?", true));
+    });
+    CheckCallback(allowed, "AL test menu obeys the configured callback policy", [] {
+      CHECK_TRUE("permitted AL menu handler retains its explicit answer",
+                 agiru::StrMenu("Post,Preview", 2) == 0);
+    });
+  } catch (...) {
+    agiru::HandlerTable::Reset();
+    throw;
+  }
+  const auto missed = agiru::HandlerTable::Uninstall();
+  CHECK_TRUE(
+      "disabled policy refuses before invoking or marking AL test callbacks",
+      (allowed ? missed.empty() : missed == std::vector<std::string_view>{"Question", "Menu"}));
+}
+
 void DetachedSessionsKeepTheirEndpoint() {
   const gate::OwnedDatabase database("ui_migration");
   const agiru::Guid identity = agiru::Guid::Create();
@@ -292,7 +414,7 @@ void DetachedSessionsKeepTheirEndpoint() {
     user.Insert();
     agiru::Commit();
   }
-  agiru::Session session(identity);
+  agiru::Session session(identity, {.allowSessionCallSuspendWhenWriteTransactionStarted = false});
   auto &host = Install(session);
   CHECK_TRUE("an idle authenticated context cannot become the ambient UI host",
              agiru::CurrentUiHost() == nullptr);
@@ -304,6 +426,10 @@ void DetachedSessionsKeepTheirEndpoint() {
         agiru::SessionCommand execution(session, connection);
         CHECK_TRUE("worker activation finds this session's retained UI endpoint",
                    agiru::CurrentUiHost() == &host && agiru::GuiAllowed());
+        agiru::detail::RequireWrite();
+        CHECK_TRUE("callback policy belongs to the session across worker migration",
+                   Refused("UiWriteTransaction",
+                           [] { static_cast<void>(agiru::Confirm("Worker question?", true)); }));
         agiru::Message("Command %1", command);
         CHECK_TRUE("an active command refuses UI host replacement",
                    Refused({}, [&] { agiru::InstallUiHost(session, nullptr); }));
@@ -330,6 +456,10 @@ int main() {
     LiveProgressBindings();
     TestAdapterDoesNotFallBack();
     QuestionsPreserveTransactions();
+    ConfiguredCallbackPolicy(true);
+    ConfiguredCallbackPolicy(false);
+    TestHandlersObeyCallbackPolicy(true);
+    TestHandlersObeyCallbackPolicy(false);
     DetachedSessionsKeepTheirEndpoint();
   });
 }

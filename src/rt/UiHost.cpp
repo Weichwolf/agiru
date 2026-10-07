@@ -25,6 +25,16 @@ UiHost *CurrentUiHost() {
   return state == nullptr ? nullptr : state->uiHost.get();
 }
 
+void detail::RequireUiCallback() {
+  if (!Session::HasCurrent()) { return; }
+  const auto &session = Session::Current();
+  if (!session.Options().allowSessionCallSuspendWhenWriteTransactionStarted &&
+      session.Transaction().IsWriting()) {
+    throw Error("Client callbacks during a write transaction are disabled by runtime configuration",
+                "UiWriteTransaction");
+  }
+}
+
 void detail::OpenUiProgress(const void *owner,
                             std::string_view text,
                             std::span<const UiValueBinding> values) {

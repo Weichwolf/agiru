@@ -23,6 +23,7 @@
     "lifetime_seconds": 3600
   },
   "transactions": {
-    "disable_write_inside_try_functions": false
+    "disable_write_inside_try_functions": false,
+    "allow_session_call_suspend_when_write_transaction_started": true
   }
 }

@@ -82,6 +82,12 @@ void InstallUiHost(Session &session, std::unique_ptr<UiHost> host);
 [[nodiscard]] UiHost *CurrentUiHost();
 
 namespace detail {
+/// \brief Enforces the active session's trusted callback-in-write-transaction policy.
+/// Applies before native interaction or an explicit AL test handler; does not commit,
+/// roll back or detach the session. Without an active session the default enabled policy applies.
+/// \throws Error with UiWriteTransaction when callbacks are disabled in a write transaction.
+void RequireUiCallback();
+
 /// \brief Route live progress bindings to the owning host; AL tests remain headless.
 /// \param owner Live dialog identity. \param text AL mask. \param values Live bindings.
 /// \throws Error when neither an interactive host nor the explicit AL test adapter exists.

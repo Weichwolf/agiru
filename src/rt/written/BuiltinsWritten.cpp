@@ -937,6 +937,7 @@ void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
 }
 
 bool DispatchUiInteraction(HandlerKind kind, std::string_view text, void *reply) {
+  if (kind == HandlerKind::Confirm || kind == HandlerKind::StrMenu) { detail::RequireUiCallback(); }
   const TestHandler *handler = HandlerTable::For(kind);
   if (detail::TraceUi()) {
     std::println(stderr,

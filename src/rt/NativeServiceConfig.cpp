@@ -139,10 +139,14 @@ NativeServiceOptions ParseNativeServiceOptions(std::string_view text) {
     options.pages.origin = Text(root, "origin");
     options.http = Transport(root["http"]);
     Pages(root["pages"], options.pages);
-    constexpr std::array<std::string_view, 1> transactions{"disable_write_inside_try_functions"};
+    constexpr std::array<std::string_view, 2> transactions{
+        "disable_write_inside_try_functions",
+        "allow_session_call_suspend_when_write_transaction_started"};
     Object(root["transactions"], transactions);
     options.pages.session.disableWriteInsideTryFunctions =
         Boolean(root["transactions"], "disable_write_inside_try_functions");
+    options.pages.session.allowSessionCallSuspendWhenWriteTransactionStarted =
+        Boolean(root["transactions"], "allow_session_call_suspend_when_write_transaction_started");
     return options;
   } catch (const Error &) { Invalid(); }
 }

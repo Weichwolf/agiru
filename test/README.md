@@ -34,13 +34,19 @@ distinguish both Randomize overloads; generated callers preserve omitted argumen
 Integer maximum is covered; Random's minimum Integer bound explicitly refuses and
 remains unqualified against BC. This is not suspended AL-stack migration or full lint/UT.
 
-`make ui-host JOBS=2` qualifies the session-owned native dialog bridge: 60 C++ checks
-and six compiled capability/answer/test-fallback/implicit-commit/live-binding defects.
+`make ui-host JOBS=2` qualifies the session-owned native dialog bridge: 154 C++ checks,
+205 native-configuration checks and eleven compiled capability/answer/test-fallback/
+implicit-commit/live-binding/callback-policy defects.
 Background GuiAllowed is false; actual host callbacks and explicit AL handlers are
 separate. Questions never implicitly commit, prior Commit survives unwind, and live
 progress values remain exact. Detached authenticated sessions retain their own endpoint
 across workers. This is not HTTP dialog admission/suspension, automatic progress teardown,
 modal-page or browser/CMD/MCP acceptance; those remain in WI 0720.
+The trusted `transactions.allow_session_call_suspend_when_write_transaction_started`
+default is true. False refuses Confirm/StrMenu before native or AL test callbacks in a
+write transaction; read-only callbacks, messages and progress remain allowed. Both policies,
+Commit/unwind, independent SQL visibility and worker migration are covered. Modal and
+report/request-page callback enforcement still requires their actual UI integration.
 
 `make record-windows JOBS=2` runs the row-bounded SQL window gate and five compiled
 bound/seek/reverse/permission/continuation defects through the existing record-order

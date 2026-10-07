@@ -61,7 +61,9 @@ void Defaults() {
                  options.pages.listRows == pages.listRows &&
                  options.pages.lifetime == pages.lifetime &&
                  options.pages.session.disableWriteInsideTryFunctions ==
-                     pages.session.disableWriteInsideTryFunctions);
+                     pages.session.disableWriteInsideTryFunctions &&
+                 options.pages.session.allowSessionCallSuspendWhenWriteTransactionStarted ==
+                     pages.session.allowSessionCallSuspendWhenWriteTransactionStarted);
   CHECK_TRUE("deployment examples contain no password or synthetic credentials",
              !options.pages.database.contains("password") &&
                  options.pages.company == "CRONUS International Ltd" &&
@@ -69,6 +71,7 @@ void Defaults() {
   auto root = Node::parse(Template());
   root["http"]["workers"] = Node(2);
   root["transactions"]["disable_write_inside_try_functions"] = Node(true);
+  root["transactions"]["allow_session_call_suspend_when_write_transaction_started"] = Node(false);
   root["pages"]["receipt_bytes"] = Node::Number("9007199254740993");
   constexpr auto kConfiguredListRows = 7;
   root["pages"]["list_rows"] = Node(kConfiguredListRows);
@@ -76,6 +79,8 @@ void Defaults() {
   const auto selected = agiru::ParseNativeServiceOptions(root.dump());
   CHECK_TRUE("trusted explicit worker and transaction policies are retained",
              selected.http.workers == 2 && selected.pages.session.disableWriteInsideTryFunctions);
+  CHECK_TRUE("trusted callback suspension policy is retained independently of try-write policy",
+             !selected.pages.session.allowSessionCallSuspendWhenWriteTransactionStarted);
   CHECK_TRUE("trusted configuration changes the common list row bound",
              selected.pages.listRows == kConfiguredListRows);
   CHECK_TRUE("integer budgets never travel through binary floating point",
@@ -140,19 +145,25 @@ void Schema() {
              Refuses(publicListener.dump()));
   publicListener["http"]["loopback"] = Node(1);
   CHECK_TRUE("booleans are not coerced from numbers", Refuses(publicListener.dump()));
-  auto policy = original;
-  policy["transactions"]["disable_write_inside_try_functions"] = Node(std::string("false"));
-  CHECK_TRUE("transaction policy is not coerced from text", Refuses(policy.dump()));
+  for (const auto &member : original["transactions"].Members()) {
+    for (const auto &invalid : {Node{}, Node(0), Node(1), Node(std::string("false"))}) {
+      auto policy = original;
+      policy["transactions"][member.first] = invalid;
+      CHECK_TRUE("transaction policies accept only actual booleans", Refuses(policy.dump()));
+    }
+  }
 }
 
 void DuplicatesAndNumbers() {
   const auto original = Node::parse(Template());
   const auto compact = original.dump();
-  for (const std::string_view anchor : {"\"schema\":1",
-                                        "\"port\":18080",
-                                        "\"contexts\":64",
-                                        "\"list_rows\":40",
-                                        "\"disable_write_inside_try_functions\":false"}) {
+  for (const std::string_view anchor :
+       {"\"schema\":1",
+        "\"port\":18080",
+        "\"contexts\":64",
+        "\"list_rows\":40",
+        "\"disable_write_inside_try_functions\":false",
+        "\"allow_session_call_suspend_when_write_transaction_started\":true"}) {
     auto duplicate = compact;
     const auto at = duplicate.find(anchor);
     if (at == std::string::npos) { throw std::runtime_error("duplicate control anchor absent"); }

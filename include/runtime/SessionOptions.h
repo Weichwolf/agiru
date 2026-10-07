@@ -9,6 +9,9 @@ struct SessionOptions {
   /// BC server DisableWriteInsideTryFunctions; false permits writes without try-call rollback.
   /// The default preserves the BC online policy. Native hosts may select the on-premises policy.
   bool disableWriteInsideTryFunctions = false;
+  /// BC AllowSessionCallSuspendWhenWriteTransactionStarted; enabled by default.
+  /// False refuses blocking client callbacks before invoking native or AL test handlers.
+  bool allowSessionCallSuspendWhenWriteTransactionStarted = true;
 };
 
 }

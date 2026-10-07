@@ -32,7 +32,7 @@ refresh-records: comments db ## qualify session/table read-cache refresh and tra
 	@B="$(B)" bash "$(SELF)/test/runtime/record-refresh.sh"
 
 ui-host: comments db ## qualify session-owned UI routing and compiled contract defects, not HTTP dialog parity
-	@cmake --build "$(B)" -j "$(JOBS)" --target gate_UiHostGate
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_UiHostGate gate_NativeServiceConfigGate
 	@B="$(B)" bash "$(SELF)/test/runtime/ui-host.sh"
 
 client: ## build the external Node agent CMD/MCP client from locked dependencies
