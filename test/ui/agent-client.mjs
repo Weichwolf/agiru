@@ -2,14 +2,16 @@ import assert from "node:assert/strict";
 import { test, after } from "node:test";
 import { readFile, mkdtemp, chmod, symlink, rm } from "node:fs/promises";
 import { createServer } from "node:http";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 const modules = process.env.AGIRU_CLIENT_MODULES ? pathToFileURL(process.env.AGIRU_CLIENT_MODULES + "/") : new URL("../../build/client/", import.meta.url);
 const { parsePage, commandEnvelope, limits } = await import(new URL("profile.mjs", modules));
 const { renderAscii, quote } = await import(new URL("ascii.mjs", modules));
 const { AgentClient, readAuth } = await import(new URL("http.mjs", modules));
 const { operate } = await import(new URL("command.mjs", modules));
+const execute = promisify(execFile);
 const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
 const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"));
 const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"));
@@ -285,6 +287,21 @@ test("CLI refuses malformed/unknown arguments with stable stderr-only errors", a
     assert.equal(result.code, 2); assert.equal(result.stdout, "");
     assert.ok(JSON.parse(result.stderr).error.endsWith("Refused"));
   }
+});
+
+test("private auth files reject FIFOs without waiting for a writer", async () => {
+  const dir = await mkdtemp("/tmp/agiru-agent-auth.");
+  const fifo = `${dir}/auth.fifo`;
+  try {
+    await execute("mkfifo", ["--mode=600", fifo]);
+    const source = `import { readAuth } from ${JSON.stringify(new URL("http.mjs", modules).href)};
+      try { await readAuth(process.argv[1]); process.exitCode = 1; }
+      catch (error) { if (error.code !== "AuthFile") throw error; console.log(error.code); }`;
+    const result = await execute(process.execPath, ["--input-type=module", "--eval", source, fifo],
+      { timeout: 3000, killSignal: "SIGKILL" });
+    assert.equal(result.stdout, "AuthFile\n");
+    assert.equal(result.stderr, "");
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
 test("private auth files reject loose modes, symlinks and unknown headers", async () => {

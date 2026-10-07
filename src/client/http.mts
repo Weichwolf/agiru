@@ -12,7 +12,7 @@ export type Headers = Readonly<{ authorization?: string; cookie?: string }>;
 export async function readAuth(path: string): Promise<Headers> {
   let file;
   try {
-    file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const stat = await file.stat();
     if (!stat.isFile() || stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0 || stat.size > 8192) {
       throw new ClientError("AuthFile", "Authentication file must be owned, private and at most 8 KiB");

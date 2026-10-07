@@ -358,13 +358,15 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 - External agent implementation: `src/client/{profile,ascii,http,command,cmd,mcp}.mts`.
   `make client-test` builds the locked TypeScript package, consumes actual C++
   `PageHtmlGate --html` and checks a declared Node HTTP transport fixture on the host.
-  Thirty-five tests pass: exact Decimal/Int64 and enum/temporal metadata, ordering,
+  Thirty-six tests pass: exact Decimal/Int64 and enum/temporal metadata, ordering,
   Unicode/entity/terminal framing, strict profile/schema bounds, shell CMD and actual
   MCP stdio discovery/read/set/action, stale/disabled/forged-command refusals,
   redirect/body/UTF-8/timeout handling, private authentication files and uncertain
   write identity without retries. Oversized ASCII explicitly refuses its presentation
-  while JSON/MCP retains full structured values. Four executable scalar-rounding,
-  disabled-fence, stale-revision and duplicate-POST mutants reject. C++ HTML still
+  while JSON/MCP retains full structured values. Authentication-file opens are nonblocking;
+  FIFOs refuse without a writer. A bounded child-process regression fails without this guard.
+  Five executable scalar-rounding, disabled-fence, stale-revision, duplicate-POST and
+  blocking-authentication mutants reject. C++ HTML still
   passes 164 checks; its changed producer's targeted tidy passes. Fixtures make no
   SQL/browser/production-authentication claim.
   parse5 8.0.1 supplies HTML tree/entity semantics; official MCP SDK 1.32.1 and

@@ -33,7 +33,8 @@ node build/client/mcp.mjs
   No write retries. `WriteUncertain` includes the command ID: reconcile the
   future server receipt endpoint before choosing another command.
 - Optional `AGIRU_AUTH_FILE`: owned regular file, mode 0600, at most 8 KiB;
-  JSON keys only `authorization` and/or `cookie`. Keep outside Git. Credentials
+  symlinks/devices/FIFOs refuse without waiting. JSON keys only `authorization`
+  and/or `cookie`. Keep outside Git. Credentials
   never appear in argv, page output or diagnostics. Authentication is server-owned.
 
 Dependencies: parse5 8.0.1 (MIT) supplies HTML entity/tree semantics, not a browser;

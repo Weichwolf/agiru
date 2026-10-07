@@ -234,9 +234,11 @@ list window or complete page lifecycle. View navigation remains open (0720).
 `make client` builds the external Node 20+ TypeScript client from its locked
 dependencies. `make client-test` runs on the host: C++ `PageHtmlGate --html` produces
 the actual fragment in `agiru-dev`; a clearly labelled Node HTTP fixture checks
-lossless values, shell CMD and real MCP stdio calls over one agent library. Four
+lossless values, shell CMD and real MCP stdio calls over one agent library. Five
 executable mutants must expose rounded scalars, disabled-command execution,
-stale revisions and duplicate POSTs. This is not a Node ERP server or proof of
+stale revisions, duplicate POSTs and blocking authentication-file opens. FIFOs must
+refuse without a writer; the defective child is killed after a bounded timeout.
+This is not a Node ERP server or proof of
 production authentication, SQL effects, actual htmx browser behaviour or complete
 page/ERP parity. `AGIRU_PAGE_HTML_GATE` can select an explicitly built host producer.
 Fixtures and disposable mutant modules use `/tmp`; Node stays outside the ERP container.
