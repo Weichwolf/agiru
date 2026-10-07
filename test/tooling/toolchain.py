@@ -3654,6 +3654,69 @@ class MilestoneGate(unittest.TestCase):
         result = subprocess.run(self.command, env=self.env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 
+    def test_selected_build_controls_runner_freshness_hashes_and_nested_make(self):
+        self.runner_output('2 of 2 passed')
+        selected = self.root / 'build/native'
+        selected.mkdir()
+        shutil.copyfile(self.runner, selected / 'agiru')
+        (selected / 'agiru').chmod(0o755)
+        (selected / 'build.ninja').write_text('')
+        (selected / 'libagiru_fixture.so').write_text('selected native library')
+        self.runner.write_text('#!/bin/sh\necho wrong-root-image >&2\nexit 42\n')
+        self.ninja.write_text('''#!/bin/sh
+[ "$2" = "$EXPECTED_BUILD" ] || exit 43
+printf 'ninja: no work to do.\\n'
+''')
+        make = self.root / 'build/make'
+        make.write_text('''#!/bin/sh
+[ "$2" = "B=$EXPECTED_BUILD" ] || exit 44
+exit 0
+''')
+        make.chmod(0o755)
+        env = dict(self.env, B='build/native', EXPECTED_BUILD=str(selected))
+        result = subprocess.run(self.command + ['--build'], env=env,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        metadata = json.loads((self.root / 'build/ut.log.run.json').read_text())
+        self.assertEqual(metadata['build_directory'], str(selected))
+        self.assertEqual(metadata['image_sha256']['agiru'], milestone.file_sha256(selected / 'agiru'))
+        self.assertEqual(metadata['image_sha256']['libagiru_fixture.so'],
+                         milestone.file_sha256(selected / 'libagiru_fixture.so'))
+        result = subprocess.run(self.command, env=dict(env, B=str(selected)),
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_absent_selected_image_cannot_fall_back_to_the_root_image(self):
+        self.runner_output('2 of 2 passed')
+        selected = self.root / 'build/native'
+        selected.mkdir()
+        (selected / 'build.ninja').write_text('')
+        result = subprocess.run(self.command, env=dict(self.env, B=str(selected)),
+                                capture_output=True, text=True)
+        self.assert_preflight_population(result, 'No such file')
+
+    def test_make_forwards_explicit_build_and_master_without_changing_the_default(self):
+        shutil.copyfile(SCRIPT.parents[2] / 'Makefile', self.root / 'Makefile')
+        receipt = self.root / 'ut-arguments.json'
+        (self.root / 'scripts/ut_milestone.py').write_text(
+            'import json, os, pathlib, sys\n'
+            + f'pathlib.Path({str(receipt)!r}).write_text(json.dumps('
+            + '{"B":os.environ["B"],"arguments":sys.argv[1:]}))\n')
+        master = 'postgresql://fixture.invalid/qualified_seed'
+        selected = self.root / 'build/native'
+        result = subprocess.run([shutil.which('make'), '-C', str(self.root), 'ut',
+                                 f'B={selected}', f'UT_MASTER_DSN={master}', 'JOBS=2'],
+                                env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        invocation = json.loads(receipt.read_text())
+        self.assertEqual(invocation['B'], str(selected))
+        self.assertEqual(invocation['arguments'], [str(selected / 'ut.log'), '2', master, '--build'])
+        result = subprocess.run([shutil.which('make'), '-C', str(self.root), 'ut', 'JOBS=2'],
+                                env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(receipt.read_text())['arguments'],
+                         [str(self.root / 'build/ut.log'), '2', '--build'])
+
     def test_frozen_bc_revision_is_not_the_parent_project_revision(self):
         self.runner_output('2 of 2 passed')
         env = dict(self.env, AGIRU_BC_REVISION='bc-fixture-revision')

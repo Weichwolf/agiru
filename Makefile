@@ -375,8 +375,9 @@ gate: comments db   ## build and run one C++ gate (GATE=RecordRefGate)
 	    "$(B)/gate_$$AGIRU_GATE"
 
 UT_LOG ?= $(B)/ut.log
+UT_MASTER_DSN ?=
 ut:                ## count source tests, build, then run the UT milestone on disposable clones
-	@bash "$(SELF)/scripts/ut-milestone.sh" "$(UT_LOG)" "$(JOBS)" --build
+	@B="$(B)" bash "$(SELF)/scripts/ut-milestone.sh" "$(UT_LOG)" "$(JOBS)" $(if $(UT_MASTER_DSN),"$(UT_MASTER_DSN)") --build
 
 VERIFY_TARGETS ?= all test
 VERIFY_CHECKS ?= SnapshotGate NativeToolchainGate

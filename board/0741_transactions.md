@@ -98,6 +98,12 @@ Full native transpilation still exits 1 for counted unsupported/missing source d
 regenerating the complete tree is not full compilation or a green AL suite.
 These results are not
 current whole-tree, full AL UT or finance acceptance.
+The UT driver now uses the selected `B` for nested builds, freshness checks, execution
+and image/library hashes; absent selected images cannot fall back to root build outputs.
+`make ut B=<native-build> UT_MASTER_DSN=<verified-seed>` preserves the original default
+when no seed override is supplied. Sixteen existing/extended MilestoneGate tooling tests
+pass, including missing/stale image, timeout/interruption and source-population controls;
+these mocked orchestration cases are not AL UT execution.
 The previous direct integration lane was deliberately interrupted after 519/1174 steps
 before changing compiler inputs. It is not a build pass or current UT measurement.
 

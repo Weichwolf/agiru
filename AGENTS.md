@@ -243,6 +243,7 @@ Inspect the local environment instead of assuming resources or container state. 
 containers are `agiru-pg` and `agiru-mssql`; `podman start agiru-pg` starts the existing database.
 Use the dedicated gate database for C++ tests and disposable clones for AL runs. Never run
 mutating tests against the demo source or a master template.
+`make ut B=<build> UT_MASTER_DSN=<verified-seed>` selects the image and clone source explicitly.
 
 `BC_VERSION` pins the demo artefact, not the BCApps source revision. Record both revisions
 and report schema/data mismatches. The imported CRONUS database uses company/system schemas;

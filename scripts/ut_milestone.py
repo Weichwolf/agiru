@@ -107,8 +107,12 @@ def seed_identity(dsn):
     return details
 
 
+def build_directory():
+    return (ROOT / os.environ.get('B', 'build')).resolve()
+
+
 def require_current_image():
-    build = ROOT / 'build'
+    build = build_directory()
     try:
         configured = subprocess.run(['ninja', '-C', str(build), 'build.ninja'],
                                     capture_output=True, text=True, check=False, timeout=30)
@@ -145,7 +149,7 @@ def run_one(entry, parts, dsn, maintenance, work_date, timeout, stop, active, lo
     stem = parts / str(entry['id'])
     scratch = f'agiru_ut_{os.getpid()}_{entry["id"]}'
     log_path = stem.with_suffix('.log')
-    command = [str(ROOT / 'build/agiru'), 'run-tests', '--database', dsn, '--fresh',
+    command = [str(build_directory() / 'agiru'), 'run-tests', '--database', dsn, '--fresh',
                '--scratch', scratch, '--codeunit', entry['name'],
                '--results-jsonl', str(stem.with_suffix('.jsonl'))]
     if work_date:
@@ -220,7 +224,7 @@ def terminate(process):
 def run_build(workers, stop):
     if stop.is_set():
         return 130
-    process = subprocess.Popen(['make', 'all', f'JOBS={workers}'], cwd=ROOT,
+    process = subprocess.Popen(['make', 'all', f'B={build_directory()}', f'JOBS={workers}'], cwd=ROOT,
                                start_new_session=True)
     while process.poll() is None:
         if stop.is_set():
@@ -259,12 +263,13 @@ def main(arguments):
     parts = Path(tempfile.mkdtemp(prefix=output.name + '.parts.', dir=output.parent))
     for entry in manifest:
         (parts / f"{entry['id']}.status").write_text('-1\n')
-    binary = ROOT / 'build/agiru'
+    binary = build_directory() / 'agiru'
     canonical_manifest = [{**entry, 'source': str(Path(entry['source']).relative_to(tests_root))}
                           for entry in manifest]
     manifest_digest = hashlib.sha256(json.dumps(canonical_manifest, sort_keys=True).encode()).hexdigest()
     metadata = {
         'agiru_revision': None,
+        'build_directory': str(build_directory()),
         'image_sha256': {},
         'source_revision': None,
         'source_manifest_sha256': manifest_digest,
@@ -308,7 +313,7 @@ def main(arguments):
             if built != 0:
                 raise ValueError(f'build exited {built}; the UT runner was not started')
         require_current_image()
-        images = [binary, *sorted(ROOT.joinpath('build').glob('libagiru_*.so'))]
+        images = [binary, *sorted(build_directory().glob('libagiru_*.so'))]
         metadata['image_sha256'] = {path.name: file_sha256(path) for path in images}
         metadata['seed_identity'] = seed_identity(dsn)
         metadata['seed_snapshot_hint'] = seed_snapshot(dsn)
