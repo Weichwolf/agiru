@@ -185,7 +185,7 @@ struct DateTime {
   /// \note AL ASSIGNS THE .NET VALUE TO AN AL ONE WITHOUT CEREMONY -- `ExcelBuffer` writes
   ///       `DateTimeResult := DotNetDateTime.DateTime(Ticks, Kind)` -- so the conversion is
   ///       implicit here for the same reason it is there.
-  [[nodiscard]] operator ::agiru::DateTime() const { return at_; } // NOLINT(*-explicit-constructor)
+  [[nodiscard]] operator ::agiru::DateTime() const { return at_; }
 
   /// \brief The instant this value holds.
   ::agiru::DateTime at_{};

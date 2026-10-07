@@ -578,8 +578,7 @@ public:
       throw Error(std::string("this Variant holds no codeunit ") +
                   std::string(::agiru::CodeunitTraits<C>::kName));
     }
-    return *const_cast<C *>(
-        static_cast<const C *>(held->instance)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+    return *const_cast<C *>(static_cast<const C *>(held->instance));
   }
 
   template <typename T>
@@ -648,7 +647,7 @@ public:
       { R::kId } -> std::convertible_to<TableId>;
     }
   operator R &() {
-    return const_cast<R &>(AsRecord<R>()); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+    return const_cast<R &>(AsRecord<R>());
   }
 
   /// \brief The record this Variant refers to.
@@ -696,8 +695,7 @@ public:
 
   /// \brief Holds a `Char`, which AL's `Any` takes as its code point.
   /// \param value The character.
-  Variant(::agiru::Char value) // NOLINT(*-explicit-constructor)
-      : held_(::agiru::Encoded(value)) {}
+  Variant(::agiru::Char value) : held_(::agiru::Encoded(value)) {}
 
   /// \brief Takes a value AL's `Any` accepts and this Variant cannot represent, and REFUSES.
   ///
@@ -725,7 +723,7 @@ public:
             (!requires { T::Traits::kValues; }) &&
             (!requires(const T &held) { held.AsInteger(); }) && (!requires { T::kKind; }) &&
             (!requires { T::kJsonKind; }) && (!requires { typename T::IsATextPosition; })
-  Variant(const T &value) { // NOLINT(*-explicit-constructor)
+  Variant(const T &value) {
     static_cast<void>(value);
     Refuse("that type");
   }
@@ -737,8 +735,7 @@ public:
   /// \param at The position.
   template <typename T>
     requires requires { typename T::IsATextPosition; }
-  Variant(const T &at)
-      : Variant(static_cast<::agiru::Char>(at)) {} // NOLINT(*-explicit-constructor)
+  Variant(const T &at) : Variant(static_cast<::agiru::Char>(at)) {}
 
   /// \brief Holds a `BigText`, which AL hands to an `Any` like any other text.
   /// \tparam T The BigText's type, recognised by the `ToText()` a `StringValue` does not have.

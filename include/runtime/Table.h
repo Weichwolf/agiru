@@ -2588,17 +2588,14 @@ private:
   }
 
   void CaptureImage() {
-    auto *copy =
-        new Derived(*static_cast<const Derived *>(this)); // NOLINT(cppcoreguidelines-owning-memory)
+    auto *copy = new Derived(*static_cast<const Derived *>(this));
     copy->State_Block = detail::StateHandle{};
     State().image.Hold(copy);
   }
 
   /// A record that was Init'd or Cleared has a BLANK image and not a mirror of itself, which is
   /// openerp WI-1078: a mirror makes every `Rec.F <> xRec.F` trivially false.
-  void BlankImage() {
-    State().image.Hold(new Derived()); // NOLINT(cppcoreguidelines-owning-memory)
-  }
+  void BlankImage() { State().image.Hold(new Derived()); }
 
   [[nodiscard]] detail::RecordState &State() {
     return reinterpret_cast<detail::StateHandle *>(Self())->Ensure();

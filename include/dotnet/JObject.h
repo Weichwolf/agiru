@@ -128,13 +128,13 @@ public:
 
   /// \brief AL `JObject := JToken` handed as an ARGUMENT: the same node, seen as an object.
   /// \return The object.
-  [[nodiscard]] operator JObject() const; // NOLINT(*-explicit-constructor)
+  [[nodiscard]] operator JObject() const;
   /// \brief The same node, seen as an array. \return The array.
-  [[nodiscard]] operator JArray() const; // NOLINT(*-explicit-constructor)
+  [[nodiscard]] operator JArray() const;
   /// \brief The same node, seen as a leaf. \return The leaf.
-  [[nodiscard]] operator JValue() const; // NOLINT(*-explicit-constructor)
+  [[nodiscard]] operator JValue() const;
   /// \brief The same node, seen as a nameless property. \return The property.
-  [[nodiscard]] operator JProperty() const; // NOLINT(*-explicit-constructor)
+  [[nodiscard]] operator JProperty() const;
 
   /// \brief AL `foreach Item in Token`: the first child. \return The iterator.
   [[nodiscard]] JsonChildIterator begin() const;

@@ -689,19 +689,18 @@ class TextArgument {
 public:
   /// \brief From an AL string literal or any view of one.
   /// \param text The characters.
-  constexpr TextArgument(std::string_view text) : view_(text) {} // NOLINT(*-explicit-constructor)
+  constexpr TextArgument(std::string_view text) : view_(text) {}
 
   /// \brief From a `std::string` a door method already returns -- `TableCaption()` is one.
   /// \param text The characters, which outlive the call they are an argument to.
   /// \note IT IS ITS OWN CONSTRUCTOR AND NOT A CONVERSION CHAIN. `std::string` reaches
   ///       `std::string_view` through a conversion of its own, and C++ takes only ONE
   ///       user-defined step -- so without this the call does not compile at all.
-  TextArgument(const std::string &text) : view_(text) {} // NOLINT(*-explicit-constructor)
+  TextArgument(const std::string &text) : view_(text) {}
 
   /// \brief From AL's own `Text` and `Code`, which share `StringValue`.
   /// \param value The AL string.
-  TextArgument(const StringValue &value) // NOLINT(*-explicit-constructor)
-      : view_(value.Value()) {}
+  TextArgument(const StringValue &value) : view_(value.Value()) {}
 
   /// \brief From any AL value that renders itself as text -- `Guid` is the one the door needs.
   /// \tparam T The value's type.
@@ -713,8 +712,7 @@ public:
   template <typename T>
     requires requires(const T &value) { value.ToText(); } && (!std::is_base_of_v<StringValue, T>) &&
                  (!requires { typename T::IsAlRefusal; })
-  TextArgument(const T &value) // NOLINT(*-explicit-constructor)
-      : owned_(value.ToText()), view_(owned_) {}
+  TextArgument(const T &value) : owned_(value.ToText()), view_(owned_) {}
 
   TextArgument(const TextArgument &) = delete;
   TextArgument(TextArgument &&) = delete;
@@ -724,9 +722,7 @@ public:
 
   /// \brief What the door reads.
   /// \return The characters, for as long as the call lasts.
-  [[nodiscard]] constexpr operator std::string_view() const {
-    return view_;
-  } // NOLINT(*-explicit-constructor)
+  [[nodiscard]] constexpr operator std::string_view() const { return view_; }
 
 private:
   std::string owned_;

@@ -86,7 +86,7 @@ public:
   ///       the callee makes lands in the caller's storage. Nothing is copied.
   template <typename U, std::size_t M>
     requires(M != 0 && (std::same_as<U, T> || std::derived_from<U, T>))
-  AlArray(AlArray<U, M> &other) // NOLINT(google-explicit-constructor)
+  AlArray(AlArray<U, M> &other)
       : storage_(other.Storage_()),
         count_(static_cast<std::size_t>(other.Length())),
         at_(&AlArray<U, M>::template Element_<T>) {}
@@ -96,7 +96,7 @@ public:
   /// \param other The inner view, which must outlive this one.
   template <typename U>
     requires(!std::same_as<U, T> && std::derived_from<U, T>)
-  AlArray(AlArray<U, 0> &other) // NOLINT(google-explicit-constructor)
+  AlArray(AlArray<U, 0> &other)
       : storage_(&other), count_(static_cast<std::size_t>(other.Length())), at_(&Through_<U>) {}
 
   /// \brief A view over an array a codeunit holds BY HANDLE, which is how its globals arrive.
@@ -104,8 +104,7 @@ public:
   /// \param handle The handle, which makes the array on first use.
   template <typename H>
     requires requires(H &h) { (*h.operator->()).Storage_(); }
-  AlArray(H &handle) // NOLINT(google-explicit-constructor)
-      : AlArray(*handle.operator->()) {}
+  AlArray(H &handle) : AlArray(*handle.operator->()) {}
 
   /// \brief A second view over the same storage, which is what handing a `var` parameter on is.
   AlArray(const AlArray &) = default;
@@ -218,15 +217,13 @@ public:
   /// \note AL DECLARES A SIZE AND PASSES ONE ON WITHOUT IT. A `var array of Integer` parameter is
   ///       the unsized view here, and the procedure it is handed to declares `array[10]`; the
   ///       elements are copied, which is what passing by value means in AL too.
-  AlArray(const AlArray<T, 0> &other) // NOLINT(google-explicit-constructor)
-      : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
+  AlArray(const AlArray<T, 0> &other) : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
     Take(other);
   }
 
   template <typename U, std::size_t M>
     requires(!std::same_as<U, T> && M != 0 && std::constructible_from<T, const U &>)
-  AlArray(const AlArray<U, M> &other) // NOLINT(google-explicit-constructor)
-      : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
+  AlArray(const AlArray<U, M> &other) : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
     Take(other);
   }
 
@@ -236,8 +233,7 @@ public:
   /// \param other The view.
   template <typename U>
     requires(!std::same_as<U, T> && std::constructible_from<T, const U &>)
-  AlArray(const AlArray<U, 0> &other) // NOLINT(google-explicit-constructor)
-      : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
+  AlArray(const AlArray<U, 0> &other) : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
     Take(other);
   }
 
@@ -265,8 +261,7 @@ public:
   ///          parameter's 17 it would read ten elements the caller never filled.
   template <std::size_t M>
     requires(M != N && M != 0)
-  AlArray(const AlArray<T, M> &other) // NOLINT(google-explicit-constructor)
-      : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
+  AlArray(const AlArray<T, M> &other) : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
     Take(other);
   }
 

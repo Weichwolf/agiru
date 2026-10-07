@@ -86,17 +86,15 @@ public:
 
   /// \brief What AL reads wherever it puts the string into a `Text`: the text.
   /// \return The characters.
-  operator std::string_view() const {
-    return std::string_view(value_);
-  } // NOLINT(*-explicit-constructor)
+  operator std::string_view() const { return std::string_view(value_); }
 
   /// \brief AL `Proc(var Param: Text)` given a `DotNet String`, which AL allows because a .NET
   ///        string IS a text there: the callee writes into this string's own text.
   /// \return The text, by reference.
-  operator ::agiru::Text<0> &() { return value_; } // NOLINT(*-explicit-constructor)
+  operator ::agiru::Text<0> &() { return value_; }
 
   /// \brief The same, read-only. \return The text.
-  operator const ::agiru::Text<0> &() const { return value_; } // NOLINT(*-explicit-constructor)
+  operator const ::agiru::Text<0> &() const { return value_; }
 
   /// \brief `String.ToString()`. \return The text.
   [[nodiscard]] ::agiru::Text<0> ToString() const { return value_; }
