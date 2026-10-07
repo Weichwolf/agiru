@@ -2,8 +2,9 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: enforce atomic optimistic Modify/Delete/Rename conflicts without rereading the whole
-record; then implement BC table/record locking and transaction-type transitions. Integrate
+Next: preserve timestamps through Record.Init with typed/reflected regression checks;
+then enforce atomic optimistic Modify/Delete/Rename conflicts without rereading the whole
+record, followed by BC table/record locking and transaction-type transitions. Integrate
 with the full native build and counted AL runs; preserve every refusal and failure.
 
 ## Acceptance
@@ -49,7 +50,7 @@ Developer docs at `f928288ee840334be73142e5fc0202c0e19b246d`:
 `devenv-{read-isolation,tri-state-locking,table-system-fields}.md`,
 `properties/devenv-{transactiontype,readstate}-property.md`,
 `methods-auto/database/database-currenttransactiontype-method.md`,
-`methods-auto/record/record-{locktable,readisolation}-method.md`.
+`methods-auto/record/record-{locktable,readisolation,rename,init,reset}-method.md`.
 `administration/server-instance-settings.md` defines the callback-in-write-transaction
 policy (enabled by default), still unimplemented, and the try-write switch and on-premises
 default true (online allows writes). agiru preserves its previous allow-writes default
@@ -135,6 +136,32 @@ checks and three wrong-root/fallback controls pass; the full tooling suite passe
 regeneration would overwrite. Exact builtin reproduction passes; read/write and implicit/
 explicit Commit checks execute the AL builtin, and both constant-answer defects reject.
 All three affected C++ units pass targeted clang-tidy. A complete native rerun remains due.
+
+## Optimistic-write implementation boundary
+
+- Record.Init must retain both timestamp aliases; the existing native primitive clears
+  both (two failing checks), while key retention, ordinary initialization and Clear pass.
+  Repair `src/rt/Table.cpp::Defaulted`; extend `test/gate/SqlRowVersionGate.cpp` and
+  the compiled controls in `test/runtime/rowversions.sh` before attaching private stamps.
+- Capture expected SystemId/version privately at SQL load/write boundaries, not from
+  mutable AL fields. Assignment/Copy/RecordRef, Reset/Init/Clear and temporary records
+  need explicit lifecycle tests; unloaded-record write behaviour still needs qualification.
+- CAS predicates match key + logical identity + (expected version or own transaction token).
+  A SQL-owned UUID token stays stable across released children and changes after Commit;
+  do not use tuple xmin, subtransaction status or a copied numeric transaction ID as authority.
+  A temporary native SQL candidate passes 43 checks; five guard/identity/fence defects fail
+  named checks, including independent waiting writers that commit or roll back. Numeric-ID
+  collision is synthetic, not backup/restore acceptance. No Record API or ERP pass is claimed.
+- Persist the private token without changing AL field declarations; measure its 16-byte
+  scalar plus actual row/index/write costs. Schema provisioning/import/restore and every
+  write path must qualify before enabling the guard. Keep successful writes one statement;
+  missing-row versus stale diagnostics must not weaken the atomic predicate.
+
+PostgreSQL 17 backend references (local provider docs unavailable):
+[transaction IDs](https://www.postgresql.org/docs/17/functions-info.html#FUNCTIONS-PG-SNAPSHOT),
+[Read Committed update rechecking](https://www.postgresql.org/docs/17/transaction-iso.html#XACT-READ-COMMITTED),
+[UUID generation](https://www.postgresql.org/docs/17/functions-uuid.html).
+These backend guarantees implement the pinned BC contracts above, not SQL Server equivalence.
 
 ## Remaining documented cases — no completion claim
 
