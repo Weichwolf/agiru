@@ -339,11 +339,10 @@ private:
 
 namespace detail {
 
-/// \brief Runs the triggers a page owes after landing on a record: `OnAfterGetRecord`, then
-///        `OnAfterGetCurrRecord`.
+/// \brief Calculates shown FlowFields and runs one loaded row's trigger and event.
 /// \tparam P The generated page class.
 /// \param page The page.
-template <typename P> void AfterGetRecord(P &page) {
+template <typename P> void AfterReadPageRecord(P &page) {
   if constexpr (requires {
                   PageTraits<P>::kPage.layout;
                   page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{});
@@ -354,8 +353,22 @@ template <typename P> void AfterGetRecord(P &page) {
   }
   if constexpr (requires { page.OnAfterGetRecord(); }) { page.OnAfterGetRecord(); }
   RaisePageRecordEvent(page, "OnAfterGetRecordEvent");
+}
+
+/// \brief Runs the selected-row trigger and event after all loaded-row triggers.
+/// \tparam P The generated page class.
+/// \param page The page positioned on its selected post-trigger record buffer.
+template <typename P> void AfterCurrentPageRecord(P &page) {
   if constexpr (requires { page.OnAfterGetCurrRecord(); }) { page.OnAfterGetCurrRecord(); }
   RaisePageRecordEvent(page, "OnAfterGetCurrRecordEvent");
+}
+
+/// \brief Runs both phases for existing single-row and AL TestPage navigation.
+/// \tparam P The generated page class.
+/// \param page The page after navigation.
+template <typename P> void AfterGetRecord(P &page) {
+  AfterReadPageRecord(page);
+  AfterCurrentPageRecord(page);
 }
 
 /// \brief Starts a new record on a page the way the platform does: the page notes it, then
@@ -469,7 +482,8 @@ template <typename P> OpenedPageRecord PositionOpenedPage(P &page, bool editable
 ///                 `TestPage.Editable()`, every control's `Editable()` and `CurrPage.Editable`
 ///                 answer false on `VAT Return Period Card` (5 UT cases, 2026-09-12).
 /// \param isNew    Whether it opens on a new record (`OpenNew`).
-template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
+/// \return Effective editing mode; positions/triggers for loaded rows are a separate phase.
+template <typename P> bool InitializePage(P &page, bool editable, bool isNew) {
   const bool opensEditable = [&] {
     if constexpr (requires { PageTraits<P>::kPage.editable; }) {
       return editable && !detail::SaysFalse(PageTraits<P>::kPage.editable);
@@ -481,6 +495,16 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
   PreparePageRecord(page, isNew);
   if constexpr (requires { page.OnOpenPage(); }) { page.OnOpenPage(); }
   RaisePageRecordEvent(page, "OnOpenPageEvent");
+  return opensEditable;
+}
+
+/// \brief Initializes and positions a single-row page through the existing AL lifecycle.
+/// \tparam P The generated page class.
+/// \param page The page.
+/// \param editable Requested editing mode, constrained by the declaration.
+/// \param isNew Whether to open a new record.
+template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
+  const bool opensEditable = InitializePage(page, editable, isNew);
   const OpenedPageRecord selected = PositionOpenedPage(page, opensEditable, isNew);
   if (selected.found) { page.LandedOnRecord(); }
   if (selected.found || isNew || selected.blank) { AfterGetRecord(page); }

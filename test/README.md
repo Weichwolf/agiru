@@ -251,7 +251,12 @@ Generated list/card instances also retain selection across detached SessionComma
 leases; validation/save is verified by independent SQL value and modifier-GUID reads.
 Its authored permission allowlist does not establish production authorization or HTTP parity.
 AL controls Open/Move/Declaration retain their names. Missing/null/mismatched factories
-refuse. Eleven execution mutants and a control-shadowing compile refusal must reject;
+refuse. The production-only generated SQL window adapter additionally proves row/probe
+bounds at 0/1/39/40/41/80 and limits 7/40/80, block trigger order, retained selection,
+post-trigger record values/original images and rollback after loaded-row errors. It does not clone whole
+pages or use TestPage.Next to enumerate rows. New/custom/temporary providers, refresh,
+selected globals/xRec and production HTML/client wiring remain unqualified.
+Sixteen execution mutants and a control-shadowing compile refusal must reject;
 the narrow PageInstance interface must not pull in typed page/control/record headers.
 `make page-profile JOBS=2` additionally checks exact bound scalar values and a bounded
 current-row semantic HTML fragment over the same production handles. Display text is

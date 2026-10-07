@@ -9,6 +9,7 @@
 #include "runtime/PageValue.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
+#include "runtime/RecordWindow.h"
 #include "runtime/Relation.h"
 #include "runtime/SubPageLink.h"
 #include "runtime/Table.h"
@@ -21,6 +22,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <functional>
@@ -36,6 +38,8 @@
 /// \brief Typed page lifecycle and control execution shared by production and AL test adapters.
 
 namespace agiru {
+
+template <typename P> class PageWindowSession;
 
 /// \brief Production diagnostic policy; test error collection is an explicit adapter policy.
 struct PageSessionDiagnostics {
@@ -990,20 +994,24 @@ private:
   }
 
   void Open_(bool editable, bool isNew) {
+    OpenWith_(isNew, [editable, isNew](P &page) { detail::OpenPage(page, editable, isNew); });
+  }
+
+  template <typename Initialize> void OpenWith_(bool isNew, Initialize initialize) {
     if (page_ != nullptr) { throw Error(Diagnostics::kAlreadyOpen, Diagnostics::kAlreadyOpenCode); }
     if constexpr (requires { PageTraits<P>::kPage; }) {
       page_ = new P();
       owned_ = true;
       Bind_();
       try {
-        detail::OpenPage(*page_, editable, isNew);
+        initialize(*page_);
       } catch (...) {
         Release_();
         throw;
       }
       newRecord_ = isNew;
     } else {
-      static_cast<void>(editable);
+      static_cast<void>(initialize);
       static_cast<void>(isNew);
       Unopened_();
     }
@@ -1328,6 +1336,7 @@ protected:
   [[noreturn]] static void NotOpen() { Unopened_(); }
 
 private:
+  friend class PageWindowSession<P>;
   P *page_ = nullptr;
   bool owned_ = false;
   bool newRecord_ = false;
@@ -1336,6 +1345,160 @@ private:
   std::vector<std::string> validationErrors_;
   PageCore *parent_ = nullptr;
   std::string partName_;
+};
+
+/// \brief Production-only SQL list loading; adds no methods to the AL TestPage facade.
+/// \tparam P The generated page class; custom/temporary providers remain explicit gaps.
+template <typename P> class PageWindowSession final : public PageSession<P> {
+  using Base = PageSession<P>;
+
+public:
+  /// \brief Initializes a SQL list and loads its first block without single-row triggers.
+  /// \param mode View/Edit; New is not qualified by this adapter.
+  /// \param limit Positive trusted server bound.
+  /// \param receiver Synchronous authorized presentation receiver.
+  /// \return Bounded row counts and forward continuation.
+  [[nodiscard]] PageWindowState
+  Open_Window(PageOpenMode mode, std::size_t limit, PageWindowReceiver &receiver) {
+    Require_();
+    ValidateRecordWindowLimit(limit);
+    if (mode != PageOpenMode::View && mode != PageOpenMode::Edit) {
+      throw Error("Unsupported list opening mode.", "PageWindowMode");
+    }
+    PageWindowState result;
+    if (Base::IsOpen()) {
+      throw Error(PageSessionDiagnostics::kAlreadyOpen, PageSessionDiagnostics::kAlreadyOpenCode);
+    }
+    window_.reset();
+    selected_ = {};
+    Base::OpenWith_(false, [&](P &page) {
+      static_cast<void>(detail::InitializePage(page, mode == PageOpenMode::Edit, false));
+      result = Load_(RecordWindowPosition::First, limit, receiver, true);
+    });
+    return result;
+  }
+
+  /// \brief Discards display boundaries after explicit single-record navigation.
+  void Forget_Window() {
+    window_.reset();
+    selected_ = {};
+  }
+
+  /// \return Original selected SQL identity, not a key changed only in an AL buffer.
+  [[nodiscard]] RecordId Window_Current_Record() const {
+    static_cast<void>(Base::Page_());
+    return window_.has_value() ? selected_ : Base::Current_Record();
+  }
+
+  /// \brief Loads a block relative to retained SQL boundaries, not mutated AL key values.
+  /// \param position Requested SQL-order movement.
+  /// \param limit Positive trusted server bound.
+  /// \param receiver Synchronous authorized presentation receiver.
+  /// \return Bounded rows and continuation in the requested direction.
+  [[nodiscard]] PageWindowState
+  Read_Window(PageWindowPosition position, std::size_t limit, PageWindowReceiver &receiver) {
+    Require_();
+    ValidateRecordWindowLimit(limit);
+    static_cast<void>(Base::Page_());
+    const RecordWindowPosition sqlPosition = Position_(position);
+    if ((sqlPosition == RecordWindowPosition::After ||
+         sqlPosition == RecordWindowPosition::Before) &&
+        (!window_.has_value() || window_->Size() == 0)) {
+      throw Error("List continuation has no SQL boundary.", "PageWindowAnchor");
+    }
+    try {
+      Base::RowLeft();
+      return Load_(sqlPosition, limit, receiver, false);
+    } catch (...) {
+      window_.reset();
+      Base::Release_();
+      throw;
+    }
+  }
+
+private:
+  static void Require_() {
+    if constexpr (
+        !Base::kHasRecord || PageTraits<P>::kPage.type != PageType::List ||
+        requires { &P::OnFindRecord; } || requires { &P::OnNextRecord; }) {
+      throw Error("This page has no qualified SQL list provider.", "PageWindowProvider");
+    }
+  }
+
+  static RecordWindowPosition Position_(PageWindowPosition position) {
+    switch (position) {
+      case PageWindowPosition::First: return RecordWindowPosition::First;
+      case PageWindowPosition::Next: return RecordWindowPosition::After;
+      case PageWindowPosition::Previous: return RecordWindowPosition::Before;
+      case PageWindowPosition::Last: return RecordWindowPosition::Last;
+      case PageWindowPosition::Unknown: break;
+    }
+    throw Error("Unknown list window movement.", "PageWindowPosition");
+  }
+
+  PageWindowState Load_(RecordWindowPosition position,
+                        std::size_t limit,
+                        PageWindowReceiver &receiver,
+                        bool opening) {
+    if constexpr (!Base::kHasRecord) {
+      static_cast<void>(position);
+      static_cast<void>(limit);
+      static_cast<void>(receiver);
+      static_cast<void>(opening);
+      throw Error("The page has no source record.", "PageWindowProvider");
+    } else {
+      auto &page = Base::Page_();
+      auto &rec = page.Rec;
+      using Source = std::remove_cvref_t<decltype(rec)>;
+      Source anchor;
+      static_cast<typename Source::Platform_Half &>(anchor).Copy(rec);
+      if (position == RecordWindowPosition::After || position == RecordWindowPosition::Before) {
+        window_->Load(position == RecordWindowPosition::After ? window_->Size() - 1 : 0, &anchor);
+      }
+      auto loaded = ReadRecordWindow(&anchor, TableTraits<Source>::kTable, position, limit);
+      if (loaded.Size() == 0 && opening && page.OpenedEditable()) {
+        throw Error("Empty editable list windows are not qualified.", "PageWindowNewRow");
+      }
+      if (loaded.Size() == 0 &&
+          (position == RecordWindowPosition::After || position == RecordWindowPosition::Before)) {
+        receiver.Current(selected_, *this);
+        return {0, loaded.RowsRead(), false};
+      }
+      const RecordId previous = window_.has_value() ? selected_ : RecordId{};
+      RecordId selected;
+      Source selectedValues;
+      detail::HeldImage selectedImage;
+      for (std::size_t i = 0; i < loaded.Size(); ++i) {
+        loaded.Load(i, &rec);
+        const RecordId identity = rec.RecordId();
+        static_cast<void>(static_cast<typename Source::Platform_Half &>(rec).Read(true));
+        page.LandedOnRecord();
+        detail::AfterReadPageRecord(page);
+        receiver.Row(identity, *this);
+        if (i == 0 || identity == previous) {
+          selected = identity;
+          selectedValues = rec;
+          selectedImage.SetFrom(reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image);
+        }
+      }
+      if (loaded.Size() != 0) {
+        rec = selectedValues;
+        reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image.SetFrom(selectedImage);
+      } else {
+        rec = Source{};
+        reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().positioned = false;
+      }
+      if (opening || selected != previous) { detail::AfterCurrentPageRecord(page); }
+      receiver.Current(selected, *this);
+      const PageWindowState result{loaded.Size(), loaded.RowsRead(), loaded.HasMore()};
+      window_ = std::move(loaded);
+      selected_ = selected;
+      return result;
+    }
+  }
+
+  std::optional<RecordWindow> window_;
+  RecordId selected_;
 };
 
 /// \brief Makes the closed production adapter for a generated page catalogue entry.
@@ -1358,13 +1521,20 @@ template <typename P> PageInstance *MakePageSession() {
       throw Error("Unknown page opening mode.", "PageOpenMode");
     }
 
-    void Close() override { session_.Close(); }
+    void Close() override {
+      session_.Close();
+      session_.Forget_Window();
+    }
 
     void Save() override { session_.RowLeft(); }
 
     [[nodiscard]] bool IsOpen() const override { return session_.IsOpen(); }
 
     [[nodiscard]] bool Move(PagePosition position) override {
+      if (position == PagePosition::Unknown) {
+        throw Error("Unknown page movement.", "PagePosition");
+      }
+      session_.Forget_Window();
       switch (position) {
         case PagePosition::First: return session_.First();
         case PagePosition::Next: return session_.Next();
@@ -1376,13 +1546,27 @@ template <typename P> PageInstance *MakePageSession() {
     }
 
     [[nodiscard]] bool SelectRecord(const RecordId &record) override {
+      session_.Forget_Window();
       return session_.Select_Record(record);
     }
 
-    [[nodiscard]] RecordId CurrentRecord() const override { return session_.Current_Record(); }
+    [[nodiscard]] RecordId CurrentRecord() const override {
+      return session_.Window_Current_Record();
+    }
+
+    [[nodiscard]] PageWindowState
+    OpenWindow(PageOpenMode mode, std::size_t limit, PageWindowReceiver &receiver) override {
+      return session_.Open_Window(mode, limit, receiver);
+    }
+
+    [[nodiscard]] PageWindowState ReadWindow(PageWindowPosition position,
+                                             std::size_t limit,
+                                             PageWindowReceiver &receiver) override {
+      return session_.Read_Window(position, limit, receiver);
+    }
 
   private:
-    PageSession<P> session_;
+    PageWindowSession<P> session_;
   };
 
   return new Adapter();

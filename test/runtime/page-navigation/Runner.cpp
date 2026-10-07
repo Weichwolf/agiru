@@ -11,6 +11,7 @@
 #include "runtime/PageInstance.h"
 #include "runtime/PageSession.h"
 #include "runtime/PageValue.h"
+#include "runtime/PageWindow.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/SessionCommand.h"
@@ -33,13 +34,20 @@
 #include "fixture/page/NavigationDelayed.h"
 #include "fixture/page/NavigationList.h"
 #include "fixture/page/NavigationOverride.h"
+#include "fixture/page/NavigationWindow.h"
+#include "fixture/page/NavigationWindowError.h"
 #include "fixture/report/NavigationReport.h"
 #include "fixture/table/NavigationRow.h"
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -51,6 +59,7 @@ constexpr agiru::Integer kSecondValue = 22;
 constexpr agiru::Integer kOverrideIncrement = 100;
 constexpr agiru::Integer kCopiedValue = 55;
 constexpr agiru::Integer kRequestLimit = 7;
+constexpr std::size_t kListRows = 40;
 
 class HtmlAuthorization final : public agiru::PageAuthorization {
 public:
@@ -189,6 +198,189 @@ void InstalledPageLifecycle() {
              refused && list->CurrentRecord() == selected);
   list->Close();
   card->Close();
+}
+
+class WindowReceiver final : public agiru::PageWindowReceiver {
+public:
+  void Row(const agiru::RecordId &identity, agiru::PageCore &controls) override {
+    identities.push_back(identity);
+    ids.push_back(controls.ControlText("ID"));
+    values.push_back(controls.Control_Value("Value").value);
+    if (calculated) {
+      loaded.push_back(controls.ControlText("Loaded"));
+      originals.push_back(controls.ControlText("Original"));
+      CHECK_TEXT("row triggers do not make every loaded row current",
+                 controls.ControlText("CurrentCount"),
+                 previousCurrentCount);
+    }
+  }
+
+  void Current(const agiru::RecordId &identity, agiru::PageCore &controls) override {
+    current = identity;
+    if (!calculated) { return; }
+    trace = controls.ControlText("Trace");
+    readCount = controls.ControlText("ReadCount");
+    currentCount = controls.ControlText("CurrentCount");
+    currentValue = controls.Control_Value("Value").value;
+    selectedOriginal = controls.ControlText("SelectedOriginal");
+  }
+
+  bool calculated = true;
+  std::string previousCurrentCount = "0";
+  std::vector<agiru::RecordId> identities;
+  std::vector<std::string> ids;
+  std::vector<std::string> values;
+  std::vector<std::string> loaded;
+  std::vector<std::string> originals;
+  agiru::RecordId current;
+  std::string trace;
+  std::string readCount;
+  std::string currentCount;
+  std::string currentValue;
+  std::string selectedOriginal;
+};
+
+void GeneratedListWindows() {
+  using Window = agiru::Fixture::NavigationWindow_Page;
+  auto block = agiru::MakeInstalledPage(agiru::PageTraits<Window>::kId);
+  WindowReceiver pair;
+  static_cast<void>(block->OpenWindow(agiru::PageOpenMode::View, kListRows, pair));
+  CHECK_TEXT("selected row restores its original image after other rows were loaded",
+             pair.selectedOriginal,
+             "11");
+  CHECK_TEXT("the selected trigger sees all completed row triggers", pair.trace, "OAAC");
+  block->Close();
+  auto list = agiru::MakeInstalledPage(agiru::PageTraits<Window>::kId);
+  WindowReceiver first;
+  const auto initial = list->OpenWindow(agiru::PageOpenMode::View, 1, first);
+  CHECK_TRUE("generated list reads only the trusted bound and one unpresented probe",
+             initial.rows == 1 && initial.rowsRead == 2 && initial.more && first.ids.size() == 1);
+  CHECK_TEXT("opening runs each loaded trigger before the selected trigger", first.trace, "OAC");
+  CHECK_TEXT("probe rows run no AL after-get trigger", first.readCount, "1");
+  CHECK_TEXT("calculated controls are captured at their own row", first.loaded.front(), "22");
+  CHECK_TEXT("loaded rows capture their original stored image before AL changes",
+             first.originals.front(),
+             "11");
+  CHECK_TEXT(
+      "current row retains AL buffer changes without rereading SQL", first.currentValue, "22");
+  CHECK_TRUE("first SQL row remains selected after rendering",
+             first.current == list->CurrentRecord());
+  WindowReceiver next;
+  next.previousCurrentCount = "1";
+  const auto following = list->ReadWindow(agiru::PageWindowPosition::Next, 1, next);
+  CHECK_TRUE("next continues at the retained SQL boundary",
+             following.rows == 1 && following.rowsRead == 1 && !following.more);
+  CHECK_TEXT("next row follows declared SQL order", next.ids.front(), "2");
+  CHECK_TEXT("block movement runs exactly one selected trigger", next.trace, "OACAC");
+  WindowReceiver all;
+  all.previousCurrentCount = "2";
+  const auto repeated = list->ReadWindow(agiru::PageWindowPosition::First, kListRows, all);
+  CHECK_TRUE("forty-row block presents the complete small filtered source",
+             repeated.rows == 2 && repeated.rowsRead == 2 && !repeated.more);
+  CHECK_TRUE("all row callbacks precede current state and retain row-specific calculations",
+             (all.values == std::vector<std::string>{"22", "44"} && all.values == all.loaded));
+  CHECK_TRUE("each loaded row retains its own original image rather than the prior row",
+             (all.originals == std::vector<std::string>{"11", "22"}));
+  CHECK_TEXT("unchanged selection does not rerun its current trigger", all.trace, "OACACAA");
+  CHECK_TRUE("reading a block keeps the selected row rather than the last visited row",
+             all.current == next.current && list->CurrentRecord() == next.current);
+  CHECK_TEXT("selected post-trigger record fields survive the block", all.currentValue, "44");
+  WindowReceiver last;
+  last.previousCurrentCount = "2";
+  const auto ending = list->ReadWindow(agiru::PageWindowPosition::Last, 1, last);
+  CHECK_TRUE("last window reports reverse continuation", ending.rows == 1 && ending.more);
+  WindowReceiver previous;
+  previous.previousCurrentCount = "2";
+  const auto preceding = list->ReadWindow(agiru::PageWindowPosition::Previous, 1, previous);
+  CHECK_TRUE("previous uses the first retained SQL boundary",
+             preceding.rows == 1 && !preceding.more);
+  CHECK_TEXT("previous returns declared forward-order data", previous.ids.front(), "1");
+  CHECK_TEXT("selected-row callback follows all row triggers", previous.trace, "OACACAAAAC");
+  WindowReceiver exhausted;
+  const auto empty = list->ReadWindow(agiru::PageWindowPosition::Previous, kListRows, exhausted);
+  CHECK_TRUE("exhausted continuation retains the previous block and selected row",
+             empty.rows == 0 && exhausted.ids.empty() && exhausted.current == previous.current &&
+                 list->CurrentRecord() == previous.current);
+  CHECK_TEXT(
+      "exhausted continuation runs no row/current triggers", exhausted.trace, previous.trace);
+  list->Close();
+  auto card = agiru::MakeInstalledPage(agiru::PageTraits<Card>::kId);
+  bool refused = false;
+  try {
+    static_cast<void>(card->OpenWindow(agiru::PageOpenMode::View, kListRows, first));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageWindowProvider"; }
+  CHECK_TRUE("unsupported page windows refuse before opening", refused && !card->IsOpen());
+  auto invalid = agiru::MakeInstalledPage(agiru::PageTraits<Window>::kId);
+  refused = false;
+  try {
+    static_cast<void>(invalid->OpenWindow(agiru::PageOpenMode::View, 0, first));
+  } catch (const agiru::Error &error) { refused = error.Code() == "RecordWindowLimit"; }
+  CHECK_TRUE("invalid trusted limits refuse before AL page initialization",
+             refused && !invalid->IsOpen());
+}
+
+void ListWindowErrorsCloseAndRollback() {
+  using Failing = agiru::Fixture::NavigationWindowError_Page;
+  auto list = agiru::MakeInstalledPage(agiru::PageTraits<Failing>::kId);
+  WindowReceiver receiver;
+  receiver.calculated = false;
+  bool refused = false;
+  {
+    const agiru::detail::Scope boundary;
+    try {
+      static_cast<void>(list->OpenWindow(agiru::PageOpenMode::View, kListRows, receiver));
+    } catch (const agiru::Error &error) {
+      refused = std::string_view(error.what()).contains("Window trigger error");
+    }
+    CHECK_TRUE("a loaded-row AL error closes the page without successful completion",
+               refused && !list->IsOpen());
+    CHECK_TRUE("the continuation probe is never exposed as a completed row",
+               receiver.ids.size() == 1);
+  }
+  const auto stored = agiru::Session::Current().Database().Execute(
+      R"(SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1)");
+  CHECK_TEXT("the caller's rollback boundary undoes earlier row-trigger writes",
+             stored.Value(0, 0).value_or(""),
+             "11");
+}
+
+void ListWindowBoundaries() {
+  constexpr std::array<std::size_t, 6> populations{0, 1, 39, 40, 41, 80};
+  constexpr std::array<std::size_t, 3> bounds{7, 40, 80};
+  const auto &database = agiru::Session::Current().Database();
+  for (const auto population : populations) {
+    database.Run(R"(DELETE FROM "Navigation Row")");
+    for (std::size_t i = 1; i <= population; ++i) {
+      database.Run(R"(INSERT INTO "Navigation Row" ("ID", "Value") VALUES ()" + std::to_string(i) +
+                   "," + std::to_string(i) + ")");
+    }
+    for (const auto bound : bounds) {
+      auto page = agiru::MakeInstalledPage(agiru::PageTraits<List>::kId);
+      WindowReceiver receiver;
+      receiver.calculated = false;
+      const auto state = page->OpenWindow(agiru::PageOpenMode::View, bound, receiver);
+      CHECK_TRUE("generated windows respect zero/one/39/40/41 and configurable row bounds",
+                 state.rows == std::min(population, bound) &&
+                     state.rowsRead == std::min(population, bound + 1) &&
+                     state.more == (population > bound) && receiver.ids.size() == state.rows);
+      CHECK_TRUE("display enumeration retains the first selected row, not its last",
+                 receiver.current.IsEmpty() == (population == 0) &&
+                     (population == 0 || receiver.current == receiver.identities.front()));
+      if (state.more) {
+        WindowReceiver continuation;
+        continuation.calculated = false;
+        const auto next = page->ReadWindow(agiru::PageWindowPosition::Next, bound, continuation);
+        CHECK_TRUE("generated continuation transfers at most bound plus one",
+                   next.rows == std::min(population - bound, bound) &&
+                       next.rowsRead == std::min(population - bound, bound + 1));
+        CHECK_TEXT("generated continuation does not skip the row after its boundary",
+                   continuation.ids.front(),
+                   std::to_string(bound + 1));
+      }
+      page->Close();
+    }
+  }
+  Prepare();
 }
 
 void ListEditOpensSelectedCard() {
@@ -492,6 +684,9 @@ int main(int argc, char **argv) {
     Prepare();
     PageRunArgumentsBorrowTheLastUsableRecord();
     InstalledPageLifecycle();
+    GeneratedListWindows();
+    ListWindowErrorsCloseAndRollback();
+    ListWindowBoundaries();
     ListEditOpensSelectedCard();
     ExplicitEditAndStandaloneModes();
     CardModificationPolicy();

@@ -4,8 +4,8 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: connect the qualified SQL windows below to generated page loading and shared
-HTML/CMD/MCP rows; install the consumed trusted `pages.list_rows` default of 40.
+Next: connect generated SQL page windows to shared HTML/CMD/MCP rows and install
+the consumed trusted `pages.list_rows` default of 40. Do not add an unused config knob.
 Integrate the session-owned native UI bridge from 0741 with real HTTP dialog
 admission/suspension and typed error responses; rerun original Customer
 List → Card → Validate → Save using external CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
@@ -33,6 +33,29 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   40 rows, an explicit positive `pages.list_rows` in `deploy/dev/agiru.json`, parsed by
   `src/rt/NativeServiceConfig.cpp`; never a client-controlled SQL limit. Enforce the
   bound in the shared production record read, not by trimming an unbounded result.
+- Generated loading: `include/runtime/{PageWindow,PageInstance,PageSession}.h` separates
+  loaded-row and selected-row triggers through `Page.h`. The production-only adapter
+  retains raw SQL boundaries and selected post-trigger record fields, not a copied page,
+  cloned codeunits/parts, client comparison or a reread that erases calculated values.
+  One selected trigger follows all row callbacks; an unchanged selection and exhausted
+  continuation do not make each displayed row current. Loading errors close the page;
+  rollback remains the authenticated caller's boundary, not an implicit close/save.
+  Authored generated AL fixtures under `test/runtime/page-navigation/` cover row
+  calculations, selected identity, original stored images, 0/1/39/40/41/80 rows and
+  limits 7/40/80. Five compiled trigger/selection/image defects supplement the existing
+  eleven execution controls. Loading reuses Table's automatic FlowField/image read
+  completion before AL triggers and restores only the chosen record's image.
+  `make page-navigation JOBS=2`: 183 generated checks, PageSource 15 and PageDispatcher
+  105, zero red; all sixteen execution defects and the AL-control-shadowing compile
+  refusal reject. Three affected units pass clang-tidy; 120/121 function-length control
+  passes. Three no-PCH header rounds measure PageWindow 6.8 ms, PageInstance 202.3 ms,
+  PageSession 1,926.2 ms (before: 1,922.0 ms); not an application/performance comparison.
+  Ordinary SQL List pages are the initial provider. Custom navigation, new/empty
+  editable rows, temporary/virtual providers, inclusive refresh, current-row xRec,
+  selected-page-variable/part state and lazy BLOB/byte budgets remain unqualified.
+  This API is not yet used by HTTP or the current-row HTML profile; no client parity claim.
+  Rebuild generated production factories before calling the expanded PageInstance API;
+  the focused generated fixtures are current, not the full ERP image or AL UT population.
 - Preserve server permissions/company and all filter groups. Continue in the declared
   key's SQL order with a unique primary-key tie-breaker; forwards/backwards boundaries
   must use the same collation/comparisons as ORDER BY and indexes. No client-side sort.
@@ -66,13 +89,24 @@ References: developer `devenv-table-field-text-search.md` and
 comment 3, identifies skipped rows from numeric Code comparisons against SQL text order.
 Implement through `src/rt/{PageCommandHost,PageHtml,Navigate,Selection,RecordFilter}.cpp`
 and `include/runtime/{PageHostOptions,PageInstance}.h`, not separate client masks.
-Page loading must separate `OnAfterGetRecord` for loaded rows from one selected-row
-`OnAfterGetCurrRecord` after that block; the current `AfterGetRecord` helper conflates
-both. Preserve source filters, exact calculated control values and AL trigger effects.
+Page loading separates `OnAfterGetRecord` for loaded rows from one selected-row
+`OnAfterGetCurrRecord` after that block; existing single-row/TestPage navigation still
+uses both phases. Preserve source filters, calculated values and AL trigger effects.
 Reference: `triggers-auto/page/devenv-onafterget{record,currrecord}-page-trigger.md`,
 `methods-auto/decimal/decimal-data-type.md` at the developer revision above. The gate
 checks exact persisted scale-20 Decimal values and a separately authored numeric
 column at scale 28; this does not qualify changing BC's storage/assignment limits.
+Predecessor `openerp/board/1713_arc-headless-client-protocol.md`, comment 3,
+and `openerp/runtime/base/test_page.py::{display_rows,_display_pass}` identify accidental
+current-row changes and shallow restoration of page globals. Do not transplant its
+offset/thread/context machinery or clone mutable codeunit/part authority to restore rows.
+`openerp/board/1768_custom_source_record_restored_through_variant.md` records calculated
+values lost on a reread; its temporary provider remains a separate qualification.
+Developer `devenv-system-defined-variables.md` and
+`methods-auto/record/record-setautocalcfields-method.md` require original modification
+values and automatic calculations on retrieval. Predecessor 1707 reports previous-row
+`xRec` during selected-row changes, with an explicitly unproven initial-row rule;
+that separate page-trigger behaviour is not established by stored-image regression proof.
 
 ## Production UI suspension contract
 

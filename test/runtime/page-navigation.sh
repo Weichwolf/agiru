@@ -6,10 +6,22 @@ B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 dsn=${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}
 proof=$(mktemp -d /tmp/agiru-page-navigation.XXXXXX)
+cleanup() {
+  local target
+  for target in objects mutant; do
+    if [[ -d "$proof/$target" ]]; then rm -r -- "$proof/$target"; fi
+  done
+  for target in runner runner.o; do
+    if [[ -f "$proof/$target" ]]; then unlink "$proof/$target"; fi
+  done
+}
+trap cleanup EXIT
 sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
   src/rt/PageCore.cpp src/rt/PageValue.cpp include/runtime/PageValue.h \
   src/rt/PageHtml.cpp src/rt/HtmlText.{h,cpp} include/runtime/PageHtml.h \
   src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
+  include/runtime/PageWindow.h include/runtime/RecordWindow.h src/rt/RecordWindow.cpp \
+  include/runtime/Table.h \
   include/runtime/Page.h src/gen/BodyWriter.cpp \
   include/runtime/PageSession.h include/runtime/test/TestPage.h \
   include/runtime/Session.h include/runtime/SessionCommand.h src/rt/Session.cpp \
@@ -63,6 +75,8 @@ jq -n --arg directory "$PWD" --arg file "$PWD/test/ui/page-host/Runner.cpp" \
     "$CXX" "${flags[@]}" -c test/ui/page-host/Runner.cpp -o "$host_target/host.o" \
     > "$B/fixture-commands/page-host.json"
 unlink "$host_target/host.o"
+mkdir -p "$proof/mutant"
+cp -a include "$proof/mutant/"
 for control in no-authorization no-enabled no-editable no-visible unknown-control; do
   awk -v control="$control" '
     control == "no-authorization" && /authorization_\.Require\(declaration_\.id, command\)/ {
@@ -91,6 +105,51 @@ for control in no-authorization no-enabled no-editable no-visible unknown-contro
   rg -q 'invalid commands refuse with the expected diagnostic' "$proof/dispatcher-$control.log"
   rm -- "$proof/dispatcher-$control" "$proof/dispatcher-$control.cpp"
 done
+for control in window-no-row-trigger window-row-is-current window-no-current-trigger window-lose-current window-no-original-image; do
+  awk -v control="$control" '
+    control == "window-no-row-trigger" && /detail::AfterReadPageRecord\(page\);/ {
+      sub(/detail::AfterReadPageRecord\(page\);/, "static_cast<void>(page);"); changed++
+    }
+    control == "window-row-is-current" && /detail::AfterReadPageRecord\(page\);/ {
+      sub(/detail::AfterReadPageRecord\(page\);/, "detail::AfterGetRecord(page);"); changed++
+    }
+    control == "window-no-current-trigger" && /if \(opening \|\| selected != previous\)/ {
+      sub(/opening \|\| selected != previous/, "false"); changed++
+    }
+    control == "window-lose-current" && /if \(i == 0 \|\| identity == previous\)/ {
+      sub(/i == 0 \|\| identity == previous/, "true"); changed++
+    }
+    control == "window-no-original-image" && /static_cast<void>\(static_cast<typename Source::Platform_Half &>\(rec\)\.Read\(true\)\);/ {
+      sub(/static_cast<void>\(static_cast<typename Source::Platform_Half &>\(rec\)\.Read\(true\)\);/,
+          "static_cast<void>(rec);"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' include/runtime/PageSession.h > "$proof/mutant/include/runtime/PageSession.h"
+  mutant_objects=()
+  for source in "${sources[@]}"; do
+    object="$proof/objects/${source##*/}.o"
+    if [[ "$source" == */NavigationWindow.def.cpp || "$source" == */NavigationList.def.cpp ]]; then
+      object="$proof/objects/window-mutant-${source##*/}.o"
+      "$CXX" "-I$proof/mutant/include" "${flags[@]}" -c "$source" -o "$object"
+    fi
+    mutant_objects+=("$object")
+  done
+  "$CXX" "-I$proof/mutant/include" "${flags[@]}" test/runtime/page-navigation/Runner.cpp \
+    "${mutant_objects[@]}" "${links[@]}" -o "$proof/$control"
+  status=0
+  "$proof/$control" "$dsn" > "$proof/$control.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  case "$control" in
+    window-no-row-trigger) claim='opening runs each loaded trigger before the selected trigger' ;;
+    window-row-is-current) claim='row triggers do not make every loaded row current' ;;
+    window-no-current-trigger) claim='opening runs each loaded trigger before the selected trigger' ;;
+    window-lose-current) claim='display enumeration retains the first selected row, not its last' ;;
+    window-no-original-image) claim='loaded rows capture their original stored image before AL changes' ;;
+  esac
+  rg -q "$claim" "$proof/$control.log"
+  unlink "$proof/$control"
+done
 awk '
   /&instance->Declaration\(\) != entry->page/ {
     sub(/&instance->Declaration\(\) != entry->page/, "false"); changed++
@@ -110,8 +169,6 @@ jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/page-navigation/Runne
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
   "$CXX" "${flags[@]}" -c test/runtime/page-navigation/Runner.cpp -o "$proof/runner.o" \
   > "$B/fixture-commands/page-navigation.json"
-mkdir -p "$proof/mutant"
-cp -a include "$proof/mutant/"
 awk '
   /PageSession\(\) = default;/ {
     print "  void Open() {}"; changed++
@@ -178,4 +235,4 @@ fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; eleven execution controls and one control-name compile refusal reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; sixteen execution controls and one control-name compile refusal reject; %s\n' "$proof"

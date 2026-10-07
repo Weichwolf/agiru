@@ -3,10 +3,24 @@
 #include "meta/Ids.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/PageWindow.h"
 
+#include <cstddef>
 #include <memory>
 
 namespace agiru {
+
+PageWindowState PageInstance::OpenWindow([[maybe_unused]] PageOpenMode mode,
+                                         [[maybe_unused]] std::size_t limit,
+                                         [[maybe_unused]] PageWindowReceiver &receiver) {
+  throw Error("The page has no qualified list window adapter.", "PageWindowProvider");
+}
+
+PageWindowState PageInstance::ReadWindow([[maybe_unused]] PageWindowPosition position,
+                                         [[maybe_unused]] std::size_t limit,
+                                         [[maybe_unused]] PageWindowReceiver &receiver) {
+  throw Error("The page has no qualified list window adapter.", "PageWindowProvider");
+}
 
 std::unique_ptr<PageInstance> MakeInstalledPage(PageId page) {
   const PageEntry *entry = FindPage(page);

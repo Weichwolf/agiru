@@ -97,13 +97,17 @@ void RecordWindow::Load(std::size_t index, void *record) const {
   state.positioned = true;
 }
 
+void ValidateRecordWindowLimit(std::size_t limit) {
+  if (limit == 0 || limit >= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
+    Refuse("RecordWindowLimit");
+  }
+}
+
 RecordWindow ReadRecordWindow(const void *record,
                               const TableDef &table,
                               RecordWindowPosition position,
                               std::size_t limit) {
-  if (limit == 0 || limit >= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
-    Refuse("RecordWindowLimit");
-  }
+  ValidateRecordWindowLimit(limit);
   if (position != RecordWindowPosition::First && position != RecordWindowPosition::Last &&
       position != RecordWindowPosition::After && position != RecordWindowPosition::Before) {
     Refuse("RecordWindowPosition");

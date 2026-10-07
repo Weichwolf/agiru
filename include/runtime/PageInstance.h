@@ -1,7 +1,9 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "runtime/PageWindow.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 
@@ -79,6 +81,27 @@ public:
   /// \return Its identity, or an empty identity for a source-less page.
   /// \note A pending new record's key is not proof of a persisted SQL row.
   [[nodiscard]] virtual RecordId CurrentRecord() const = 0;
+
+  /// \brief Opens an ordinary SQL list without first running single-row navigation.
+  /// \param mode View/Edit; unqualified new/empty editable rows refuse explicitly.
+  /// \param limit Positive trusted server row bound, never supplied by an HTTP client.
+  /// \param receiver Captures loaded rows and the selected row synchronously.
+  /// \return Row/probe counts and continuation in the forward direction.
+  /// \throws Error for unsupported page/providers or opening/loading failures.
+  /// \note Implementations without a generated window adapter refuse by default.
+  [[nodiscard]] virtual PageWindowState
+  OpenWindow(PageOpenMode mode, std::size_t limit, PageWindowReceiver &receiver);
+
+  /// \brief Loads another block, saving pending existing-row edits before leaving it.
+  /// \param position First/Last or relative to the previous block's original SQL boundary.
+  /// \param limit Trusted server row bound.
+  /// \param receiver Captures exact row values after their triggers, then selected state.
+  /// \return Bounded rows and continuation in the requested direction.
+  /// \throws Error for missing boundaries, unsupported providers or AL failures.
+  /// \note No client-side key comparison, implicit Commit or replay of AL opening occurs.
+  /// An exhausted relative step presents no new rows and retains the previous block/selection.
+  [[nodiscard]] virtual PageWindowState
+  ReadWindow(PageWindowPosition position, std::size_t limit, PageWindowReceiver &receiver);
 };
 
 /// \brief Creates a closed interactive handle from the same installed page catalogue.

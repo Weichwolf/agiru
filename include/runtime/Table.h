@@ -36,6 +36,8 @@
 
 namespace agiru {
 
+template <typename P> class PageWindowSession;
+
 /// \brief The declaration belonging to a generated table.
 ///
 /// The generator specialises this beside the table's field and key tables, so that the class itself
@@ -2411,6 +2413,7 @@ public:
 
 private:
   friend Derived;
+  template <typename P> friend class PageWindowSession;
 
   /// Runs the `OnValidate` trigger of one field, when the table declares one.
   ///

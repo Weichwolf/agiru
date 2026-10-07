@@ -61,6 +61,11 @@ private:
                                        std::size_t limit);
 };
 
+/// \brief Validates the trusted row bound before any page trigger or row-save effects.
+/// \param limit Positive bound leaving room for one SQL continuation probe.
+/// \throws Error with RecordWindowLimit for zero or an unrepresentable SQL bound.
+void ValidateRecordWindowLimit(std::size_t limit);
+
 /// \brief Executes a bounded read using all active filter groups and the complete stable key.
 /// ORDER BY and seek predicates use the same SQL columns, directions and collations,
 /// with the primary key appended as a unique tie-breaker. No offsets/client-side comparison.
