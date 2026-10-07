@@ -2,8 +2,11 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: provide real HTTP UI-host capability/suspension under 0720; the rebuilt native
-Customer regression now opens/edits but retains its interactive Card lifecycle failure.
+Next: move ApplicationArea and random-generator authority into private session state;
+prove nested sessions, worker reuse/migration, explicit seeds and documented random
+bounds with C++ gates and compiled negative controls. Then provide real HTTP UI-host
+capability/suspension under 0720; the rebuilt native Customer regression now opens/edits
+but retains its interactive Card lifecycle failure.
 Repeat counted AL execution after the verified SelectLatestVersion increment below;
 retain every startup refusal and test identity. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
@@ -34,6 +37,11 @@ do not defer client construction until all transaction acceptance is complete.
 - HTTP defaults to affinity-available CPU workers within an explicit ceiling. Independent
   sessions execute concurrently; one session never executes two commands simultaneously.
   Worker reuse/migration must not leak identity, policy, errors, restrictions or SQL effects.
+  ApplicationArea and random sequences belong to the session, not the executing thread.
+  Randomize preserves explicit seeds including zero; its omitted seed uses milliseconds
+  since midnight. Random treats negative bounds as positive, zero as one and accepts the
+  full AL Integer range without signed overflow. Posting determinism does not override
+  these platform contracts; the AL test library explicitly controls its own seed.
 - UI callbacks follow AllowSessionCallSuspendWhenWriteTransactionStarted (BC default enabled).
   Trusted server configuration, never a client parameter, owns the policy. A permitted
   write-transaction pause retains its SQL lease and rollback boundary without an implicit
@@ -59,7 +67,30 @@ Tests: `test/gate/{RecordRefresh,GenReceiver}Gate.cpp`,
 Existing DynamicRecord 7,493, CursorLifecycle 313, SelectionChange 364, Transaction 12
 and RequiredTestIsolation 430 checks pass. Six affected compiled units pass targeted
 clang-tidy without suppressions; builtin regeneration reproduces exactly. Full native
-build/test/lint and the unchanged 2,314-test AL diagnostic still need a fresh run.
+build at `f232cfb` exits zero: 14,225 slice sources, 2,717 seconds. Full test/lint and
+the unchanged 2,314-test AL diagnostic are still pending; the running verification
+does not qualify session migration or financial integrity.
+
+Session-state defects observed against the native runtime at `f232cfb`:
+
+- Nested sessions overwrite another session's ApplicationArea and seeded random sequence.
+- Two sequential worker activations retain the authenticated identity but lose both values.
+- Reseeding with 11: Random(100) returns 48; Random(-100) incorrectly returns 1.
+- `BuiltinsWritten.cpp` stores both in thread_local; its Random bound adds one in signed
+  Integer arithmetic, and Randomize conflates omitted/zero seeds with one. Durable
+  regression gates and repairs are the next increment, not claimed completed work.
+
+Contracts at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
+`methods-auto/session/session-applicationarea-method.md`,
+`methods-auto/system/system-{random,randomize}-method.md`.
+BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`:
+`src/Layers/W1/Tests/ApplicationTestLibrary/LibraryRandom.Codeunit.al` explicitly sets
+the test seed; `src/Layers/W1/BaseApp/Modules/System/ApplicationArea/ApplicationAreaMgmt.Codeunit.al`
+sets/reads the current session area. Predecessor `board/1479_applicationarea-sichtbarkeit.md`
+identifies session ownership but retracts inferred TestPage visibility rules; do not
+port that visibility hypothesis. Its `_math.py` clock/negative-bound shortcuts contradict
+the developer contracts and are not adopted. Runtime owners:
+`src/rt/{SessionState.h,SingleInstance.cpp,written/BuiltinsWritten.cpp}`.
 
 Post-bridge native rerun at `ea6c922`: `make ut B=/workspace/build/podman JOBS=6
 UT_MASTER_DSN=<same-complete-seed>` retains all 2,314 tests/80 codeunits; zero executed,
@@ -72,14 +103,6 @@ AL result. Predecessor `_system.py`'s no-op and
 WI 889's proposed implicit commit are not adopted. Reference overloads:
 `methods-auto/database/database-selectlatestversion{,-integer,--}-method.md` at the
 developer revision below; `src/rt/{RecordChanges,Cursor,Navigate}.cpp` own bounded reads.
-
-Native AL diagnostic at `769399a`: `make ut B=/workspace/build/podman JOBS=6
-UT_MASTER_DSN=<complete-seed>` retains all 2,314 tests over 80 codeunits. Result:
-zero executed/passed; all 80 codeunits incomplete during CompanyOpen, before test
-handlers install. Native logs identify the GuiAllowed refusal. This is not 2,314
-failed assertions or a green subset. The shared CRONUS transfer has version/schema gaps
-and is not a sealed equivalent A/B template. Current UI bridge qualification is in
-0720 and `make ui-host`; the diagnostic must be repeated after the native image rebuild.
 
 Developer docs at `f928288ee840334be73142e5fc0202c0e19b246d`:
 `methods-auto/codeunit/codeunit-run{,-integer-table,-string-table}-method.md`,
