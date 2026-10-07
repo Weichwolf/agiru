@@ -475,6 +475,7 @@ void Defaulted(void *record, const TableDef &table, bool sparePrimaryKey) {
   const std::span<const FieldNo> key =
       table.keys.empty() ? std::span<const FieldNo>{} : table.keys[0].fields;
   for (const FieldDef &def : table.fields) {
+    if (sparePrimaryKey && def.sqlTimestamp) { continue; }
     if (sparePrimaryKey && std::ranges::find(key, def.no) != key.end()) { continue; }
     if (def.initValue.has_value()) {
       SetFieldText(record, def, *def.initValue);

@@ -106,6 +106,9 @@ records. Five compiled defects must fail; fixtures use AutoSave=false and do not
 write SQL rows. This profile does not qualify every XMLport import/trigger policy.
 
 `make rowversions JOBS=2` qualifies allocator fences and SQL record/SystemId paths.
+Typed Record and RecordRef.Init retain loaded timestamp aliases without writing SQL;
+Clear still resets them. Removing timestamp retention must fail both record paths.
+These checks do not yet qualify atomic stale-write rejection.
 The disconnect gate observes the specific backend's termination before asserting
 the unchanged active minimum; a live backend must time out without hiding its fence.
 A compiled delayed-close adapter must pass, while removing the observation must fail.

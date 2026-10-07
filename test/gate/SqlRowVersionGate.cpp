@@ -123,6 +123,50 @@ VersionedRow Inserted(agiru::Integer id) {
   return row;
 }
 
+void InitializationKeepsLoadedVersions() {
+  const gate::OwnedDatabase database("sql_initialization");
+  const agiru::Session session(database.Dsn());
+  const auto &connection = session.Database();
+  agiru::CreateTable(connection, Declaration());
+  auto row = Inserted(1);
+  row.LookupVersion = 1;
+  row.SetRange(row.ID, 1);
+  row.Init();
+  CHECK_TRUE("Record.Init keeps the loaded timestamp alias", row.Version == 1);
+  CHECK_TRUE("Record.Init keeps the loaded implicit timestamp", row.SystemRowVersion == 1);
+  CHECK_TRUE("Record.Init keeps the primary key", row.ID == 1);
+  CHECK_TRUE("Record.Init initializes ordinary fields", row.Amount == agiru::Decimal{});
+  CHECK_TRUE("Record.Init initializes ordinary BigInteger FlowFields", row.LookupVersion == 0);
+  CHECK_TRUE("Record.Init initializes SystemId", row.SystemId.IsNull());
+  CHECK_TEXT("Record.Init keeps filters", row.GetFilter(row.ID), "1");
+  row.Reset();
+  CHECK_TRUE("Reset retains both timestamp aliases", row.Version == 1 && row.SystemRowVersion == 1);
+  CHECK_TEXT("Reset still clears filters", row.GetFilter(row.ID), "");
+
+  row.Amount = agiru::Decimal{1};
+  agiru::RecordRef reference;
+  reference.GetTable(row);
+  reference.Init();
+  VersionedRow reflected;
+  reference.SetTable(reflected);
+  CHECK_TRUE("RecordRef.Init keeps the loaded timestamp alias", reflected.Version == 1);
+  CHECK_TRUE("RecordRef.Init keeps the loaded implicit timestamp", reflected.SystemRowVersion == 1);
+  CHECK_TRUE("RecordRef.Init keeps the primary key", reflected.ID == 1);
+  CHECK_TRUE("RecordRef.Init initializes ordinary fields", reflected.Amount == agiru::Decimal{});
+  agiru::detail::RuntimeClear(&reflected, Declaration());
+  CHECK_TRUE("Clear resets both timestamp aliases",
+             reflected.Version == 0 && reflected.SystemRowVersion == 0);
+  CHECK_TRUE("Clear resets the primary key", reflected.ID == 0);
+  CHECK_TRUE("initialization never allocates a rowversion",
+             Scalar(connection, "SELECT agiru_platform.last_rowversion_v1()") == 1);
+  VersionedRow stored;
+  stored.Get(1);
+  CHECK_TEXT("initialization never writes the stored ordinary value",
+             stored.Amount.ToInvariantString(),
+             "0.33333333333333333333");
+  CHECK_TRUE("initialization never writes the stored timestamp", stored.SystemRowVersion == 1);
+}
+
 void PhysicalStorageAndWrites() {
   const gate::OwnedDatabase database("sql_writes");
   const agiru::Session session(database.Dsn());
@@ -542,6 +586,7 @@ void RollbackAndTwoSessions() {
 
 int main() {
   return gate::Run("SqlRowVersion", [] {
+    InitializationKeepsLoadedVersions();
     PhysicalStorageAndWrites();
     SystemIdLookupsShareOptionalResultsAndCursorPosition();
     RecordIdReadsPreserveOptionalResultsOnSql();

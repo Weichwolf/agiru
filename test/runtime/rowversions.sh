@@ -171,6 +171,15 @@ gate="$record_gate"
 flags+=(-Isrc/rt)
 
 awk '
+  /if \(sparePrimaryKey && def.sqlTimestamp\)/ { matches++; next }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Table.cpp > "$proof/initialized-timestamp.cpp"
+build_overlay initialized-timestamp
+expect_red initialized-timestamp "Record.Init keeps the loaded timestamp alias"
+rg -q 'FAIL .*RecordRef.Init keeps the loaded implicit timestamp' "$proof/initialized-timestamp.log"
+
+awk '
   / = agiru_platform.next_rowversion_v1\(\)";/ { sub(/next_rowversion_v1\(\)/, "last_rowversion_v1()"); matches++ }
   { print }
   END { if (matches != 1) exit 2 }
@@ -274,4 +283,4 @@ rg -q "FAIL .*discarding a reflected missing SystemId result" "$proof/unchecked-
 find "$proof/unchecked-system-id" -depth -delete
 
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'rowversions: allocator fences, observed disconnect, SQL record/alias/SystemId paths and eighteen compiled negative controls proved; %s\n' "$proof"
+printf 'rowversions: allocator fences, observed disconnect, SQL record/alias/Init/SystemId paths and nineteen compiled negative controls proved; %s\n' "$proof"

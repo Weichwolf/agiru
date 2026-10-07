@@ -2,8 +2,7 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: preserve timestamps through Record.Init with typed/reflected regression checks;
-then enforce atomic optimistic Modify/Delete/Rename conflicts without rereading the whole
+Next: enforce atomic optimistic Modify/Delete/Rename conflicts without rereading the whole
 record, followed by BC table/record locking and transaction-type transitions. Integrate
 with the full native build and counted AL runs; preserve every refusal and failure.
 
@@ -50,7 +49,8 @@ Developer docs at `f928288ee840334be73142e5fc0202c0e19b246d`:
 `devenv-{read-isolation,tri-state-locking,table-system-fields}.md`,
 `properties/devenv-{transactiontype,readstate}-property.md`,
 `methods-auto/database/database-currenttransactiontype-method.md`,
-`methods-auto/record/record-{locktable,readisolation,rename,init,reset}-method.md`.
+`methods-auto/record/record-{locktable,readisolation,rename,init,reset}-method.md`,
+`methods-auto/recordref/recordref-init-method.md`.
 `administration/server-instance-settings.md` defines the callback-in-write-transaction
 policy (enabled by default), still unimplemented, and the try-write switch and on-premises
 default true (online allows writes). agiru preserves its previous allow-writes default
@@ -119,30 +119,25 @@ counts 14,225 sources with none missing; `make all` exits zero. C++ inputs staye
 through the client/tooling/deployment-only increments. All frozen AL file hashes match
 clean BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. The diagnostic slice still links
 1,902 explicit unlinked-procedure refusals: build success is not full-app or G1 acceptance.
-The full native `make test JOBS=2` completed with 179 cases, eight red: four metadata
-gates, reflection qualification, header dependencies, builtin reproduction without local
-developer docs and toolchain source-binding fixtures. The toolchain reported four failures
-among 254 tests, all missing-session fixtures. These are retained failures, not AL UT results.
-Write preflight now checks permission → writable provider → trusted TryFunction policy;
-set-based DeleteAll shares that boundary. The catalogue gate rejects wrong session errors,
-and a compiled ordering defect fails both empty bulk-write diagnostics. `make reflection-metadata`
-passes all 79 compiled controls. PageTableField 312, TransactionContract 110, TablePermissions 29,
-SqlRowVersion 123 and Temporary 95 checks pass; the four source-binding fixture variants
-pass with owned sessions. Targeted clang-tidy reports zero findings in all three changed
-C++ units. Builtin reproduction now uses the explicit verified developer root; all 1,904
-frozen method documents match the pinned developer revision above. Eight NativeToolchain
-checks and three wrong-root/fallback controls pass; the full tooling suite passes 257 tests.
-`IsInWriteTransaction` now belongs to `BuiltinsWritten`, not a generated body that
-regeneration would overwrite. Exact builtin reproduction passes; read/write and implicit/
-explicit Commit checks execute the AL builtin, and both constant-answer defects reject.
-All three affected C++ units pass targeted clang-tidy. A complete native rerun remains due.
+The complete native `make test JOBS=2` rerun passes 179 cases with zero red, including
+257 tooling tests. This precedes the Init repair below and is not an AL UT result.
+Write preflight checks permission → writable provider → trusted TryFunction policy;
+set-based DeleteAll shares that boundary and compiled ordering defects refuse. Builtin
+reproduction uses the explicit verified developer root; all 1,904 frozen method documents
+match the pinned revision. `IsInWriteTransaction` belongs to `BuiltinsWritten`, not a
+generated refusing body. Source-binding fixtures retain owned sessions; header dependency
+and all 79 reflection controls pass. Full-app and counted AL acceptance remain open.
 
 ## Optimistic-write implementation boundary
 
-- Record.Init must retain both timestamp aliases; the existing native primitive clears
-  both (two failing checks), while key retention, ordinary initialization and Clear pass.
-  Repair `src/rt/Table.cpp::Defaulted`; extend `test/gate/SqlRowVersionGate.cpp` and
-  the compiled controls in `test/runtime/rowversions.sh` before attaching private stamps.
+- `src/rt/Table.cpp::Defaulted` retains timestamp fields for Record/RecordRef.Init;
+  Clear still resets them. `test/gate/SqlRowVersionGate.cpp` passes 141 SQL checks,
+  including key/filter retention, ordinary defaults and independent unchanged storage.
+  Before the repair the same gate has five red checks. `make rowversions JOBS=2`
+  passes nineteen compiled controls; removing timestamp retention fails both typed and
+  reflected checks. The post-repair native `make all` passes; targeted clang-tidy reports
+  zero findings for Table.cpp and SqlRowVersionGate.cpp. Private optimistic stamps
+  remain unimplemented; retaining public timestamps alone does not enforce stale writes.
 - Capture expected SystemId/version privately at SQL load/write boundaries, not from
   mutable AL fields. Assignment/Copy/RecordRef, Reset/Init/Clear and temporary records
   need explicit lifecycle tests; unloaded-record write behaviour still needs qualification.
