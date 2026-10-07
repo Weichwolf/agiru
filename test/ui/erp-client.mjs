@@ -6,6 +6,7 @@ import { chmod, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
 import { commandEnvelope, parsePage } from "../../build/client/profile.mjs";
+import { ServerConfigs } from "./server-config.mjs";
 
 const execute = promisify(execFile);
 const container = process.env.AGIRU_DEV_CONTAINER ?? "agiru-dev";
@@ -19,6 +20,7 @@ assert.match(native ?? "", /^\/tmp\/agiru-erp-fixture\.[A-Za-z0-9]+$/);
 assert.match(proof ?? "", /^\/tmp\/agiru-erp-fixture\.[A-Za-z0-9]+$/);
 assert.ok(company);
 const dsn = `postgresql://agiru:agiru@127.0.0.1:5432/${database}`;
+const configurations = new ServerConfigs(container, native, proof);
 const path = result => `/?handle=${result.page.handle}`;
 const field = (result, name) => result.page.controls.find(control => control.identity === name)?.scalar?.value;
 const operation = (result, name, text) => {
@@ -60,6 +62,7 @@ async function mcp(name, args, denied = false) {
 let server, closed, pid, first, denied, client, list, card, saved, selected, original;
 let output = "", diagnostic = "";
 before(async () => {
+  const config = await configurations.write({ database: dsn, company, origin });
   for (const suffix of ["", ".denied"]) {
     await execute("podman", ["cp", `${container}:${native}/auth.json${suffix}`, `${proof}/auth.json${suffix}`]);
     await chmod(`${proof}/auth.json${suffix}`, 0o600);
@@ -71,7 +74,7 @@ before(async () => {
     "env", `LD_LIBRARY_PATH=${native}/binaries`,
     ...(process.env.AGIRU_ERP_PRELOAD ? [`LD_PRELOAD=${process.env.AGIRU_ERP_PRELOAD}`] : []), "sh", "-c",
     'printf "START %s\\n" "$$"; exec "$@"', "agiru-erp-native",
-    `${native}/binaries/agiru`, "serve", "--database", dsn, "--company", company, "--origin", origin],
+    `${native}/binaries/agiru`, "serve", "--config", config],
     { stdio: ["ignore", "pipe", "pipe"] });
   closed = new Promise(resolve => server.once("close", resolve));
   server.stderr.on("data", chunk => { diagnostic += chunk; });
@@ -94,6 +97,7 @@ after(async () => {
     try { assert.equal(await closed, 0, "native ERP server must drain and shut down cleanly"); }
     finally { clearTimeout(timer); }
   }
+  await configurations.clean();
   await writeFile(`${proof}/server.log`, output + diagnostic);
   for (const auth of [first, denied]) {
     if (auth) assert.ok(!(output + diagnostic).includes(auth.authorization.slice(7)), "no credentials in server logs");

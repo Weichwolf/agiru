@@ -1,11 +1,10 @@
 #pragma once
 
 #include "runtime/HttpServer.h"
-#include "runtime/SessionOptions.h"
+#include "runtime/PageCommandHost.h"
 
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -15,15 +14,22 @@ namespace agiru {
 
 /// \brief Trusted single-company deployment configuration, never HTTP-controlled authority.
 struct NativeServiceOptions {
-  static constexpr std::uint16_t kBackendPort = 18080; ///< deploy/dev/Caddyfile upstream port.
-  std::string database; ///< Explicit existing database connection, not a master/template clone.
-  std::string company;  ///< Exact sole original Company.Name in the initial flat storage profile.
-  std::string origin;   ///< Trusted public Caddy origin used for browser CSRF checks.
-  std::uint16_t port = kBackendPort; ///< Private loopback upstream, never a public bind.
-  std::size_t workers =
-      DefaultHttpWorkers(); ///< One executor per affinity-available CPU by default.
-  SessionOptions session{}; ///< Immutable server policy copied into each retained session.
+  static constexpr std::size_t kConfigBytes = 65536; ///< Bounded trusted startup configuration.
+  PageHostOptions pages{};  ///< Single authoritative company/session/retained-page settings.
+  HttpServerOptions http{}; ///< Single authoritative private listener/admission settings.
 };
+
+/// \brief Parses the complete version-one server JSON schema, never AL or request authority.
+/// \param text Bounded UTF-8 JSON with all fields shown in deploy/dev/agiru.json.
+/// \return Validated configuration, retaining exact strings and integer limits.
+/// \throws Error with ServerConfiguration for missing/unknown/duplicate keys or invalid values.
+[[nodiscard]] NativeServiceOptions ParseNativeServiceOptions(std::string_view text);
+
+/// \brief Reads one bounded regular file without following a final-component symbolic link.
+/// \param path Explicit trusted operator path; FIFO/device/directory input refuses.
+/// \return Validated immutable-startup settings. No connection or listener is opened.
+/// \throws Error with ServerConfiguration for file/schema failures; values are never echoed.
+[[nodiscard]] NativeServiceOptions LoadNativeServiceOptions(std::string_view path);
 
 /// \brief Runs native HTTP/page execution until SIGINT/SIGTERM, then drains the listener.
 /// \param options Trusted explicit deployment, with existing original permission/client storage.

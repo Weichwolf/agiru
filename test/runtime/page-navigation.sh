@@ -17,7 +17,7 @@ sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/run
   include/runtime/TablePermissions.h src/rt/TablePermissions.cpp src/rt/{Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/PageCommandHost.h src/rt/PageCommandHost.cpp test/ui/page-host/Runner.cpp \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
-  include/runtime/NativeService.h src/rt/NativeService.cpp \
+  include/runtime/NativeService.h src/rt/{NativeService,NativeServiceConfig}.cpp deploy/dev/agiru.json \
   src/cli/{Main,Services}.cpp src/cli/Services.h \
   test/gate/PrivateAuthFile.h test/gate/NativePermissionFixture.h \
   test/gate/PageDispatcherGate.cpp test/runtime/page-navigation/Runner.cpp \

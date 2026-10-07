@@ -98,13 +98,17 @@ as the browser. Keep database data persistent, use disposable test clones and pr
 existing containers/data during migration. This development packaging does not mandate
 a single-container production topology or put Node.js in the ERP server.
 
-Use unmodified Caddy from official Debian repositories at the public edge and system libmicrohttpd for agiru's private
-native HTTP listener. Caddy owns ACME/TLS/static delivery; C++ owns authentication and ERP
+Use unmodified Caddy from official Debian repositories at the public edge and system
+libmicrohttpd for agiru's private native HTTP listener. Caddy owns ACME/TLS/static delivery; C++ owns authentication and ERP
 execution. Keep blocking work off network event loops, bound admission and disable
 automatic upstream write retries. Persist certificate state; keep the admin API disabled.
 Replace untrusted forwarding headers at the trusted edge; neither proxy headers nor
 deep links grant permissions. No custom HTTP/TLS parser or
 ERP embedding in nginx/Caddy modules. WASM uses a separate platform transport adapter.
+
+Native server settings use the complete JSON profile in `deploy/dev/agiru.json`.
+Start with `agiru serve --config <file>`; server policy is never a CLI/HTTP parameter.
+Keep credentials in a private deployment file or libpq passfile, not repository defaults.
 
 Linux/container multi-user performance and bounded resources drive architecture decisions.
 The single-user WASM demo must retain functional behaviour, but does not impose production

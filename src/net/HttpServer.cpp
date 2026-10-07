@@ -86,6 +86,10 @@ std::size_t DefaultHttpWorkers() {
   return std::clamp(count, std::size_t{1}, HttpServerOptions::kMaxWorkers);
 }
 
+void ValidateHttpServerOptions(const HttpServerOptions &options) {
+  if (!ValidOptions(options)) { throw Error("Invalid HTTP server limits", "HttpServerOptions"); }
+}
+
 std::string_view ServerHttpRequest::Header(std::string_view name) const {
   const auto found = std::ranges::find_if(
       headers, [name](const auto &header) { return SameHeader(header.name, name); });
@@ -122,9 +126,8 @@ struct HttpServer::Impl {
   Impl(std::function<ServerHttpResponse(const ServerHttpRequest &)> callback,
        HttpServerOptions limits)
       : handler(std::move(callback)), options(limits) {
-    if (!handler || !ValidOptions(options)) {
-      throw Error("Invalid HTTP server limits or handler", "HttpServerOptions");
-    }
+    ValidateHttpServerOptions(options);
+    if (!handler) { throw Error("Invalid HTTP server limits or handler", "HttpServerOptions"); }
     try {
       for (std::size_t at = 0; at < options.workers; ++at) {
         workers.emplace_back([this] { Work(); });

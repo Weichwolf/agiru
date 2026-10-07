@@ -6,6 +6,7 @@ import { chmod } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
 import { commandEnvelope, parsePage } from "../../build/client/profile.mjs";
+import { ServerConfigs } from "./server-config.mjs";
 
 const execute = promisify(execFile);
 const container = process.env.AGIRU_DEV_CONTAINER ?? "agiru-dev";
@@ -13,6 +14,9 @@ const origin = `http://127.0.0.1:${process.env.AGIRU_DEV_HTTP_PORT ?? "8080"}`;
 const native = process.env.AGIRU_PAGE_HOST_NATIVE;
 const proof = process.env.AGIRU_PAGE_HOST_PROOF;
 const nativeApplication = process.env.AGIRU_PAGE_HOST_APPLICATION === "1";
+const disableTryWrites = process.env.AGIRU_TRY_WRITE_DISABLED === "1";
+const configurations = new ServerConfigs(container, native, proof);
+let serverConfig;
 let application, applicationPid, applicationClosed;
 const server = spawn("make", ["--no-print-directory", "dev-exec",
   `COMMAND=${process.env.AGIRU_PAGE_HOST_PRELOAD ? `env LD_PRELOAD=${process.env.AGIRU_PAGE_HOST_PRELOAD} ` : ""}${native}/host ${native}/auth.json ${origin}${nativeApplication ? " --seed-only" : ""}`],
@@ -26,6 +30,7 @@ after(async () => {
     await execute("podman", ["exec", "--user", "1000:1001", container, "kill", "-TERM", applicationPid]);
     assert.equal(await applicationClosed, 0, "agiru serve must drain and shut down cleanly");
   }
+  await configurations.clean();
   server.stdin.end("Q");
   const timer = setTimeout(() => server.kill(), 15000);
   try { assert.equal(await closed, 0, "fixture must shut down and drop its owned database"); }
@@ -41,8 +46,11 @@ const database = output.match(/^DATABASE (agiru_owned_gate_[0-9]+_page_host)$/m)
 assert.ok(database);
 const dsn = `postgresql://agiru:agiru@127.0.0.1:5432/${database}`;
 if (nativeApplication) {
+  serverConfig = await configurations.write({ database: dsn, company: "Fixture + Company", origin,
+    transactions: { disable_write_inside_try_functions: disableTryWrites } });
   application = spawn("podman", ["exec", "--user", "1000:1001", container,
-    `${native}/agiru`, "serve", "--database", dsn, "--company", "Fixture + Company", "--origin", origin],
+    "env", ...(process.env.AGIRU_PAGE_HOST_PRELOAD ? [`LD_PRELOAD=${process.env.AGIRU_PAGE_HOST_PRELOAD}`] : []),
+    `${native}/agiru`, "serve", "--config", serverConfig],
     { stdio: ["ignore", "pipe", "pipe"] });
   applicationClosed = new Promise(resolve => application.once("close", resolve));
   let ready = "";
@@ -258,8 +266,18 @@ test("a noncommitted AL action rolls back; production Commit survives a later er
 });
 
 if (nativeApplication) {
-  const operator = (...args) => execute("podman", ["exec", "--user", "1000:1001", container,
-    `${native}/agiru`, ...args, "--database", dsn]);
+  const operator = (command, ...args) => execute("podman", ["exec", "--user", "1000:1001", container,
+    `${native}/agiru`, command, ...args, ...(command === "serve" ? [] : ["--database", dsn])]);
+
+  test("startup configuration selects TryFunction write policy with independent SQL effects", async () => {
+    try {
+      const fresh = await client.read("/?page=50347&mode=Edit");
+      const caught = await post(fresh, "CaughtTryWrite");
+      assert.equal(caught.response.status, 200);
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1'),
+        disableTryWrites ? "111" : "777");
+    } finally { await sql('UPDATE "Navigation Row" SET "Value" = 111 WHERE "ID" = 1'); }
+  });
 
   test("trusted client storage initialization is idempotent and grants no ERP rights", async () => {
     await operator("client-init");
@@ -292,20 +310,31 @@ if (nativeApplication) {
     assert.equal((await fetch(origin + "/?page=50341", { headers: first })).status, 200);
   });
 
-  test("service flags and the original Company identity refuse before a listener starts", async () => {
-    for (const [args, message] of [[[], /required option --company/],
-      [["--company", "Missing", "--origin", origin], /configured company/],
-      [["--company", "Fixture + Company", "--origin", origin, "--port", "0"], /invalid positive service bound --port/],
-      [["--company", "Fixture + Company", "--origin", origin, "--workers", "257"], /invalid positive service bound --workers/],
-      [["--company", "Fixture + Company", "--company", "Other", "--origin", origin], /duplicate or missing service option --company/]]) {
+  test("server settings cannot be supplied as CLI flags and invalid files refuse before a listener starts", async () => {
+    for (const [args, message] of [[[], /required option --config/],
+      [["--database", dsn], /service option --database/],
+      [["--workers", "2"], /service option --workers/],
+      [["--disable-write-inside-try-functions", "true"], /service option --disable/],
+      [["--config", serverConfig, "--config", serverConfig], /service option --config/],
+      [["--config", `${native}/missing.json`], /invalid server configuration/]]) {
       await assert.rejects(operator("serve", ...args), error => message.test(error.stderr));
+    }
+    for (const [name, patch, message] of [
+      ["wrong-company", { company: "Missing" }, /configured company/],
+      ["zero-port", { http: { port: 0 } }, /invalid server configuration/],
+      ["many-workers", { http: { workers: 257 } }, /invalid server configuration/],
+      ["unknown-field", { unknown: "DO-NOT-ECHO" }, /invalid server configuration/]]) {
+      const file = await configurations.write({ database: dsn, company: "Fixture + Company", origin,
+        ...patch }, `${name}.json`);
+      await assert.rejects(operator("serve", "--config", file), error =>
+        message.test(error.stderr) && !error.stderr.includes("DO-NOT-ECHO"));
     }
   });
 
   test("a flat database with multiple original companies cannot be relabeled as one company", async () => {
     await sql(`INSERT INTO "Company" ("Name") VALUES ('Other Company')`);
     try {
-      await assert.rejects(operator("serve", "--company", "Fixture + Company", "--origin", origin),
+      await assert.rejects(operator("serve", "--config", serverConfig),
         error => error.stderr.includes("configured company must be the only company"));
     } finally {
       await sql(`DELETE FROM "Company" WHERE "Name" = 'Other Company'`);

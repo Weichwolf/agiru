@@ -199,6 +199,11 @@ isolated-event fallback and report/XMLport Quit. `SessionParallelGate` checks co
 native HTTP sessions with independent committed/rolled-back SQL effects. These do not
 certify BC isolation, complete AL transaction coverage or financial posting integrity.
 
+`NativeServiceConfigGate` qualifies the complete `deploy/dev/agiru.json` profile:
+exact numeric bounds, types, duplicate/unknown/missing keys and bounded regular files.
+`ui/page-host.sh` starts the real CLI using only `serve --config`, proves both TryFunction
+write policies against independent SQL and rejects compiled policy/duplicate defects.
+
 `runtime/page-navigation.sh` executes generated list/card system Edit routing,
 selected-record identity, opening triggers, explicit-action precedence and card
 ModifyAllowed policy. `PageDispatcherGate` drives the shared command primitive over

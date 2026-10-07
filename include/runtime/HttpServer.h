@@ -67,6 +67,11 @@ struct HttpServerOptions {
   std::size_t responseBytes = kDefaultBodyBytes;       ///< Per-response byte ceiling.
 };
 
+/// \brief Validates resource bounds without creating workers or opening a listener.
+/// \param options Native transport limits; port zero remains valid for standalone fixtures.
+/// \throws Error with HttpServerOptions when a resource bound is invalid.
+void ValidateHttpServerOptions(const HttpServerOptions &options);
+
 /// \brief Native Linux listener with a bounded executor separate from network polling.
 /// No thread/connection is allocated per ERP session. No permissions or database
 /// access are granted here. Handler state must be synchronized and session-scoped.

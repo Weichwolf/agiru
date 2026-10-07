@@ -2,9 +2,9 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: load all native server defaults and trusted TryFunction policy from a strict JSON
-configuration in deploy/dev; keep server policy out of CLI switches. Then implement
-BC table/record locking, transaction-type transitions and atomic optimistic write conflicts.
+Next: enforce atomic optimistic Modify/Delete/Rename conflicts without rereading the whole
+record; then implement BC table/record locking and transaction-type transitions. Integrate
+with the full native build and counted AL runs; preserve every refusal and failure.
 
 ## Acceptance
 
@@ -58,6 +58,21 @@ its proposed PostgreSQL snapshot isolation is not evidence of BC lock equivalenc
 Runtime: `include/runtime/{Transaction,Codeunit,Error,Report,XmlPort,SessionOptions}.h`,
 `src/rt/{Transaction,Scopes,Events,Session,Table,TablePermissions,Navigate,PageCommandHost}.cpp`,
 `src/net/HttpServer.cpp`, `src/cli/Services.cpp`.
+Startup: `deploy/dev/agiru.json`, `src/rt/NativeServiceConfig.cpp`,
+`test/gate/NativeServiceConfigGate.cpp`, `test/ui/server-config.mjs`.
+The complete versioned JSON profile declares every default. `serve --config` is the only
+server CLI option; trusted operator credential/migration commands remain separate.
+Regular input is bounded to 64 KiB; final-component symlinks/devices/FIFOs refuse.
+Unknown/missing/duplicate keys, invalid types/numbers and malformed DSNs refuse with
+sanitized diagnostics before connecting. Native/page validation is shared, not copied.
+Config gate: 183 checks; AL JSON regression: 250; HTTP gate: 11; zero red.
+`make page-host-test JOBS=2`: 12 fixture cases and 18 native application cases for each
+TryFunction policy, zero red. Ignoring the policy must fail independent SQL checks;
+removing duplicate rejection must fail five named schema checks. Existing three
+ownership/revision/replay controls remain required. All eight affected C++ units pass
+targeted clang-tidy with no suppression. `make include-cost HEADERS=runtime/NativeService.h`:
+1,151 ms mean frontend, three rounds without PCH; pre-change header at `60f2e40` measured
+1,181 ms against the same dependencies. These samples do not establish a speedup.
 New gates: `test/gate/{TransactionContract,SessionParallel}Gate.cpp`.
 `test/ui/http-server.sh` runs native SessionParallel with a compiled worker-default
 defect from `test/gate/HttpWorkerControl.cpp.in`; it must fail the affinity/ceiling check.
@@ -78,7 +93,7 @@ generated constructor is rejected by compilation. Targeted generator/fixture lin
 The replacement Debian-Caddy container passes HTTP/authentication and generated-page
 CMD/MCP fixtures. SessionParallel observes six concurrent workers with six available CPUs;
 CPU placement is left to Linux, not manually pinned. Session policy is copied from trusted
-NativeService/PageHost options; JSON startup configuration remains due, not a CLI flag.
+NativeService/PageHost options loaded once from JSON, never from client input.
 Full native transpilation still exits 1 for counted unsupported/missing source declarations;
 regenerating the complete tree is not full compilation or a green AL suite.
 These results are not

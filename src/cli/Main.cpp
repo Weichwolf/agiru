@@ -69,9 +69,8 @@ void Usage() {
   std::println("  agiru version");
   std::println("      What this binary is.");
   std::println("");
-  std::println("  agiru serve --database <dsn> --company <name> --origin <url>");
-  std::println("      Private loopback HTTP listener; optional --port and --workers.");
-  std::println("      Default workers: process-affinity CPU count.");
+  std::println("  agiru serve --config <file>");
+  std::println("      Private native server; all settings are in deploy/dev/agiru.json.");
   std::println("      Existing original company/permission data and client storage are required.");
   std::println("  agiru client-init --database <dsn>");
   std::println("      Trusted operator migration; creates client storage, never users or grants.");

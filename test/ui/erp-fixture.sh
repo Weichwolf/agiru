@@ -132,7 +132,7 @@ if [[ "$mode" = client ]]; then
     "${native_exec[@]}" cmp "$native_build/$binary" "$native/binaries/$binary"
     "${native_exec[@]}" sha256sum "$native_build/$binary" "$native/binaries/$binary" >> "$proof/client-binaries.sha256"
   done
-  sha256sum test/ui/erp-client.mjs src/client/*.{mts,json} > "$proof/client-inputs.sha256"
+  sha256sum test/ui/{erp-client,server-config}.mjs deploy/dev/agiru.json src/client/*.{mts,json} > "$proof/client-inputs.sha256"
   printf 'erp-client: frozen existing binaries; not current integration-build or browser acceptance\n' | tee "$proof/client-qualification.txt"
   AGIRU_ERP_NATIVE="$native" AGIRU_ERP_PROOF="$proof" AGIRU_ERP_DATABASE="$database" \
     AGIRU_ERP_COMPANY="$company" node --test test/ui/erp-client.mjs \

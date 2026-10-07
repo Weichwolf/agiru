@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "database": "host=127.0.0.1 port=5432 dbname=agiru_master user=agiru",
+  "company": "CRONUS International Ltd",
+  "origin": "http://127.0.0.1:8080",
+  "http": {
+    "port": 18080,
+    "loopback": true,
+    "workers": "auto",
+    "queue": 32,
+    "connections": 256,
+    "timeout_seconds": 15,
+    "body_bytes": 1048576,
+    "total_body_bytes": 33554432,
+    "response_bytes": 1048576
+  },
+  "pages": {
+    "contexts": 64,
+    "navigation_depth": 16,
+    "commands": 128,
+    "receipt_bytes": 4194304,
+    "lifetime_seconds": 3600
+  },
+  "transactions": {
+    "disable_write_inside_try_functions": false
+  }
+}

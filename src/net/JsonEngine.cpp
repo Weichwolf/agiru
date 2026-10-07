@@ -246,7 +246,7 @@ namespace {
 
 constexpr std::size_t kMaximumJsonDepth = 256;
 
-JsonNode Imported(yyjson_val *value, std::size_t depth) {
+JsonNode Imported(yyjson_val *value, std::size_t depth, bool rejectDuplicates) {
   if (depth > kMaximumJsonDepth) { throw Error("JSON nesting exceeds the runtime limit of 256"); }
   if (yyjson_is_null(value)) { return {}; }
   if (yyjson_is_bool(value)) { return JsonNode(yyjson_get_bool(value)); }
@@ -260,15 +260,16 @@ JsonNode Imported(yyjson_val *value, std::size_t depth) {
     JsonNode array = JsonNode::array();
     yyjson_arr_iter iterator = yyjson_arr_iter_with(value);
     while (yyjson_val *child = yyjson_arr_iter_next(&iterator)) {
-      array.push_back(Imported(child, depth + 1));
+      array.push_back(Imported(child, depth + 1, rejectDuplicates));
     }
     return array;
   }
   JsonNode object = JsonNode::object();
   yyjson_obj_iter iterator = yyjson_obj_iter_with(value);
   while (yyjson_val *key = yyjson_obj_iter_next(&iterator)) {
-    object[std::string_view(yyjson_get_str(key), yyjson_get_len(key))] =
-        Imported(yyjson_obj_iter_get_val(key), depth + 1);
+    const std::string_view name(yyjson_get_str(key), yyjson_get_len(key));
+    if (rejectDuplicates && object.contains(name)) { throw Error("JSON keys must be unique"); }
+    object[name] = Imported(yyjson_obj_iter_get_val(key), depth + 1, rejectDuplicates);
   }
   return object;
 }
@@ -308,6 +309,10 @@ yyjson_mut_val *Exported(const JsonNode &node, yyjson_mut_doc *document, std::si
 }
 
 JsonNode JsonNode::parse(std::string_view text) {
+  return parse(text, false);
+}
+
+JsonNode JsonNode::parse(std::string_view text, bool rejectDuplicates) {
   yyjson_read_err error{};
   const std::unique_ptr<yyjson_doc, decltype(&yyjson_doc_free)> document(
       yyjson_read_opts(
@@ -319,7 +324,7 @@ JsonNode JsonNode::parse(std::string_view text) {
     invalid.kind_ = Kind::Invalid;
     return invalid;
   }
-  return Imported(yyjson_doc_get_root(document.get()), 0);
+  return Imported(yyjson_doc_get_root(document.get()), 0, rejectDuplicates);
 }
 
 std::string JsonNode::dump(int indent) const {

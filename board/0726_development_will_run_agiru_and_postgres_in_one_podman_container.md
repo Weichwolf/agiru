@@ -58,6 +58,10 @@ Files: `deploy/dev/{Containerfile,entrypoint.sh,Caddyfile}`, `scripts/dev_contai
   application requests return 502. No successful HTTP ERP server or client parity is claimed.
   `agiru_master` starts empty, not as a qualified BC seed. The development superuser/password
   and PostgreSQL-only healthcheck are not production security or application readiness.
+- Native startup is `agiru serve --config <file>`; the complete default profile is
+  `deploy/dev/agiru.json` in the repository bind mount. Protect deployment credentials
+  with a private mounted file or libpq passfile. The example database is not auto-seeded;
+  missing company/permission/client storage refuses before listener startup.
 
 ## TLS configuration
 

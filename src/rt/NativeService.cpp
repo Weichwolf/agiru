@@ -27,8 +27,6 @@
 namespace agiru {
 namespace {
 
-static_assert(NativeServiceOptions::kBackendPort == HttpServerOptions::kBackendPort);
-
 class Shutdown {
   using SignalMask = decltype(std::declval<struct sigaction>().sa_mask);
 
@@ -81,21 +79,21 @@ void VerifyStorage(const std::string &database, const std::string &company) {
 }
 
 void RunNativeService(const NativeServiceOptions &options) {
-  VerifyStorage(options.database, options.company);
+  ValidatePageHostOptions(options.pages);
+  ValidateHttpServerOptions(options.http);
+  if (!options.http.loopback || options.http.port == 0) {
+    throw Error("native listener must use a nonzero private loopback port", "ServerConfiguration");
+  }
+  VerifyStorage(options.pages.database, options.pages.company);
   const InstalledPermissionSets system;
   const auto permissions = std::make_shared<NativePermissions>(system);
   PageCommandHost host(
-      {.database = options.database,
-       .company = options.company,
-       .origin = options.origin,
-       .session = options.session},
+      options.pages,
       [permissions](const PageDef &page, auto, const auto &) { permissions->RequirePage(page); },
       permissions);
   const Shutdown shutdown;
-  HttpServerOptions transport;
-  transport.port = options.port;
-  transport.workers = options.workers;
-  const HttpServer server([&host](const auto &request) { return host.Handle(request); }, transport);
+  const HttpServer server([&host](const auto &request) { return host.Handle(request); },
+                          options.http);
   std::println("READY {} {}", getpid(), server.Port());
   std::fflush(stdout);
   shutdown.Wait();

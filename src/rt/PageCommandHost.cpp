@@ -222,6 +222,15 @@ std::string DiagnosticHtml(std::string_view message) {
 
 }
 
+void ValidatePageHostOptions(const PageHostOptions &options) {
+  if (options.database.empty() || options.company.empty() || options.origin.empty() ||
+      options.contexts == 0 || options.navigationDepth == 0 || options.commands == 0 ||
+      options.receiptBytes == 0 || options.lifetime.count() <= 0 ||
+      options.lifetime > kMaximumContextLifetime) {
+    Refuse("PageHostConfiguration");
+  }
+}
+
 void InstallPageCommandHost(const Connection &connection) {
   connection.Run(R"(CREATE TABLE IF NOT EXISTS agiru_client.page_contexts (
     handle text PRIMARY KEY,
@@ -251,12 +260,8 @@ struct PageCommandHost::Impl {
       : options(std::move(configuration)),
         authorize(std::move(authority)),
         tableAuthority(std::move(tableAuthorization)) {
-    if (options.database.empty() || options.company.empty() || options.origin.empty() ||
-        !authorize || !tableAuthority || options.contexts == 0 || options.navigationDepth == 0 ||
-        options.commands == 0 || options.receiptBytes == 0 || options.lifetime.count() <= 0 ||
-        options.lifetime > kMaximumContextLifetime) {
-      Refuse("PageHostConfiguration");
-    }
+    ValidatePageHostOptions(options);
+    if (!authorize || !tableAuthority) { Refuse("PageHostConfiguration"); }
   }
 
   std::shared_ptr<Context> Retain(const Guid &user) {

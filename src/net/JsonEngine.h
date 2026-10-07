@@ -48,6 +48,7 @@ public:
   [[nodiscard]] static JsonNode array();
   [[nodiscard]] static JsonNode Number(std::string text);
   [[nodiscard]] static JsonNode parse(std::string_view text);
+  [[nodiscard]] static JsonNode parse(std::string_view text, bool rejectDuplicates);
   [[nodiscard]] std::string dump(int indent = -1) const;
 
   [[nodiscard]] bool is_null() const noexcept { return kind_ == Kind::Null; }

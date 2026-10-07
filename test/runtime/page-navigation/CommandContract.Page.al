@@ -57,6 +57,25 @@ page 50347 "Command Contract Card"
                     Error('durable fixture error');
                 end;
             }
+            action(CaughtTryWrite)
+            {
+                trigger OnAction()
+                begin
+                    if AttemptWrite() then
+                        Error('try fixture must fail');
+                end;
+            }
         }
     }
+
+    [TryFunction]
+    local procedure AttemptWrite()
+    var
+        Row: Record "Navigation Row";
+    begin
+        Row.Get(1);
+        Row.Value := 777;
+        Row.Modify();
+        Error('caught try fixture error');
+    end;
 }

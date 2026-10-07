@@ -57,6 +57,11 @@ struct PageHostOptions {
   SessionOptions session{}; ///< Trusted immutable runtime policy for every retained context.
 };
 
+/// \brief Validates page/session configuration without connecting to SQL or running AL.
+/// \param options Trusted company, origin and positive bounded host settings.
+/// \throws Error with PageHostConfiguration for missing authority context or invalid limits.
+void ValidatePageHostOptions(const PageHostOptions &options);
+
 /// \brief Installs host-owned context/receipt storage using trusted migration authority.
 /// \param connection Database containing the original User and agiru_client credential store.
 /// \note Grants no users or ERP permissions; caller owns commit/rollback.
