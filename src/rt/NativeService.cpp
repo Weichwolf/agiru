@@ -85,7 +85,10 @@ void RunNativeService(const NativeServiceOptions &options) {
   const InstalledPermissionSets system;
   const auto permissions = std::make_shared<NativePermissions>(system);
   PageCommandHost host(
-      {.database = options.database, .company = options.company, .origin = options.origin},
+      {.database = options.database,
+       .company = options.company,
+       .origin = options.origin,
+       .session = options.session},
       [permissions](const PageDef &page, auto, const auto &) { permissions->RequirePage(page); },
       permissions);
   const Shutdown shutdown;

@@ -192,7 +192,12 @@ encoding, bounds, nonseekable/BigInteger positions and Native activation remain 
 `runtime/codeunit-record.sh` executes generated typed/static/dynamic `Codeunit.Run`
 forms. Table-global saves survive SQL rollback through scoped var-Record identity;
 ordinary assignment remains independent. Nested runs, callee restoration, handles,
-temporary cursors and compiled no-borrow/no-restore/assignment-alias controls are covered.
+temporary cursors, durable production Run, pending-write refusal and both configured
+TryFunction write policies are covered. Three global-state and four transaction/scope
+defects must fail. `TransactionContractGate` checks rollback/commit, collectible errors,
+isolated-event fallback and report/XMLport Quit. `SessionParallelGate` checks concurrent
+native HTTP sessions with independent committed/rolled-back SQL effects. These do not
+certify BC isolation, complete AL transaction coverage or financial posting integrity.
 
 `runtime/page-navigation.sh` executes generated list/card system Edit routing,
 selected-record identity, opening triggers, explicit-action precedence and card

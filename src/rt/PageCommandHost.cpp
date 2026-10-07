@@ -153,7 +153,8 @@ private:
 
 struct Context {
   Context(const Guid &principal, const PageHostOptions &options)
-      : session(principal), deadline(std::chrono::steady_clock::now() + options.lifetime) {
+      : session(principal, options.session),
+        deadline(std::chrono::steady_clock::now() + options.lifetime) {
     session.CompanyName(options.company);
   }
 

@@ -20,6 +20,7 @@
 
 #include <microhttpd.h>
 #include <netinet/in.h>
+#include <sched.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -30,7 +31,6 @@ constexpr std::size_t kTargetBytes = 8192;
 constexpr std::size_t kHeaderBytes = 32768;
 constexpr std::size_t kHeaderCount = 64;
 constexpr std::size_t kConnectionMemory = 65536;
-constexpr std::size_t kMaxWorkers = 128;
 constexpr std::size_t kMaxQueue = 4096;
 constexpr unsigned kMaxTimeoutSeconds = 120;
 constexpr std::size_t kMaxBodyBytes = 16777216;
@@ -60,10 +60,11 @@ ServerHttpResponse Refusal(unsigned status, std::string_view code) {
 }
 
 bool ValidOptions(const HttpServerOptions &options) {
-  return options.workers > 0 && options.workers <= kMaxWorkers && options.queue > 0 &&
-         options.queue <= kMaxQueue && options.connections > 0 && options.timeoutSeconds > 0 &&
-         options.timeoutSeconds <= kMaxTimeoutSeconds && options.bodyBytes > 0 &&
-         options.bodyBytes <= kMaxBodyBytes && options.totalBodyBytes >= options.bodyBytes &&
+  return options.workers > 0 && options.workers <= HttpServerOptions::kMaxWorkers &&
+         options.queue > 0 && options.queue <= kMaxQueue && options.connections > 0 &&
+         options.timeoutSeconds > 0 && options.timeoutSeconds <= kMaxTimeoutSeconds &&
+         options.bodyBytes > 0 && options.bodyBytes <= kMaxBodyBytes &&
+         options.totalBodyBytes >= options.bodyBytes &&
          options.responseBytes >= kMinResponseBytes && options.responseBytes <= kMaxBodyBytes;
 }
 
@@ -74,6 +75,15 @@ bool HeaderName(std::string_view value) {
   });
 }
 
+}
+
+std::size_t DefaultHttpWorkers() {
+  cpu_set_t available{};
+  std::size_t count = std::thread::hardware_concurrency();
+  if (sched_getaffinity(0, sizeof(available), &available) == 0) {
+    count = static_cast<std::size_t>(CPU_COUNT(&available));
+  }
+  return std::clamp(count, std::size_t{1}, HttpServerOptions::kMaxWorkers);
 }
 
 std::string_view ServerHttpRequest::Header(std::string_view name) const {

@@ -1,6 +1,7 @@
 #include "Services.h"
 
 #include "runtime/ErrorValue.h"
+#include "runtime/HttpServer.h"
 #include "runtime/NativeService.h"
 
 #include <algorithm>
@@ -65,11 +66,14 @@ int Serve(std::span<const std::string_view> arguments) {
   const auto options = Read(arguments, names);
   NativeServiceOptions service{.database = Required(options, "--database"),
                                .company = Required(options, "--company"),
-                               .origin = Required(options, "--origin")};
+                               .origin = Required(options, "--origin"),
+                               .session = {}};
   constexpr std::uint32_t kMaximumPort = 65535;
-  constexpr std::uint32_t kMaximumWorkers = 256;
   service.port = static_cast<std::uint16_t>(Number(options, "--port", service.port, kMaximumPort));
-  service.workers = Number(options, "--workers", 2, kMaximumWorkers);
+  service.workers = Number(options,
+                           "--workers",
+                           static_cast<std::uint32_t>(service.workers),
+                           HttpServerOptions::kMaxWorkers);
   RunNativeService(service);
   return 0;
 }

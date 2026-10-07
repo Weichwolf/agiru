@@ -1,5 +1,8 @@
 #pragma once
 
+#include "runtime/HttpServer.h"
+#include "runtime/SessionOptions.h"
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -17,7 +20,9 @@ struct NativeServiceOptions {
   std::string company;  ///< Exact sole original Company.Name in the initial flat storage profile.
   std::string origin;   ///< Trusted public Caddy origin used for browser CSRF checks.
   std::uint16_t port = kBackendPort; ///< Private loopback upstream, never a public bind.
-  std::size_t workers = 2;           ///< Fixed blocking execution workers, not per-session threads.
+  std::size_t workers =
+      DefaultHttpWorkers(); ///< One executor per affinity-available CPU by default.
+  SessionOptions session{}; ///< Immutable server policy copied into each retained session.
 };
 
 /// \brief Runs native HTTP/page execution until SIGINT/SIGTERM, then drains the listener.

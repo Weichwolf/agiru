@@ -2,8 +2,8 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: qualify existing rollback gates, concurrent HTTP and generated AL call contexts;
-repair failures and run targeted clang-tidy before commit/push. Then implement and qualify
+Next: load all native server defaults and trusted TryFunction policy from a strict JSON
+configuration in deploy/dev; keep server policy out of CLI switches. Then implement
 BC table/record locking, transaction-type transitions and atomic optimistic write conflicts.
 
 ## Acceptance
@@ -59,6 +59,8 @@ Runtime: `include/runtime/{Transaction,Codeunit,Error,Report,XmlPort,SessionOpti
 `src/rt/{Transaction,Scopes,Events,Session,Table,TablePermissions,Navigate,PageCommandHost}.cpp`,
 `src/net/HttpServer.cpp`, `src/cli/Services.cpp`.
 New gates: `test/gate/{TransactionContract,SessionParallel}Gate.cpp`.
+`test/ui/http-server.sh` runs native SessionParallel with a compiled worker-default
+defect from `test/gate/HttpWorkerControl.cpp.in`; it must fail the affinity/ceiling check.
 Existing regressions: `test/gate/{Transaction,CommitDurability,CommitBehavior,TestIsolation,
 RequiredTestIsolation,SessionCommand,NumberSequence,SqlRowVersion}Gate.cpp`,
 `test/runtime/{codeunit-record,test-contexts,xmlport-import}/`.
@@ -73,6 +75,10 @@ scope leakage) fail their named checks. Generated Report/XMLport classes now dec
 own default constructor, preventing aggregate construction from bypassing private CRTP
 base access. GenReport/GenXmlPort and executable XMLport gates pass; removing the
 generated constructor is rejected by compilation. Targeted generator/fixture lint passes.
+The replacement Debian-Caddy container passes HTTP/authentication and generated-page
+CMD/MCP fixtures. SessionParallel observes six concurrent workers with six available CPUs;
+CPU placement is left to Linux, not manually pinned. Session policy is copied from trusted
+NativeService/PageHost options; JSON startup configuration remains due, not a CLI flag.
 Full native transpilation still exits 1 for counted unsupported/missing source declarations;
 regenerating the complete tree is not full compilation or a green AL suite.
 These results are not

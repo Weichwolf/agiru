@@ -1,5 +1,7 @@
 #pragma once
 
+#include "runtime/SessionOptions.h"
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -52,6 +54,7 @@ struct PageHostOptions {
   std::size_t commands = kDefaultCommands;     ///< Maximum durable command receipts per window.
   std::size_t receiptBytes = kDefaultReceiptBytes;       ///< Stored-response budget per window.
   std::chrono::seconds lifetime = std::chrono::hours(1); ///< Fixed bounded context lifetime.
+  SessionOptions session{}; ///< Trusted immutable runtime policy for every retained context.
 };
 
 /// \brief Installs host-owned context/receipt storage using trusted migration authority.

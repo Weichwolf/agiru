@@ -71,6 +71,7 @@ void Usage() {
   std::println("");
   std::println("  agiru serve --database <dsn> --company <name> --origin <url>");
   std::println("      Private loopback HTTP listener; optional --port and --workers.");
+  std::println("      Default workers: process-affinity CPU count.");
   std::println("      Existing original company/permission data and client storage are required.");
   std::println("  agiru client-init --database <dsn>");
   std::println("      Trusted operator migration; creates client storage, never users or grants.");

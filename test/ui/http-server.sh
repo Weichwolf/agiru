@@ -6,7 +6,8 @@ git rev-parse HEAD > "$proof/head.txt"
 sha256sum CMakeLists.txt Makefile include/runtime/{HttpServer.h,PageHtml.h,PageCore.h} \
   src/net/{HttpServer,SecureToken}.cpp src/rt/{PageHtml,HtmlText,ClientCredentials,Session,SessionCommand}.cpp src/rt/HtmlText.h \
   include/runtime/{SecureToken,ClientCredentials,Session,SessionCommand}.h \
-  test/gate/{HttpServerGate,PageHtmlGate,ClientCredentialsGate}.cpp test/gate/PrivateAuthFile.h \
+  test/gate/{HttpServerGate,PageHtmlGate,ClientCredentialsGate,SessionParallelGate}.cpp \
+  test/gate/HttpWorkerControl.cpp.in test/gate/PrivateAuthFile.h \
   test/ui/http-server.{sh,mjs} test/ui/client-authentication.mjs \
   src/client/*.{mts,json} deploy/dev/{Containerfile,Caddyfile,entrypoint.sh} \
   scripts/dev_container.sh > "$proof/inputs.sha256"
@@ -15,6 +16,7 @@ make dev-exec COMMAND='df -h /tmp'
 make dev-exec COMMAND='make gate GATE=HttpServerGate JOBS=2 B=/workspace/build/podman' > "$proof/cpp-gate.log"
 make dev-exec COMMAND='make gate GATE=PageHtmlGate JOBS=2 B=/workspace/build/podman' >> "$proof/cpp-gate.log"
 make dev-exec COMMAND='make gate GATE=ClientCredentialsGate JOBS=2 B=/workspace/build/podman' >> "$proof/cpp-gate.log"
+make dev-exec COMMAND='make gate GATE=SessionParallelGate JOBS=2 B=/workspace/build/podman' >> "$proof/cpp-gate.log"
 cat "$proof/cpp-gate.log"
 native=$(make --no-print-directory dev-exec COMMAND='mktemp -d /tmp/agiru-native-http.XXXXXX')
 [[ "$native" =~ ^/tmp/agiru-native-http\.[A-Za-z0-9]+$ ]]
@@ -24,6 +26,7 @@ cleanup() {
     podman exec --user 0 "${AGIRU_DEV_CONTAINER:-agiru-dev}" rm -f -- /usr/share/agiru/web/http-fixture.html || :
   fi
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/page.html" || :
+  make --no-print-directory dev-exec COMMAND="rm -f -- $native/worker-control.so" || :
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second" || :
   make --no-print-directory dev-exec COMMAND="rmdir -- $native" || :
   for file in "$proof/auth.json" "$proof/auth.json.second"; do
@@ -31,6 +34,14 @@ cleanup() {
   done
 }
 trap cleanup EXIT
+make --no-print-directory dev-exec COMMAND="clang++-19 -x c++ -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -fPIC -shared test/gate/HttpWorkerControl.cpp.in --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 -o $native/worker-control.so" \
+  > "$proof/worker-control.compile.log" 2>&1
+status=0
+make --no-print-directory dev-exec COMMAND="env LD_PRELOAD=$native/worker-control.so /workspace/build/podman/gate_SessionParallelGate" \
+  > "$proof/worker-control.log" 2>&1 || status=$?
+[[ "$status" = 2 ]]
+rg -q 'FAIL.*default executor uses the available affinity CPUs' "$proof/worker-control.log"
+make --no-print-directory dev-exec COMMAND="rm -f -- $native/worker-control.so"
 make --no-print-directory dev-exec COMMAND='/workspace/build/podman/gate_PageHtmlGate --html' > "$proof/page.html"
 podman cp "$proof/page.html" "${AGIRU_DEV_CONTAINER:-agiru-dev}:$native/page.html"
 podman exec --user 0 "${AGIRU_DEV_CONTAINER:-agiru-dev}" test ! -e /usr/share/agiru/web/http-fixture.html
