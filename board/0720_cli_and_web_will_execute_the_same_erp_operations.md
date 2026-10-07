@@ -4,7 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: install the native BC permission authority and an `agiru serve` entrypoint against
+Next: wire the original SQL permission authority into the native host, install real system
+permission declarations and an `agiru serve` entrypoint against
 a validated company seed; execute Customer List → Card → Validate → Save using external
 CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
@@ -29,6 +30,21 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   original System `Tenant Database Tables/{AccessControl,TenantPermission,TenantPermissionSetRel}.Table.al`
   and `System Enums/PermissionObjectType.Enum.al`. Predecessor WI 1700 and
   `openerp/runtime/permissions.py`: reject global whole-object exclusions and implicit SUPER.
+
+- Native SQL authority: `include/runtime/NativePermissions.h`,
+  `src/rt/NativePermissionSnapshot.{h,cpp}`, `src/rt/NativePermissions.cpp` resolve the
+  active authenticated user/company from original Access Control/Tenant Permission rows
+  in one bounded SQL snapshot. No cross-user cache, role-name grant or system-table exemption.
+  `make native-permissions JOBS=2`: 41 checks, eight compiled defects and ASan/UBSan;
+  independent SQL verifies denied writes. `RequirePage` rechecks Page Execute/source Read.
+  Native integration: 14,225 slice sources, `make all`, 176/176 C++/tooling cases and
+  changed-code lint pass; not a current AL UT, HTTP authorization or ERP milestone.
+  Original Code[20]/Code[30] role widths require explicit text casts in the recursive CTE.
+  System catalogue installation, storage/schema migration, indirect AL contexts, row filters,
+  in-flight revocation fencing and actual HTTP wiring remain unqualified. Source references:
+  original `TenantPermissionSet.Table.al`; user `ui-define-granular-permissions.md` and
+  BCApps `System Application/Test/Permission Sets/src/PermissionRelationTests.Codeunit.al`
+  (`TestReduceToIndirectPermissionFromPermissionSet`), at the revisions pinned below.
 
 - Selected transport: unmodified nginx → private loopback libmicrohttpd → C++ handler;
   no ERP module, custom HTTP/TLS parser or Node ERP server.
