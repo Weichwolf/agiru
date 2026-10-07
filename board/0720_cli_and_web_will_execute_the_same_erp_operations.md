@@ -4,7 +4,9 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: integrate the session-owned native UI bridge from 0741 with real HTTP dialog
+Next: connect the qualified SQL windows below to generated page loading and shared
+HTML/CMD/MCP rows; install the consumed trusted `pages.list_rows` default of 40.
+Integrate the session-owned native UI bridge from 0741 with real HTTP dialog
 admission/suspension and typed error responses; rerun original Customer
 List → Card → Validate → Save using external CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
@@ -17,6 +19,16 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 
 ## Bounded lists and collation
 
+- SQL kernel implemented: `include/runtime/RecordWindow.h`, `src/rt/RecordWindow.cpp`
+  and private `RecordSeek.h` share the actual Navigate seek/order logic. One SQL query
+  reads at most the requested limit plus one continuation probe; no offset, client
+  comparison, unbounded result trimming, source-row/cursor mutation or implicit Commit.
+  Loaded values recheck permissions; reverse windows return declared forward order.
+  `make record-windows JOBS=2`: 23,511 checks and five compiled bound/seek/reverse/
+  permission/continuation defects rejected through the existing `record-order.sh`.
+  Its full 37 navigation controls and the six refresh controls also pass. Three affected
+  units pass clang-tidy; the standalone public header measures 223.7 ms frontend,
+  three no-PCH rounds, not a build-speed or ERP-performance comparison.
 - Pending: replace the single-current-record presentation with list windows. Default
   40 rows, an explicit positive `pages.list_rows` in `deploy/dev/agiru.json`, parsed by
   `src/rt/NativeServiceConfig.cpp`; never a client-controlled SQL limit. Enforce the
@@ -28,11 +40,20 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   whitespace and digit-only Code values. PostgreSQL defaults and bytewise temporary
   comparisons are not BC parity. Keep equality, uniqueness, ranges, wildcard/`@` filters,
   temporary records and SQL ordering consistent; unsupported profiles remain gaps.
-- Current native seed `agiru_client_seed_20261007b` uses libc `C`/`C`; Customer
+- Current native seed `agiru_client_seed_20261007b`, gate database and template1 use
+  SQL_ASCII with libc `C`/`C`; Customer
   No./Name/Search Name inherit deterministic database-default collation. BC collation
   parity is unproven; `scripts/cronus_to_pg.py` already encounters mixed SQL Server
   column collations but the transfer does not qualify their preservation. Inspect
   `pg_database`, `pg_attribute`/`pg_collation` and original SQL Server column metadata.
+- The window gate explicitly creates UTF-8 storage and tests both C and an ICU
+  `und-u-ks-level1` nondeterministic column collation, independently confirming case/
+  accent equality. Text equality/ranges, wildcard Code filters, OR filter group -1,
+  mixed directions, primary ties, digit-only Codes, deleted anchors and pending-write
+  rollback are covered. Existing native data remains unchanged; qualify a validated
+  UTF-8 clone and source collation mapping before BC/Unicode claims. PostgreSQL 17's
+  nondeterministic wildcard behaviour, temporary/virtual/sequence window adapters,
+  projected/lazy BLOB reads, byte budgets and indexed scan cost remain unqualified.
 - Acceptance in `test/ui/` and focused C++ gates: 0/1/39/40/41 rows, configured smaller
   and larger windows, equal secondary keys, filtered next/previous, concurrent changes,
   exact Unicode/typed values and identical web/CMD/MCP windows. Count queries/rows read;
@@ -45,6 +66,13 @@ References: developer `devenv-table-field-text-search.md` and
 comment 3, identifies skipped rows from numeric Code comparisons against SQL text order.
 Implement through `src/rt/{PageCommandHost,PageHtml,Navigate,Selection,RecordFilter}.cpp`
 and `include/runtime/{PageHostOptions,PageInstance}.h`, not separate client masks.
+Page loading must separate `OnAfterGetRecord` for loaded rows from one selected-row
+`OnAfterGetCurrRecord` after that block; the current `AfterGetRecord` helper conflates
+both. Preserve source filters, exact calculated control values and AL trigger effects.
+Reference: `triggers-auto/page/devenv-onafterget{record,currrecord}-page-trigger.md`,
+`methods-auto/decimal/decimal-data-type.md` at the developer revision above. The gate
+checks exact persisted scale-20 Decimal values and a separately authored numeric
+column at scale 28; this does not qualify changing BC's storage/assignment limits.
 
 ## Production UI suspension contract
 

@@ -21,7 +21,11 @@ export CCACHE_SLOPPINESS
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-storage native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-web dev-configure dev-exec dev-check
-.PHONY: page-profile client client-test web web-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions refresh-records
+.PHONY: page-profile client client-test web web-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions refresh-records record-windows
+
+record-windows: comments db ## qualify bounded SQL windows and collation-consistent continuation
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_RecordWindowGate
+	@B="$(B)" bash "$(SELF)/test/runtime/record-order.sh" --windows-only
 
 refresh-records: comments db ## qualify session/table read-cache refresh and transactional negative controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_RecordRefreshGate gate_GenReceiverGate
@@ -298,7 +302,7 @@ record-position: comments db ## prove record position syntax and key-only naviga
 	@B="$(B)" bash "$(SELF)/test/runtime/record-order.sh" --positions-only
 
 record-order: comments db ## prove record ordering, changing selections and negative controls
-	@cmake --build $(B) -j $(JOBS) --target gate_MixedOrderGate gate_SelectionChangeGate gate_CursorLifecycleGate gate_DynamicRecordGate gate_RenameGate gate_TemporaryGate gate_AlArrayGate gate_CursorGate gate_FilterGate gate_RecordPositionGate
+	@cmake --build $(B) -j $(JOBS) --target gate_MixedOrderGate gate_SelectionChangeGate gate_CursorLifecycleGate gate_DynamicRecordGate gate_RenameGate gate_TemporaryGate gate_AlArrayGate gate_CursorGate gate_FilterGate gate_RecordPositionGate gate_RecordWindowGate
 	@B="$(B)" bash "$(SELF)/test/runtime/record-order.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)

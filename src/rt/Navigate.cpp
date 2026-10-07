@@ -14,6 +14,7 @@
 #include "PageMetadata.h"
 #include "RecordChanges.h"
 #include "RecordOrder.h"
+#include "RecordSeek.h"
 #include "Selection.h"
 #include "SqlColumn.h"
 #include "TableMetadata.h"
@@ -88,9 +89,7 @@ bool ReadInto(void *record, const TableDef &table, const Cursor &cursor) {
 
 }
 
-namespace {
-
-std::string Reversed(const RecordOrder &by, bool descending) {
+std::string SqlRecordOrder(const RecordOrder &by, bool descending) {
   std::string order;
   for (const RecordOrder::Column &column : by.Columns()) {
     if (!order.empty()) { order += ", "; }
@@ -99,6 +98,8 @@ std::string Reversed(const RecordOrder &by, bool descending) {
   }
   return order;
 }
+
+namespace {
 
 std::string TuplePredicate(Selection &made,
                            std::span<const RecordOrder::Column> order,
@@ -146,7 +147,9 @@ std::string MixedPredicate(Selection &made,
   return predicate;
 }
 
-void Compare(Selection &made, const RecordOrder &by, const void *record, std::string_view op) {
+}
+
+void SeekRecord(Selection &made, const RecordOrder &by, const void *record, std::string_view op) {
   const auto order = by.Columns();
   if (order.empty()) { return; }
   const bool uniform = std::ranges::all_of(order, [&](const RecordOrder::Column &column) {
@@ -157,6 +160,8 @@ void Compare(Selection &made, const RecordOrder &by, const void *record, std::st
   if (!made.where.empty()) { made.where += " AND "; }
   made.where += "(" + predicate + ")";
 }
+
+namespace {
 
 bool ReadOne(void *record, const TableDef &table, const Selection &made, const std::string &order) {
   std::string sql = "SELECT " + Columns(table) + " FROM " + made.from;
@@ -209,15 +214,15 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
     const RecordOrder by(table, state->key, state->ascending);
     switch (step) {
       case '+': break;
-      case '=': Compare(made, by, record, "="); break;
-      case '>': Compare(made, by, record, ">"); break;
-      case '<': Compare(made, by, record, "<"); break;
+      case '=': SeekRecord(made, by, record, "="); break;
+      case '>': SeekRecord(made, by, record, ">"); break;
+      case '<': SeekRecord(made, by, record, "<"); break;
       default:
         throw Error("Record.Find: '" + std::string(1, step) +
                     "' is not one of the characters record-find-method.md declares");
     }
     const bool backwards = step == '+' || step == '<';
-    if (ReadOne(record, table, made, Reversed(by, backwards))) {
+    if (ReadOne(record, table, made, SqlRecordOrder(by, backwards))) {
       state->positioned = true;
       return true;
     }
@@ -280,8 +285,8 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
   if (open == nullptr || open->backwards != backwards) {
     Selection made = Select(state, table);
     const RecordOrder by(table, state->key, state->ascending);
-    Compare(made, by, record, backwards ? "<" : ">");
-    made.order = Reversed(by, backwards);
+    SeekRecord(made, by, record, backwards ? "<" : ">");
+    made.order = SqlRecordOrder(by, backwards);
     open = OpenSelection(*state, table, made, backwards);
   }
   const std::int64_t count = backwards ? -std::int64_t{steps} : steps;

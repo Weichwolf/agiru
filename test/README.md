@@ -42,6 +42,15 @@ progress values remain exact. Detached authenticated sessions retain their own e
 across workers. This is not HTTP dialog admission/suspension, automatic progress teardown,
 modal-page or browser/CMD/MCP acceptance; those remain in WI 0720.
 
+`make record-windows JOBS=2` runs the row-bounded SQL window gate and five compiled
+bound/seek/reverse/permission/continuation defects through the existing record-order
+script. Its owned database explicitly uses UTF-8, with C and case/accent-insensitive
+ICU column profiles. Independent SQL ordering/filtering checks cover 0/1/39/40/41
+rows, limits 7/40/80, ties, mixed directions, Unicode, numeric Codes, filter groups,
+deleted anchors, exact stored values and pending-write rollback. The full record-order
+target retains its 37 existing controls. This is not page trigger/HTML/client parity,
+BC collation equivalence, byte/scan bounds or qualification of native SQL_ASCII seeds.
+
 `make table-permissions JOBS=2` checks the session-owned TableData boundary for typed
 and reflected records, buffered record/query reads, individual write kinds, temporary
 buffers and company isolation. Independent SQL verifies denied writes; two compiled

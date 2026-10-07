@@ -4,11 +4,58 @@ cd "$(dirname "$0")/../.."
 B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-record-order-controls.XXXXXX)
+git rev-parse HEAD > "$proof/head"
 trap 'find "$proof" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.so" -o -name "gate" -o -name "*-gate" \) -delete' EXIT
-position="$B/gate_RecordPositionGate"
-"$position" > "$proof/position.log" 2>&1
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
+if [[ "${1:-}" != --positions-only ]]; then
+  window="$B/gate_RecordWindowGate"
+  sha256sum include/runtime/RecordWindow.h src/rt/RecordWindow.cpp src/rt/RecordSeek.h \
+    src/rt/{RecordOrder,Navigate,Selection}.cpp test/gate/{RecordWindowGate.cpp,OwnedDatabase.h} \
+    test/runtime/record-order.sh "$window" "$B/libagiru_rt.so" > "$proof/window-inputs.sha256"
+  "$window" > "$proof/windows.log" 2>&1
+  for control in window-bound window-seek window-reverse window-permission window-more; do
+    claim='window SQL transfers no more than the bound plus one probe'
+    case "$control" in
+      window-seek|window-reverse) claim='window rows follow the independent SQL order without omissions';;
+      window-permission) claim='window reads cannot bypass authenticated permissions';;
+      window-more) claim='continuation discovery distinguishes exact and incomplete windows';;
+    esac
+    awk -v control="$control" '
+      control == "window-bound" && /sql \+= " LIMIT " \+ std::to_string\(limit \+ 1\);/ {
+        changed++; next
+      }
+      control == "window-seek" && /detail::SeekRecord\(selected, order, record,/ {
+        changed++; next
+      }
+      control == "window-reverse" && /const std::size_t row = impl_->backwards/ {
+        print "  const std::size_t row = index;"; changed++; next
+      }
+      control == "window-permission" && /detail::RequireRecordPermission\(record, table,/ {
+        changed++; next
+      }
+      control == "window-more" && /return impl_->rows.Rows\(\) > impl_->limit;/ {
+        print "  return false;"; changed++; next
+      }
+      { print }
+      END { if (changed != 1) exit 2 }
+    ' src/rt/RecordWindow.cpp > "$proof/$control.cpp"
+    "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+      -lagiru_rt -lagiru_db -lagiru_net -o "$proof/$control.so" \
+      > "$proof/$control.compile.log" 2>&1
+    status=0
+    LD_PRELOAD="$proof/$control.so" "$window" > "$proof/$control.log" 2>&1 || status=$?
+    [[ "$status" = 1 ]]
+    rg -q "FAIL .*${claim}" "$proof/$control.log"
+    sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/window-controls.sha256"
+  done
+  sha256sum --check "$proof/window-inputs.sha256" > "$proof/window-integrity.log"
+  cat "$proof/windows.log"
+  printf 'record-windows: five bound/seek/reverse/permission/continuation defects reject; BC collation and client parity remain unqualified; %s\n' "$proof"
+  if [[ "${1:-}" = --windows-only ]]; then exit 0; fi
+fi
+position="$B/gate_RecordPositionGate"
+"$position" > "$proof/position.log" 2>&1
 for control in position-option-caption position-boolean-format position-quote position-key-order position-constant position-cursor position-integer-range; do
   awk -v control="$control" '
     control == "position-option-caption" && /return std::string\(member->name\);/ {

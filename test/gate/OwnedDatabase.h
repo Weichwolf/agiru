@@ -15,13 +15,19 @@ namespace gate {
 
 class OwnedDatabase {
 public:
-  explicit OwnedDatabase(std::string_view suffix)
+  enum class Encoding { Inherited, Utf8 };
+
+  explicit OwnedDatabase(std::string_view suffix, Encoding encoding = Encoding::Inherited)
       : name_("agiru_owned_gate_" + std::to_string(getpid()) + "_" + std::string(suffix)),
         dsn_(agiru::ConnectionInfo(AGIRU_TEST_DSN).AtDatabase(name_)),
         drop_("DROP DATABASE " + name_),
         maintenance_(agiru::ConnectionInfo(AGIRU_TEST_DSN).AtDatabase("postgres")) {
     maintenance_.Run("SET client_min_messages = warning");
-    maintenance_.Run("CREATE DATABASE " + name_);
+    std::string create = "CREATE DATABASE " + name_;
+    if (encoding == Encoding::Utf8) {
+      create += " TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'";
+    }
+    maintenance_.Run(create);
   }
 
   OwnedDatabase(const OwnedDatabase &) = delete;
