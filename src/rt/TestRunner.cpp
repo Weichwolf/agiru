@@ -285,7 +285,7 @@ std::vector<const TestCatalogue *> RegisteredTestCodeunits() {
 
 std::string TestResultJson(CodeunitId id, const TestResult &result) {
   constexpr Integer kResultSchema = 1;
-  JsonObject row;
+  const JsonObject row;
   row.Add("schema", kResultSchema);
   row.Add("codeunit_id", id.Value());
   row.Add("codeunit", result.codeunit);

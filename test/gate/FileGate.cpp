@@ -127,7 +127,7 @@ void BinaryTextReadsDoNotSplitLines() {
 void SavedXmlDoctypeRemainsReadable() {
   const auto name = FileWithBytes("<?xml version=\"1.0\"?><!DOCTYPE rootNode><rootNode/>");
   agiru::dotnet::XmlDocument document;
-  document = document.XmlDocument();
+  document = agiru::dotnet::XmlDocument::XmlDocument();
   agiru::dotnet::XmlReaderSettings settings;
   settings.DtdProcessing(agiru::dotnet::DtdProcessing::Parse());
   auto reader = agiru::dotnet::XmlReader::Create(name, settings);
