@@ -35,6 +35,36 @@ expect_red() {
 "$gate" > "$proof/baseline.log" 2>&1
 
 awk '
+  /IF pg_catalog.starts_with\(held_token, owner_tag\) THEN/ {
+    print "  IF false THEN"; matches++; next
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/RowVersionStorage.cpp > "$proof/regenerated-write-token.cpp"
+build_overlay regenerated-write-token
+expect_red regenerated-write-token "repeated writes retain the top-level transaction token"
+
+awk '
+  /token := pg_catalog.gen_random_uuid\(\);/ {
+    print "  token := '\''00000000-0000-0000-0000-000000000001'\''::uuid;"; matches++; next
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/RowVersionStorage.cpp > "$proof/shared-write-token.cpp"
+build_overlay shared-write-token
+expect_red shared-write-token "independent transactions have distinct own-write tokens"
+
+awk '
+  /set_config\('\''agiru.write_transaction_v1'\'', owner_tag/ {
+    sub(/true\);/, "false);"); matches++
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/RowVersionStorage.cpp > "$proof/session-write-token.cpp"
+build_overlay session-write-token
+expect_red session-write-token "Commit releases the connection-local token cache"
+
+awk '
   /^Connection::~Connection\(\) \{/ {
     print
     print "  if (handle_ != nullptr && PQtransactionStatus(Conn(handle_)) == PQTRANS_INTRANS) {"
@@ -283,4 +313,4 @@ rg -q "FAIL .*discarding a reflected missing SystemId result" "$proof/unchecked-
 find "$proof/unchecked-system-id" -depth -delete
 
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'rowversions: allocator fences, observed disconnect, SQL record/alias/Init/SystemId paths and nineteen compiled negative controls proved; %s\n' "$proof"
+printf 'rowversions: write-transaction tokens, allocator fences, observed disconnect, SQL record/alias/Init/SystemId paths and twenty-two compiled negative controls proved; %s\n' "$proof"

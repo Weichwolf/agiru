@@ -21,6 +21,12 @@ class Connection;
 /// it is internal connection state, not user-controlled configuration. Each live transaction
 /// retains its earliest fence, not a lock per row. Savepoint rollback restores both the fence
 /// and its setting; Commit, rollback and disconnect release transaction locks automatically.
+/// \note write_transaction_v1 returns a PostgreSQL-owned UUID stable within the top-level
+/// transaction, including released savepoints. Its transaction-local setting rolls back with
+/// its boundary; a new transaction receives a new UUID. The numeric transaction ID only tags
+/// that connection-local cache and is never a persisted own-write authority. This function
+/// allocates neither rowversions nor advisory locks. ERP optimistic-write predicates and
+/// private per-record expected stamps are separate, not enabled by provisioning this function.
 /// \note Provisioning uses an isolated savepoint in a caller transaction, or its own transaction
 /// otherwise. Schema changes roll back together; allocations on existing storage do not.
 void ProvisionRowVersions(const Connection &connection);

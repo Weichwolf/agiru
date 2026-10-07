@@ -64,6 +64,96 @@ std::int64_t OwnFences(const Connection &connection) {
                 "AND pid = pg_catalog.pg_backend_pid()");
 }
 
+std::string WriteToken(const Connection &connection) {
+  const auto result = connection.Execute("SELECT agiru_platform.write_transaction_v1()");
+  const auto value = result.Value(0, 0);
+  if (result.Rows() != 1 || result.Columns() != 1 || !value) {
+    throw DatabaseError("Write transaction gate requires an exact non-null token");
+  }
+  return std::string(*value);
+}
+
+void WriteTransactionIdentity() {
+  const OwnedDatabase database("write_identity");
+  const Connection writer(database.Dsn());
+  const Connection independent(database.Dsn());
+  ProvisionRowVersions(writer);
+  writer.Run("BEGIN");
+  independent.Run("BEGIN");
+  const std::string original = WriteToken(writer);
+  CHECK_TEXT(
+      "repeated writes retain the top-level transaction token", WriteToken(writer), original);
+  CHECK_TRUE("independent transactions have distinct own-write tokens",
+             WriteToken(independent) != original);
+  CHECK_TRUE("the transaction token does not allocate a rowversion", Last(writer) == 0);
+  CHECK_TRUE("the transaction token does not acquire an allocator fence", OwnFences(writer) == 0);
+  CHECK_TRUE("bulk token reads still use one transaction identity",
+             Scalar(writer,
+                    "SELECT count(DISTINCT agiru_platform.write_transaction_v1()) "
+                    "FROM pg_catalog.generate_series(1, 1000)") == 1);
+  CHECK_TRUE("the server token is a non-null UUID",
+             Scalar(writer,
+                    "SELECT (pg_typeof(agiru_platform.write_transaction_v1()) = "
+                    "'uuid'::regtype AND agiru_platform.write_transaction_v1() <> "
+                    "'00000000-0000-0000-0000-000000000000'::uuid)::integer") == 1);
+  writer.Run("SAVEPOINT retained");
+  CHECK_TEXT("a savepoint retains its parent's own-write token", WriteToken(writer), original);
+  writer.Run("RELEASE SAVEPOINT retained");
+  CHECK_TEXT("released children keep the top-level token", WriteToken(writer), original);
+  writer.Run("SAVEPOINT discarded");
+  writer.Run("SELECT set_config('agiru.write_transaction_v1', '', true)");
+  CHECK_TRUE("a discarded cache replacement has a distinct token", WriteToken(writer) != original);
+  writer.Run("ROLLBACK TO SAVEPOINT discarded");
+  writer.Run("RELEASE SAVEPOINT discarded");
+  CHECK_TEXT("rollback restores the parent's own-write token", WriteToken(writer), original);
+  ProvisionRowVersions(writer);
+  CHECK_TEXT("reprovisioning does not change an active write token", WriteToken(writer), original);
+  writer.Run("COMMIT");
+  CHECK_TRUE("Commit releases the connection-local token cache",
+             Scalar(writer,
+                    "SELECT (NULLIF(current_setting('agiru.write_transaction_v1', true), "
+                    "'') IS NULL)::integer") == 1);
+  writer.Run("BEGIN");
+  const std::string committed = WriteToken(writer);
+  CHECK_TRUE("Commit never grants the preceding transaction's exemption", committed != original);
+  writer.Run("ROLLBACK");
+  CHECK_TRUE("rollback releases the connection-local token cache",
+             Scalar(writer,
+                    "SELECT (NULLIF(current_setting('agiru.write_transaction_v1', true), "
+                    "'') IS NULL)::integer") == 1);
+  writer.Run("BEGIN");
+  CHECK_TRUE("rollback never grants the preceding transaction's exemption",
+             WriteToken(writer) != committed);
+  writer.Run("ROLLBACK");
+  independent.Run("ROLLBACK");
+}
+
+void FirstWriteInsideSavepoint() {
+  const OwnedDatabase database("write_child");
+  const Connection writer(database.Dsn());
+  ProvisionRowVersions(writer);
+  writer.Run("BEGIN");
+  writer.Run("SAVEPOINT discarded");
+  const std::string discarded = WriteToken(writer);
+  writer.Run("ROLLBACK TO SAVEPOINT discarded");
+  writer.Run("RELEASE SAVEPOINT discarded");
+  CHECK_TRUE("a rolled-back first write token cannot authorize its parent",
+             WriteToken(writer) != discarded);
+  writer.Run("ROLLBACK");
+  writer.Run("BEGIN");
+  writer.Run("SAVEPOINT retained");
+  const std::string retained = WriteToken(writer);
+  writer.Run("RELEASE SAVEPOINT retained");
+  CHECK_TEXT(
+      "a released first write retains its token in the parent", WriteToken(writer), retained);
+  writer.Run("COMMIT");
+  CHECK_TRUE("autocommit cannot revive a released transaction token",
+             WriteToken(writer) != retained);
+  const std::string autocommitted = WriteToken(writer);
+  CHECK_TRUE("separate autocommitted writes have distinct tokens",
+             WriteToken(writer) != autocommitted);
+}
+
 void WaitForBackendExit(const Connection &observer,
                         std::int64_t backend,
                         std::chrono::milliseconds timeout = kDisconnectTimeout) {
@@ -535,6 +625,8 @@ int main(int argc, char **argv) {
       return;
     }
     if (argc != 1) { throw DatabaseError("RowVersion gate: unknown arguments"); }
+    WriteTransactionIdentity();
+    FirstWriteInsideSavepoint();
     InitialStateAndReprovisioning();
     SqlWritesAcrossTablesAndCommitOrder();
     SavepointsAndBoundedFences();

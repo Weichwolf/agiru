@@ -144,6 +144,14 @@ and all 79 reflection controls pass. Full-app and counted AL acceptance remain o
 - CAS predicates match key + logical identity + (expected version or own transaction token).
   A SQL-owned UUID token stays stable across released children and changes after Commit;
   do not use tuple xmin, subtransaction status or a copied numeric transaction ID as authority.
+  `src/rt/RowVersionStorage.cpp` now provisions `agiru_platform.write_transaction_v1()`;
+  `test/gate/RowVersionGate.cpp` passes 136 primitive checks, including transaction-local
+  cache cleanup, first writes inside released/rolled-back children and independent connections.
+  `make rowversions JOBS=2` passes twenty-two compiled controls, including fixed, regenerated
+  and session-persistent tokens. Changed-code `make lint JOBS=2` passes three of 328
+  handwritten units with zero findings; native `make all` passes. TransactionContract 110
+  and RequiredTestIsolation 430 checks remain green. This primitive does not yet activate
+  Record write guards.
   A temporary native SQL candidate passes 43 checks; five guard/identity/fence defects fail
   named checks, including independent waiting writers that commit or roll back. Numeric-ID
   collision is synthetic, not backup/restore acceptance. No Record API or ERP pass is claimed.

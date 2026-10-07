@@ -106,6 +106,9 @@ records. Five compiled defects must fail; fixtures use AutoSave=false and do not
 write SQL rows. This profile does not qualify every XMLport import/trigger policy.
 
 `make rowversions JOBS=2` qualifies allocator fences and SQL record/SystemId paths.
+The PostgreSQL write-transaction UUID stays stable through released savepoints and
+changes at Commit/rollback. Its cache is transaction-local; fixed, regenerated and
+session-persistent tokens fail compiled controls. It does not allocate rowversions.
 Typed Record and RecordRef.Init retain loaded timestamp aliases without writing SQL;
 Clear still resets them. Removing timestamp retention must fail both record paths.
 These checks do not yet qualify atomic stale-write rejection.

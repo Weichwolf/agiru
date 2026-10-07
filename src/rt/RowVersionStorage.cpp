@@ -105,6 +105,24 @@ END
 $function$
 )SQL";
 
+constexpr std::string_view kWriteTransaction = R"SQL(
+CREATE OR REPLACE FUNCTION agiru_platform.write_transaction_v1()
+RETURNS uuid LANGUAGE plpgsql VOLATILE PARALLEL UNSAFE SET search_path = pg_catalog AS $function$
+DECLARE
+  owner_tag text := pg_catalog.pg_current_xact_id()::text || ':';
+  held_token text := pg_catalog.current_setting('agiru.write_transaction_v1', true);
+  token uuid;
+BEGIN
+  IF pg_catalog.starts_with(held_token, owner_tag) THEN
+    RETURN pg_catalog.substr(held_token, pg_catalog.length(owner_tag) + 1)::uuid;
+  END IF;
+  token := pg_catalog.gen_random_uuid();
+  PERFORM pg_catalog.set_config('agiru.write_transaction_v1', owner_tag || token::text, true);
+  RETURN token;
+END
+$function$
+)SQL";
+
 }
 
 void ProvisionRowVersions(const Connection &connection) {
@@ -118,6 +136,7 @@ void ProvisionRowVersions(const Connection &connection) {
     connection.Run(kLast);
     connection.Run(kNext);
     connection.Run(kMinimum);
+    connection.Run(kWriteTransaction);
     connection.Run(callerTransaction ? "RELEASE SAVEPOINT agiru_rowversions_provision_v1"
                                      : "COMMIT");
   } catch (const DatabaseError &) {
