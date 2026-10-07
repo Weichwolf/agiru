@@ -15,6 +15,32 @@ sandbox reference execution and agiru replication. Their agiru prerequisites are
 specific working client contracts, not this WI's full acceptance; no dependency cycle.
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
+## Bounded lists and collation
+
+- Pending: replace the single-current-record presentation with list windows. Default
+  40 rows, an explicit positive `pages.list_rows` in `deploy/dev/agiru.json`, parsed by
+  `src/rt/NativeServiceConfig.cpp`; never a client-controlled SQL limit. Enforce the
+  bound in the shared production record read, not by trimming an unbounded result.
+- Preserve server permissions/company and all filter groups. Continue in the declared
+  key's SQL order with a unique primary-key tie-breaker; forwards/backwards boundaries
+  must use the same collation/comparisons as ORDER BY and indexes. No client-side sort.
+- Qualify the actual source database collation: case/accent sensitivity, Unicode,
+  whitespace and digit-only Code values. PostgreSQL defaults and bytewise temporary
+  comparisons are not BC parity. Keep equality, uniqueness, ranges, wildcard/`@` filters,
+  temporary records and SQL ordering consistent; unsupported profiles remain gaps.
+- Acceptance in `test/ui/` and focused C++ gates: 0/1/39/40/41 rows, configured smaller
+  and larger windows, equal secondary keys, filtered next/previous, concurrent changes,
+  exact Unicode/typed values and identical web/CMD/MCP windows. Count queries/rows read;
+  removing the bound or changing continuation comparison must fail named controls.
+
+References: developer `devenv-table-field-text-search.md` and
+`dev-itpro/cside/cside-change-database-collation.md` at
+`f928288ee840334be73142e5fc0202c0e19b246d`; predecessor
+`openerp/board/1742_bc-web-client-defects-reported-on-the-live-client-2026-09-30.md`,
+comment 3, identifies skipped rows from numeric Code comparisons against SQL text order.
+Implement through `src/rt/{PageCommandHost,PageHtml,Navigate,Selection,RecordFilter}.cpp`
+and `include/runtime/{PageHostOptions,PageInstance}.h`, not separate client masks.
+
 ## Production UI suspension contract
 
 - Authorize and durably identify the opening operation before company login/OnOpenPage

@@ -139,6 +139,11 @@ prove the narrow header's dependency profile with negative controls.
   results plus compact text for MCP. No TTY/ANSI requirement or automatic confirmations.
   Preserve Decimal/Int64 exactly, treat content as untrusted, and reconcile uncertain writes
   before retries. HTTP wiring and independent SQL effects are part of parity proof.
+- List pages use bounded windows of 40 rows by default, configurable only in trusted
+  server configuration. Web/CMD/MCP share the same limit, filters and stable continuation.
+- Database collation governs text filtering, key equality and list ordering/continuation.
+  Qualify case/accent/Unicode behaviour against BC; never substitute client-side sorting
+  or assume PostgreSQL's default collation matches the source database.
 
 ## Layouts, charts and analysis
 
