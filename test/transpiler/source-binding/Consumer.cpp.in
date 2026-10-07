@@ -2,7 +2,10 @@
 #include "fixture/table/SourceRow.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
+#include "runtime/Session.h"
 #include "runtime/Table.h"
+
+#include "OwnedDatabase.h"
 
 #include <cstdio>
 #include <exception>
@@ -10,6 +13,8 @@
 
 int main() {
   try {
+    const gate::OwnedDatabase database("source_binding");
+    const agiru::Session session(database.Dsn());
     agiru::Fixture::Caller_Codeunit caller;
     if (!caller.Run()) { return 1; }
     agiru::Temporary<agiru::Fixture::SourceRow_Table> row;

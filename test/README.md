@@ -302,6 +302,10 @@ throw. RecordRef/native metadata gates exercise temporary/live reads; SqlRowVers
 adds owned SQL exact-value/filter/read-only/error checks. Two compiled controls must fail
 both temporary and native paths. `make verify-check VERIFY_CHECKS=TableSourceBindingGate`
 executes both AL Get forms in named/numeric and table/codeunit fixture contexts.
+The executable fixtures use an owned database/session for their consumed TryFunction;
+temporary records do not replace session-owned error/transaction context. Native catalogue
+write checks require the provider diagnostic, not merely any exception; a compiled
+session-before-provider defect must fail both empty bulk-write checks.
 
 `make record-order JOBS=2` verifies mixed field directions, global reversal,
 primary-key ties, filters, relative searches and cursor/keyset direction changes.

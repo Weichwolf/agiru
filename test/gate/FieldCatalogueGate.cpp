@@ -156,15 +156,20 @@ void TypedAndReflectedNamesUseTheLiveCatalogue() {
   CHECK_TRUE("native catalogue identity follows the original key encoding",
              rows.SystemId == agiru::Guid("77359429-9406-7735-0300-000000000000"));
 
-  CHECK_TRUE("native catalogue insertion refuses", !Failure([&] { rows.Insert(); }).empty());
-  CHECK_TRUE("native catalogue modification refuses", !Failure([&] { rows.Modify(); }).empty());
-  CHECK_TRUE("native catalogue deletion refuses", !Failure([&] { rows.Delete(); }).empty());
-  CHECK_TRUE("native catalogue DeleteAll refuses", !Failure([&] { rows.DeleteAll(); }).empty());
+  CHECK_TRUE("native catalogue insertion refuses",
+             Failure([&] { rows.Insert(); }).contains("read-only live catalogue"));
+  CHECK_TRUE("native catalogue modification refuses",
+             Failure([&] { rows.Modify(); }).contains("read-only live catalogue"));
+  CHECK_TRUE("native catalogue deletion refuses",
+             Failure([&] { rows.Delete(); }).contains("read-only live catalogue"));
+  CHECK_TRUE("native catalogue DeleteAll refuses",
+             Failure([&] { rows.DeleteAll(); }).contains("read-only live catalogue"));
   rows.SetRange(rows.No, 0);
-  CHECK_TRUE("native ModifyAll refuses even when no row matches",
-             !Failure([&] { rows.ModifyAll(rows.Enabled, false); }).empty());
+  CHECK_TRUE(
+      "native ModifyAll refuses even when no row matches",
+      Failure([&] { rows.ModifyAll(rows.Enabled, false); }).contains("read-only live catalogue"));
   CHECK_TRUE("native triggered DeleteAll refuses even when no row matches",
-             !Failure([&] { rows.DeleteAll(true); }).empty());
+             Failure([&] { rows.DeleteAll(true); }).contains("read-only live catalogue"));
   rows.SetFilter(rows.SQLDataType, "0");
   CHECK_TRUE("unqualified attributes refuse rather than silently filtering default values",
              !Failure([&] { static_cast<void>(rows.Count()); }).empty());

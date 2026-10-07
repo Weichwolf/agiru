@@ -89,29 +89,25 @@ rg -q 'FAIL .*moved read failure retains exact key text' "$proof/$control.log"
 sha256sum "$proof/$control/runtime/Table.h" "$proof/$control/gate" > "$proof/read-controls.sha256"
 find "$proof/$control" -depth -delete
 
-control=empty-provider-write
-mkdir -p "$proof/$control/runtime"
+control=write-provider-order
 awk '
-  /detail::RuntimeRequireWritableProvider\(Self\(\), TableDefinition<Derived>\(\)\);/ {
-    changed++; next
+  /^      RequireTableProvider\(table\);$/ {
+    print "      RequireWrite();"; changed++; next
   }
   { print }
-  END { if (changed != 2) exit 2 }
-' include/runtime/Table.h > "$proof/$control/runtime/Table.h"
-"$CXX" -O2 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
-  --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
-  "-I$proof/$control" -Iinclude -Itest/gate -Isrc/rt \
-  test/gate/FieldCatalogueGate.cpp \
+  END { if (changed != 1) exit 2 }
+' src/rt/TablePermissions.cpp > "$proof/$control.cpp"
+"$CXX" "${flags[@]}" "$proof/$control.cpp" \
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db \
-  -o "$proof/$control/gate" > "$proof/$control.compile.log" 2>&1
-if "$proof/$control/gate" > "$proof/$control.log" 2>&1; then
-  printf 'reflection-metadata: empty native write escaped its provider guard\n' >&2
+  -o "$proof/$control.so" > "$proof/$control.compile.log" 2>&1
+if LD_PRELOAD="$proof/$control.so" "$catalogue_gate" > "$proof/$control.log" 2>&1; then
+  printf 'reflection-metadata: session failure escaped the native write diagnostic\n' >&2
   exit 1
 fi
 rg -q 'FAIL .*native ModifyAll refuses even when no row matches' "$proof/$control.log"
 rg -q 'FAIL .*native triggered DeleteAll refuses even when no row matches' "$proof/$control.log"
-sha256sum "$proof/$control/runtime/Table.h" "$proof/$control/gate" > "$proof/write-controls.sha256"
-find "$proof/$control" -depth -delete
+sha256sum "$proof/$control.cpp" "$proof/$control.so" > "$proof/write-controls.sha256"
+rm -- "$proof/$control.cpp" "$proof/$control.so"
 
 control=field-value-context
 awk '

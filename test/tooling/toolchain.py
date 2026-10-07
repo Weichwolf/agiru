@@ -4197,6 +4197,9 @@ class TableSourceBindingGate(unittest.TestCase):
         compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
         self.assertIsNotNone(compiler, 'configured compiler is missing')
         self.compiler = compiler[1]
+        database = re.search(r'^AGIRU_TEST_DSN:[^=]+=(.+)$', cache, re.M)
+        self.assertIsNotNone(database, 'configured gate database is missing')
+        self.database = database[1]
 
     def run_fixture(self, receiver_kind, numeric):
         with tempfile.TemporaryDirectory() as temp:
@@ -4233,6 +4236,7 @@ class TableSourceBindingGate(unittest.TestCase):
             command = [self.compiler, '-std=c++23', '-stdlib=libc++',
                 '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
                 '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{self.root / "include"}',
+                f'-I{self.root / "test/gate"}', f'-DAGIRU_TEST_DSN="{self.database}"',
                 *(f'-I{path}' for path in (output, output / 'fixture', output / 'shared',
                                           output / 'absent')),
                 *(str(path) for path in sorted(output.rglob('*.cpp'))),

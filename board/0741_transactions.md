@@ -109,7 +109,17 @@ counts 14,225 sources with none missing; `make all` exits zero. C++ inputs staye
 through the client/tooling/deployment-only increments. All frozen AL file hashes match
 clean BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. The diagnostic slice still links
 1,902 explicit unlinked-procedure refusals: build success is not full-app or G1 acceptance.
-The full native `make test JOBS=2` is underway; no current AL UT result is claimed.
+The full native `make test JOBS=2` completed with 179 cases, eight red: four metadata
+gates, reflection qualification, header dependencies, builtin reproduction without local
+developer docs and toolchain source-binding fixtures. The toolchain reported four failures
+among 254 tests, all missing-session fixtures. These are retained failures, not AL UT results.
+Write preflight now checks permission → writable provider → trusted TryFunction policy;
+set-based DeleteAll shares that boundary. The catalogue gate rejects wrong session errors,
+and a compiled ordering defect fails both empty bulk-write diagnostics. `make reflection-metadata`
+passes all 79 compiled controls. PageTableField 312, TransactionContract 106, TablePermissions 29,
+SqlRowVersion 123 and Temporary 95 checks pass; the four source-binding fixture variants
+pass with owned sessions. Targeted clang-tidy reports zero findings in all three changed
+C++ units. Header dependency and builtin-reference repairs and a complete rerun remain due.
 
 ## Remaining documented cases — no completion claim
 

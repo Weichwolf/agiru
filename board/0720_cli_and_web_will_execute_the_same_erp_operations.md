@@ -32,7 +32,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   UT-handler impersonation or object-specific bypasses. Native AL errors outside the
   PageHost whitelist currently become a generic transport `HttpHandlerFailure`; exact
   client error/message parity remains open. Binary copies/hashes are existing-artifact
-  diagnostics, not the still-running current integration build or actual browser acceptance.
+  diagnostics, not actual browser acceptance. The rerun after the successful current
+  14,225-source native integration build retains one pass/six failures; stale binaries
+  do not explain the Customer opening failure.
   Owned clone, binaries and private credentials are removed on failure. This regression
   covers existing-customer edits, not New/template selection, posting or full sales acceptance.
   References: developer `methods-auto/system/system-guiallowed-method.md` at
@@ -86,9 +88,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   source refusals. Existing product exclusion remains separately counted. Translation stays
   red (5,683 property refusals and other retained gaps), not a green subset. Slice check:
   14,225 sources, zero missing. The actual platform library compiles/links all four new tables;
-  complete integration build failed after 740/1,064 steps because TableFilter expected-value
-  diagnostics attempted `std::string(TableFilter)`; the focused repair is qualified above,
-  but a successful integration rerun remains required. Thirty native-source tooling tests pass;
+  complete native integration build now exits zero, including the repaired TableFilter
+  diagnostics. Diagnostic slice linking retains 1,902 explicit unlinked-procedure refusals;
+  successful compilation is not complete app or AL execution. Thirty native-source tooling tests pass;
   changed-code clang-tidy: 6/323 units checked, zero findings, no new suppression.
   This is not seed provisioning, virtual permission metadata, generated system roles,
   native Customer/browser execution, complete System inventory or AL UT acceptance.
