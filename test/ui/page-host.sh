@@ -5,6 +5,7 @@ proof=$(mktemp -d /tmp/agiru-page-host.XXXXXX)
 git rev-parse HEAD > "$proof/head.txt"
 sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSession,SessionCommand}.h \
   src/rt/{PageCommandHost,PageHtml,PageInstance,SessionCommand,HtmlText}.cpp src/rt/HtmlText.h \
+  src/rt/PageListHtml.h include/runtime/{PageWindow,RecordWindow}.h src/rt/RecordWindow.cpp \
   include/runtime/TablePermissions.h src/rt/{TablePermissions,Session,Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/NativePermissions.h src/rt/{NativePermissions,NativePermissionSnapshot}.cpp \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
@@ -12,7 +13,7 @@ sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSe
   include/runtime/{HttpServerOptions,PageHostOptions,SessionOptions}.h \
   src/net/JsonEngine.{h,cpp} test/gate/NativeServiceConfigGate.cpp \
   src/cli/{Main,Services}.cpp src/cli/Services.h test/gate/NativePermissionFixture.h \
-  test/ui/page-host.{sh,mjs} test/ui/server-config.mjs test/ui/page-host/Runner.cpp test/runtime/page-navigation.sh \
+  test/ui/page-host.{sh,mjs} test/ui/{server-config,browser-client}.mjs test/ui/page-host/Runner.cpp test/runtime/page-navigation.sh \
   test/runtime/page-navigation/*.al test/gate/PrivateAuthFile.h \
   src/client/*.{mts,json} > "$proof/inputs.sha256"
 make dev-exec COMMAND='findmnt -T /tmp'
@@ -25,8 +26,9 @@ cleanup() {
   for file in "$proof/auth.json" "$proof/auth.json.second"; do
     if [[ -f "$file" ]]; then unlink "$file"; fi
   done
-  for control in owner revision replay policy duplicates; do
+  for control in owner revision replay policy duplicates list-limit; do
     if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
+    make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
   done
 }
 trap cleanup EXIT
@@ -47,9 +49,15 @@ cat "$proof/application.log"
 for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second"
 AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" AGIRU_PAGE_HOST_APPLICATION=1 \
-  AGIRU_TRY_WRITE_DISABLED=1 node --test test/ui/page-host.mjs \
+  AGIRU_TRY_WRITE_DISABLED=1 AGIRU_LIST_ROWS=7 node --test test/ui/page-host.mjs \
   > "$proof/try-disabled.log" 2>&1 || { cat "$proof/try-disabled.log"; exit 1; }
 cat "$proof/try-disabled.log"
+for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
+make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second"
+AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" AGIRU_PAGE_HOST_APPLICATION=1 \
+  AGIRU_LIST_ROWS=80 node --test test/ui/page-host.mjs \
+  > "$proof/list-80.log" 2>&1 || { cat "$proof/list-80.log"; exit 1; }
+cat "$proof/list-80.log"
 for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second"
 mutation='
@@ -65,10 +73,13 @@ mutation='
   control == "policy" && /session\(principal, options.session\)/ {
     sub(/session\(principal, options.session\)/, "session(principal, {})"); changed++
   }
+  control == "list-limit" && /options.listRows, loader/ {
+    sub(/options.listRows, loader/, "PageHostOptions::kDefaultListRows, loader"); changed++
+  }
   { print }
-  END { if (changed != 1) exit 2 }
+  END { if (changed != (control == "list-limit" ? 2 : 1)) exit 2 }
 '
-for control in owner revision replay policy; do
+for control in owner revision replay policy list-limit; do
   podman exec --user 1000:1001 "${AGIRU_DEV_CONTAINER:-agiru-dev}" \
     awk -v control="$control" "$mutation" /workspace/src/rt/PageCommandHost.cpp > "$proof/$control.cpp"
   podman cp "$proof/$control.cpp" "${AGIRU_DEV_CONTAINER:-agiru-dev}:$native/$control.cpp"
@@ -76,9 +87,9 @@ for control in owner revision replay policy; do
     > "$proof/$control.compile.log" 2>&1
   status=0
   application=0
-  if [[ "$control" = policy ]]; then application=1; fi
+  if [[ "$control" = policy || "$control" = list-limit ]]; then application=1; fi
   AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" \
-    AGIRU_PAGE_HOST_APPLICATION="$application" AGIRU_TRY_WRITE_DISABLED=1 \
+    AGIRU_PAGE_HOST_APPLICATION="$application" AGIRU_TRY_WRITE_DISABLED=1 AGIRU_LIST_ROWS=7 \
     AGIRU_PAGE_HOST_PRELOAD="$native/$control.so" node --test test/ui/page-host.mjs \
     > "$proof/$control.log" 2>&1 || status=$?
   [[ "$status" = 1 ]]
@@ -87,6 +98,7 @@ for control in owner revision replay policy; do
     revision) rg -q '^not ok .*PostgreSQL owns revision' "$proof/$control.log" ;;
     replay) rg -q '^not ok .*identical completed command replays' "$proof/$control.log" ;;
     policy) rg -q '^not ok .*startup configuration selects TryFunction write policy' "$proof/$control.log" ;;
+    list-limit) rg -q '^not ok .*shared HTTP list windows obey the trusted bound' "$proof/$control.log" ;;
   esac
   for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
@@ -110,4 +122,4 @@ rg -q 'FAIL.*duplicate configuration keys refuse' "$proof/duplicates.log"
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/duplicates.cpp $native/duplicates.so"
 unlink "$proof/duplicates.cpp"
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'page-host: generated-page SQL effects over Caddy/C++, external CMD/MCP and config-only agiru serve; both TryFunction write policies; five compiled ownership/revision/replay/policy/duplicate defects rejected; not full ERP/browser acceptance; %s\n' "$proof"
+printf 'page-host: generated-page SQL effects over Caddy/C++, external CMD/MCP and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; six compiled ownership/revision/replay/policy/duplicate/list-bound defects rejected; not full ERP/browser acceptance; %s\n' "$proof"

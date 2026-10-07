@@ -92,13 +92,14 @@ HttpServerOptions Transport(const Node &node) {
 }
 
 void Pages(const Node &node, PageHostOptions &options) {
-  constexpr std::array<std::string_view, 5> fields{
-      "contexts", "navigation_depth", "commands", "receipt_bytes", "lifetime_seconds"};
+  constexpr std::array<std::string_view, 6> fields{
+      "contexts", "navigation_depth", "commands", "receipt_bytes", "list_rows", "lifetime_seconds"};
   Object(node, fields);
   options.contexts = Number<std::size_t>(node, "contexts");
   options.navigationDepth = Number<std::size_t>(node, "navigation_depth");
   options.commands = Number<std::size_t>(node, "commands");
   options.receiptBytes = Number<std::size_t>(node, "receipt_bytes");
+  options.listRows = Number<std::size_t>(node, "list_rows");
   options.lifetime = std::chrono::seconds(Number<std::int64_t>(node, "lifetime_seconds"));
   ValidatePageHostOptions(options);
 }

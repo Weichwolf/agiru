@@ -35,30 +35,63 @@ export async function assertBrowserPage(page, model) {
   const rendered = await page.evaluate(() => {
     const article = document.querySelector("#workspace article");
     if (!article) return null;
+    const readControl = node => {
+      const identity = node.dataset.control;
+      const kind = node.dataset.kind ?? (node.tagName === "ASIDE" ? "unsupported" : "label");
+      const value = node.querySelector(":scope > form > input[name=text], :scope > output[data-type]");
+      const heading = node.querySelector(":scope > h2, :scope > h3, :scope > form > button");
+      const button = node.querySelector(":scope > form > button");
+      const command = node.querySelector(':scope > form > input[name="command"]');
+      return { identity, kind, caption: heading?.textContent ?? node.textContent,
+        ...(value ? { scalar: { type: value.dataset.type, value: value.dataset.value, domain: value.dataset.domain,
+          member: value.dataset.member, undefined: value.dataset.undefined === "true", closing: value.dataset.closing === "true" } } : {}),
+        ...(command ? { command: command.value, enabled: !button.disabled } : {}) };
+    };
+    const rows = [...article.querySelectorAll('[data-kind="row"]')].map(row => {
+      const entries = [...row.querySelectorAll("[data-control]")].map(readControl);
+      const action = entries.at(-1);
+      return { handle: row.dataset.row, selected: row.dataset.selected === "true",
+        caption: row.querySelector(":scope > h2").textContent, controls: entries.slice(0, -1),
+        select: { control: action.identity, command: action.command, enabled: action.enabled } };
+    });
+    const controls = [...article.querySelectorAll("[data-control]")]
+      .filter(node => !node.closest('[data-kind="rows"]')).map(readControl);
+    for (const row of rows) controls.push({ identity: row.select.control, kind: "action", caption: "Select row",
+      command: row.select.command, enabled: row.select.enabled });
     return {
       profile: article.dataset.agiruProfile, view: article.dataset.view, page: article.dataset.page,
       handle: article.dataset.handle, revision: article.dataset.revision,
       caption: article.querySelector(":scope > h1").textContent,
-      controls: [...article.querySelectorAll("[data-control]")].map(node => {
-        const identity = node.dataset.control;
-        const kind = node.dataset.kind ?? (node.tagName === "ASIDE" ? "unsupported" : "label");
-        const value = node.querySelector(":scope > form > input[name=text], :scope > output[data-type]");
-        const heading = node.querySelector(":scope > h2, :scope > h3, :scope > form > button");
-        const button = node.querySelector(":scope > form > button");
-        const command = node.querySelector(':scope > form > input[name="command"]');
-        return { identity, kind, caption: heading?.textContent ?? node.textContent,
-          ...(value ? { scalar: { type: value.dataset.type, value: value.dataset.value, domain: value.dataset.domain,
-            member: value.dataset.member, undefined: value.dataset.undefined === "true", closing: value.dataset.closing === "true" } } : {}),
-          ...(command ? { command: command.value, enabled: !button.disabled } : {}) };
-      }),
+      controls,
+      ...(article.dataset.agiruProfile === "2" ? { rows, window: { limit: article.dataset.limit,
+        more: article.dataset.more === "true", direction: article.dataset.direction } } : {}),
       unsupported: article.querySelector(":scope > output[data-unsupported-count]").dataset.unsupportedCount,
     };
   });
-  const controls = model.controls.map(control => ({ identity: control.identity, kind: control.kind, caption: control.caption,
+  const expectedControl = control => ({ identity: control.identity, kind: control.kind, caption: control.caption,
     ...(control.scalar ? { scalar: control.scalar } : {}),
-    ...(control.operation ? { command: control.operation.command, enabled: control.operation.enabled } : {}) }));
+    ...(control.operation ? { command: control.operation.command, enabled: control.operation.enabled } : {}) });
+  const controls = model.controls.map(expectedControl);
+  const rows = model.rows?.map(row => ({ handle: row.handle, selected: row.selected, caption: row.caption,
+    controls: row.controls.map(expectedControl), select: { control: row.select.control,
+      command: row.select.command, enabled: row.select.enabled } }));
   assert.deepEqual(rendered, { profile: model.profile, view: model.view, page: model.page, handle: model.handle,
-    revision: model.revision, caption: model.caption, controls, unsupported: String(model.unsupported) });
+    revision: model.revision, caption: model.caption, controls, unsupported: String(model.unsupported),
+    ...(rows ? { rows, window: model.window } : {}) });
+}
+
+export async function browserAction(page, origin, model, identity) {
+  const escaped = await page.evaluate(value => CSS.escape(value), identity);
+  const received = page.waitForResponse(response => response.url() === `${origin}/commands` &&
+    response.request().method() === "POST");
+  await page.locator(`[data-control="${escaped}"] button`).click();
+  const response = await received;
+  assert.equal(response.status(), 200, await response.text());
+  await page.waitForFunction(previous => document.querySelector("#workspace article")?.dataset.revision !== previous, model.revision);
+  await settled(page);
+  const result = { page: parsePage(await response.text()), status: response.status() };
+  await assertBrowserPage(page, result.page);
+  return result;
 }
 
 export async function browserSet(page, origin, model, identity, text) {

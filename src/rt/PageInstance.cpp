@@ -22,6 +22,10 @@ PageWindowState PageInstance::ReadWindow([[maybe_unused]] PageWindowPosition pos
   throw Error("The page has no qualified list window adapter.", "PageWindowProvider");
 }
 
+bool PageInstance::SelectWindowRecord([[maybe_unused]] const RecordId &record) {
+  throw Error("The page has no qualified list window adapter.", "PageWindowProvider");
+}
+
 std::unique_ptr<PageInstance> MakeInstalledPage(PageId page) {
   const PageEntry *entry = FindPage(page);
   if (entry == nullptr) { throw Error("The page is not installed.", "PageMissing"); }

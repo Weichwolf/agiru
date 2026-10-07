@@ -13,9 +13,12 @@ export type Control = Readonly<{
   caption: string; depth: number; display?: string; scalar?: Scalar; operation?: Operation; reason?: string;
 }>;
 export type Page = Readonly<{
-  profile: "1"; view: "current-row"; page: string; handle: string; revision: string;
+  profile: "1" | "2"; view: "current-row" | "list"; page: string; handle: string; revision: string;
   caption: string; controls: readonly Control[]; unsupported: number;
+  rows?: readonly Row[]; window?: Readonly<{ limit: string; more: boolean; direction: "forward" | "backward" }>;
 }>;
+export type Row = Readonly<{ handle: string; selected: boolean; caption: string;
+  controls: readonly Control[]; select: Operation }>;
 type Envelope = Readonly<{ path: string; fields: Readonly<Record<string, string>> }>;
 const envelopes = new WeakMap<Page, ReadonlyMap<string, Envelope>>();
 const token = /^[A-Za-z0-9_-]{1,128}$/;
@@ -36,8 +39,8 @@ export function checkResponseProfile(contentType: string, hasHeader: (name: stri
 const tags = new Set(["article", "h1", "h2", "h3", "section", "form", "input", "button", "output", "aside", "p"]);
 const scalarAttributes = ["data-type", "data-value", "data-domain", "data-member", "data-undefined", "data-closing"];
 const attributes: Readonly<Record<string, readonly string[]>> = {
-  article: ["data-agiru-profile", "data-view", "data-page", "data-handle", "data-revision"],
-  h1: [], h2: [], h3: [], section: ["data-control", "data-kind"],
+  article: ["data-agiru-profile", "data-view", "data-page", "data-handle", "data-revision", "data-limit", "data-more", "data-direction"],
+  h1: [], h2: [], h3: [], section: ["data-control", "data-kind", "data-row", "data-selected"],
   form: ["method", "action", "hx-post", "hx-target", "hx-swap"],
   input: ["type", "name", "value", "aria-label", ...scalarAttributes],
   button: ["type", "disabled"], output: ["data-unsupported-count", ...scalarAttributes],
@@ -143,10 +146,11 @@ function form(node: Tree.Element, page: Pick<Page, "handle" | "revision">, ident
   return Object.freeze({ operation, control: identity, command: fields.command!, enabled: !has(button, "disabled") });
 }
 
-function controls(root: Tree.Element, page: Pick<Page, "handle" | "revision">, commands: Map<string, Envelope>): Control[] {
+function controls(nodes: readonly Tree.Element[], page: Pick<Page, "handle" | "revision">, commands: Map<string, Envelope>): Control[] {
   const result: Control[] = [];
   const identities = new Set<string>();
   function visit(node: Tree.Element, depth: number): void {
+    check(!has(node, "data-row") && !has(node, "data-selected"), "Misplaced row metadata");
     check(result.length < limits.controls && depth <= limits.depth, "Control budget exceeded");
     const identity = attr(node, "data-control");
     check(identity.length > 0 && !identities.has(identity), "Empty or duplicate control identity");
@@ -190,7 +194,33 @@ function controls(root: Tree.Element, page: Pick<Page, "handle" | "revision">, c
       result.push(Object.freeze({ identity, depth, kind, caption: text(one(contents, "button")), operation }));
     } else check(false, "Unknown control kind");
   }
-  for (const child of children(root).slice(1, -1)) visit(child, 0);
+  for (const child of nodes) visit(child, 0);
+  return result;
+}
+
+function listRows(node: Tree.Element, page: Pick<Page, "handle" | "revision">,
+                  commands: Map<string, Envelope>, limit: string): Row[] {
+  check(node.tagName === "section" && attr(node, "data-kind") === "rows" &&
+    attr(node, "data-control") === "$agiru.rows" && node.attrs.length === 2, "Invalid list container");
+  const seen = new Set<string>();
+  const result = children(node).map(row => {
+    check(row.tagName === "section" && attr(row, "data-kind") === "row" && row.attrs.length === 3, "Invalid list row");
+    const handle = attr(row, "data-row");
+    check(token.test(handle) && !seen.has(handle), "Invalid or repeated row handle");
+    seen.add(handle);
+    const items = children(row);
+    check(items[0]?.tagName === "h2", "Missing row heading");
+    const entries = controls(items.slice(1), page, commands);
+    const action = entries.at(-1);
+    check(action?.kind === "action" && action.identity === `$agiru.row_${handle}` &&
+      action.operation?.operation === "action", "Missing row selection command");
+    const cells = entries.slice(0, -1);
+    check(cells.every(cell => !cell.operation && cell.kind !== "action"), "Rows must be read-only projections");
+    return Object.freeze({ handle, selected: exactFlag(row, "data-selected"), caption: text(items[0]!),
+      controls: Object.freeze(cells), select: action.operation });
+  });
+  check(BigInt(result.length) <= BigInt(limit) && result.length <= limits.controls, "List row bound exceeded");
+  check(result.filter(row => row.selected).length === (result.length ? 1 : 0), "Invalid selected row census");
   return result;
 }
 
@@ -207,7 +237,9 @@ export function parsePage(html: string): Page {
   const roots = children(fragment);
   check(roots.length === 1 && roots[0]!.tagName === "article", "Expected one profile article");
   const root = roots[0]!;
-  check(attr(root, "data-agiru-profile") === "1" && attr(root, "data-view") === "current-row", "Unsupported HTML profile");
+  const profile = attr(root, "data-agiru-profile");
+  const view = attr(root, "data-view");
+  check((profile === "1" && view === "current-row") || (profile === "2" && view === "list"), "Unsupported HTML profile");
   const header = { handle: attr(root, "data-handle"), revision: attr(root, "data-revision") };
   const pageId = attr(root, "data-page");
   check(token.test(header.handle) && digits.test(header.revision) && digits.test(pageId), "Invalid page identity");
@@ -216,11 +248,29 @@ export function parsePage(html: string): Page {
   const census = attr(items.at(-1)!, "data-unsupported-count");
   check(digits.test(census) && census.length <= 4 && text(items.at(-1)!) === "", "Invalid unsupported census");
   const commands = new Map<string, Envelope>();
-  const entries = controls(root, header, commands);
-  const unsupported = entries.filter(control => control.kind === "unsupported").length;
+  const body = items.slice(1, -1);
+  const lists = body.filter(node => node.tagName === "section" && attr(node, "data-kind") === "rows");
+  check(lists.length === (profile === "2" ? 1 : 0), "List profile structure mismatch");
+  const entries = controls(body.filter(node => !lists.includes(node)), header, commands);
+  let rows: readonly Row[] | undefined;
+  let window: Page["window"];
+  if (profile === "2") {
+    const limit = attr(root, "data-limit");
+    const direction = attr(root, "data-direction");
+    check(/^[1-9][0-9]{0,18}$/.test(limit) && BigInt(limit) < 9223372036854775807n, "Invalid trusted row bound");
+    check(direction === "forward" || direction === "backward", "Invalid window direction");
+    window = Object.freeze({ limit, more: exactFlag(root, "data-more"), direction });
+    rows = Object.freeze(listRows(lists[0]!, header, commands, limit));
+    for (const row of rows) entries.push(Object.freeze({ identity: row.select.control, kind: "action",
+      depth: 0, caption: "Select row", operation: row.select }));
+  } else check(!["data-limit", "data-more", "data-direction"].some(name => has(root, name)), "Misplaced list metadata");
+  const cells = [...entries, ...(rows?.flatMap(row => row.controls) ?? [])];
+  check(cells.length <= limits.controls && new Set(entries.map(entry => entry.identity)).size === entries.length,
+    "Combined control budget or identity violated");
+  const unsupported = cells.filter(control => control.kind === "unsupported").length;
   check(BigInt(census) === BigInt(unsupported), "Unsupported controls disappeared from the census");
-  const result: Page = Object.freeze({ profile: "1", view: "current-row", page: pageId, ...header,
-    caption: text(items[0]!), controls: Object.freeze(entries), unsupported });
+  const result: Page = Object.freeze({ profile: profile as "1" | "2", view: view as "current-row" | "list", page: pageId, ...header,
+    caption: text(items[0]!), controls: Object.freeze(entries), unsupported, ...(rows && window ? { rows, window } : {}) });
   envelopes.set(result, commands);
   return result;
 }

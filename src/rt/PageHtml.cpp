@@ -6,8 +6,11 @@
 #include "runtime/PageCore.h"
 #include "runtime/PageDispatcher.h"
 #include "runtime/PageValue.h"
+#include "runtime/SecureToken.h"
+#include "type/RecordId.h"
 
 #include "HtmlText.h"
+#include "PageListHtml.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -126,6 +129,17 @@ public:
 
   [[nodiscard]] std::size_t UnsupportedCount() const { return unsupported_; }
 
+  [[nodiscard]] std::size_t ControlCount() const { return controls_; }
+
+  void Row(const PageListRow &row) {
+    if (row.controls > limits_.controls - controls_) {
+      throw Error("Page HTML declaration budget exceeded", "PageHtmlLimit");
+    }
+    controls_ += row.controls;
+    Raw(row.presentation.html);
+    unsupported_ += row.presentation.unsupported;
+  }
+
 private:
   PageHtmlLimits limits_;
   const PageHtmlContext &context_;
@@ -143,7 +157,7 @@ void ValueAttributes(Writer &out, const PageValue &value) {
   out.Attribute("data-closing", value.closing ? "true" : "false");
 }
 
-void FieldHtml(Writer &out, PageDispatcher &dispatcher, const ControlDef &control) {
+void FieldHtml(Writer &out, PageDispatcher &dispatcher, const ControlDef &control, bool readOnly) {
   PageControlResult field;
   try {
     field =
@@ -159,7 +173,7 @@ void FieldHtml(Writer &out, PageDispatcher &dispatcher, const ControlDef &contro
   out.Raw("<h3>");
   out.Text(field.caption);
   out.Raw("</h3>");
-  if (field.editable && field.enabled) {
+  if (!readOnly && field.editable && field.enabled) {
     out.Form("set", control.name);
     out.Raw(R"(<input name="text" type="text")");
     out.Attribute("aria-label", field.caption);
@@ -201,7 +215,8 @@ void Tree(Writer &out,
           PageAuthorization &authorization,
           PageDispatcher &dispatcher,
           std::span<const ControlDef> controls,
-          std::size_t depth) {
+          std::size_t depth,
+          bool readOnly = false) {
   for (const ControlDef &control : controls) {
     out.Visit(depth);
     const PageControlCommand presentation{.operation = PageControlOperation::Inspect,
@@ -215,12 +230,17 @@ void Tree(Writer &out,
       out.Raw("<h2>");
       out.Text(control.caption);
       out.Raw("</h2>");
-      Tree(out, declaration, page, authorization, dispatcher, control.children, depth + 1);
+      Tree(
+          out, declaration, page, authorization, dispatcher, control.children, depth + 1, readOnly);
       out.Raw("</section>");
     } else if (control.kind == ControlKind::Field) {
-      FieldHtml(out, dispatcher, control);
+      FieldHtml(out, dispatcher, control, readOnly);
     } else if (control.kind == ControlKind::Action) {
-      ActionHtml(out, dispatcher, control);
+      if (readOnly) {
+        out.Unsupported(control.name, "PageListRowAction");
+      } else {
+        ActionHtml(out, dispatcher, control);
+      }
     } else {
       if (control.kind == ControlKind::Label || control.kind == ControlKind::Separator) {
         out.Raw("<p");
@@ -235,17 +255,70 @@ void Tree(Writer &out,
   }
 }
 
+const ControlDef *Repeater(Writer &walk,
+                           const PageDef &declaration,
+                           PageCore &page,
+                           PageAuthorization &authorization,
+                           std::span<const ControlDef> controls,
+                           std::size_t depth) {
+  const ControlDef *result = nullptr;
+  for (const auto &control : controls) {
+    walk.Visit(depth);
+    authorization.Require(declaration.id,
+                          {.operation = PageControlOperation::Inspect, .control = control.name});
+    if (!page.ControlVisible(control.name)) { continue; }
+    const ControlDef *found =
+        control.kind == ControlKind::Repeater
+            ? &control
+            : Repeater(walk, declaration, page, authorization, control.children, depth + 1);
+    if (found == nullptr) { continue; }
+    if (result != nullptr) {
+      throw Error("Multiple list repeaters are not qualified", "PageListLayout");
+    }
+    result = found;
+  }
+  return result;
 }
 
-PageHtmlResult RenderPageHtml(const PageDef &declaration,
-                              PageCore &page,
-                              PageAuthorization &authorization,
-                              const PageHtmlContext &context,
-                              PageHtmlLimits limits) {
+void ListRows(Writer &out, const PageListView &view) {
+  if (view.limit == 0 || view.rows.size() > view.limit || view.rows.size() != view.state.rows) {
+    throw Error("Invalid list window presentation", "PageListState");
+  }
+  out.Visit(0);
+  out.Raw(R"(<section data-kind="rows" data-control="$agiru.rows">)");
+  for (const auto &row : view.rows) {
+    if (!Token(row.handle)) { throw Error("Invalid row handle", "PageListState"); }
+    out.Visit(1);
+    out.Raw(R"(<section data-kind="row")");
+    out.Attribute("data-row", row.handle);
+    out.Attribute("data-selected", row.identity == view.selected ? "true" : "false");
+    out.Raw("><h2>");
+    out.Text(row.identity.ToText());
+    out.Raw("</h2>");
+    out.Row(row);
+    out.Visit(2);
+    out.Action("$agiru.row_" + row.handle, "Select row", true);
+    out.Raw("</section>");
+  }
+  out.Raw("</section>");
+}
+
+PageHtmlResult Render(const PageDef &declaration,
+                      PageCore &page,
+                      PageAuthorization &authorization,
+                      const PageHtmlContext &context,
+                      const PageListView *view,
+                      PageHtmlLimits limits) {
   CheckContext(context);
   Writer out(limits, context);
   PageDispatcher dispatcher(declaration, page, authorization);
-  out.Raw(R"(<article data-agiru-profile="1" data-view="current-row")");
+  out.Raw(view == nullptr ? R"(<article data-agiru-profile="1" data-view="current-row")"
+                          : R"(<article data-agiru-profile="2" data-view="list")");
+  if (view != nullptr) {
+    out.Attribute("data-limit", std::to_string(view->limit));
+    out.Attribute("data-more", view->state.more ? "true" : "false");
+    out.Attribute("data-direction", view->backwards ? "backward" : "forward");
+  }
   out.Attribute("data-page", std::to_string(declaration.id.Value()));
   out.Attribute("data-handle", context.pageHandle);
   out.Attribute("data-revision", context.revision);
@@ -253,13 +326,87 @@ PageHtmlResult RenderPageHtml(const PageDef &declaration,
   out.Text(declaration.caption.empty() ? declaration.name : declaration.caption);
   out.Raw("</h1>");
   Tree(out, declaration, page, authorization, dispatcher, declaration.layout, 0);
+  if (view != nullptr) { ListRows(out, *view); }
   Tree(out, declaration, page, authorization, dispatcher, declaration.actions, 0);
   HostActions(out, declaration, context);
   out.Raw("<output");
   out.Attribute("data-unsupported-count", std::to_string(out.UnsupportedCount()));
-  out.Raw("></output>");
-  out.Raw("</article>");
+  out.Raw("></output></article>");
   return out.Take();
+}
+
+}
+
+PageHtmlResult RenderPageHtml(const PageDef &declaration,
+                              PageCore &page,
+                              PageAuthorization &authorization,
+                              const PageHtmlContext &context,
+                              PageHtmlLimits limits) {
+  return Render(declaration, page, authorization, context, nullptr, limits);
+}
+
+PageHtmlResult RenderPageListHtml(const PageDef &declaration,
+                                  PageCore &page,
+                                  PageAuthorization &authorization,
+                                  const PageHtmlContext &context,
+                                  const PageListView &view,
+                                  PageHtmlLimits limits) {
+  return Render(declaration, page, authorization, context, &view, limits);
+}
+
+PageListLoader::PageListLoader(const PageDef &declaration,
+                               PageAuthorization &authorization,
+                               PageListView &view,
+                               PageHtmlLimits limits)
+    : declaration_(declaration), authorization_(authorization), view_(view), limits_(limits) {
+  for (const auto &row : view_.rows) {
+    bytes_ += row.presentation.html.size();
+    controls_ += row.controls;
+  }
+  if (bytes_ > limits_.bytes || controls_ > limits_.controls) {
+    throw Error("Page HTML output budget exceeded", "PageHtmlLimit");
+  }
+}
+
+PageListRow PageListLoader::Capture_(const RecordId &identity, PageCore &controls) {
+  const PageHtmlContext unused;
+  Writer walk(limits_, unused);
+  const auto *repeater =
+      Repeater(walk, declaration_, controls, authorization_, declaration_.layout, 0);
+  if (repeater == nullptr) { throw Error("The list has no visible repeater", "PageListLayout"); }
+  Writer out({.bytes = limits_.bytes - bytes_,
+              .controls = limits_.controls - controls_,
+              .depth = limits_.depth},
+             unused);
+  PageDispatcher dispatcher(declaration_, controls, authorization_);
+  Tree(out, declaration_, controls, authorization_, dispatcher, repeater->children, 0, true);
+  const auto count = out.ControlCount();
+  auto row = PageListRow{.handle = GenerateSecureToken(),
+                         .identity = identity,
+                         .presentation = out.Take(),
+                         .controls = count};
+  bytes_ += row.presentation.html.size();
+  controls_ += row.controls;
+  return row;
+}
+
+void PageListLoader::Row(const RecordId &identity, PageCore &controls) {
+  if (view_.rows.size() >= view_.limit) { throw Error("List row limit exceeded", "PageListLimit"); }
+  view_.rows.push_back(Capture_(identity, controls));
+}
+
+void PageListLoader::Current(const RecordId &identity, PageCore &controls) {
+  view_.selected = identity;
+  if (identity.IsEmpty() || view_.rows.empty()) { return; }
+  const auto found = std::ranges::find(view_.rows, identity, &PageListRow::identity);
+  if (found == view_.rows.end()) {
+    throw Error("Selected row is outside the window", "PageListSelection");
+  }
+  bytes_ -= found->presentation.html.size();
+  controls_ -= found->controls;
+  auto updated = Capture_(identity, controls);
+  updated.handle = found->handle;
+  *found = std::move(updated);
 }
 
 }

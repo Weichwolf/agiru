@@ -55,7 +55,8 @@ dev-web: web ## publish built browser assets to Caddy in the owned development c
 http-test: comments client ## qualify external CMD/MCP over Caddy/private C++ HTTP and PostgreSQL, not ERP parity
 	@bash "$(SELF)/test/ui/http-server.sh"
 
-page-host-test: comments client ## execute generated list/card edits over shared native HTTP with external agents
+page-host-test: comments web ## execute generated list/card edits over shared native HTTP with external agents
+	@bash "$(SELF)/scripts/dev_container.sh" web
 	@bash "$(SELF)/test/ui/page-host.sh"
 
 erp-fixture: ## qualify isolated original CRONUS Company and explicit native client authority, not ERP workflows

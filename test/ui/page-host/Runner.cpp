@@ -11,6 +11,7 @@
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/TablePermissions.h"
+#include "type/Decimal.h"
 #include "type/Guid.h"
 
 #include "Check.h"
@@ -22,6 +23,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <optional>
@@ -38,6 +40,8 @@ constexpr std::string_view kOtherUser = "00000000-0000-0000-0000-000000000002";
 constexpr std::string_view kCompany = "Fixture + Company";
 constexpr int kInitialValueStep = 11;
 constexpr int kRestrictedValue = 999;
+constexpr std::string_view kExactAmount = "0.12345678901234567890";
+constexpr std::int64_t kExactInteger = 9223372036854775807LL;
 
 void NativeGrants(const agiru::Connection &connection) {
   agiru::CreateTable(connection, agiru::platform::kCompanyTable);
@@ -84,6 +88,10 @@ void Seed(const std::string &dsn, const std::string &authPath) {
     Row row;
     row.ID = identity;
     row.Value = identity * kInitialValueStep;
+    row.Label = "Grüezi <script> 東京 🔧";
+    row.Amount = agiru::Decimal::FromInvariantString(kExactAmount);
+    row.Exact = kExactInteger;
+    row.Code = identity == 1 ? "0001" : "20";
     row.Insert();
   }
   connection.Run("CREATE TABLE ui_grants(user_security_id uuid,company text,readable boolean,"
@@ -155,7 +163,7 @@ public:
 };
 
 void Serve(const std::string &authPath, const std::string &origin, bool seedOnly) {
-  const gate::OwnedDatabase database("page_host");
+  const gate::OwnedDatabase database("page_host", gate::OwnedDatabase::Encoding::Utf8);
   Seed(database.Dsn(), authPath);
   if (seedOnly) {
     std::fputs("READY\n", stdout);

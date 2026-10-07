@@ -48,7 +48,7 @@ struct PageHtmlLimits {
 
 /// \brief HTML and counted unsupported controls; partial is not workflow acceptance.
 struct PageHtmlResult {
-  std::string html{};          ///< UTF-8 fragment, data-agiru-profile="1".
+  std::string html{};          ///< UTF-8 fragment with an explicit semantic-profile version.
   std::size_t unsupported = 0; ///< Visible kinds or scalar bindings lacking a renderer.
 };
 

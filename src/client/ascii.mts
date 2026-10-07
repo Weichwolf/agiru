@@ -1,9 +1,17 @@
-import type { Page } from "./profile.mjs";
+import type { Control, Page } from "./profile.mjs";
 import { ClientError } from "./errors.mjs";
 
 export function quote(value: string): string {
   return JSON.stringify(value).replace(/[\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/gu,
     character => `\\u${character.codePointAt(0)!.toString(16).padStart(4, "0")}`);
+}
+
+function field(control: Control, command = ""): string {
+  const value = control.scalar!;
+  const domain = value.domain ? ` domain=${quote(value.domain)} member=${quote(value.member)}` : "";
+  const flags = `${value.undefined ? " undefined" : ""}${value.closing ? " closing" : ""}`;
+  const display = control.display !== value.value ? ` display=${quote(control.display!)}` : "";
+  return `${quote(control.identity)} ${value.type}=${quote(value.value)}${domain}${flags}${command}${display}`;
 }
 
 export function renderAscii(page: Page, budget = 262144): string {
@@ -16,12 +24,18 @@ export function renderAscii(page: Page, budget = 262144): string {
     else if (control.kind === "action") {
       lines.push(`action ${key} ${quote(control.caption)} ${control.operation!.enabled ? "enabled" : "disabled"} cmd=${control.operation!.command}`);
     } else {
-      const value = control.scalar!;
-      const detail = value.domain ? ` domain=${quote(value.domain)} member=${quote(value.member)}` : "";
-      const flags = `${value.undefined ? " undefined" : ""}${value.closing ? " closing" : ""}`;
       const command = control.operation ? ` set=${control.operation.command}${control.operation.enabled ? "" : " disabled"}` : " readonly";
-      const display = control.display !== value.value ? ` display=${quote(control.display!)}` : "";
-      lines.push(`${key} ${value.type}=${quote(value.value)}${detail}${flags}${command}${display}`);
+      lines.push(field(control, command));
+    }
+  }
+  if (page.rows) {
+    lines.push(`rows=${page.rows.length} limit=${page.window!.limit} more=${page.window!.more} direction=${page.window!.direction}`);
+    for (const row of page.rows) {
+      const values = row.controls.filter(control => control.kind === "field").map(control => field(control));
+      lines.push(`row ${row.handle}${row.selected ? " selected" : ""} ${values.join(" ")} select=${row.select.command}`);
+      for (const cell of row.controls.filter(control => control.kind === "unsupported")) {
+        lines.push(`! row=${row.handle} ${quote(cell.identity)} unsupported=${quote(cell.reason!)}`);
+      }
     }
   }
   lines.push(`unsupported=${page.unsupported}`);

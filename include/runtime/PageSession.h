@@ -1390,6 +1390,38 @@ public:
     return window_.has_value() ? selected_ : Base::Current_Record();
   }
 
+  /// \brief Selects an exact retained SQL row while retaining the loaded block's boundaries.
+  /// \param identity Server-retained SQL identity.
+  /// \return Whether the row still exists.
+  [[nodiscard]] bool Select_Window_Record(const RecordId &identity) {
+    Require_();
+    static_cast<void>(Base::Page_());
+    if (!window_.has_value()) { throw Error("The page has no loaded block.", "PageWindowAnchor"); }
+    if constexpr (Base::kHasRecord) {
+      using Source = std::remove_cvref_t<decltype(Base::Record_())>;
+      Source source;
+      bool retained = false;
+      for (std::size_t i = 0; i < window_->Size(); ++i) {
+        window_->Load(i, &source);
+        if (source.RecordId() == identity) {
+          retained = true;
+          break;
+        }
+      }
+      if (!retained) { throw Error("Selected row is outside the window.", "PageWindowSelection"); }
+      try {
+        if (!Base::Select_Record(identity)) { return false; }
+        selected_ = identity;
+        return true;
+      } catch (...) {
+        Forget_Window();
+        Base::Release_();
+        throw;
+      }
+    }
+    return false;
+  }
+
   /// \brief Loads a block relative to retained SQL boundaries, not mutated AL key values.
   /// \param position Requested SQL-order movement.
   /// \param limit Positive trusted server bound.
@@ -1563,6 +1595,10 @@ template <typename P> PageInstance *MakePageSession() {
                                              std::size_t limit,
                                              PageWindowReceiver &receiver) override {
       return session_.Read_Window(position, limit, receiver);
+    }
+
+    [[nodiscard]] bool SelectWindowRecord(const RecordId &record) override {
+      return session_.Select_Window_Record(record);
     }
 
   private:

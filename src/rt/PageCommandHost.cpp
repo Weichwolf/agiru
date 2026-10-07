@@ -11,6 +11,8 @@
 #include "runtime/PageHostOptions.h"
 #include "runtime/PageHtml.h"
 #include "runtime/PageInstance.h"
+#include "runtime/PageWindow.h"
+#include "runtime/RecordWindow.h"
 #include "runtime/SecureToken.h"
 #include "runtime/Session.h"
 #include "runtime/SessionCommand.h"
@@ -20,6 +22,7 @@
 #include "type/Utf8.h"
 
 #include "HtmlText.h"
+#include "PageListHtml.h"
 
 #include <algorithm>
 #include <array>
@@ -139,7 +142,7 @@ std::int64_t Number(std::string_view text) {
 
 class Authorization final : public PageAuthorization {
 public:
-  Authorization(const PageDef &page, PageHostAuthorization &authority)
+  Authorization(const PageDef &page, const PageHostAuthorization &authority)
       : page_(page), authority_(authority) {}
 
   void Require(PageId page, const PageControlCommand &command) override {
@@ -149,7 +152,12 @@ public:
 
 private:
   const PageDef &page_;
-  PageHostAuthorization &authority_;
+  const PageHostAuthorization &authority_;
+};
+
+struct PageFrame {
+  std::unique_ptr<PageInstance> page;
+  std::optional<PageListView> list;
 };
 
 struct Context {
@@ -162,7 +170,8 @@ struct Context {
   std::mutex mutex;
   Session session;
   std::unique_ptr<PageInstance> page;
-  std::vector<std::unique_ptr<PageInstance>> parents;
+  std::optional<PageListView> list;
+  std::vector<PageFrame> parents;
   std::string handle = GenerateSecureToken();
   std::string csrf = GenerateSecureToken();
   std::string prefix = GenerateSecureToken();
@@ -224,6 +233,9 @@ std::string DiagnosticHtml(std::string_view message) {
 }
 
 void ValidatePageHostOptions(const PageHostOptions &options) {
+  try {
+    ValidateRecordWindowLimit(options.listRows);
+  } catch (const Error &) { Refuse("PageHostConfiguration"); }
   if (options.database.empty() || options.company.empty() || options.origin.empty() ||
       options.contexts == 0 || options.navigationDepth == 0 || options.commands == 0 ||
       options.receiptBytes == 0 || options.lifetime.count() <= 0 ||
@@ -310,12 +322,28 @@ struct PageCommandHost::Impl {
                  {.identity = "$agiru.next", .caption = "Next"},
                  {.identity = "$agiru.last", .caption = "Last"},
                  {.identity = "$agiru.save", .caption = "Save"}};
+      if (context.list.has_value()) {
+        actions[1].enabled = context.list->previous;
+        actions[2].enabled = context.list->next;
+      }
     }
     if (page.Declaration().cardPageId.Value() != 0) {
       actions.push_back({"$agiru.card", "Edit card"});
     }
     if (!context.parents.empty()) { actions.push_back({"$agiru.back", "Back"}); }
     Authorization authority(page.Declaration(), authorize);
+    const auto revision = std::to_string(context.revision);
+    const PageHtmlContext envelope{.pageHandle = context.handle,
+                                   .revision = revision,
+                                   .commandPrefix = context.prefix,
+                                   .csrf = context.csrf,
+                                   .actions = actions};
+    if (context.list.has_value()) {
+      AuthorizeSnapshot(page.Declaration(), page.Declaration().layout);
+      return RenderPageListHtml(
+                 page.Declaration(), page.Controls(), authority, envelope, *context.list)
+          .html;
+    }
     return RenderPageHtml(page.Declaration(),
                           page.Controls(),
                           authority,
@@ -349,7 +377,15 @@ struct PageCommandHost::Impl {
       const auto mode = Mode(context->page->Declaration(), Get(values, "mode"));
       authorize(context->page->Declaration(), Opening(mode), {});
       context->session.OpenCompany();
-      context->page->Open(mode);
+      if (context->page->Declaration().type == PageType::List) {
+        auto &list = context->list.emplace(options.listRows);
+        Authorization authority(context->page->Declaration(), authorize);
+        PageListLoader loader(context->page->Declaration(), authority, list);
+        list.state = context->page->OpenWindow(mode, options.listRows, loader);
+        list.next = list.state.more;
+      } else {
+        context->page->Open(mode);
+      }
       const std::array<std::optional<std::string>, 5> binds{
           context->handle,
           user.ToStorageText(),
@@ -383,35 +419,98 @@ struct PageCommandHost::Impl {
     return result;
   }
 
+  void ListMovement(Context &context, PageWindowPosition position) const {
+    if (!context.list.has_value()) { Refuse("PageHostUnsupported"); }
+    if ((position == PageWindowPosition::Next && !context.list->next) ||
+        (position == PageWindowPosition::Previous && !context.list->previous)) {
+      Refuse("PageHostUnsupported");
+    }
+    auto &page = *context.page;
+    authorize(page.Declaration(), PageHostOperation::Move, {});
+    PageListView next{.limit = options.listRows};
+    Authorization authority(page.Declaration(), authorize);
+    PageListLoader loader(page.Declaration(), authority, next);
+    next.state = page.ReadWindow(position, options.listRows, loader);
+    next.backwards =
+        position == PageWindowPosition::Previous || position == PageWindowPosition::Last;
+    next.previous = next.backwards ? next.state.more : position != PageWindowPosition::First;
+    next.next = next.backwards ? position != PageWindowPosition::Last : next.state.more;
+    if (next.rows.empty() &&
+        (position == PageWindowPosition::Next || position == PageWindowPosition::Previous)) {
+      if (position == PageWindowPosition::Next) {
+        context.list->next = false;
+      } else {
+        context.list->previous = false;
+      }
+      return;
+    }
+    context.list = std::move(next);
+  }
+
+  void SelectRow(Context &context, std::string_view control) const {
+    if (!context.list.has_value()) { Refuse("PageHostUnsupported"); }
+    const auto handle = control.substr(std::string_view("$agiru.row_").size());
+    const auto row = std::ranges::find(context.list->rows, handle, &PageListRow::handle);
+    if (row == context.list->rows.end()) { Refuse("PageHostMissing"); }
+    authorize(context.page->Declaration(), PageHostOperation::Move, {});
+    if (!context.page->SelectWindowRecord(row->identity)) { Refuse("PageHostMissing"); }
+    Authorization authority(context.page->Declaration(), authorize);
+    PageListLoader loader(context.page->Declaration(), authority, *context.list);
+    loader.Current(context.page->CurrentRecord(), context.page->Controls());
+  }
+
+  void OpenCard(Context &context) const {
+    auto &page = *context.page;
+    if (context.parents.size() >= options.navigationDepth) { Refuse("PageHostCapacity"); }
+    const auto &source = page.Declaration();
+    if (source.cardPageId.Value() == 0) { Refuse("PageHostUnsupported"); }
+    authorize(source, PageHostOperation::Read, {});
+    auto card = MakeInstalledPage(source.cardPageId);
+    if (card->Declaration().source != source.source) { Refuse("PageHostUnsupported"); }
+    authorize(card->Declaration(), PageHostOperation::OpenEdit, {});
+    const RecordId record = page.CurrentRecord();
+    if (record.IsEmpty()) { Refuse("PageHostMissing"); }
+    card->Open(PageOpenMode::Edit);
+    if (!card->SelectRecord(record)) { Refuse("PageHostMissing"); }
+    context.parents.push_back({.page = std::move(context.page), .list = std::move(context.list)});
+    context.page = std::move(card);
+    context.list.reset();
+  }
+
+  void Back(Context &context) const {
+    auto &page = *context.page;
+    if (context.parents.empty()) { Refuse("PageHostUnsupported"); }
+    authorize(page.Declaration(), PageHostOperation::Close, {});
+    authorize(context.parents.back().page->Declaration(), PageHostOperation::Read, {});
+    page.Close();
+    context.page = std::move(context.parents.back().page);
+    context.list = std::move(context.parents.back().list);
+    context.parents.pop_back();
+    const RecordId selected = context.page->CurrentRecord();
+    if (!selected.IsEmpty() &&
+        !(context.list.has_value() ? context.page->SelectWindowRecord(selected)
+                                   : context.page->SelectRecord(selected))) {
+      Refuse("PageHostMissing");
+    }
+    if (context.list.has_value() && !selected.IsEmpty()) {
+      Authorization authority(context.page->Declaration(), authorize);
+      PageListLoader loader(context.page->Declaration(), authority, *context.list);
+      loader.Current(selected, context.page->Controls());
+    }
+  }
+
   void Lifecycle(Context &context, std::string_view control) const {
     auto &page = *context.page;
+    if (control.starts_with("$agiru.row_")) {
+      SelectRow(context, control);
+      return;
+    }
     if (control == "$agiru.card") {
-      if (context.parents.size() >= options.navigationDepth) { Refuse("PageHostCapacity"); }
-      const auto &source = page.Declaration();
-      if (source.cardPageId.Value() == 0) { Refuse("PageHostUnsupported"); }
-      authorize(source, PageHostOperation::Read, {});
-      auto card = MakeInstalledPage(source.cardPageId);
-      if (card->Declaration().source != source.source) { Refuse("PageHostUnsupported"); }
-      authorize(card->Declaration(), PageHostOperation::OpenEdit, {});
-      const RecordId record = page.CurrentRecord();
-      if (record.IsEmpty()) { Refuse("PageHostMissing"); }
-      card->Open(PageOpenMode::Edit);
-      if (!card->SelectRecord(record)) { Refuse("PageHostMissing"); }
-      context.parents.push_back(std::move(context.page));
-      context.page = std::move(card);
+      OpenCard(context);
       return;
     }
     if (control == "$agiru.back") {
-      if (context.parents.empty()) { Refuse("PageHostUnsupported"); }
-      authorize(page.Declaration(), PageHostOperation::Close, {});
-      authorize(context.parents.back()->Declaration(), PageHostOperation::Read, {});
-      page.Close();
-      context.page = std::move(context.parents.back());
-      context.parents.pop_back();
-      const RecordId selected = context.page->CurrentRecord();
-      if (!selected.IsEmpty() && !context.page->SelectRecord(selected)) {
-        Refuse("PageHostMissing");
-      }
+      Back(context);
       return;
     }
     if (control == "$agiru.save") {
@@ -425,11 +524,20 @@ struct PageCommandHost::Impl {
     if (control == "$agiru.next") { position = PagePosition::Next; }
     if (control == "$agiru.last") { position = PagePosition::Last; }
     if (position == PagePosition::Unknown) { Refuse("PageHostUnsupported"); }
+    if (context.list.has_value()) {
+      PageWindowPosition window = PageWindowPosition::Unknown;
+      if (position == PagePosition::First) { window = PageWindowPosition::First; }
+      if (position == PagePosition::Previous) { window = PageWindowPosition::Previous; }
+      if (position == PagePosition::Next) { window = PageWindowPosition::Next; }
+      if (position == PagePosition::Last) { window = PageWindowPosition::Last; }
+      ListMovement(context, window);
+      return;
+    }
     authorize(page.Declaration(), PageHostOperation::Move, {});
     static_cast<void>(page.Move(position));
   }
 
-  void Execute(Context &context, const Parameters &values) {
+  void Execute(Context &context, const Parameters &values) const {
     const auto operation = Get(values, "operation");
     const auto control = Get(values, "control");
     if (operation == "action" && control.starts_with(kActionPrefix)) {

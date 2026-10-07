@@ -7,6 +7,8 @@ import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
 import { commandEnvelope, parsePage } from "../../build/client/profile.mjs";
 import { ServerConfigs } from "./server-config.mjs";
+import { launchBrowser, openBrowserPage, assertBrowserPage, browserAction } from "./browser-client.mjs";
+import { renderAscii } from "../../build/client/ascii.mjs";
 
 const execute = promisify(execFile);
 const container = process.env.AGIRU_DEV_CONTAINER ?? "agiru-dev";
@@ -15,6 +17,7 @@ const native = process.env.AGIRU_PAGE_HOST_NATIVE;
 const proof = process.env.AGIRU_PAGE_HOST_PROOF;
 const nativeApplication = process.env.AGIRU_PAGE_HOST_APPLICATION === "1";
 const disableTryWrites = process.env.AGIRU_TRY_WRITE_DISABLED === "1";
+const rowLimit = Number(process.env.AGIRU_LIST_ROWS ?? "40");
 const configurations = new ServerConfigs(container, native, proof);
 let serverConfig;
 let application, applicationPid, applicationClosed;
@@ -47,6 +50,7 @@ assert.ok(database);
 const dsn = `postgresql://agiru:agiru@127.0.0.1:5432/${database}`;
 if (nativeApplication) {
   serverConfig = await configurations.write({ database: dsn, company: "Fixture + Company", origin,
+    pages: { list_rows: rowLimit },
     transactions: { disable_write_inside_try_functions: disableTryWrites } });
   application = spawn("podman", ["exec", "--user", "1000:1001", container,
     "env", ...(process.env.AGIRU_PAGE_HOST_PRELOAD ? [`LD_PRELOAD=${process.env.AGIRU_PAGE_HOST_PRELOAD}`] : []),
@@ -66,6 +70,7 @@ if (nativeApplication) {
     });
   });
 }
+
 for (const suffix of ["", ".second"]) {
   await execute("podman", ["cp", `${container}:${native}/auth.json${suffix}`, `${proof}/auth.json${suffix}`]);
   await chmod(`${proof}/auth.json${suffix}`, 0o600);
@@ -100,14 +105,33 @@ test("native generated list retains its row and handle across request-local conn
   assert.equal(opened.page.page, "50341");
   assert.equal(field(opened, "ID"), "1");
   assert.equal(field(opened, "Value"), "11");
+  assert.equal(opened.page.profile, "2");
+  assert.equal(opened.page.window.limit, String(nativeApplication ? rowLimit : 40));
+  assert.equal(opened.page.rows.length, 2);
+  assert.deepEqual(opened.page.rows.map(row => row.controls.find(cell => cell.identity === "ID").scalar.value), ["1", "2"]);
+  assert.equal(opened.page.rows[0].selected, true);
   assert.equal(opened.page.revision, "0");
   assert.deepEqual(await client.read(path(opened)), opened);
   assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), "2");
 });
 
+test("native list rows retain exact Decimal, Int64, Code and untrusted Unicode data", async () => {
+  for (const row of opened.page.rows) {
+    const values = Object.fromEntries(row.controls.filter(control => control.scalar)
+      .map(control => [control.identity, control.scalar.value]));
+    assert.equal(values.Amount, "0.12345678901234567890");
+    assert.equal(values.Exact, "9223372036854775807");
+    assert.equal(values.Label, "Grüezi <script> 東京 🔧");
+    assert.equal(values.Code, row.selected ? "0001" : "20");
+  }
+  assert.equal(await sql('SELECT "Amount"::text || \'|\' || "Exact"::text FROM "Navigation Row" WHERE "ID" = 1'),
+    "0.12345678901234567890|9223372036854775807");
+  assert.ok(renderAscii(opened.page).includes('Decimal="0.12345678901234567890"'));
+});
+
 let moved, card, saved, originalPost;
 test("external agent navigates list to exact selected card through the common lifecycle commands", async () => {
-  moved = await client.execute(path(opened), operation(opened, "$agiru.next"));
+  moved = await client.execute(path(opened), operation(opened, opened.page.rows[1].select.control));
   assert.equal(field(moved, "ID"), "2");
   assert.equal(moved.page.revision, "1");
   card = await client.execute(path(moved), operation(moved, "$agiru.card"));
@@ -341,3 +365,74 @@ if (nativeApplication) {
     }
   });
 }
+
+test("shared HTTP list windows obey the trusted bound at zero/one/39/40/41 and never accept a URL limit", async () => {
+  const bound = nativeApplication ? rowLimit : 40;
+  const rowIds = result => result.page.rows.map(row => row.controls.find(cell => cell.identity === "ID").scalar.value);
+  for (const population of [0, 1, 39, 40, 41, 81]) {
+    await sql(`DELETE FROM "Navigation Row";
+      INSERT INTO "Navigation Row" ("ID","Value","Label","Amount","Exact","Code")
+      SELECT n,n,'ROW 東京 ' || n,0.12345678901234567890,9223372036854775807,lpad(n::text,4,'0')
+      FROM generate_series(1,${population}) n`);
+    const fresh = await client.read("/?page=50341");
+    assert.equal(fresh.page.window.limit, String(bound));
+    assert.equal(fresh.page.window.more, population > bound);
+    assert.deepEqual(rowIds(fresh), Array.from({ length: Math.min(population, bound) }, (_, index) => String(index + 1)));
+    assert.equal(fresh.page.rows.filter(row => row.selected).length, population ? 1 : 0);
+    assert.deepEqual(await client.read(path(fresh)), fresh, "a GET must not repeat AL loading or change row handles");
+    if (population > bound) {
+      const next = await client.execute(path(fresh), operation(fresh, "$agiru.next"));
+      assert.deepEqual(rowIds(next), Array.from({ length: Math.min(population - bound, bound) }, (_, index) => String(bound + index + 1)));
+      const previous = await client.execute(path(next), operation(next, "$agiru.previous"));
+      assert.deepEqual(rowIds(previous), rowIds(fresh));
+      const last = await client.execute(path(previous), operation(previous, "$agiru.last"));
+      assert.deepEqual(rowIds(last), Array.from({ length: Math.min(population, bound) }, (_, index) => String(Math.max(1, population - bound + 1) + index)));
+    }
+    assert.equal((await fetch(origin + "/?page=50341&limit=1", { headers: first })).status, 400);
+    assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), String(population));
+  }
+  const fresh = await client.read("/?page=50341");
+  const received = await fetch(origin + path(fresh), { headers: first });
+  assert.equal(received.status, 200);
+  const decoded = parsePage(await received.text());
+  assert.deepEqual(decoded, fresh.page);
+  for (const bad of [
+    ["data-limit", 'data-limit="' + bound + '"', 'data-limit="1"'],
+    ["duplicate row", `data-row="${fresh.page.rows[1].handle}"`, `data-row="${fresh.page.rows[0].handle}"`],
+    ["missing selection", 'data-selected="true"', 'data-selected="false"'],
+  ]) {
+    const response = await fetch(origin + path(fresh), { headers: first });
+    const html = await response.text();
+    assert.ok(html.includes(bad[1]));
+    assert.throws(() => parsePage(html.replace(bad[1], bad[2])), error => error.code === "ProfileRefused");
+  }
+});
+
+test("external CMD/MCP and actual Chromium consume identical native list rows and row-selection commands", async () => {
+  const fresh = await client.read("/?page=50341");
+  const cmd = await execute(process.execPath, ["build/client/cmd.mjs", "--json", "read", path(fresh)],
+    { env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } });
+  assert.deepEqual(JSON.parse(cmd.stdout), fresh);
+  const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
+  const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"));
+  const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"));
+  const mcp = new Client({ name: "agiru-list-window", version: "1" });
+  const transport = new StdioClientTransport({ command: process.execPath, args: ["build/client/mcp.mjs"],
+    env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } });
+  const browser = await launchBrowser();
+  try {
+    await mcp.connect(transport);
+    const reply = await mcp.callTool({ name: "agiru_read", arguments: { path: path(fresh) } });
+    assert.deepEqual(reply.structuredContent, fresh);
+    const opened = await openBrowserPage(browser, origin, path(fresh), first.authorization);
+    assert.equal(opened.response.status(), 200);
+    await assertBrowserPage(opened.page, fresh.page);
+    await opened.page.screenshot({ path: `${proof}/list-window.png`, fullPage: true });
+    const selected = await browserAction(opened.page, origin, fresh.page, fresh.page.rows[1].select.control);
+    assert.equal(field(selected, "ID"), "2");
+    assert.equal(selected.page.rows[1].selected, true);
+    assert.deepEqual(await client.read(path(fresh)), selected);
+    assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), "81");
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 2'), "2");
+  } finally { await mcp.close(); await browser.close(); }
+});

@@ -102,6 +102,13 @@ public:
   /// An exhausted relative step presents no new rows and retains the previous block/selection.
   [[nodiscard]] virtual PageWindowState
   ReadWindow(PageWindowPosition position, std::size_t limit, PageWindowReceiver &receiver);
+
+  /// \brief Selects a server-retained row without losing SQL window continuation boundaries.
+  /// \param record Exact SQL identity from the current loaded block, not a client offset.
+  /// \return Whether the persisted record was found and selected.
+  /// \throws Error for absent windows/providers or AL failures. AL selection errors
+  /// release the page without running close/save triggers.
+  [[nodiscard]] virtual bool SelectWindowRecord(const RecordId &record);
 };
 
 /// \brief Creates a closed interactive handle from the same installed page catalogue.

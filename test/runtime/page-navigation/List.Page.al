@@ -14,6 +14,10 @@ page 50341 "Navigation List"
             {
                 field(ID; Rec.ID) { }
                 field(Value; Rec.Value) { }
+                field(Label; Rec.Label) { }
+                field(Amount; Rec.Amount) { }
+                field(Exact; Rec.Exact) { }
+                field(Code; Rec.Code) { }
             }
         }
     }

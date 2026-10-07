@@ -19,6 +19,7 @@
     "navigation_depth": 16,
     "commands": 128,
     "receipt_bytes": 4194304,
+    "list_rows": 40,
     "lifetime_seconds": 3600
   },
   "transactions": {

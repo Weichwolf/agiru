@@ -255,9 +255,16 @@ refuse. The production-only generated SQL window adapter additionally proves row
 bounds at 0/1/39/40/41/80 and limits 7/40/80, block trigger order, retained selection,
 post-trigger record values/original images and rollback after loaded-row errors. It does not clone whole
 pages or use TestPage.Next to enumerate rows. New/custom/temporary providers, refresh,
-selected globals/xRec and production HTML/client wiring remain unqualified.
+selected globals/xRec and full ERP providers remain unqualified.
 Sixteen execution mutants and a control-shadowing compile refusal must reject;
 the narrow PageInstance interface must not pull in typed page/control/record headers.
+`make page-host-test JOBS=2` additionally exercises shared native profile-2 list rows
+through Caddy, external CMD/MCP and actual Chromium. Trusted `pages.list_rows` defaults
+to 40; actual-entry runs qualify 7/40/80, empty/one/39/40/41/81 populations, forward/
+backward/last blocks, retained row handles and row selection. Exact Decimal/Int64 and
+Unicode values remain unchanged; independent UTF-8 owned fixture SQL checks effects.
+URL limits and malformed row profiles refuse; an ignored-config compiled mutant must
+fail the list-bound test. Cards keep profile 1. This is not full ERP/BC collation parity.
 `make page-profile JOBS=2` additionally checks exact bound scalar values and a bounded
 current-row semantic HTML fragment over the same production handles. Display text is
 separate from canonical Decimal/Int64, enum domains/member names and temporal flags.

@@ -58,6 +58,7 @@ void Defaults() {
                  options.pages.navigationDepth == pages.navigationDepth &&
                  options.pages.commands == pages.commands &&
                  options.pages.receiptBytes == pages.receiptBytes &&
+                 options.pages.listRows == pages.listRows &&
                  options.pages.lifetime == pages.lifetime &&
                  options.pages.session.disableWriteInsideTryFunctions ==
                      pages.session.disableWriteInsideTryFunctions);
@@ -69,10 +70,14 @@ void Defaults() {
   root["http"]["workers"] = Node(2);
   root["transactions"]["disable_write_inside_try_functions"] = Node(true);
   root["pages"]["receipt_bytes"] = Node::Number("9007199254740993");
+  constexpr auto kConfiguredListRows = 7;
+  root["pages"]["list_rows"] = Node(kConfiguredListRows);
   root["company"] = Node(std::string("Original + Gesellschaft 東京"));
   const auto selected = agiru::ParseNativeServiceOptions(root.dump());
   CHECK_TRUE("trusted explicit worker and transaction policies are retained",
              selected.http.workers == 2 && selected.pages.session.disableWriteInsideTryFunctions);
+  CHECK_TRUE("trusted configuration changes the common list row bound",
+             selected.pages.listRows == kConfiguredListRows);
   CHECK_TRUE("integer budgets never travel through binary floating point",
              selected.pages.receiptBytes == 9007199254740993ULL);
   root["company"] = Node(std::string("Changed"));
@@ -146,6 +151,7 @@ void DuplicatesAndNumbers() {
   for (const std::string_view anchor : {"\"schema\":1",
                                         "\"port\":18080",
                                         "\"contexts\":64",
+                                        "\"list_rows\":40",
                                         "\"disable_write_inside_try_functions\":false"}) {
     auto duplicate = compact;
     const auto at = duplicate.find(anchor);

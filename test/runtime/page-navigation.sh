@@ -19,6 +19,7 @@ trap cleanup EXIT
 sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
   src/rt/PageCore.cpp src/rt/PageValue.cpp include/runtime/PageValue.h \
   src/rt/PageHtml.cpp src/rt/HtmlText.{h,cpp} include/runtime/PageHtml.h \
+  src/rt/PageListHtml.h \
   src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
   include/runtime/PageWindow.h include/runtime/RecordWindow.h src/rt/RecordWindow.cpp \
   include/runtime/Table.h \

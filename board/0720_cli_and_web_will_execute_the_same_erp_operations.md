@@ -4,9 +4,8 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: connect generated SQL page windows to shared HTML/CMD/MCP rows and install
-the consumed trusted `pages.list_rows` default of 40. Do not add an unused config knob.
-Integrate the session-owned native UI bridge from 0741 with real HTTP dialog
+Next: rebuild generated production factories for the expanded PageInstance API, then
+integrate the session-owned native UI bridge from 0741 with real HTTP dialog
 admission/suspension and typed error responses; rerun original Customer
 List → Card → Validate → Save using external CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
@@ -29,10 +28,24 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Its full 37 navigation controls and the six refresh controls also pass. Three affected
   units pass clang-tidy; the standalone public header measures 223.7 ms frontend,
   three no-PCH rounds, not a build-speed or ERP-performance comparison.
-- Pending: replace the single-current-record presentation with list windows. Default
-  40 rows, an explicit positive `pages.list_rows` in `deploy/dev/agiru.json`, parsed by
-  `src/rt/NativeServiceConfig.cpp`; never a client-controlled SQL limit. Enforce the
-  bound in the shared production record read, not by trimming an unbounded result.
+- Native HTTP lists now consume `pages.list_rows` from `deploy/dev/agiru.json`, default
+  40, through `NativeServiceConfig.cpp` and the generated SQL window adapter. Web,
+  CMD and MCP receive profile-2 read-only rows, exact typed values and opaque selection
+  commands from one bounded `PageHtml.cpp` renderer; cards retain profile 1. Selection
+  retains SQL continuation boundaries. The current-row panel remains alongside rows;
+  this is not final BC grid/UI acceptance. No URL/CLI limit or client-side sorting.
+  `make page-host-test JOBS=2`: 15 fixture-host cases and 21 actual-entry cases for
+  each of limits 40/7/80, zero red; both TryFunction policies and six compiled ownership,
+  revision, replay, policy, duplicate-key and ignored-list-limit defects reject.
+  Actual Chromium DOM rows/typed values/selection agree with external CMD/MCP;
+  UTF-8 owned fixture SQL independently confirms population and unchanged row values.
+  Native configuration has 194 checks, zero red. This is authored generated-page proof,
+  not original Customer/workflow, production-collation, full ERP or UT acceptance.
+  Seven affected native/configuration/generated-consumer units pass clang-tidy without
+  additional suppressions; existing current-row HTML/scalar gates retain 164/34 checks
+  and nine compiled refusal controls, zero red.
+  `make client-test` and `make web-test` remain green, including the five agent and
+  three browser execution defects; these preserve profile-1 transport regressions.
 - Generated loading: `include/runtime/{PageWindow,PageInstance,PageSession}.h` separates
   loaded-row and selected-row triggers through `Page.h`. The production-only adapter
   retains raw SQL boundaries and selected post-trigger record fields, not a copied page,
@@ -53,7 +66,10 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Ordinary SQL List pages are the initial provider. Custom navigation, new/empty
   editable rows, temporary/virtual providers, inclusive refresh, current-row xRec,
   selected-page-variable/part state and lazy BLOB/byte budgets remain unqualified.
-  This API is not yet used by HTTP or the current-row HTML profile; no client parity claim.
+  HTTP now uses this API through the private `src/rt/PageListHtml.h` projection.
+  Unchanged GETs retain row handles/projections without replaying row triggers; reads
+  reauthorize cached controls before returning values. Byte/control/depth budgets bound
+  presentation, not SQL BLOB read volume or query scan cost.
   Rebuild generated production factories before calling the expanded PageInstance API;
   the focused generated fixtures are current, not the full ERP image or AL UT population.
 - Preserve server permissions/company and all filter groups. Continue in the declared
