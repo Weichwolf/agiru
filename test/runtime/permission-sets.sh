@@ -7,7 +7,7 @@ proof=$(mktemp -d /tmp/agiru-permission-sets.XXXXXX)
 sha256sum include/meta/PermissionSetDef.h include/runtime/PermissionSets.h \
   src/rt/PermissionSets.cpp test/gate/PermissionSetsGate.cpp \
   test/runtime/permission-sets.sh > "$proof/inputs.sha256"
-controls=(precedence exclude filter identity cycle entries edges)
+controls=(precedence exclude filter identity cycle entries edges override)
 cleanup() {
   for control in "${controls[@]}"; do
     for suffix in cpp bin; do
@@ -48,6 +48,9 @@ for control in "${controls[@]}"; do
       sub(/edges_ == limits_.edges/,
           "(static_cast<void>(edges_ == limits_.edges), false)"); changed++
     }
+    control == "override" && /result.level = PermissionLevel::Indirect;/ {
+      sub(/PermissionLevel::Indirect/, "PermissionLevel::None"); changed++
+    }
     { print }
     END { if (changed != 1) exit 2 }
   ' src/rt/PermissionSets.cpp > "$proof/$control.cpp"
@@ -64,6 +67,7 @@ for control in "${controls[@]}"; do
     cycle) claim='include cycles refuse explicitly' ;;
     entries) claim='entry bound refuses excess permission arrays' ;;
     edges) claim='edge bound counts repeated cached references' ;;
+    override) claim='tenant override reduces a direct modify permission to indirect' ;;
   esac
   rg -q "^FAIL .*${claim}" "$proof/$control.log"
 done
@@ -73,4 +77,4 @@ done
 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
   "$proof/sanitizers.bin" > "$proof/sanitizers.log" 2>&1
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'permission-sets: BC composition, ASan/UBSan and seven compiled defects; native SQL assignment/execution-context providers remain unqualified; %s\n' "$proof"
+printf 'permission-sets: BC composition, ASan/UBSan and eight compiled defects; native SQL assignment/execution-context providers remain unqualified; %s\n' "$proof"

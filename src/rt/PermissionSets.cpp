@@ -144,6 +144,13 @@ private:
     }
     const Effective excluded = Includes(definition->excluded);
     result.level = Subtract(result.level, excluded.level);
+    const Effective override = Entries(definition->excludedPermissions);
+    if (override.level == PermissionLevel::Direct) {
+      result.level = PermissionLevel::None;
+    } else if (override.level == PermissionLevel::Indirect &&
+               result.level == PermissionLevel::Direct) {
+      result.level = PermissionLevel::Indirect;
+    }
     active_.pop_back();
     completed_.emplace(identity, result);
     return result;

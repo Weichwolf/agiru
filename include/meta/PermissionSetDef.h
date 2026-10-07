@@ -65,10 +65,12 @@ struct PermissionSetExtensionDef {
 /// \brief One immutable system/tenant set with its target-bound extensions.
 /// The owning catalogue keeps every borrowed identity/array alive throughout resolution.
 struct PermissionSetDef {
-  PermissionSetIdentity identity;                          ///< Exact app/role/scope owner.
-  std::span<const PermissionEntry> permissions{};          ///< This set's own rights.
-  std::span<const PermissionSetIdentity> included{};       ///< Recursively added sets.
-  std::span<const PermissionSetIdentity> excluded{};       ///< Rights removed at this level only.
+  PermissionSetIdentity identity;                    ///< Exact app/role/scope owner.
+  std::span<const PermissionEntry> permissions{};    ///< This set's own rights.
+  std::span<const PermissionSetIdentity> included{}; ///< Recursively added sets.
+  std::span<const PermissionSetIdentity> excluded{}; ///< Rights removed at this level only.
+  /// Original Tenant Permission.Type=Exclude rows: Yes removes; Indirect reduces, never grants.
+  std::span<const PermissionEntry> excludedPermissions{};
   std::span<const PermissionSetExtensionDef> extensions{}; ///< Extensions installed for this set.
 };
 

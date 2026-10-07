@@ -268,6 +268,29 @@ void MissingAndCycles() {
   });
 }
 
+void TenantOverrides() {
+  constexpr std::array inherited{agiru::PermissionEntry{.rights = kAll, .object = kObject}};
+  constexpr std::array overrides{
+      agiru::PermissionEntry{.rights = {kNone, kNone, kIndirect, kDirect}, .object = kObject}};
+  constexpr std::array included{kLeaf};
+  const std::array definitions{
+      Set{.identity = kRoot, .included = included, .excludedPermissions = overrides},
+      Set{.identity = kLeaf, .permissions = inherited},
+      Set{.identity = kParent, .excludedPermissions = overrides}};
+  const Catalog catalog(definitions);
+  constexpr std::array assigned{kRoot};
+  CHECK_TRUE("tenant override preserves a blank read override",
+             Resolve(catalog, assigned) == kDirect);
+  CHECK_TRUE("tenant override reduces a direct modify permission to indirect",
+             Resolve(catalog, assigned, Operation::Modify) == kIndirect);
+  CHECK_TRUE("tenant override removes the explicit delete permission",
+             Resolve(catalog, assigned, Operation::Delete) == kNone);
+  CHECK_TRUE("tenant reduction cannot create an absent permission",
+             Resolve(catalog, std::array{kParent}, Operation::Modify) == kNone);
+  CHECK_TRUE("tenant reduction cannot downgrade a separately assigned direct set",
+             Resolve(catalog, std::array{kRoot, kLeaf}, Operation::Modify) == kDirect);
+}
+
 void Bounds() {
   constexpr std::array read{agiru::PermissionEntry{.rights = kRead, .object = kObject}};
   constexpr std::array references{kLeaf, kLeaf, kLeaf};
@@ -364,6 +387,7 @@ int main() {
     WildcardsAndIdentity();
     ExtensionsAndFilters();
     MissingAndCycles();
+    TenantOverrides();
     Bounds();
     InvalidPolicy();
   });
