@@ -59,6 +59,7 @@ while IFS=$'\t' read -r id source; do
     3) outcome=unbound;;
     4) outcome=parse-refused;;
     2) outcome=binding-refused;;
+    5) outcome=storage-unqualified;;
     *) printf 'unexpected emitter status: %s\n' "$status" >&2; outcome=crashed;;
   esac
   jq -nc --argjson id "$id" --arg source "$source" --arg status "$outcome" \

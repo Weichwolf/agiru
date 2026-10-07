@@ -19,7 +19,7 @@ export CCACHE_SLOPPINESS
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
-.PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
+.PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-storage native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
 .PHONY: page-profile client client-test http-test page-host-test session-identity table-permissions permission-sets native-permissions
 
@@ -206,6 +206,11 @@ native-table-ids: comments db tc ## execute source-owned native table IDs withou
 	@"$(B)/gate_GenNativeBindingGate"
 	@"$(B)/gate_AlParserGate"
 	@B="$(B)" bash "$(SELF)/test/transpiler/native-table-ids.sh"
+
+native-storage: comments db tc ## qualify original persisted System permission tables through PostgreSQL
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenNativeBindingGate
+	@"$(B)/gate_GenNativeBindingGate"
+	@B="$(B)" bash "$(SELF)/test/transpiler/native-storage.sh"
 
 native-codeunits: comments db tc ## qualify source-owned native indexing/output and explicit unbound methods
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenCodeunitGate

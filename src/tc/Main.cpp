@@ -1859,6 +1859,16 @@ void NoteObjectOptions(const agiru::al::PageObject &object, OptionsInScope &into
   NoteControlOptions(object.dataset, into);
 }
 
+void NoteTableOptions(const agiru::al::TableObject &table, OptionsInScope &into) {
+  NoteOptions(table.variables, table.procedures, into);
+  for (const auto &field : table.fields) {
+    const auto *members = agiru::al::Find(field.properties, "OptionMembers");
+    if (members == nullptr) { continue; }
+    const auto listed = agiru::al::ListValue(*members);
+    into.insert_or_assign(agiru::gen::OptionContentName(listed), listed);
+  }
+}
+
 void NoteFieldEnums(const agiru::al::TableObject &table,
                     const agiru::gen::EnumIndex &enums,
                     agiru::gen::FieldEnums &into,
@@ -1884,8 +1894,15 @@ void NoteFieldEnums(const agiru::al::TableObject &table,
 
 void NoteNativeFieldEnums(const agiru::gen::NativeSources &sources, agiru::gen::Objects &objects) {
   for (const auto &table : sources.tables) {
-    if (!objects.tables.contains(std::to_string(table.id))) { continue; }
-    NoteFieldEnums(table, objects.enums, objects.fieldEnums, false);
+    const auto binding = objects.tables.find(std::to_string(table.id));
+    if (binding == objects.tables.end()) { continue; }
+    NoteFieldEnums(table, objects.enums, objects.fieldEnums, !binding->second.native);
+    const auto &fields = objects.fieldEnums.at(agiru::gen::LowerKey(table.name));
+    objects.fieldEnums.insert_or_assign(std::to_string(table.id), fields);
+    if (!table.nameSpace.empty()) {
+      objects.fieldEnums.insert_or_assign(agiru::gen::LowerKey(table.nameSpace + "." + table.name),
+                                          fields);
+    }
   }
 }
 
@@ -2954,12 +2971,21 @@ bool HasUnboundNativeMethods(const Gathered &gathered) {
 
 std::size_t WriteNativeTables(Run &run,
                               const agiru::gen::NativeSources &native,
-                              const agiru::gen::Objects &objects) {
+                              const agiru::gen::Objects &objects,
+                              Gathered &gathered,
+                              std::map<std::string, std::size_t> &unresolved) {
   if (run.output.empty() || native.app.id.empty()) { return 0; }
   std::size_t count = 0;
-  for (const auto &table : native.tables) {
+  for (std::size_t at = 0; at < native.tables.size(); ++at) {
+    const auto &table = native.tables[at];
     const auto binding = objects.tables.find(std::to_string(table.id));
     if (binding == objects.tables.end()) { continue; }
+    if (!binding->second.native) {
+      NoteTableOptions(table, gathered.options);
+      WriteTable(run, table, native.paths.at(at), objects.enums, objects, gathered, unresolved);
+      ++count;
+      continue;
+    }
     const auto relative = "native/table/" + std::to_string(table.id) + ".cpp";
     Keep(run,
          Output{.directory = run.output, .relative = relative},
@@ -2979,6 +3005,7 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
                                       const TableByName &tables,
                                       std::set<std::filesystem::path> &kept,
                                       LayoutCounts &layouts,
+                                      std::map<std::string, std::size_t> &unresolvedEnums,
                                       std::map<std::string, std::size_t> &unresolvedTables,
                                       std::vector<Failure> &refusals) {
   const bool ownedTables = !native.tables.empty() && !native.app.id.empty();
@@ -3000,7 +3027,8 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
              native.app,
              "platform/NavxManifest.xml",
              objects);
-  const auto tablesWritten = WriteNativeTables(run, native, objects);
+  const auto tablesWritten = WriteNativeTables(run, native, objects, gathered, unresolvedEnums);
+  const auto tableFiles = run.written;
   std::println("native {} table declarations emitted with original module/namespace ownership; "
                "no live metadata provider proof",
                tablesWritten);
@@ -3013,9 +3041,9 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
   NoteUnwrittenReports(run, reports, gathered);
   for (const auto &report : reports.objects) { NoteObjectOptions(report, gathered.options); }
   WritePages(run, reports, objects, gathered, tables);
-  const auto reportWritten = run.written - tablesWritten;
+  const auto reportWritten = run.written - tableFiles;
   WriteEnums(run, enums, objects);
-  const auto enumWritten = run.written - reportWritten - tablesWritten;
+  const auto enumWritten = run.written - reportWritten - tableFiles;
   const auto beforeInterfaces = run.written;
   WriteInterfaces(run,
                   Interfaces{.objects = native.interfaces, .paths = native.interfacePaths},
@@ -3236,6 +3264,7 @@ public:
                                                  everyTable,
                                                  kept,
                                                  layouts,
+                                                 unresolvedEnums,
                                                  unresolvedTables,
                                                  refusals);
     written += nativeOutput.written;
@@ -3476,13 +3505,7 @@ private:
     WriteQueries(run, parsedQueries, objects, queryCounts);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
-      NoteOptions(table.variables, table.procedures, gathered.options);
-      for (const agiru::al::FieldDecl &field : table.fields) {
-        const agiru::al::Property *members = agiru::al::Find(field.properties, "OptionMembers");
-        if (members == nullptr) { continue; }
-        const std::vector<std::string> listed = agiru::al::ListValue(*members);
-        gathered.options.insert_or_assign(agiru::gen::OptionContentName(listed), listed);
-      }
+      NoteTableOptions(table, gathered.options);
     }
     for (const agiru::al::PageObject &page : parsed.objects) {
       NoteObjectOptions(page, gathered.options);

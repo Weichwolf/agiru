@@ -244,6 +244,72 @@ void NativeOwnedDeclarations() {
   CHECK_TRUE("unowned native source cannot be qualified", refused);
 }
 
+void StoredSystemBindings() {
+  const auto table = agiru::al::ParseTable(R"(namespace System.Security.AccessControl;
+    table 2000000165 "Tenant Permission Set" {
+      DataPerCompany = false; ReplicateData = false; Scope = Cloud;
+      fields {
+        field(1; "App ID"; Guid) {} field(2; "Role ID"; Code[20]) {}
+        field(3; Name; Text[30]) {} field(4; Assignable; Boolean) { InitValue = true; }
+      }
+      keys { key(Key1; "App ID", "Role ID") { Clustered = true; } }
+    })");
+  const std::array sources{table};
+  agiru::gen::Objects objects;
+  objects.tables = agiru::gen::PlatformTables(sources);
+  objects.module = "::agiru::app::platform::kModule";
+  objects.moduleHeader = "platformModule.h";
+  const auto &binding = objects.tables.at(std::to_string(table.id));
+  CHECK_TRUE("stored system tables use the ordinary writer", !binding.native);
+  CHECK_TEXT("stored system headers retain source namespace",
+             binding.header,
+             "system/security/access_control/table/TenantPermissionSet.h");
+  CHECK_TRUE("stored system declarations need no duplicate handwritten ABI assertions",
+             binding.declarationAssertions.empty());
+  for (const auto *name : {"tenant permission set",
+                           "2000000165",
+                           "system.security.accesscontrol.tenant permission set"}) {
+    CHECK_TEXT("stored source aliases retain one class",
+               objects.tables.at(name).identifier,
+               binding.identifier);
+  }
+  const auto definition = agiru::gen::TableDefinitions(table, objects);
+  CHECK_TRUE("stored system definitions retain shared scope",
+             definition.contains(".dataPerCompany = false,"));
+  CHECK_TRUE("stored system definitions retain original module",
+             definition.contains(".module = &::agiru::app::platform::kModule,"));
+  const auto header = agiru::gen::WriteHeader(table, "original.al", {}, objects);
+  CHECK_TRUE("original field widths remain source-derived", header.text.contains("Code<20>"));
+  CHECK_TRUE("stored source initialization uses runtime InitValue semantics",
+             header.text.contains("RuntimeInitValues(this,"));
+  for (const auto *part : {"id", "namespace", "name"}) {
+    auto changed = table;
+    if (std::string_view(part) == "id") { changed.id = kUnboundId; }
+    if (std::string_view(part) == "namespace") { changed.nameSpace = "Other"; }
+    if (std::string_view(part) == "name") { changed.name = "Other"; }
+    const std::array altered{changed};
+    CHECK_TRUE("unknown system declarations do not manufacture persisted providers",
+               agiru::gen::PlatformTables(altered).empty());
+  }
+  for (const auto *property :
+       {"DataPerCompany = true; ReplicateData = false;",
+        "DataPerCompany = false; ReplicateData = true;",
+        "DataPerCompany = false; ReplicateData = false; TableType = Temporary;",
+        "DataPerCompany = false;"}) {
+    auto changed = table;
+    changed.properties =
+        agiru::al::ParseTable("table 1 T { " + std::string(property) + " }").properties;
+    const std::array altered{changed};
+    bool refused = false;
+    try {
+      static_cast<void>(agiru::gen::PlatformTables(altered));
+    } catch (const std::runtime_error &error) {
+      refused = std::string_view(error.what()).contains("stored System table property");
+    }
+    CHECK_TRUE("incompatible native storage policies refuse", refused);
+  }
+}
+
 void SharedTableProperties() {
   auto table = SourceTable();
   table.properties = agiru::al::ParseTable(R"(table 1 T {
@@ -524,6 +590,7 @@ int main() {
     NativeIdentityConstants();
     NativeIdentityRefusals();
     NativeOwnedDeclarations();
+    StoredSystemBindings();
     SharedTableProperties();
     RefusalsAndCodedOrdinals();
     NativePropertyRefusals();

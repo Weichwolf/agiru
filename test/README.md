@@ -108,6 +108,17 @@ fail. Qualified names and local Option shadowing remain distinct. The fixture's 
 unbound table keeps translation nonzero; `make native-table-ids JOBS=2` qualifies the
 constant path, not native provider/business execution or the UT milestone.
 
+`make native-storage JOBS=2 AGIRU_SYSTEM_SYMBOLS=<verified-package>` translates four
+original stored System permission tables through the ordinary table writer, preserving
+the original module, namespace, fields, keys, options and InitValue. Its C++ runner creates
+a disposable PostgreSQL database, writes/reads typed generated records and checks independent
+SQL and native permission resolution. Changed source defaults/widths must fail. TableFilter
+storage and Init are tested; enforcing a nonempty security filter remains an explicit refusal.
+This pinned four-source qualification is not the full System-table inventory, virtual metadata
+provider, system permission-set installation, Customer workflow or UT acceptance. The separate
+intrinsic ABI audit reports generated stored sources as `storage-unqualified`, never an empty
+successful assertion unit.
+
 `transpiler/native-codeunits.sh` executes void/value/named-return/overloaded/local
 Native refusals before var/stream/event effects. Removing Native must fail the
 compiled runner. `make native-codeunits JOBS=2` is the focused entry point;

@@ -21,6 +21,7 @@ namespace {
 
 constexpr int kPageArgumentCount = 5;
 constexpr int kCodeunitArgumentCount = 4;
+constexpr int kStoredSource = 5;
 
 std::string Read(const char *path) {
   std::ifstream stream(path);
@@ -37,6 +38,11 @@ int Emit(const char *path) {
   if (binding == bindings.end()) {
     std::cerr << "unbound native table: " << table.id << ' ' << table.name << '\n';
     return 3;
+  }
+  if (!binding->second.native) {
+    std::cerr << "stored System source requires native-storage SQL qualification: " << table.name
+              << '\n';
+    return kStoredSource;
   }
   static_cast<void>(agiru::gen::PlatformFieldEnums(declarations, bindings));
   std::cout << binding->second.declarationAssertions;

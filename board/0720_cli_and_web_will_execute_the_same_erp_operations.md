@@ -5,7 +5,7 @@ Depends on: existing generated page declarations, typed record/session primitive
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
 Next: emit/install real system permission declarations and provision original Company/User
-and persisted permission storage over the verified shared CRONUS transfer; execute Customer List → Card → Validate → Save using external
+and the generated permission tables over the verified shared CRONUS transfer; execute Customer List → Card → Validate → Save using external
 CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
 
@@ -16,6 +16,37 @@ specific working client contracts, not this WI's full acceptance; no dependency 
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
 ## Existing foundation and refreshed implementation review
+
+- Stored System permission tables: `src/gen/CodeunitWriter.cpp` binds the original
+  Access Control (2000000053), Tenant Permission Set (2000000165), Tenant Permission
+  (2000000166) and Tenant Permission Set Rel. (2000000253) by ID/name/namespace.
+  `src/tc/Main.cpp` emits their ordinary typed headers/bodies/definitions and options,
+  retaining original System module ownership; no duplicate runtime field dictionaries.
+  `src/rt/Table.cpp` now resets and reads TableFilter as its exact stored expression;
+  this does not implement row-security enforcement or FieldRef value coercion.
+  `make native-storage JOBS=2 AGIRU_SYSTEM_SYMBOLS=<verified-package>`: four original
+  sources, 53 C++/SQL checks and two rejected source mutations (InitValue/Code width).
+  Original R/I/M/D/X ordinals, Unicode filter roundtrip/reset, actual denied SQL writes,
+  indirect rights, company isolation and revocation pass in an owned disposable database.
+  Nonempty security filters still refuse explicitly. `GenNativeBindingGate`: 183 checks;
+  `make native-table-ids`: 159 parser/25 executed writer checks and seven identity controls.
+  CMake's existing platform library owns these sources; do not also register them in the slice.
+  Full translation: 234 raw/233 selected System tables, 22 bound/211 unbound; zero table
+  source refusals. Existing product exclusion remains separately counted. Translation stays
+  red (5,683 property refusals and other retained gaps), not a green subset. Slice check:
+  14,225 sources, zero missing. The actual platform library compiles/links all four new tables;
+  complete integration build is still pending. Thirty native-source tooling tests pass;
+  changed-code clang-tidy: 6/323 units checked, zero findings, no new suppression.
+  This is not seed provisioning, virtual permission metadata, generated system roles,
+  native Customer/browser execution, complete System inventory or AL UT acceptance.
+  References: System `src/Tenant Database Tables/{AccessControl,TenantPermissionSet,
+  TenantPermission,TenantPermissionSetRel}.Table.al`, package 29.0.55365.0 SHA-256
+  `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`;
+  developer `properties/devenv-{datapercompany,tabletype,replicatedata,initvalue}-property.md`
+  and `methods-auto/record/record-init-method.md` at
+  `f928288ee840334be73142e5fc0202c0e19b246d` (TableFilter defaults to empty).
+  Predecessor `openerp/board/1810_permission_set_relation_tables.md` identifies missing
+  relation/metadata providers; WI 1700's implicit SUPER/system-table exemptions are rejected.
 
 - Native CRONUS transfer: `scripts/seed_demo.py` supports separate container/database/user
   endpoints, stdin SQL, checked bytea-to-Int64 rowversions, monotonic allocator reconciliation

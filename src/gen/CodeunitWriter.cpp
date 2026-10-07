@@ -2279,6 +2279,38 @@ std::optional<std::int32_t> NativeTableNumberOf(const Objects &objects, std::str
   return matched->id;
 }
 
+namespace {
+
+bool StoredPlatformTable(const al::TableObject &table) {
+  constexpr std::array identities{
+      std::pair{2000000053, std::string_view{"Access Control"}},
+      std::pair{2000000165, std::string_view{"Tenant Permission Set"}},
+      std::pair{2000000166, std::string_view{"Tenant Permission"}},
+      std::pair{2000000253, std::string_view{"Tenant Permission Set Rel."}}};
+  const bool known = std::ranges::any_of(identities, [&](const auto &identity) {
+    return table.id == identity.first && SameName(table.name, identity.second);
+  });
+  if (!known || !SameName(table.nameSpace, "System.Security.AccessControl")) { return false; }
+  for (const auto &property : table.properties) {
+    const auto name = LowerKey(property.name);
+    const auto value = LowerKey(property.text);
+    if ((name == "tabletype" && value != "normal") ||
+        ((name == "datapercompany" || name == "replicatedata") && value != "false")) {
+      throw std::runtime_error("incompatible stored System table property: " + table.name + "." +
+                               property.name);
+    }
+  }
+  for (const auto *property : {"DataPerCompany", "ReplicateData"}) {
+    if (al::Find(table.properties, property) == nullptr) {
+      throw std::runtime_error("missing stored System table property: " + table.name + "." +
+                               property);
+    }
+  }
+  return true;
+}
+
+}
+
 TableIndex PlatformTables(std::span<const al::TableObject> declarations,
                           std::optional<SystemFieldProfile> hostProfile) {
   const TableIndex bindings = PlatformTables();
@@ -2290,16 +2322,25 @@ TableIndex PlatformTables(std::span<const al::TableObject> declarations,
       throw std::runtime_error("duplicate System table declaration: " + table.name);
     }
     const auto binding = bindings.find(LowerKey(table.name));
-    if (binding == bindings.end() || binding->second.id != table.id) { continue; }
+    const bool stored = StoredPlatformTable(table);
+    if (!stored && (binding == bindings.end() || binding->second.id != table.id)) { continue; }
     TableRef ref =
-        BindTable(table, binding->second.identifier, binding->second.header, hostProfile);
-    for (const auto &field : table.fields) {
-      const auto spelling =
-          PlatformFieldSpelling(PlatformField{.table = table.name, .field = field.name});
-      if (!spelling.empty()) { ref.fields.insert_or_assign(LowerKey(field.name), spelling); }
+        stored ? BindTable(table,
+                           "::agiru::" + NamespaceSuffix(table.nameSpace) +
+                               ClassName(Identifier(table.name), ObjectKind::Table),
+                           OutputDirectory(table.nameSpace, ObjectKind::Table) + "/" +
+                               Identifier(table.name) + ".h",
+                           hostProfile)
+               : BindTable(table, binding->second.identifier, binding->second.header, hostProfile);
+    if (!stored) {
+      for (const auto &field : table.fields) {
+        const auto spelling =
+            PlatformFieldSpelling(PlatformField{.table = table.name, .field = field.name});
+        if (!spelling.empty()) { ref.fields.insert_or_assign(LowerKey(field.name), spelling); }
+      }
+      ref.native = true;
+      ref.declarationAssertions = NativeTableAssertions(table, ref);
     }
-    ref.native = true;
-    ref.declarationAssertions = NativeTableAssertions(table, ref);
     const std::string name = LowerKey(table.name);
     if (!tables.emplace(name, ref).second ||
         !tables.emplace(std::to_string(table.id), ref).second) {

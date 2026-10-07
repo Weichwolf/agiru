@@ -29,6 +29,7 @@
 #include "type/MediaSet.h"
 #include "type/RecordId.h"
 #include "type/StringValue.h"
+#include "type/TableFilter.h"
 #include "type/Time.h"
 
 #include "BuiltinsWritten.h"
@@ -333,6 +334,8 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
       return;
     }
     case FieldType::TableFilter:
+      *reinterpret_cast<TableFilter *>(At(record, def)) = TableFilter{text};
+      return;
     default: throw Error("no reader for the field type of " + std::string(def.name) + " yet");
   }
 }
@@ -365,6 +368,9 @@ void ClearField(void *record, const FieldDef &def) {
     case FieldType::Media: *reinterpret_cast<Media *>(At(record, def)) = Media{}; return;
     case FieldType::MediaSet: *reinterpret_cast<MediaSet *>(At(record, def)) = MediaSet{}; return;
     case FieldType::RecordId: *reinterpret_cast<RecordId *>(At(record, def)) = RecordId{}; return;
+    case FieldType::TableFilter:
+      *reinterpret_cast<TableFilter *>(At(record, def)) = TableFilter{};
+      return;
     default:
       throw Error("Init: field " + std::string(def.name) +
                   " has a type this runtime cannot return to its default yet");
