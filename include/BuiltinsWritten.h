@@ -262,6 +262,11 @@ void LogAuditMessage(
 /// \return The type in force.
 ::agiru::TransactionType CurrentTransactionType();
 
+/// \brief AL `Database.IsInWriteTransaction()` for the currently active session.
+/// \return Whether an AL write has moved the current transaction into its write phase.
+/// \throws SessionError when no session is active.
+::agiru::Boolean IsInWriteTransaction();
+
 /// \brief AL `System.NormalDate(Date)`. The normal date of a closing date, and a normal date
 ///        unchanged (`system-normaldate-method.md`).
 /// \param Date A normal or a closing date.

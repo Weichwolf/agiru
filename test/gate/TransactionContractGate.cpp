@@ -16,6 +16,7 @@
 #include "type/IsolatedStorage.h"
 #include "type/StringValue.h"
 
+#include "BuiltinsWritten.h"
 #include "Check.h"
 #include "OwnedDatabase.h"
 #include "ResourceCost.h"
@@ -129,12 +130,16 @@ void EvaluatedRuns(const std::string &dsn) {
   const agiru::Connection observer(dsn);
   Routine unit;
   CHECK_TEXT("the gate executes the declared codeunit", Routine::Name(), "Transaction contract");
+  CHECK_TRUE("the AL write-transaction builtin starts in the read phase",
+             !agiru::IsInWriteTransaction());
   unit.body = [] { Make("VALUE").Insert(); };
   {
     const agiru::CommitScope restriction(agiru::CommitBehavior::Error);
     CHECK_TRUE("evaluated success bypasses explicit CommitBehavior", unit.Ok_Run());
   }
   CHECK_TRUE("evaluated success is independently durable", Exists(observer, "VALUE"));
+  CHECK_TRUE("implicit Commit clears the AL write-transaction builtin",
+             !agiru::IsInWriteTransaction());
   unit.body = [] {
     Make("FAILED").Insert();
     throw agiru::Error("callee failure", "RunFailure");
@@ -148,6 +153,8 @@ void EvaluatedRuns(const std::string &dsn) {
              "callee failure");
   CHECK_TRUE("a failed evaluated run restores the read phase", !session.Transaction().IsWriting());
   Make("PENDING").Insert();
+  CHECK_TRUE("the AL write-transaction builtin observes an uncommitted write",
+             agiru::IsInWriteTransaction());
   bool invoked = false;
   unit.body = [&] { invoked = true; };
   CHECK_TRUE("a pending write refuses before executing evaluated Run",
@@ -155,6 +162,8 @@ void EvaluatedRuns(const std::string &dsn) {
                  !invoked);
   CHECK_TRUE("refusal does not secretly commit the caller", !Exists(observer, "PENDING"));
   agiru::Commit();
+  CHECK_TRUE("explicit Commit clears the AL write-transaction builtin",
+             !agiru::IsInWriteTransaction());
   CHECK_TRUE("explicit commit permits a subsequent evaluated run", unit.Ok_Run());
 }
 

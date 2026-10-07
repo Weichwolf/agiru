@@ -372,12 +372,6 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type);
                             ::agiru::Boolean IncludeGlobalData = {},
                             const ::agiru::RecordRef &CompanyRecord = {});
 
-/// \brief AL `Database.IsInWriteTransaction()`. Checks whether or not you are in a write
-/// transaction.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean IsInWriteTransaction();
-
 /// \brief AL `Database.LastUsedRowVersion()`. Gets the last used RowVersion from the database.
 /// \return The AL `BigInteger`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).

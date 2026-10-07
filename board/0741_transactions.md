@@ -119,10 +119,16 @@ among 254 tests, all missing-session fixtures. These are retained failures, not 
 Write preflight now checks permission → writable provider → trusted TryFunction policy;
 set-based DeleteAll shares that boundary. The catalogue gate rejects wrong session errors,
 and a compiled ordering defect fails both empty bulk-write diagnostics. `make reflection-metadata`
-passes all 79 compiled controls. PageTableField 312, TransactionContract 106, TablePermissions 29,
+passes all 79 compiled controls. PageTableField 312, TransactionContract 110, TablePermissions 29,
 SqlRowVersion 123 and Temporary 95 checks pass; the four source-binding fixture variants
 pass with owned sessions. Targeted clang-tidy reports zero findings in all three changed
-C++ units. Builtin-reference repair and a complete rerun remain due.
+C++ units. Builtin reproduction now uses the explicit verified developer root; all 1,904
+frozen method documents match the pinned developer revision above. Eight NativeToolchain
+checks and three wrong-root/fallback controls pass; the full tooling suite passes 257 tests.
+`IsInWriteTransaction` now belongs to `BuiltinsWritten`, not a generated body that
+regeneration would overwrite. Exact builtin reproduction passes; read/write and implicit/
+explicit Commit checks execute the AL builtin, and both constant-answer defects reject.
+All three affected C++ units pass targeted clang-tidy. A complete native rerun remains due.
 
 ## Remaining documented cases — no completion claim
 

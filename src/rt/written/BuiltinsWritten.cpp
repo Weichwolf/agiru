@@ -8,6 +8,7 @@
 #include "runtime/RecordRef.h"
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
+#include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
@@ -529,6 +530,10 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
 
 ::agiru::TransactionType CurrentTransactionType() {
   return Session::Current().Transaction().CurrentType();
+}
+
+::agiru::Boolean IsInWriteTransaction() {
+  return Session::Current().Transaction().IsWriting();
 }
 
 ::agiru::Date NormalDate(::agiru::Date Date) {

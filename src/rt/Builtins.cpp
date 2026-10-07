@@ -2,7 +2,6 @@
 
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
-#include "runtime/Session.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -273,10 +272,6 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type) 
   static_cast<void>(IncludeGlobalData);
   static_cast<void>(CompanyRecord);
   RefuseUnimplemented("Database.ImportData(Boolean, Text, Boolean, Boolean, Record)");
-}
-
-::agiru::Boolean IsInWriteTransaction() {
-  return Session::Current().Transaction().IsWriting();
 }
 
 ::agiru::BigInteger LastUsedRowVersion() {
