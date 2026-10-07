@@ -21,7 +21,7 @@ export CCACHE_SLOPPINESS
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-storage native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
-.PHONY: page-profile client client-test http-test page-host-test erp-fixture session-identity table-permissions permission-sets native-permissions
+.PHONY: page-profile client client-test http-test page-host-test erp-fixture erp-client-test session-identity table-permissions permission-sets native-permissions
 
 client: ## build the external Node agent CMD/MCP client from locked dependencies
 	@npm ci --prefix "$(SELF)/src/client" --ignore-scripts --no-fund --no-audit
@@ -39,6 +39,9 @@ page-host-test: comments client ## execute generated list/card edits over shared
 
 erp-fixture: ## qualify isolated original CRONUS Company and explicit native client authority, not ERP workflows
 	@bash "$(SELF)/test/ui/erp-fixture.sh"
+
+erp-client-test: client ## execute original Customer List/Card/Name edits over frozen native binaries and disposable CRONUS
+	@bash "$(SELF)/test/ui/erp-fixture.sh" client
 
 session-identity: comments db ## qualify SQL identity, persistent command leases and compiled refusal controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_SessionIdentityGate gate_SessionCommandGate gate_ClientCredentialsGate

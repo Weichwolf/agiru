@@ -4,8 +4,9 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: complete the integration build after the TableFilter diagnostic repair, then execute Customer List → Card → Validate → Save using external
-CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
+Next: inspect the live integration result, then implement session-owned production UI
+capabilities for GuiAllowed/dialogs and typed error responses; rerun original Customer
+List → Card → Validate → Save using external CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
@@ -15,6 +16,33 @@ specific working client contracts, not this WI's full acceptance; no dependency 
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
 ## Existing foundation and refreshed implementation review
+
+- Original Customer client regression: `make erp-client-test JOBS=2`,
+  `test/ui/erp-client.mjs` and the existing CRONUS fixture pipeline: seven cases,
+  one pass/six failures, zero skipped/cancelled. Caddy/native service starts and drains
+  cleanly; unassigned users are refused over HTTP/CMD/MCP without Customer/context SQL
+  effects. Authorized Customer List returns HTTP 500; all five dependent Card/edit/receipt
+  cases explicitly retain their unexecuted status as failures. A temporary C++ throw probe
+  locates `CustomerList.OnOpenPage → OfficeHostProvider.OnIsAvailable → GuiAllowed`.
+  `src/rt/written/BuiltinsWritten.cpp::GuiAllowed` currently accepts only installed test
+  handlers; a production UI host is not implemented. Earlier isolated company-login
+  subscribers also encounter retained native-method refusals. Production sessions must
+  expose real UI capability, with false for background execution and true only for a
+  working host; do not insert always-true/always-false stubs, automatic dialog answers,
+  UT-handler impersonation or object-specific bypasses. Native AL errors outside the
+  PageHost whitelist currently become a generic transport `HttpHandlerFailure`; exact
+  client error/message parity remains open. Binary copies/hashes are existing-artifact
+  diagnostics, not the still-running current integration build or actual browser acceptance.
+  Owned clone, binaries and private credentials are removed on failure. This regression
+  covers existing-customer edits, not New/template selection, posting or full sales acceptance.
+  References: developer `methods-auto/system/system-guiallowed-method.md` at
+  `f928288ee840334be73142e5fc0202c0e19b246d`; BCApps
+  `Layers/W1/BaseApp/{Sales/Customer/CustomerList.Page,CRM/Outlook/OfficeHostProvider.Codeunit,
+  Sales/Customer/Customer.Table}.al` at `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`;
+  user `sales-how-register-new-customers.md` and `includes/create_new_customer.md` at
+  `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`. Predecessor
+  `openerp/board/1713_arc-headless-client-protocol.md`: real UI-host GuiAllowed and dialogs
+  before a page handle exists; its Python threading/default-confirm machinery is not adopted.
 
 - Native ERP client preparation: `make erp-fixture JOBS=2`,
   `test/ui/erp-fixture.sh` and `test/ui/erp/Prepare.cpp`: 26 C++ checks, exact independent

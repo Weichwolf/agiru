@@ -6,6 +6,8 @@ seed=${AGIRU_ERP_SEED:-agiru_client_seed_20261007b}
 source_container=${AGIRU_ERP_SOURCE_CONTAINER:-agiru-pg}
 source_database=${AGIRU_ERP_SOURCE_DATABASE:-cronus}
 native_build=${AGIRU_ERP_BUILD:-/workspace/build/podman}
+mode=${1:-fixture}
+[[ "$#" -le 1 && ( "$mode" = fixture || "$mode" = client ) ]]
 [[ "$seed" =~ ^agiru_client_seed_[A-Za-z0-9_]+$ ]]
 [[ "$container" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]
 [[ "$source_container" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]
@@ -43,6 +45,16 @@ cleanup() {
     fi
   fi
   "${native_exec[@]}" rm -f -- "$native/prepare" "$native/prepare.o" "$native/auth.json" "$native/auth.json.denied" || status=1
+  if [[ "$mode" = client ]]; then
+    "${native_exec[@]}" rm -f -- "$native/binaries/agiru" "$native/binaries/libagiru_rt.so" \
+      "$native/binaries/libagiru_net.so" "$native/binaries/libagiru_db.so" \
+      "$native/binaries/libagiru_al.so" "$native/binaries/libagiru_slice.so" \
+      "$native/binaries/libagiru_app_platform.so" || status=1
+    "${native_exec[@]}" rmdir -- "$native/binaries" || status=1
+  fi
+  for auth in "$proof/auth.json" "$proof/auth.json.denied"; do
+    if [[ -f "$auth" ]]; then unlink "$auth"; fi
+  done
   "${native_exec[@]}" rmdir -- "$native" || status=1
   printf 'erp-fixture: exit %s; receipt %s\n' "$status" "$proof"
   exit "$status"
@@ -92,6 +104,7 @@ native_sql "$database" 'COPY (SELECT "timestamp","Name","Evaluation Company","Di
 "SystemId","SystemCreatedAt","SystemCreatedBy","SystemModifiedAt","SystemModifiedBy" FROM "Company") TO STDOUT' \
   > "$proof/company-target.tsv"
 cmp "$proof/company-source.tsv" "$proof/company-target.tsv"
+[[ $(native_sql "$database" 'SELECT last_value >= (SELECT max("timestamp") FROM "Company") FROM agiru_platform.rowversions_v1') = t ]]
 "${native_exec[@]}" "$native/prepare" "$dsn" "$company" "$native/auth.json" | tee "$proof/prepare.log"
 [[ $("${native_exec[@]}" stat --format=%a "$native/auth.json") = 600 ]]
 [[ $("${native_exec[@]}" stat --format=%a "$native/auth.json.denied") = 600 ]]
@@ -111,3 +124,19 @@ cmp "$proof/company-source.tsv" "$proof/company-source-after.tsv"
 cmp "$proof/libraries.sha256" "$proof/libraries-after.sha256"
 sha256sum --check --status "$proof/inputs.sha256"
 printf 'erp-fixture: original Company copied exactly; explicit tenant authority and denial; no ERP workflow acceptance\n'
+if [[ "$mode" = client ]]; then
+  "${native_exec[@]}" mkdir "$native/binaries"
+  binaries=(agiru libagiru_rt.so libagiru_net.so libagiru_db.so libagiru_al.so libagiru_slice.so libagiru_app_platform.so)
+  for binary in "${binaries[@]}"; do
+    "${native_exec[@]}" cp "$native_build/$binary" "$native/binaries/$binary"
+    "${native_exec[@]}" cmp "$native_build/$binary" "$native/binaries/$binary"
+    "${native_exec[@]}" sha256sum "$native_build/$binary" "$native/binaries/$binary" >> "$proof/client-binaries.sha256"
+  done
+  sha256sum test/ui/erp-client.mjs src/client/*.{mts,json} > "$proof/client-inputs.sha256"
+  printf 'erp-client: frozen existing binaries; not current integration-build or browser acceptance\n' | tee "$proof/client-qualification.txt"
+  AGIRU_ERP_NATIVE="$native" AGIRU_ERP_PROOF="$proof" AGIRU_ERP_DATABASE="$database" \
+    AGIRU_ERP_COMPANY="$company" node --test test/ui/erp-client.mjs \
+    > "$proof/client.log" 2>&1 || { cat "$proof/client.log"; exit 1; }
+  cat "$proof/client.log"
+  sha256sum --check --status "$proof/client-inputs.sha256"
+fi

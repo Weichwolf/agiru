@@ -57,6 +57,15 @@ The original source and seed remain unchanged; owned database, binaries and priv
 are removed even on failure. A non-fixture DSN must refuse before connecting. This is
 client preparation, not actual Customer execution, system-role installation or a full seed.
 
+`make erp-client-test JOBS=2` reuses that isolated fixture and freezes existing native
+binaries under `/tmp` while the external CMD/MCP clients use Caddy. Seven explicit cases
+cover unassigned-user refusal, original Customer List state, Card selection, Unicode Name
+Validate/Save via CMD/MCP/HTML forms and independent SQL/audit/rowversion/receipt effects.
+Dependent cases fail explicitly when their prerequisite did not execute; they never vanish
+or become skipped acceptance. Current result: one pass, six failures. Customer List refuses
+at `System.GuiAllowed()` without a production UI host. Frozen existing binaries are not
+proof of the current integration build, actual browser/htmx execution or full ERP parity.
+
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.
 `make verify-check` checks build tooling without rebuilding C++.
