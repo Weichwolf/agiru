@@ -44,8 +44,10 @@ podman run --detach --name "$prefix-main" --label io.agiru.development=true \
   --label "io.agiru.repository=$PWD" --label "io.agiru.development.test=$prefix" --volume "$volume:/var/lib/agiru" \
   "$image" /bin/sleep 300 > "$proof/main-id.txt"
 ready
-[[ "$(podman exec "$prefix-main" caddy version)" = v2.11.7* ]]
-podman exec "$prefix-main" test -s /usr/share/doc/caddy/LICENSE
+podman exec "$prefix-main" dpkg-query -W -f='${Version}\n' caddy > "$proof/caddy-package.txt"
+[[ "$(podman exec "$prefix-main" sh -c 'command -v caddy')" = /usr/bin/caddy ]]
+podman exec "$prefix-main" dpkg-query -S /usr/bin/caddy > "$proof/caddy-owner.txt"
+podman exec "$prefix-main" test -s /usr/share/doc/caddy/copyright
 if podman exec "$prefix-main" sh -c 'command -v nginx' > "$proof/obsolete-proxy.log" 2>&1; then exit 1; fi
 [[ "$(podman exec --user postgres "$prefix-main" psql -XAt -v ON_ERROR_STOP=1 -d agiru_gate -c 'SHOW server_encoding')" = UTF8 ]]
 [[ "$(podman exec "$prefix-main" curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/)" = 502 ]]

@@ -98,7 +98,7 @@ as the browser. Keep database data persistent, use disposable test clones and pr
 existing containers/data during migration. This development packaging does not mandate
 a single-container production topology or put Node.js in the ERP server.
 
-Use unmodified Caddy at the public edge and system libmicrohttpd for agiru's private
+Use unmodified Caddy from official Debian repositories at the public edge and system libmicrohttpd for agiru's private
 native HTTP listener. Caddy owns ACME/TLS/static delivery; C++ owns authentication and ERP
 execution. Keep blocking work off network event loops, bound admission and disable
 automatic upstream write retries. Persist certificate state; keep the admin API disabled.

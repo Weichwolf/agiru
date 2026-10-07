@@ -13,7 +13,7 @@ owned() {
 }
 case "${1:-}" in
   image)
-    exec podman build --format docker --layers --build-arg "DEV_UID=$(id -u)" --build-arg "DEV_GID=$(id -g)" \
+    exec podman build --format docker --no-cache --pull=always --build-arg "DEV_UID=$(id -u)" --build-arg "DEV_GID=$(id -g)" \
       --tag "$image" deploy/dev
     ;;
   start)

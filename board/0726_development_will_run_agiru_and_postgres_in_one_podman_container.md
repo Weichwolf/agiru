@@ -29,8 +29,10 @@ Files: `deploy/dev/{Containerfile,entrypoint.sh,Caddyfile}`, `scripts/dev_contai
 - `make dev-image dev-start dev-configure`: Debian trixie, Clang 19/libc++, PostgreSQL 17;
   persistent `agiru-dev-postgres` volume, host HTTP port bound to loopback, no published SQL port.
   Existing agiru-pg and its source/seed databases remain unchanged.
-- Qualified image: `52a08f6929eaa8dee2b8272c6008904227144d87858cbe410cdb387846d3aa38`.
-  Caddy 2.11.7/libmicrohttpd 1.0.1; only Caddy's 8080 port is published on host loopback.
+- Qualified image: `cf1f01b7222e1c51a5bd8b5516cc76d89975ac8d78228589861f18c16543e491`.
+  Official Debian Caddy package `2.6.2-12+deb13u1`/libmicrohttpd 1.0.1; only Caddy's
+  8080 port is published on host loopback. Builds bypass cached package installation,
+  refresh signed Debian indexes and upgrade installed packages before provisioning.
   Private backend defaults to 127.0.0.1:18080; SQL remains unpublished.
   `make dev-check` passes committed exact SQL persistence across restart, PostgreSQL failure,
   application exit 42, Caddy failure, unowned container start/stop refusals and incompatible
@@ -38,9 +40,10 @@ Files: `deploy/dev/{Containerfile,entrypoint.sh,Caddyfile}`, `scripts/dev_contai
   Caddy runs unprivileged with bounded shutdown, disabled admin API and persistent certificate
   storage. Local TLS verifies with its explicit CA; untrusted TLS fails. Redirects and certificate
   persistence survive restart. Public ACME issuance/renewal and production load remain unqualified.
-  Existing container is preserved stopped as `agiru-dev-pre-caddy-20261007`; all seven databases,
-  seed Customer/G/L Entry counts and provenance status are unchanged. Compiler cache and frozen
-  verification inputs were preserved with native agiru ownership, not reinitialized.
+  The development replacement is authorized; the previous container is stopped as
+  `agiru-dev-pre-debian-caddy-20261007`. All seven database identities, seed Customer/G/L
+  Entry counts and complete provenance are unchanged. Compiler-cache statistics and
+  frozen verification-input hashes match; native agiru ownership is restored.
   New clusters explicitly use UTF8/C.UTF-8; the existing gate/master volume remains
   SQL_ASCII and is not a qualified production seed. Preserve it during later seed migration.
 - `make http-test JOBS=2`: twelve native transport and nine credential cases pass with
@@ -64,7 +67,9 @@ Files: `deploy/dev/{Containerfile,entrypoint.sh,Caddyfile}`, `scripts/dev_contai
   remains loopback-only; public deployment must forward external 80/443 and configure DNS.
 - `AGIRU_DEV_SITE=localhost` uses the local CA, never a publicly trusted ACME certificate.
   Certificate state lives under the persistent volume's `caddy/` directory; do not discard it.
-- Caddy release 2.11.7 amd64/arm64 archives have fixed SHA-512 checksums in `Containerfile`;
-  upstream `LICENSE`/`README.md` ship under `/usr/share/doc/caddy/`. Native amd64 is qualified;
-  arm64 execution is not. Sources: `caddyserver/caddy-docker/2.11/alpine/Dockerfile`,
-  `https://caddyserver.com/docs/automatic-https` and `https://caddyserver.com/docs/caddyfile/options`.
+- Install Caddy exclusively from signed official Debian repositories; `/usr/bin/caddy`
+  belongs to the Debian package, whose notice is `/usr/share/doc/caddy/copyright`.
+  No upstream binary archives or extra package repositories. Native amd64 is qualified;
+  arm64 execution is not. The packaged Caddy accepts the bounded edge configuration;
+  admin API remains disabled and certificate/configuration storage stays private.
+  No automatic running-container replacement or unattended service restart is implemented.
