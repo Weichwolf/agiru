@@ -142,6 +142,8 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
   CHECK_TRUE(
       "the class derives from XmlPort",
       Has(header.text, "class ExportSomeLines_XmlPort : public XmlPort<ExportSomeLines_XmlPort>"));
+  CHECK_TRUE("XMLport construction invokes its own authorized base constructor",
+             Has(header.text, "ExportSomeLines_XmlPort() = default;"));
   CHECK_TRUE(
       "the table element is a temporary record member",
       Has(header.text,

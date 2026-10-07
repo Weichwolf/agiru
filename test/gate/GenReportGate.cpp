@@ -147,6 +147,8 @@ void TheGeneratorWritesTheReportAsAPageWithADatasetWalk() {
       agiru::gen::WritePage(report, "Sales/Reports/SomeStatement.Report.al", objects);
   CHECK_TRUE("the class derives from Report",
              Has(header.text, "class SomeStatement_Report : public Report<SomeStatement_Report>"));
+  CHECK_TRUE("report construction invokes its own authorized base constructor",
+             Has(header.text, "SomeStatement_Report() = default;"));
   CHECK_TRUE("UseRequestPage = false is the default of the instance",
              Has(header.text, "static constexpr bool kUseRequestPage = false;"));
   CHECK_TRUE("the dataitem is a record member",

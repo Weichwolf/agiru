@@ -8,7 +8,7 @@ proof=$(mktemp -d /tmp/agiru-xmlport-import.XXXXXX)
 trap 'find "$proof" -type f \( -name "*.o" -o -name "runner" -o -name "control" -o -name "mutant.cpp" \) -delete' EXIT
 printf 'xmlport-import: receipts %s\n' "$proof"
 sha256sum test/runtime/xmlport-import.sh test/runtime/xmlport-import/* \
-  src/gen/BodyWriter.cpp "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
+  src/gen/{BodyWriter,PageWriter}.cpp "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
   "$B/libagiru_db.so" "$B/libagiru_net.so" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
@@ -99,6 +99,22 @@ for profile in default-false default-true omitted temporary; do
     sha256sum "$case_root/mutant.cpp" "$case_root/control" >> "$proof/controls.sha256"
     rm -- "$case_root/mutant.cpp" "$case_root/control"
   done
+  if [ "$profile" = default-false ]; then
+    header="$case_root/generated/fixture/fixture/xmlport/ImportValidationConsumer.h"
+    cp "$header" "$case_root/original.h"
+    awk '
+      /ImportValidationConsumer_XmlPort\(\) = default;/ { changed++; next }
+      { print }
+      END { if (changed != 1) exit 2 }
+    ' "$case_root/original.h" > "$header"
+    status=0
+    "$CXX" "${flags[@]}" -c test/runtime/xmlport-import/Runner.cpp \
+      -o "$case_root/control.o" > "$case_root/aggregate-construction.log" 2>&1 || status=$?
+    [ "$status" -eq 1 ]
+    rg -q 'private default constructor' "$case_root/aggregate-construction.log"
+    cp "$case_root/original.h" "$header"
+    rm -- "$case_root/original.h"
+  fi
 done
 sha256sum --check "$proof/inputs.sha256" > "$proof/input-integrity.log"
-printf 'xmlport-import: generated field/attribute assignment, validation/defaults, temporary import and explicit Validate pass; five compiled controls reject; %s\n' "$proof"
+printf 'xmlport-import: generated field/attribute assignment, validation/defaults, temporary import and explicit Validate pass; five execution controls and aggregate-construction defect reject; %s\n' "$proof"

@@ -1751,7 +1751,7 @@ private:
              : object_.report ? "Report<"
                               : "Page<") +
             pageClass_ + "> {\npublic:\n";
-    if (!object_.report && !object_.xmlport) { out_ += "  " + pageClass_ + "() = default;\n\n"; }
+    out_ += "  " + pageClass_ + "() = default;\n\n";
     UnhideBaseMethods_();
     out_ += "  static constexpr PageId kId{" + std::to_string(object_.id) + "};\n";
     out_ += "  static constexpr std::string_view kName{" + Literal(object_.name) + "};\n\n";

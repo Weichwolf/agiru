@@ -69,8 +69,12 @@ TestIsolation 17, Report 50, Event 34, Instance 51 and HttpServer 11: zero red.
 Generated test contexts passed 48 checks; the Make target now rebuilds the key-control
 consumer after the Session ABI change. Three generated global-state defects and four
 runtime defects (missing implicit Commit, missing rollback, try-write bypass, worker-local
-scope leakage) fail their named checks. Targeted lint repairs include direct headers,
-CRTP construction access and fixture constness; final affected checks remain running.
+scope leakage) fail their named checks. Generated Report/XMLport classes now declare their
+own default constructor, preventing aggregate construction from bypassing private CRTP
+base access. GenReport/GenXmlPort and executable XMLport gates pass; removing the
+generated constructor is rejected by compilation. Targeted generator/fixture lint passes.
+Full native transpilation still exits 1 for counted unsupported/missing source declarations;
+regenerating the complete tree is not full compilation or a green AL suite.
 These results are not
 current whole-tree, full AL UT or finance acceptance.
 The previous direct integration lane was deliberately interrupted after 519/1174 steps
@@ -82,7 +86,7 @@ before changing compiler inputs. It is not a build pass or current UT measuremen
 `methods-auto/session/session-stopsession-method.md`: statement-boundary cancellation;
 `devenv-upgrading-extensions.md`: atomic lifecycle and normal-event fallback during
 install/uninstall/upgrade. Providers currently refuse or are absent; refusal is not
-implementation. Executable XMLport/AL report fixtures and full integration/UT remain due.
+implementation. Executable AL report business fixtures and full integration/UT remain due.
 External HTTP/files/printing and variable/temporary/SingleInstance state are not reversible
 SQL effects. CurrentTransactionType/ReadIsolation currently carry values without SQL
 enforcement; LockTable only changes record state and discards overload flags. These are
