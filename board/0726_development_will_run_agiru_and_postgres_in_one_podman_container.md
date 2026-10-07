@@ -30,6 +30,12 @@ Files: `deploy/dev/{Containerfile,entrypoint.sh,Caddyfile}`, `scripts/dev_contai
   persistent `agiru-dev-postgres` volume, host HTTP port bound to loopback, no published SQL port.
   Existing agiru-pg and its source/seed databases remain unchanged.
 - Qualified image: `cf1f01b7222e1c51a5bd8b5516cc76d89975ac8d78228589861f18c16543e491`.
+  The next qualified image is `916d9ee8fe2cd925c6041f293ff72168db993dbe26cc6fcd36b832187c1df9a6`:
+  PostgreSQL starts with `max_locks_per_transaction=1024`, matching `scripts/pg_master.sh`.
+  A real transaction retains 16,384 advisory locks; a separate disposable container with
+  a compiled-entrypoint fixture reduced to 64 fails the same SQL with out-of-shared-memory.
+  The full development check remains green. Activate it after the live native build;
+  the current container still runs the prior image with the PostgreSQL default of 64.
   Official Debian Caddy package `2.6.2-12+deb13u1`/libmicrohttpd 1.0.1; only Caddy's
   8080 port is published on host loopback. Builds bypass cached package installation,
   refresh signed Debian indexes and upgrade installed packages before provisioning.

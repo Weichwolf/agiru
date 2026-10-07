@@ -43,7 +43,8 @@ else
   runuser -u postgres -- initdb -D "$PGDATA" --encoding=UTF8 --locale=C.UTF-8 \
     --auth-local=peer --auth-host=scram-sha-256
 fi
-runuser -u postgres -- postgres -D "$PGDATA" -c listen_addresses=127.0.0.1 &
+runuser -u postgres -- postgres -D "$PGDATA" -c listen_addresses=127.0.0.1 \
+  -c max_locks_per_transaction=1024 &
 postgres_pid=$!
 for ((attempt=0; attempt<60; attempt++)); do
   if pg_isready -h 127.0.0.1 -p 5432 -U postgres -d postgres >/dev/null; then break; fi
