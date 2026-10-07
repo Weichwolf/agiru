@@ -64,6 +64,18 @@ compile_header meta/ModuleDef.h "$proof/ModuleDef.h.d"
 for forbidden in ModuleInfo.h Guid.h List.h Text.h Version.h vector; do
   reject_dependency "$proof/ModuleDef.h.d" "$forbidden"
 done
+for header in meta/PermissionSetDef.h runtime/PermissionSets.h; do
+  compile_header "$header" "$proof/$(basename "$header").d"
+  for forbidden in Guid.h Session.h Table.h Database.h vector memory mutex functional; do
+    reject_dependency "$proof/$(basename "$header").d" "$forbidden"
+  done
+done
+compile_header runtime/PermissionSets.h "$proof/forced-permission-session.h.d" -include runtime/Session.h
+if reject_dependency "$proof/forced-permission-session.h.d" Session.h \
+  > "$proof/forced-permission-session.h.log" 2>&1; then
+  printf 'header-dependencies: session state escaped the permission declaration boundary\n' >&2
+  exit 1
+fi
 compile_header meta/ModuleDef.h "$proof/forced-ModuleInfo.h.d" -include type/ModuleInfo.h
 if reject_dependency "$proof/forced-ModuleInfo.h.d" ModuleInfo.h \
   > "$proof/forced-ModuleInfo.h.log" 2>&1; then
@@ -223,4 +235,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: twenty-four standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority/temporary controls refused\n'
+printf 'header-dependencies: twenty-six standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority/permission/temporary controls refused\n'

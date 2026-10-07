@@ -21,7 +21,7 @@ export CCACHE_SLOPPINESS
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
-.PHONY: page-profile client client-test http-test page-host-test session-identity table-permissions
+.PHONY: page-profile client client-test http-test page-host-test session-identity table-permissions permission-sets
 
 client: ## build the external Node agent CMD/MCP client from locked dependencies
 	@npm ci --prefix "$(SELF)/src/client" --ignore-scripts --no-fund --no-audit
@@ -44,6 +44,10 @@ session-identity: comments db ## qualify SQL identity, persistent command leases
 table-permissions: comments db ## qualify session-owned table rights and compiled refusal controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_TablePermissionsGate
 	@B="$(B)" bash "$(SELF)/test/runtime/table-permissions.sh"
+
+permission-sets: comments db ## qualify bounded role-local BC permission composition and refusal controls
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_PermissionSetsGate
+	@B="$(B)" bash "$(SELF)/test/runtime/permission-sets.sh"
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get

@@ -17,6 +17,19 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 
 ## Existing foundation and refreshed implementation review
 
+- Permission composition: `include/meta/PermissionSetDef.h`,
+  `include/runtime/PermissionSets.h`, `src/rt/PermissionSets.cpp` resolve exact app/role/scope
+  identities, operation-level direct/indirect rights, wildcards, target-bound extensions and
+  role-local recursive exclusions. Missing sets, cycles, malformed policy and resource excess
+  refuse; included security filters refuse until row enforcement exists. No synthetic SUPER or
+  cross-user authority cache. `make permission-sets JOBS=2` owns the C++ gate and compiled
+  counterprobes, not native SQL assignments, AL execution contexts or live client authorization.
+  References at the pinned revisions below: developer `devenv-permissionset-composing.md`,
+  `devenv-permissions-on-database-objects.md`, `properties/devenv-{included,excluded}permissionsets-property.md`;
+  original System `Tenant Database Tables/{AccessControl,TenantPermission,TenantPermissionSetRel}.Table.al`
+  and `System Enums/PermissionObjectType.Enum.al`. Predecessor WI 1700 and
+  `openerp/runtime/permissions.py`: reject global whole-object exclusions and implicit SUPER.
+
 - Selected transport: unmodified nginx → private loopback libmicrohttpd → C++ handler;
   no ERP module, custom HTTP/TLS parser or Node ERP server.
   System libmicrohttpd supplies HTTP framing/polling/suspend-resume through a private
