@@ -29,13 +29,12 @@ Files: `deploy/dev/{Containerfile,entrypoint.sh,Caddyfile}`, `scripts/dev_contai
 - `make dev-image dev-start dev-configure`: Debian trixie, Clang 19/libc++, PostgreSQL 17;
   persistent `agiru-dev-postgres` volume, host HTTP port bound to loopback, no published SQL port.
   Existing agiru-pg and its source/seed databases remain unchanged.
-- Qualified image: `cf1f01b7222e1c51a5bd8b5516cc76d89975ac8d78228589861f18c16543e491`.
-  The next qualified image is `916d9ee8fe2cd925c6041f293ff72168db993dbe26cc6fcd36b832187c1df9a6`:
+- Qualified, deployed image: `916d9ee8fe2cd925c6041f293ff72168db993dbe26cc6fcd36b832187c1df9a6`.
   PostgreSQL starts with `max_locks_per_transaction=1024`, matching `scripts/pg_master.sh`.
   A real transaction retains 16,384 advisory locks; a separate disposable container with
-  a compiled-entrypoint fixture reduced to 64 fails the same SQL with out-of-shared-memory.
-  The full development check remains green. Activate it after the live native build;
-  the current container still runs the prior image with the PostgreSQL default of 64.
+  an entrypoint mutation reduced to 64 fails the same SQL with out-of-shared-memory.
+  The full development check remains green. Replacement followed the successful native
+  build; the live PostgreSQL instance confirms the new setting.
   Official Debian Caddy package `2.6.2-12+deb13u1`/libmicrohttpd 1.0.1; only Caddy's
   8080 port is published on host loopback. Builds bypass cached package installation,
   refresh signed Debian indexes and upgrade installed packages before provisioning.
@@ -47,9 +46,11 @@ Files: `deploy/dev/{Containerfile,entrypoint.sh,Caddyfile}`, `scripts/dev_contai
   storage. Local TLS verifies with its explicit CA; untrusted TLS fails. Redirects and certificate
   persistence survive restart. Public ACME issuance/renewal and production load remain unqualified.
   The development replacement is authorized; the previous container is stopped as
-  `agiru-dev-pre-debian-caddy-20261007`. All seven database identities, seed Customer/G/L
+  `agiru-dev-pre-lock-budget-20261007`. All seven database identities, seed Customer/G/L
   Entry counts and complete provenance are unchanged. Compiler-cache statistics and
   frozen verification-input hashes match; native agiru ownership is restored.
+  The preserved 5.2-GiB compiler cache has an explicit 16-GiB ceiling, raised before
+  the former 5-GiB limit evicted entries. This is not a demonstrated build speedup.
   New clusters explicitly use UTF8/C.UTF-8; the existing gate/master volume remains
   SQL_ASCII and is not a qualified production seed. Preserve it during later seed migration.
 - `make http-test JOBS=2`: twelve native transport and nine credential cases pass with

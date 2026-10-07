@@ -104,8 +104,12 @@ and image/library hashes; absent selected images cannot fall back to root build 
 when no seed override is supplied. Sixteen existing/extended MilestoneGate tooling tests
 pass, including missing/stale image, timeout/interruption and source-population controls;
 these mocked orchestration cases are not AL UT execution.
-The previous direct integration lane was deliberately interrupted after 519/1174 steps
-before changing compiler inputs. It is not a build pass or current UT measurement.
+Latest direct native integration: `make slice-check B=/workspace/build/podman JOBS=6`
+counts 14,225 sources with none missing; `make all` exits zero. C++ inputs stayed unchanged
+through the client/tooling/deployment-only increments. All frozen AL file hashes match
+clean BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. The diagnostic slice still links
+1,902 explicit unlinked-procedure refusals: build success is not full-app or G1 acceptance.
+The full native `make test JOBS=2` is underway; no current AL UT result is claimed.
 
 ## Remaining documented cases — no completion claim
 
