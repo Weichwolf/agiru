@@ -4,8 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: emit/install real system permission declarations and provision original Company/User
-and the generated permission tables over the verified shared CRONUS transfer; execute Customer List → Card → Validate → Save using external
+Next: fix the current integration compile failure, then execute Customer List → Card → Validate → Save using external
 CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
 
@@ -16,6 +15,25 @@ specific working client contracts, not this WI's full acceptance; no dependency 
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
 ## Existing foundation and refreshed implementation review
+
+- Native ERP client preparation: `make erp-fixture JOBS=2`,
+  `test/ui/erp-fixture.sh` and `test/ui/erp/Prepare.cpp`: 26 C++ checks, exact independent
+  read-back of all eleven original Company columns (including Id/audit/rowversion),
+  68 Customers/2,820 G/L Entries/149 Items/44 Sales Headers preserved in an owned seed clone.
+  Two explicit fixture users, one assignable tenant role with nine documented wildcard
+  object kinds and one company-specific assignment; the other user has no assignments.
+  Real native authority grants/denies Customer R/I/M/D and Customer List Execute, refuses
+  another company and prevents an actual AL write (independent SQL remains unchanged).
+  Non-fixture DSNs refuse before connecting; original Company and seed provenance are
+  unchanged; clone/binaries/private credentials are cleaned up. Targeted tidy: 1/324 units,
+  zero findings. Broad administrator grants are fixture data, never production defaults,
+  implicit SUPER or exemptions. Generated system roles, complete seed/version parity,
+  actual Customer HTTP/browser execution and workflow acceptance remain open.
+  References: developer `devenv-permissions-on-database-objects.md` (explicit wildcard
+  permissions) at `f928288ee840334be73142e5fc0202c0e19b246d`; original System
+  `src/Tenant Database Tables/Company.Table.al`, package/revision pinned below;
+  predecessor `openerp/board/982_mem-project-user-table-seeded-empty.md` identifies the
+  missing User setup, while WI 1700's implicit SUPER/system-table shortcuts are rejected.
 
 - Stored System permission tables: `src/gen/CodeunitWriter.cpp` binds the original
   Access Control (2000000053), Tenant Permission Set (2000000165), Tenant Permission
@@ -35,7 +53,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   source refusals. Existing product exclusion remains separately counted. Translation stays
   red (5,683 property refusals and other retained gaps), not a green subset. Slice check:
   14,225 sources, zero missing. The actual platform library compiles/links all four new tables;
-  complete integration build is still pending. Thirty native-source tooling tests pass;
+  complete integration build failed after 740/1,064 steps with a generated C++ type
+  conversion error; diagnosis/fix and a successful rerun remain required. Thirty native-source tooling tests pass;
   changed-code clang-tidy: 6/323 units checked, zero findings, no new suppression.
   This is not seed provisioning, virtual permission metadata, generated system roles,
   native Customer/browser execution, complete System inventory or AL UT acceptance.

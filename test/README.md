@@ -48,6 +48,15 @@ Three compiled ownership/revision/replay defects must fail named HTTP cases. The
 has real generated pages and SQL grants, not a full BC permission provider or browser
 acceptance. It reuses the page-navigation compilation pipeline and private auth-file helper.
 
+`make erp-fixture JOBS=2` qualifies a disposable clone of the verified native shared
+CRONUS transfer. It copies all eleven original Company columns exactly, provisions the
+four generated System permission tables, and assigns one explicit fixture-only tenant
+administrator role. A second authenticated user has no role; native Customer/Page rights,
+company isolation and a denied AL write with independent SQL effects are checked.
+The original source and seed remain unchanged; owned database, binaries and private tokens
+are removed even on failure. A non-fixture DSN must refuse before connecting. This is
+client preparation, not actual Customer execution, system-role installation or a full seed.
+
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.
 `make verify-check` checks build tooling without rebuilding C++.
