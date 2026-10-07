@@ -22,6 +22,17 @@ const token = /^[A-Za-z0-9_-]{1,128}$/;
 const digits = /^[0-9]+$/;
 const scalarNames = ["Text", "Code", "Integer", "BigInteger", "Decimal", "Boolean", "Option", "Enum",
   "Date", "Time", "DateTime", "Duration", "Guid", "DateFormula", "RecordId"];
+const responseEffects = ["hx-redirect", "hx-location", "hx-refresh", "hx-trigger", "hx-trigger-after-settle",
+  "hx-trigger-after-swap", "hx-retarget", "hx-reswap", "hx-reselect", "hx-push-url", "hx-replace-url"];
+
+export function checkResponseProfile(contentType: string, hasHeader: (name: string) => boolean): void {
+  if (!/^text\/html(?:\s*;\s*charset=utf-8)?\s*$/i.test(contentType)) {
+    throw new ClientError("ResponseRefused", "Expected UTF-8 semantic HTML");
+  }
+  if (responseEffects.some(hasHeader)) {
+    throw new ClientError("ResponseRefused", "Undeclared htmx response effects are not supported by this profile");
+  }
+}
 const tags = new Set(["article", "h1", "h2", "h3", "section", "form", "input", "button", "output", "aside", "p"]);
 const scalarAttributes = ["data-type", "data-value", "data-domain", "data-member", "data-undefined", "data-closing"];
 const attributes: Readonly<Record<string, readonly string[]>> = {
@@ -184,7 +195,7 @@ function controls(root: Tree.Element, page: Pick<Page, "handle" | "revision">, c
 }
 
 export function parsePage(html: string): Page {
-  check(Buffer.byteLength(html, "utf8") <= limits.bytes, "HTML byte budget exceeded");
+  check(new TextEncoder().encode(html).byteLength <= limits.bytes, "HTML byte budget exceeded");
   check(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(html) && html.isWellFormed(), "Invalid HTML text");
   const fragment = parseFragment(html, { sourceCodeLocationInfo: true, onParseError: error => {
     if (error.code === "control-character-reference" && html.slice(error.startOffset - 5, error.startOffset) === "&#13;") return;

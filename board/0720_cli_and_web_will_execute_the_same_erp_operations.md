@@ -80,6 +80,20 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
 
 ## Existing foundation and refreshed implementation review
 
+- Browser entry: `src/client/web.mts`, `src/client/web/`, `scripts/build_web.sh` and
+  `make {web,web-test,dev-web}` use local locked htmx and the shared HTML profile,
+  response-effects check and exact command envelope. Development bearer credentials
+  stay in tab memory; production sign-in remains pending. Caddy serves static assets;
+  browser-document negotiation at `/` requires applying the updated container config.
+  `make web-test JOBS=2`: ten Chromium/native-HTML cases and one actual Caddy
+  document/asset/header/routing case pass; three compiled defective bundles fail named
+  controls. `make client-test JOBS=2`: 36 cases, five defects rejected. Producer
+  `PageHtmlGate`: 164 checks. These fixtures are separate from actual ERP HTTP/SQL
+  parity. Current-row fragments are not forty-row lists;
+  multiline input display and independent invalid-UTF-8 browser refusal remain unqualified.
+  Predecessor `openerp/board/1833_client_assets_from_a_cdn.md`: pin/serve local assets,
+  preserve licenses; no CDN or copied predecessor implementation.
+
 - Session-owned native dialog bridge: `include/runtime/UiHost.h`, `src/rt/UiHost.cpp`,
   `src/rt/written/BuiltinsWritten.cpp` and `include/type/Dialog.h`. `make ui-host JOBS=2`:
   60 C++ checks, six compiled defects rejected. Background GuiAllowed returns false;

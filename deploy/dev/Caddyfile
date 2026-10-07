@@ -19,12 +19,25 @@
 	header {
 		-Server
 		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; frame-ancestors 'none'"
 	}
 	request_body {
 		max_size 1MiB
 	}
 	handle_path /assets/* {
 		root * /usr/share/agiru/web
+		file_server
+	}
+	@browser {
+		method GET HEAD
+		path /
+		header Accept *text/html*
+		not header HX-Request true
+	}
+	handle @browser {
+		root * /usr/share/agiru/web
+		rewrite * /index.html
 		file_server
 	}
 	handle {

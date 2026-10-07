@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agiru</title>
+  <link rel="stylesheet" href="/assets/web.css">
+  <script type="module" src="/assets/web.js"></script>
+</head>
+<body>
+  <header><h1>agiru</h1></header>
+  <form id="connection">
+    <label>Page path <input id="target" type="text" required></label>
+    <label>Development credential <input id="credential" type="password" autocomplete="off" required></label>
+    <button type="submit">Open</button>
+    <p>Use a privately issued development token. It remains only in this tab's memory.
+      Production sign-in is not implemented by this development entry.</p>
+  </form>
+  <p id="status" role="status" aria-live="polite">Not connected</p>
+  <main id="workspace"></main>
+</body>
+</html>

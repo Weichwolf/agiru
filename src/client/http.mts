@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { ClientError } from "./errors.mjs";
-import { commandEnvelope, limits, parsePage, type Page } from "./profile.mjs";
+import { checkResponseProfile, commandEnvelope, limits, parsePage, type Page } from "./profile.mjs";
 
 export type Command = Readonly<{
   page: string; revision: string; command: string; control: string; operation: "set" | "action"; text?: string;
@@ -75,13 +75,7 @@ export class AgentClient {
         ...(body !== undefined ? { body } : {}), signal: controller.signal });
       reader = response.body?.getReader();
       if (response.status >= 300 && response.status < 400) throw new ClientError("RedirectRefused", "Redirects require explicit navigation");
-      if (!/^text\/html(?:\s*;\s*charset=utf-8)?\s*$/i.test(response.headers.get("content-type") ?? "")) {
-        throw new ClientError("ResponseRefused", "Expected UTF-8 semantic HTML");
-      }
-      if (["hx-redirect", "hx-location", "hx-refresh", "hx-trigger", "hx-trigger-after-settle", "hx-trigger-after-swap",
-        "hx-retarget", "hx-reswap", "hx-reselect", "hx-push-url", "hx-replace-url"].some(header => response.headers.has(header))) {
-        throw new ClientError("ResponseRefused", "Undeclared htmx response effects are not supported by this profile");
-      }
+      checkResponseProfile(response.headers.get("content-type") ?? "", header => response.headers.has(header));
       if (!reader) throw new ClientError("ResponseRefused", "Missing response body");
       const chunks: Uint8Array[] = [];
       let size = 0;

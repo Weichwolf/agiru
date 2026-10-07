@@ -3,7 +3,8 @@
 Node 20+, outside the agiru/PostgreSQL container. `make client` installs the locked
 dependencies and compiles into `build/client/`; `make client-test` qualifies a
 declared C++ HTML/HTTP fixture, not production ERP parity. Server HTTP wiring,
-authentication/session persistence, dialogs, lists and business workflows are pending.
+native authentication and retained page sessions exist; dialogs, bounded lists and
+business workflows remain incomplete.
 
 ```sh
 export AGIRU_ORIGIN=http://127.0.0.1:8080
@@ -43,3 +44,19 @@ zod 3.25.76 (MIT) supplies one strict operation schema for both adapters.
 TypeScript 5.9.3 (Apache-2.0) and Node declarations are build-only dependencies.
 `package-lock.json` pins the complete dependency graph and integrity hashes;
 installed packages retain their own notices/licenses. None are ERP-server dependencies.
+
+`make web` bundles htmx 2.0.11 (0BSD) and the same profile/parser/envelope into
+`build/web/`; `make dev-web` publishes those static files to the owned Caddy container.
+Open `/assets/index.html` with the privately issued development token. It stays in
+tab memory, never URL/storage; production sign-in remains pending. Updated Caddy
+configuration serves the same entry at `/?page=...&company=...` for browser navigation;
+HX requests keep the native fragment route. Applying that configuration needs a
+container restart/rebuild; publishing assets alone does not change the running proxy.
+No CDN, business rules, inline scripts, eval or automatic command retries. Unknown
+response effects and fragments refuse before htmx processes them. Browser and agent
+commands share the advertised exact envelope; server authorization stays authoritative.
+`make web-test` uses actual system Chromium with Playwright 1.63.0 (Apache-2.0,
+test-only); ten native-HTML fixture cases, one actual Caddy asset/routing case and
+three defective compiled bundles,
+not production SQL/dialog/ERP acceptance. esbuild 0.28.2 (MIT) is build-only.
+The bundle ships dependency licenses; the native server does not use Node.js.

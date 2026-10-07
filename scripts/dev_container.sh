@@ -35,6 +35,13 @@ case "${1:-}" in
       --volume "$root:/workspace" --volume "$volume:/var/lib/agiru" "$image" "$@"
     ;;
   stop) owned; exec podman stop --time 30 "$name" ;;
+  web)
+    owned
+    [[ -s "$root/build/web/index.html" && -s "$root/build/web/web.js" ]] || {
+      printf 'Build browser assets with make web before publishing\n' >&2; exit 2;
+    }
+    exec podman cp "$root/build/web/." "$name:/usr/share/agiru/web/"
+    ;;
   configure)
     owned
     exec podman exec --user "$(id -u):$(id -g)" "$name" cmake -S /workspace \
@@ -55,5 +62,5 @@ case "${1:-}" in
     esac
     exec podman exec "${flags[@]}" --user "$(id -u):$(id -g)" "$name" "$@"
     ;;
-  *) printf 'Usage: %s image|start|stop|configure|exec COMMAND...\n' "$0" >&2; exit 2 ;;
+  *) printf 'Usage: %s image|start|stop|web|configure|exec COMMAND...\n' "$0" >&2; exit 2 ;;
 esac

@@ -20,8 +20,8 @@ export CCACHE_SLOPPINESS
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-storage native-codeunits streams
-.PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-configure dev-exec dev-check
-.PHONY: page-profile client client-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions
+.PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-web dev-configure dev-exec dev-check
+.PHONY: page-profile client client-test web web-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions
 
 ui-host: comments db ## qualify session-owned UI routing and compiled contract defects, not HTTP dialog parity
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_UiHostGate
@@ -34,6 +34,15 @@ client: ## build the external Node agent CMD/MCP client from locked dependencies
 
 client-test: client ## qualify CMD/MCP transports against a declared HTML/HTTP fixture, not ERP parity
 	@bash "$(SELF)/test/ui/agent-client.sh"
+
+web: client ## bundle local htmx browser assets over the same typed HTML profile
+	@bash "$(SELF)/scripts/build_web.sh"
+
+web-test: web ## verify actual Chromium htmx rendering and commands against the native HTML fixture
+	@bash "$(SELF)/test/ui/web-client.sh"
+
+dev-web: web ## publish built browser assets to Caddy in the owned development container
+	@bash "$(SELF)/scripts/dev_container.sh" web
 
 http-test: comments client ## qualify external CMD/MCP over Caddy/private C++ HTTP and PostgreSQL, not ERP parity
 	@bash "$(SELF)/test/ui/http-server.sh"

@@ -256,6 +256,14 @@ This is not a Node ERP server or proof of
 production authentication, SQL effects, actual htmx browser behaviour or complete
 page/ERP parity. `AGIRU_PAGE_HTML_GATE` can select an explicitly built host producer.
 Fixtures and disposable mutant modules use `/tmp`; Node stays outside the ERP container.
+`make web-test` builds local htmx/static browser assets and executes ten real Chromium
+cases against the same native `PageHtmlGate` fragment and agent profile/envelope.
+Three compiled bundles must fail named response-effect, hidden-envelope and concurrent
+POST cases. One additional actual Caddy case qualifies static assets/licenses, document
+versus HX routing and security headers, with private certificate/config state and clean
+shutdown. Screenshots, source/binary hashes and logs remain current receipts under
+`/tmp`; mutant bundles are removed even on failure. This is not a Node ERP server,
+native HTTP/SQL/browser workflow acceptance, complete lists, dialogs or production login.
 `tooling/header-dependencies.sh` checks the native server's narrow options-only headers;
 forcing HTTP or retained page execution into `NativeService.h` must fail. Configuration
 and execution share the same option types, not copied defaults or validation rules.

@@ -14,5 +14,6 @@
     "declaration": true,
     "skipLibCheck": false
   },
-  "include": ["*.mts"]
+  "include": ["*.mts"],
+  "exclude": ["web.mts"]
 }
