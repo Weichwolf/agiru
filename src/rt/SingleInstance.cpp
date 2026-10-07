@@ -13,7 +13,10 @@
 namespace agiru::detail {
 
 SessionState &SessionState::Current() {
-  Session &session = Session::Current();
+  return For(Session::Current());
+}
+
+SessionState &SessionState::For(Session &session) {
   if (session.state_ == nullptr) { session.state_ = std::make_unique<SessionState>(); }
   return *session.state_;
 }

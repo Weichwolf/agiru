@@ -3574,7 +3574,7 @@ class DiscoveryGate(unittest.TestCase):
                        'transpiler/native-table-ids.sh', 'transpiler/native-codeunits.sh',
                        'runtime/base64.sh', 'runtime/encoding.sh', 'runtime/hashing.sh', 'runtime/conversion.sh', 'runtime/record-order.sh',
                        'runtime/streams.sh', 'transpiler/system-profile.sh', 'runtime/xmlport-import.sh',
-                       'ui/page-profile.sh', 'runtime/session-identity.sh', 'runtime/table-permissions.sh',
+                       'ui/page-profile.sh', 'runtime/session-identity.sh', 'runtime/ui-host.sh', 'runtime/table-permissions.sh',
                        'runtime/permission-sets.sh', 'runtime/native-permissions.sh')
             for name in scripts:
                 script = root / 'test' / name

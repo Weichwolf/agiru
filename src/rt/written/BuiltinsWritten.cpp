@@ -9,6 +9,7 @@
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
 #include "runtime/Transaction.h"
+#include "runtime/UiHost.h"
 #include "runtime/test/Handlers.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
@@ -983,16 +984,39 @@ void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
   return Session::Current().UserSecurityId();
 }
 
-bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply) {
-  const TestHandler *handler = HandlerTable::For(static_cast<HandlerKind>(kind));
+bool DispatchUiInteraction(HandlerKind kind, std::string_view text, void *reply) {
+  const TestHandler *handler = HandlerTable::For(kind);
   if (detail::TraceUi()) {
-    std::println(
-        stderr, "ui {}: {} -> {}", kind, text, handler == nullptr ? "no handler" : "handled");
+    std::println(stderr,
+                 "ui {}: {} -> {}",
+                 static_cast<std::int32_t>(kind),
+                 text,
+                 handler == nullptr ? "no test handler" : "handled");
   }
-  if (handler == nullptr) { return false; }
-  HandlerTable::Ran(*handler);
-  handler->invoke(text, reply);
-  return true;
+  if (handler != nullptr) {
+    HandlerTable::Ran(*handler);
+    handler->invoke(text, reply);
+    return true;
+  }
+  if (HandlerTable::Installed()) { return false; }
+  auto *host = CurrentUiHost();
+  if (host == nullptr) { return false; }
+  switch (kind) {
+    case HandlerKind::Message: host->QueueMessage(text); return true;
+    case HandlerKind::Confirm: {
+      if (reply == nullptr) { throw Error("UI confirmation requires a reply buffer"); }
+      auto &answer = *static_cast<Boolean *>(reply);
+      answer = host->Confirm(text, answer);
+      return true;
+    }
+    case HandlerKind::StrMenu: {
+      if (reply == nullptr) { throw Error("UI menu requires a reply buffer"); }
+      auto &answer = *static_cast<StrMenuAnswer *>(reply);
+      answer.choice = host->StrMenu(text, answer.choice, answer.instruction);
+      return true;
+    }
+    default: return false;
+  }
 }
 
 void ClearCollectedErrors() {
@@ -1034,12 +1058,11 @@ StartSession(::agiru::Integer &SessionId, ::agiru::Integer CodeunitId, std::stri
 }
 
 ::agiru::Boolean GuiAllowed() {
-  if (HandlerTable::Installed()) { return true; }
-  RefuseUnimplemented("System.GuiAllowed()");
+  return HandlerTable::Installed() || CurrentUiHost() != nullptr;
 }
 
 void Hyperlink(std::string_view URL) {
-  if (AnsweredByHandler(3, URL, nullptr)) { return; }
+  if (DispatchUiInteraction(HandlerKind::Hyperlink, URL, nullptr)) { return; }
   RefuseUnimplemented("System.Hyperlink(Text)");
 }
 

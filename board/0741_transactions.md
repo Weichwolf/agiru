@@ -2,9 +2,10 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: enforce atomic optimistic Modify/Delete/Rename conflicts without rereading the whole
-record, followed by BC table/record locking and transaction-type transitions. Integrate
-with the full native build and counted AL runs; preserve every refusal and failure.
+Next: integrate the session-owned UI bridge with the native image and rerun Customer
+opening/counted AL execution to identify the next client blocker under 0720. Atomic
+optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
+do not defer client construction until all transaction acceptance is complete.
 
 ## Acceptance
 
@@ -38,6 +39,14 @@ with the full native build and counted AL runs; preserve every refusal and failu
   visibility, explicit Commit, cancellation/rollback and nested modal boundaries under 0720.
 
 ## Sources and regression ownership
+
+Native AL diagnostic at `769399a`: `make ut B=/workspace/build/podman JOBS=6
+UT_MASTER_DSN=<complete-seed>` retains all 2,314 tests over 80 codeunits. Result:
+zero executed/passed; all 80 codeunits incomplete during CompanyOpen, before test
+handlers install. Native logs identify the GuiAllowed refusal. This is not 2,314
+failed assertions or a green subset. The shared CRONUS transfer has version/schema gaps
+and is not a sealed equivalent A/B template. Current UI bridge qualification is in
+0720 and `make ui-host`; the diagnostic must be repeated after the native image rebuild.
 
 Developer docs at `f928288ee840334be73142e5fc0202c0e19b246d`:
 `methods-auto/codeunit/codeunit-run{,-integer-table,-string-table}-method.md`,

@@ -63,16 +63,13 @@
 
 namespace agiru {
 
-/// \brief Whether a dialog kind has a handler standing in for the user right now.
-/// \param kind The dialog kind, as `HandlerKind` numbers it.
+/// \brief Dispatch a dialog to its explicit test adapter or session-owned native UI host.
+/// \param kind The typed dialog kind.
 /// \param text What the dialog would show.
 /// \param reply Where a `Confirm` or a `StrMenu` puts the answer.
-/// \return True when a handler answered, false when none is installed.
-///
-/// \note IT IS THE DOOR'S HALF OF THE HANDLER TABLE. The builtins that show something call it
-///       before refusing, so a test with `[HandlerFunctions]` gets its answer and one without gets
-///       the platform's refusal (board:0054).
-[[nodiscard]] bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply);
+/// \return True when delivered/answered, false when no selected adapter supports the kind.
+/// \note An installed test table never falls back to production UI for an undeclared handler.
+[[nodiscard]] bool DispatchUiInteraction(HandlerKind kind, std::string_view text, void *reply);
 
 /// \brief AL `System.Date2DMY(Date, Integer)`. Gets the day, month or year of a Date.
 ///
@@ -1045,8 +1042,8 @@ void ClearCollectedErrors();
 [[nodiscard]] ::agiru::Boolean HasCollectedErrors();
 
 /// \brief AL `System.GuiAllowed()`. Whether a UI is there to answer a dialog.
-/// \return True when a test has installed handlers; otherwise it refuses.
-/// \throws Error when no handler table is installed -- there is no UI to allow (board:0030).
+/// \return True for an installed AL test adapter or the active session's actual UI host;
+/// false for background execution without either. Authentication is not UI capability.
 [[nodiscard]] ::agiru::Boolean GuiAllowed();
 
 /// \brief AL `System.Hyperlink(Text)`. Opens a URL on the client.
@@ -1637,13 +1634,13 @@ void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
 /// \tparam Values The values' types.
 /// \param String The message, with `%1`-style placeholders.
 /// \param values What the placeholders are replaced with.
-/// \throws Error always -- a message needs a running UI (board:0030).
+/// \throws Error when neither the selected test adapter nor a UI host accepts the message.
 /// \note VARIADIC, BECAUSE AL'S IS: the BaseApp passes up to five values.
 /// \brief AL `Dialog.Message(Text)` -- the message alone.
 /// \param String The message.
-/// \throws Error always -- a message needs a running UI (board:0030).
+/// \throws Error when neither the selected test adapter nor a UI host accepts the message.
 inline void Message(std::string_view String) {
-  if (::agiru::AnsweredByHandler(1, String, nullptr)) { return; }
+  if (::agiru::DispatchUiInteraction(HandlerKind::Message, String, nullptr)) { return; }
   throw ::agiru::Error(std::string("Message(") + std::string(String) +
                        ") needs a running UI (board:0030)");
 }
@@ -1651,7 +1648,7 @@ inline void Message(std::string_view String) {
 template <typename First, typename... Values>
 void Message(std::string_view String, const First &first, const Values &...values) {
   const std::string shown = ::agiru::StrSubstNo(String, first, values...);
-  if (::agiru::AnsweredByHandler(1, shown, nullptr)) { return; }
+  if (::agiru::DispatchUiInteraction(HandlerKind::Message, shown, nullptr)) { return; }
   throw ::agiru::Error(std::string("Message(") + shown + ") needs a running UI (board:0030)");
 }
 
@@ -1687,8 +1684,8 @@ void LogMessage(std::string_view EventId,
 /// \param String The question, with `%1`-style placeholders.
 /// \param Default Which button the dialog opens on.
 /// \param values What the placeholders are replaced with.
-/// \return Never.
-/// \throws Error always -- a confirm needs a running UI (board:0030).
+/// \return The explicit answer from the selected test adapter or session-owned UI host.
+/// \throws Error without an available answer; Default never supplies implicit consent.
 /// \note VARIADIC, BECAUSE AL'S IS. The BaseApp passes up to five values, and the generated
 ///       three-parameter declaration refused the fourth.
 template <typename... Values>
@@ -1697,7 +1694,7 @@ Confirm(std::string_view String, ::agiru::Boolean Default, const Values &...valu
   const std::string asked =
       sizeof...(values) == 0 ? std::string(String) : ::agiru::StrSubstNo(String, values...);
   ::agiru::Boolean reply = Default;
-  if (::agiru::AnsweredByHandler(0, asked, &reply)) { return reply; }
+  if (::agiru::DispatchUiInteraction(HandlerKind::Confirm, asked, &reply)) { return reply; }
   throw ::agiru::Error(std::string("Confirm(") + asked + ") needs a running UI (board:0030)");
 }
 
@@ -1708,20 +1705,22 @@ Confirm(std::string_view String, ::agiru::Boolean Default, const Values &...valu
 /// \param DefaultNumber The option the menu opens on; 1 by default.
 /// \param Instruction The text above the menu.
 /// \return The chosen number.
-/// \throws Error when no `[StrMenuHandler]` answers -- a menu needs a running UI (board:0030).
+/// \throws Error without a selected test handler or available UI host.
 inline ::agiru::Integer StrMenu(std::string_view OptionMembers,
                                 ::agiru::Integer DefaultNumber = 1,
                                 std::string_view Instruction = {}) {
   ::agiru::StrMenuAnswer answer{.instruction = Instruction, .choice = DefaultNumber};
-  if (::agiru::AnsweredByHandler(2, OptionMembers, &answer)) { return answer.choice; }
+  if (::agiru::DispatchUiInteraction(HandlerKind::StrMenu, OptionMembers, &answer)) {
+    return answer.choice;
+  }
   throw ::agiru::Error(std::string("StrMenu(") + std::string(OptionMembers) +
                        ") needs a running UI (board:0030)");
 }
 
 /// \brief AL `Dialog.Confirm(Text)` -- the one-argument form.
 /// \param String The question.
-/// \return Never.
-/// \throws Error always -- a confirm needs a running UI (board:0030).
+/// \return The explicit answer; the default button is No.
+/// \throws Error without an available answer.
 inline ::agiru::Boolean Confirm(std::string_view String) {
   return Confirm(String, false);
 }

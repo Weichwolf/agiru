@@ -4,6 +4,7 @@
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/TestRunner.h"
+#include "runtime/UiHost.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/TestHttpRequestMessage.h"
 #include "runtime/test/TestHttpResponseMessage.h"
@@ -62,6 +63,7 @@
 
 #include "BuiltinsWritten.h"
 
+#include <array>
 #include <cctype>
 #include <cstddef>
 #include <string>
@@ -328,14 +330,19 @@ std::string Debugger::GetLastErrorText() {
   RefuseUnimplemented("Debugger.Stop()");
 }
 
-void Dialog::Close() {}
+void Dialog::Close() {
+  if (HandlerTable::Installed()) { return; }
+  if (auto *host = CurrentUiHost(); host != nullptr) {
+    host->CloseProgress(this);
+    return;
+  }
+  throw agiru::Error("Dialog.Close requires an interactive UI host", "UiHostUnavailable");
+}
 
 ::agiru::Boolean
 Dialog::Confirm(std::string_view String, ::agiru::Boolean Default, const ::agiru::Variant &Value1) {
-  static_cast<void>(String);
-  static_cast<void>(Default);
-  static_cast<void>(Value1);
-  RefuseUnimplemented("Dialog.Confirm(Text, Boolean, Any)");
+  return Value1.IsEmpty() ? ::agiru::Confirm(String, Default)
+                          : ::agiru::Confirm(String, Default, Value1);
 }
 
 void Dialog::Error(const ::agiru::ErrorInfo &Message) {
@@ -375,18 +382,20 @@ void Dialog::LogInternalError(std::string_view Message,
 }
 
 void Dialog::Message(std::string_view String, const ::agiru::Variant &Value) {
-  static_cast<void>(String);
-  static_cast<void>(Value);
-  RefuseUnimplemented("Dialog.Message(Text, Any)");
+  if (Value.IsEmpty()) {
+    ::agiru::Message(String);
+  } else {
+    ::agiru::Message(String, Value);
+  }
 }
 
 void Dialog::Open(std::string_view String) {
-  static_cast<void>(String);
+  detail::OpenUiProgress(this, String, {});
 }
 
 void Dialog::Open(std::string_view String, ::agiru::Variant &Variable1) {
-  static_cast<void>(String);
-  static_cast<void>(Variable1);
+  const std::array bindings{UiValueBinding::Bind(Variable1)};
+  detail::OpenUiProgress(this, String, bindings);
 }
 
 ::agiru::Integer Dialog::StrMenu(std::string_view OptionMembers,
@@ -396,8 +405,12 @@ void Dialog::Open(std::string_view String, ::agiru::Variant &Variable1) {
 }
 
 void Dialog::Update(::agiru::Integer Number, const ::agiru::Variant &Value) {
-  static_cast<void>(Number);
-  static_cast<void>(Value);
+  if (HandlerTable::Installed()) { return; }
+  if (auto *host = CurrentUiHost(); host != nullptr) {
+    host->UpdateProgress(this, Number, Value);
+    return;
+  }
+  throw agiru::Error("Dialog.Update requires an interactive UI host", "UiHostUnavailable");
 }
 
 ::agiru::Boolean File::Download(std::string_view FromFile,

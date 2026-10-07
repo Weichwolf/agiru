@@ -27,6 +27,14 @@ random/digest provider failures explicitly refuse. The provider fixture has a su
 compile receipt before lint. This is not browser/password sign-in, a connection pool or page/table authorization;
 container qualifiers need `AGIRU_TEST_DSN` pointing at container-local PostgreSQL.
 
+`make ui-host JOBS=2` qualifies the session-owned native dialog bridge: 60 C++ checks
+and six compiled capability/answer/test-fallback/implicit-commit/live-binding defects.
+Background GuiAllowed is false; actual host callbacks and explicit AL handlers are
+separate. Questions never implicitly commit, prior Commit survives unwind, and live
+progress values remain exact. Detached authenticated sessions retain their own endpoint
+across workers. This is not HTTP dialog admission/suspension, automatic progress teardown,
+modal-page or browser/CMD/MCP acceptance; those remain in WI 0720.
+
 `make table-permissions JOBS=2` checks the session-owned TableData boundary for typed
 and reflected records, buffered record/query reads, individual write kinds, temporary
 buffers and company isolation. Independent SQL verifies denied writes; two compiled

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/ErrorValue.h"
+#include "runtime/UiHost.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Byte.h"
@@ -17,6 +18,7 @@
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
+#include <array>
 #include <string>
 #include <string_view>
 
@@ -29,15 +31,13 @@ class ErrorInfo;
 
 /// \brief AL `Dialog`.
 ///
-/// \warning THE SURFACE IS REAL AND THE BEHAVIOUR IS NOT YET. Every signature below is the one
-///          `methods-auto/dialog/` states, so a call site compiles and is CHECKED; the body
-///          refuses by name rather than returning a plausible wrong answer (board:0035).
+/// Basic message/question/progress operations use the owning session's UI host or explicit
+/// AL test adapter. Other unsupported methods refuse, never pretend successful interaction.
 class Dialog {
 public:
   /// \brief AL `Dialog.Close()`. Closes a dialog window that has been opened by the OPEN method.
-  /// \note A DIALOG IS HEADLESS HERE: opened, updated and closed silently, the way BC's own test
-  ///       runner shows none (board:0030). What it would have shown is not lost -- a Message or an
-  ///       Error is a different call and both reach the test.
+  /// \note Progress remains headless only under the explicit AL test adapter.
+  /// \throws Error when no native UI host or test adapter is available.
   void Close();
 
   /// \brief AL `Dialog.Confirm(Text, Boolean, Any)`. Creates a dialog box that prompts the user for
@@ -46,7 +46,7 @@ public:
   /// \param Default The AL `Boolean`.
   /// \param Value1 The AL `Any`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \throws Error without an available explicit answer; Default is presentation only.
   static ::agiru::Boolean Confirm(std::string_view String,
                                   ::agiru::Boolean Default = {},
                                   const ::agiru::Variant &Value1 = {});
@@ -102,15 +102,13 @@ public:
   /// \brief AL `Dialog.Message(Text, Any)`. Displays a text string in a message window.
   /// \param String The AL `Text`.
   /// \param Value The AL `Any`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \throws Error without a selected test handler or available UI host.
   static void Message(std::string_view String, const ::agiru::Variant &Value = {});
 
   /// \brief AL `Dialog.Open(Text, Any)`. Opens a dialog window.
   /// \param String The AL `Text`.
   /// \param Variable1 The AL `Any`.
-  /// \note A DIALOG IS HEADLESS HERE: opened, updated and closed silently, the way BC's own test
-  ///       runner shows none (board:0030). What it would have shown is not lost -- a Message or an
-  ///       Error is a different call and both reach the test.
+  /// \note The host receives a live binding, not an initial-value-only copy.
   void Open(std::string_view String, ::agiru::Variant &Variable1);
 
   /// \brief AL `Dialog.Open(Text)` -- the same without a variable to show; `Window.Open(Msg)` is
@@ -119,14 +117,13 @@ public:
   void Open(std::string_view String);
 
   /// \brief AL `Dialog.Open(String, var Value1 [, var Value2 ...])` with typed variables or record
-  ///        fields behind the placeholders. Nothing is shown headless, so the values are only
-  ///        named here; `Update` redraws nothing either.
+  ///        fields behind the placeholders. Updates refresh live, exact typed bindings.
   /// \tparam Values The variables' types. \param String The text. \param values The variables.
   template <typename... Values>
     requires(sizeof...(Values) >= 1)
   void Open(std::string_view String, Values &...values) {
-    (static_cast<void>(values), ...);
-    Open(String);
+    const std::array bindings{UiValueBinding::Bind(values)...};
+    detail::OpenUiProgress(this, String, bindings);
   }
 
   /// \brief AL `Dialog.StrMenu(Text, Integer, Text)`. Creates a menu window that displays a series
@@ -135,18 +132,17 @@ public:
   /// \param DefaultNumber The AL `Integer`.
   /// \param Instruction The AL `Text`.
   /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \throws Error without a selected test handler or available UI host.
   static ::agiru::Integer StrMenu(std::string_view OptionMembers,
-                                  ::agiru::Integer DefaultNumber = {},
+                                  ::agiru::Integer DefaultNumber = 1,
                                   std::string_view Instruction = {});
 
   /// \brief AL `Dialog.Update(Integer, Any)`. Updates the value of a '#'-or '@' field in the active
   /// window.
   /// \param Number The AL `Integer`.
   /// \param Value The AL `Any`.
-  /// \note A DIALOG IS HEADLESS HERE: opened, updated and closed silently, the way BC's own test
-  ///       runner shows none (board:0030). What it would have shown is not lost -- a Message or an
-  ///       Error is a different call and both reach the test.
+  /// \note Progress remains headless only under the explicit AL test adapter.
+  /// \throws Error without an available native UI host or test adapter.
   void Update(::agiru::Integer Number = {}, const ::agiru::Variant &Value = {});
 };
 

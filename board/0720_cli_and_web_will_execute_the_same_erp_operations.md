@@ -4,8 +4,8 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: finish the priority transaction/session contract in 0741, then implement session-owned production UI
-capabilities for GuiAllowed/dialogs and typed error responses; rerun original Customer
+Next: integrate the session-owned native UI bridge from 0741 with real HTTP dialog
+admission/suspension and typed error responses; rerun original Customer
 List → Card → Validate → Save using external CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
 
@@ -28,6 +28,11 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   whitespace and digit-only Code values. PostgreSQL defaults and bytewise temporary
   comparisons are not BC parity. Keep equality, uniqueness, ranges, wildcard/`@` filters,
   temporary records and SQL ordering consistent; unsupported profiles remain gaps.
+- Current native seed `agiru_client_seed_20261007b` uses libc `C`/`C`; Customer
+  No./Name/Search Name inherit deterministic database-default collation. BC collation
+  parity is unproven; `scripts/cronus_to_pg.py` already encounters mixed SQL Server
+  column collations but the transfer does not qualify their preservation. Inspect
+  `pg_database`, `pg_attribute`/`pg_collation` and original SQL Server column metadata.
 - Acceptance in `test/ui/` and focused C++ gates: 0/1/39/40/41 rows, configured smaller
   and larger windows, equal secondary keys, filtered next/previous, concurrent changes,
   exact Unicode/typed values and identical web/CMD/MCP windows. Count queries/rows read;
@@ -75,6 +80,22 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
 
 ## Existing foundation and refreshed implementation review
 
+- Session-owned native dialog bridge: `include/runtime/UiHost.h`, `src/rt/UiHost.cpp`,
+  `src/rt/written/BuiltinsWritten.cpp` and `include/type/Dialog.h`. `make ui-host JOBS=2`:
+  60 C++ checks, six compiled defects rejected. Background GuiAllowed returns false;
+  a real installed endpoint routes Message/Confirm/StrMenu and live progress bindings.
+  Defaults never answer; explicit UT adapters never fall back to production callbacks.
+  Independent SQL proves no implicit Commit, rollback of unfinished question execution
+  and durability of prior Commit. Nested/detached sessions and worker migration preserve
+  host ownership. No endpoint is yet installed by PageCommandHost: real HTTP suspension,
+  opening admission, modal pages, bounded delivery and automatic progress teardown remain
+  pending. No new production UI or ERP milestone is claimed. References above plus
+  `methods-auto/dialog/dialog-{update,close}-method.md`; predecessor threading is not adopted.
+  The complete native `make test JOBS=2` rerun passes 181 cases, zero red, including
+  257 tooling tests. Changed-code `make lint JOBS=2`: 28/330 units, zero findings,
+  unchanged suppression count. The native ERP image rebuild and Customer rerun remain pending;
+  these gates/fixtures do not execute the source-counted AL UT or qualify actual browsers.
+
 - Original Customer client regression: `make erp-client-test JOBS=2`,
   `test/ui/erp-client.mjs` and the existing CRONUS fixture pipeline: seven cases,
   one pass/six failures, zero skipped/cancelled. Caddy/native service starts and drains
@@ -82,8 +103,8 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   effects. Authorized Customer List returns HTTP 500; all five dependent Card/edit/receipt
   cases explicitly retain their unexecuted status as failures. A temporary C++ throw probe
   locates `CustomerList.OnOpenPage → OfficeHostProvider.OnIsAvailable → GuiAllowed`.
-  `src/rt/written/BuiltinsWritten.cpp::GuiAllowed` currently accepts only installed test
-  handlers; a production UI host is not implemented. Earlier isolated company-login
+  The measured image's `GuiAllowed` accepted only installed test handlers; the new bridge
+  above still needs a production HTTP endpoint. Earlier isolated company-login
   subscribers also encounter retained native-method refusals. Production sessions must
   expose real UI capability, with false for background execution and true only for a
   working host; do not insert always-true/always-false stubs, automatic dialog answers,
