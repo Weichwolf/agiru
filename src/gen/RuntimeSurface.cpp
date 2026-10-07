@@ -331,7 +331,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 164> kElsewh
     {"InvokeTest", "runtime/TestRunner.h"},
     {"TestMethod", "runtime/TestRunner.h"},
     {"RegisterTable", "runtime/Catalogue.h"},
-    {"SelectLatestVersion", "runtime/Database.h"},
+    {"SelectLatestVersion", "runtime/RecordRefresh.h"},
     {"GetLastErrorText", "runtime/Error.h"},
     {"AssertError", "runtime/Error.h"},
     {"platform::AllObj", "platform/AllObj.h"},

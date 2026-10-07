@@ -46,6 +46,8 @@ if ! B="$B" bash test/runtime/session-identity.sh; then red=$((red + 1)); fi
 n=$((n + 1))
 if ! B="$B" bash test/runtime/ui-host.sh; then red=$((red + 1)); fi
 n=$((n + 1))
+if ! B="$B" bash test/runtime/record-refresh.sh; then red=$((red + 1)); fi
+n=$((n + 1))
 if ! B="$B" bash test/runtime/table-permissions.sh; then red=$((red + 1)); fi
 n=$((n + 1))
 if ! B="$B" bash test/runtime/permission-sets.sh; then red=$((red + 1)); fi

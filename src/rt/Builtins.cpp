@@ -301,15 +301,6 @@ void RegisterTableConnection(const ::agiru::TableConnectionType &Type,
   RefuseUnimplemented("Database.RegisterTableConnection(TableConnectionType, Text, Text)");
 }
 
-void SelectLatestVersion() {
-  RefuseUnimplemented("Database.SelectLatestVersion()");
-}
-
-void SelectLatestVersion(::agiru::Integer Table) {
-  static_cast<void>(Table);
-  RefuseUnimplemented("Database.SelectLatestVersion(Integer)");
-}
-
 std::string SerialNumber() {
   RefuseUnimplemented("Database.SerialNumber()");
 }

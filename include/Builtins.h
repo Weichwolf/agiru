@@ -409,17 +409,6 @@ void RegisterTableConnection(const ::agiru::TableConnectionType &Type,
                              std::string_view Name,
                              std::string_view Connection);
 
-/// \brief AL `Database.SelectLatestVersion()`. Forces the latest version of the database to be
-/// used.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void SelectLatestVersion();
-
-/// \brief AL `Database.SelectLatestVersion(Integer)`. Ensures that the table's latest version is
-/// used, ignoring any cached values older than the method's call time.
-/// \param Table The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void SelectLatestVersion(::agiru::Integer Table);
-
 /// \brief AL `Database.SerialNumber()`. Gets a string that contains the serial number of the
 /// license file for your system.
 /// \return The AL `Text`.

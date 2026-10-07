@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
 Next: provide real HTTP UI-host capability/suspension under 0720; the rebuilt native
 Customer regression now opens/edits but retains its interactive Card lifecycle failure.
-Repeat counted AL execution and repair its current SelectLatestVersion startup refusal
-without implicit commits or no-op cache stubs. Atomic
+Repeat counted AL execution after the verified SelectLatestVersion increment below;
+retain every startup refusal and test identity. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
 do not defer client construction until all transaction acceptance is complete.
 
@@ -42,14 +42,33 @@ do not defer client construction until all transaction acceptance is complete.
 
 ## Sources and regression ownership
 
+`make refresh-records JOBS=2`: 149 C++ checks, 80 generator checks and six compiled
+defects rejected. `runtime/RecordRefresh.h` owns both official overloads;
+`RecordChanges` invalidates active non-locked observations for the exact table/current
+session or all tables. `Navigate` then reopens its bounded SQL cursor from the unchanged
+key, retaining SQL ordering, filters and loaded values. Independent committed SQL
+updates prove fresh typed/reflected reads in both directions. Own writes still invalidate
+all readers, including cache-lock metadata. No historical table counters accumulate.
+Physical repeatable/serializable snapshots refuse before invalidation, never commit to
+manufacture freshness. Pending writes, nested rollback and prior explicit Commit survive
+the operation. CaptionClassTranslate remains unsupported and has no implemented cache.
+Cache-lock preservation is not SQL-lock qualification: LockTable/FindSet(forUpdate),
+per-table escalation and instance-level SQL locking remain gaps above.
+Tests: `test/gate/{RecordRefresh,GenReceiver}Gate.cpp`,
+`test/runtime/record-refresh.sh`; the full `make test` manifest includes the new checks.
+Existing DynamicRecord 7,493, CursorLifecycle 313, SelectionChange 364, Transaction 12
+and RequiredTestIsolation 430 checks pass. Six affected compiled units pass targeted
+clang-tidy without suppressions; builtin regeneration reproduces exactly. Full native
+build/test/lint and the unchanged 2,314-test AL diagnostic still need a fresh run.
+
 Post-bridge native rerun at `ea6c922`: `make ut B=/workspace/build/podman JOBS=6
 UT_MASTER_DSN=<same-complete-seed>` retains all 2,314 tests/80 codeunits; zero executed,
 80 incomplete, 623 seconds. The GuiAllowed startup refusal is gone; every sampled
 codeunit now refuses `Database.SelectLatestVersion(Integer)` before test execution.
 No assertion population is dropped. Native build exits zero; seed remains an unsealed
 shared-transfer diagnostic, not equivalent A/B proof. The browser/Customer rerun is
-in 0720. Inspect all active non-locked read caches and transaction boundaries before
-implementing either SelectLatestVersion overload; predecessor `_system.py`'s no-op and
+in 0720. The increment above repairs the recorded overload refusal, but is not a new
+AL result. Predecessor `_system.py`'s no-op and
 WI 889's proposed implicit commit are not adopted. Reference overloads:
 `methods-auto/database/database-selectlatestversion{,-integer,--}-method.md` at the
 developer revision below; `src/rt/{RecordChanges,Cursor,Navigate}.cpp` own bounded reads.

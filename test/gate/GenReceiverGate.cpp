@@ -154,6 +154,27 @@ void QualifiedConversionNamesRemainHiddenByRuntimeMembers() {
                   .contains("#include \"type/Boolean.h\""));
 }
 
+void RecordRefreshUsesItsRuntimeProvider() {
+  const auto unit = agiru::al::ParseCodeunit(R"(codeunit 50272 "Refresh Caller" {
+    procedure Refresh(TableNumber: Integer)
+    begin
+      SelectLatestVersion();
+      SelectLatestVersion(TableNumber);
+      Database.SelectLatestVersion();
+      Database.SelectLatestVersion(TableNumber);
+    end;
+  })");
+  const auto source = agiru::gen::WriteCodeunitSource(unit, "RefreshCaller.Codeunit.al", {});
+  CHECK_TRUE("both refresh overloads name the narrow runtime provider",
+             source.contains("#include \"runtime/RecordRefresh.h\""));
+  CHECK_TRUE("AL refresh calls do not bind a SQL connection member",
+             !source.contains("Database.SelectLatestVersion"));
+  CHECK_TRUE("the AL table argument survives native refresh lowering",
+             source.contains("SelectLatestVersion(TableNumber)"));
+  CHECK_TRUE("the AL parameterless refresh survives native lowering",
+             source.contains("SelectLatestVersion()"));
+}
+
 }
 
 int main() {
@@ -163,5 +184,6 @@ int main() {
     HeadersAreNotInsertedTwice();
     ConversionResultNamesItsArrayDependency();
     QualifiedConversionNamesRemainHiddenByRuntimeMembers();
+    RecordRefreshUsesItsRuntimeProvider();
   });
 }

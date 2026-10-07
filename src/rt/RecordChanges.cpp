@@ -6,16 +6,18 @@
 #include "SessionState.h"
 
 #include <memory>
+#include <optional>
 
 namespace agiru::detail {
 
-RecordRead::RecordRead(TableId table) {
+RecordRead::RecordRead(TableId table, bool locked) : locked_(locked) {
   SessionState &state = SessionState::Current();
   if (state.recordChanges == nullptr) { state.recordChanges = std::make_shared<RecordChanges>(); }
   owner_ = state.recordChanges;
   revision_ = owner_->tables_.try_emplace(table).first;
   ++revision_->second.readers;
   observed_ = revision_->second.value;
+  refreshed_ = revision_->second.refreshed;
 }
 
 RecordRead::~RecordRead() {
@@ -23,7 +25,16 @@ RecordRead::~RecordRead() {
 }
 
 bool RecordRead::Current() const {
-  return observed_ == revision_->second.value;
+  return observed_ == revision_->second.value &&
+         (locked_ || refreshed_ == revision_->second.refreshed);
+}
+
+void RefreshRecordReads(std::optional<TableId> table) {
+  const SessionState *state = SessionState::Peek();
+  if (state == nullptr || state->recordChanges == nullptr) { return; }
+  for (auto &[id, revision] : state->recordChanges->tables_) {
+    if (!table.has_value() || id == *table) { ++revision.refreshed; }
+  }
 }
 
 void RecordWritten(const Connection &connection, TableId table) {

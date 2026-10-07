@@ -7,6 +7,7 @@
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
 #include "runtime/TablePermissions.h"
+#include "type/IsolationLevel.h"
 
 #include "Cursor.h"
 #include "FieldMetadata.h"
@@ -60,9 +61,12 @@ OpenSelection(RecordState &state, const TableDef &table, const Selection &made, 
   state.open.Forget();
   const Connection &connection = Session::Current().Database();
   if (!connection.InTransaction()) { connection.Run("BEGIN"); }
-  auto *open = new OpenCursor{.cursor = Cursor(connection, SelectFrom(made, table), made.binds),
-                              .read = RecordRead(table.id),
-                              .backwards = backwards};
+  auto *open =
+      new OpenCursor{.cursor = Cursor(connection, SelectFrom(made, table), made.binds),
+                     .read = RecordRead(table.id,
+                                        state.isolation == IsolationLevel::UpdLock ||
+                                            state.isolation == IsolationLevel::RepeatableRead),
+                     .backwards = backwards};
   state.open.Hold(open);
   return open;
 }

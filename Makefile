@@ -21,7 +21,11 @@ export CCACHE_SLOPPINESS
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-storage native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-web dev-configure dev-exec dev-check
-.PHONY: page-profile client client-test web web-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions
+.PHONY: page-profile client client-test web web-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions refresh-records
+
+refresh-records: comments db ## qualify session/table read-cache refresh and transactional negative controls
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_RecordRefreshGate gate_GenReceiverGate
+	@B="$(B)" bash "$(SELF)/test/runtime/record-refresh.sh"
 
 ui-host: comments db ## qualify session-owned UI routing and compiled contract defects, not HTTP dialog parity
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_UiHostGate
