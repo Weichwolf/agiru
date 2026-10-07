@@ -2,6 +2,7 @@
 
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
+#include "runtime/Session.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -275,7 +276,7 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type) 
 }
 
 ::agiru::Boolean IsInWriteTransaction() {
-  RefuseUnimplemented("Database.IsInWriteTransaction()");
+  return Session::Current().Transaction().IsWriting();
 }
 
 ::agiru::BigInteger LastUsedRowVersion() {

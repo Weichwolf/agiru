@@ -160,12 +160,12 @@ native-interface-package: comments db tc ## compile every original interface hea
 	@B="$(B)" bash "$(SELF)/test/transpiler/native-interface-package.sh"
 
 test-contexts: comments db tc ## execute Runtime-18 context getters and scoped skip through generated AL
-	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_TestContextGate
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_TestContextGate gate_CurrentKeyGate
 	@"$(B)/gate_TestContextGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/test-contexts.sh"
 
 codeunit-record: comments db tc ## execute var-Record globals and Codeunit.Run rollback controls
-	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_InstanceGate
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_InstanceGate gate_TransactionContractGate
 	@"$(B)/gate_InstanceGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/codeunit-record.sh"
 

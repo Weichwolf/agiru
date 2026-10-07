@@ -38,8 +38,8 @@ public:
   [[nodiscard]] static std::optional<::agiru::CommitBehavior> Standing();
 };
 
-/// \brief AL `[ErrorBehavior(ErrorBehavior::Collect)]` -- an error inside this method is COLLECTED
-///        rather than raised.
+/// \brief AL `[ErrorBehavior(ErrorBehavior::Collect)]` -- collectible ErrorInfo values are
+/// collected; ordinary Error(Text) and noncollectible ErrorInfo still raise immediately.
 ///
 /// \note IT DOES NOT TOUCH THE TRANSACTION. `ClearCollectedErrors` does not roll back what was
 ///       written, so the documented pattern wraps a collecting call in `if Codeunit.Run then`:

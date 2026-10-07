@@ -6,6 +6,7 @@
 #include "meta/TableType.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Database.h"
+#include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Query.h"
 #include "runtime/RecordRef.h"
@@ -525,6 +526,7 @@ void RollbackAndTwoSessions() {
       const agiru::Session newer(database.Dsn());
       auto committed = Inserted(2);
       CheckVersion(committed, 2);
+      agiru::Commit();
     }
     CHECK_TRUE("another session's commit cannot skip the pending record writer",
                Scalar(observer, "SELECT agiru_platform.minimum_rowversion_v1()") == 1);

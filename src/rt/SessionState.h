@@ -1,11 +1,14 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "type/CommitBehavior.h"
+#include "type/ErrorBehavior.h"
 
 #include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace agiru {
@@ -31,6 +34,9 @@ struct SessionState {
   std::vector<Binding> bindings;
   std::uint64_t lastBinding = 0;
   std::shared_ptr<RecordChanges> recordChanges;
+  std::vector<CommitBehavior> commits;
+  std::vector<ErrorBehavior> errors;
+  std::vector<std::string> collectedErrors;
 
   static SessionState &Current();
   static SessionState *Peek();

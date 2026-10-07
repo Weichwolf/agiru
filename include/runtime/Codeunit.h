@@ -9,6 +9,7 @@
 #include "runtime/Transaction.h"
 #include "type/Integer.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -482,15 +483,19 @@ public:
   ///        to the point the run began and reports `false`, with the text left where
   ///        `GetLastErrorText()` reads it.
   /// \return True when `OnRun` completed; false when it raised.
+  /// \throws Error before execution for an uncommitted production write transaction.
+  /// \note Success commits durably, independently of CommitBehavior. Newly collected errors
+  /// roll back the run without clearing the collection. Test isolation remains explicit.
   bool Ok_Run() {
+    const std::size_t collected = detail::BeginCodeunitRun();
     detail::Scope scope;
     try {
       static_cast<Derived *>(this)->OnRun();
+      detail::EndCodeunitRun(scope, collected);
     } catch (const Error &e) {
       scope.Discard(e);
       return false;
     }
-    scope.Keep();
     return true;
   }
 
@@ -533,17 +538,18 @@ public:
   /// \param rec The record, which goes into `Rec` and comes back out.
   /// \return True when `OnRun` completed; false when it raised, with the writes rolled back.
   template <typename Record> bool Ok_Run(Record &rec) {
+    const std::size_t collected = detail::BeginCodeunitRun();
     detail::Scope scope;
     try {
       TakeIn_(rec);
       [[maybe_unused]] const auto globals = BorrowGlobals_(rec);
       static_cast<Derived *>(this)->OnRun();
       GiveBack_(rec);
+      detail::EndCodeunitRun(scope, collected);
     } catch (const Error &e) {
       scope.Discard(e);
       return false;
     }
-    scope.Keep();
     return true;
   }
 

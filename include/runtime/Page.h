@@ -470,10 +470,12 @@ template <typename P> OpenedPageRecord PositionOpenedPage(P &page, bool editable
 ///                 answer false on `VAT Return Period Card` (5 UT cases, 2026-09-12).
 /// \param isNew    Whether it opens on a new record (`OpenNew`).
 template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
-  bool opensEditable = editable;
-  if constexpr (requires { PageTraits<P>::kPage.editable; }) {
-    opensEditable = editable && !detail::SaysFalse(PageTraits<P>::kPage.editable);
-  }
+  const bool opensEditable = [&] {
+    if constexpr (requires { PageTraits<P>::kPage.editable; }) {
+      return editable && !detail::SaysFalse(PageTraits<P>::kPage.editable);
+    }
+    return editable;
+  }();
   page.OpenedAs(opensEditable);
   if constexpr (requires { page.OnInit(); }) { page.OnInit(); }
   PreparePageRecord(page, isNew);
@@ -808,10 +810,13 @@ public:
   ///       alone missed the setup dialogs run without one (Payment Registration UT
   ///       `RunNextSetupWithPrompt`, run 127).
   void CloseWith(::agiru::Action action) {
-    bool lookup = static_cast<bool>(lookupMode_) || (modal_ && byNumber_);
-    if constexpr (requires { PageTraits<Derived>::kPage.type; }) {
-      lookup = lookup || (modal_ && !EntityOriented(PageTraits<Derived>::kPage.type));
-    }
+    const bool lookup = [&] {
+      const bool requested = static_cast<bool>(lookupMode_) || (modal_ && byNumber_);
+      if constexpr (requires { PageTraits<Derived>::kPage.type; }) {
+        return requested || (modal_ && !EntityOriented(PageTraits<Derived>::kPage.type));
+      }
+      return requested;
+    }();
     if (lookup && action == ::agiru::Action::OK) {
       action = ::agiru::Action::LookupOK;
     } else if (lookup && action == ::agiru::Action::Cancel) {

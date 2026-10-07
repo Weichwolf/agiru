@@ -15,6 +15,7 @@
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/TablePermissions.h"
+#include "runtime/Transaction.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
@@ -665,6 +666,7 @@ bool RuntimeInsert(void *record, const TableDef &table, bool withSystemId) {
 
   RequireTablePermission(table, TableOperation::Insert);
   RequireTableProvider(table);
+  RequireWrite();
   StampInserted(record, table, withSystemId);
   AutoIncrement(record, table);
   const FieldValues values = ValuesOf(record, table);
@@ -696,13 +698,17 @@ bool RuntimeModify(void *record, const TableDef &table) {
   RequireTablePermission(table, TableOperation::Modify);
   RequireTableProvider(table);
 
+  RequireWrite();
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
   return TakePlatformOwned(record, table, ModifyRow(Session::Current().Database(), table, values));
 }
 
 void RuntimeRequireWritableProvider(const void *record, const TableDef &table) {
-  if (TempOf(record) == nullptr) { RequireTableProvider(table); }
+  if (TempOf(record) == nullptr) {
+    RequireTableProvider(table);
+    RequireWrite();
+  }
 }
 
 bool RuntimeRename(void *record, const void *before, const TableDef &table) {
@@ -712,6 +718,7 @@ bool RuntimeRename(void *record, const void *before, const TableDef &table) {
   }
   RequireTablePermission(table, TableOperation::Modify);
   RequireTableProvider(table);
+  RequireWrite();
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
   const FieldValues oldKey = KeyOf(before, table);
@@ -728,6 +735,7 @@ bool RuntimeDelete(const void *record, const TableDef &table) {
   RequireTablePermission(table, TableOperation::Delete);
   RequireTableProvider(table);
 
+  RequireWrite();
   const FieldValues key = KeyOf(record, table);
   return DeleteRow(Session::Current().Database(), table, key);
 }

@@ -5,6 +5,8 @@
 #include "type/CommitBehavior.h"
 #include "type/ErrorBehavior.h"
 
+#include "SessionState.h"
+
 #include <exception>
 #include <optional>
 #include <string>
@@ -17,18 +19,15 @@ namespace agiru {
 namespace {
 
 std::vector<::agiru::CommitBehavior> &Commits() {
-  static thread_local std::vector<::agiru::CommitBehavior> standing;
-  return standing;
+  return detail::SessionState::Current().commits;
 }
 
 std::vector<::agiru::ErrorBehavior> &Errors() {
-  static thread_local std::vector<::agiru::ErrorBehavior> standing;
-  return standing;
+  return detail::SessionState::Current().errors;
 }
 
 std::vector<std::string> &CollectedErrors() {
-  static thread_local std::vector<std::string> collected;
-  return collected;
+  return detail::SessionState::Current().collectedErrors;
 }
 
 }
@@ -84,6 +83,10 @@ void ErrorScope::Clear() {
 }
 
 void RaiseOrCollect(std::string_view message) {
+  throw Error(message);
+}
+
+void CollectError(std::string_view message) {
   if (!ErrorScope::Collecting()) { throw Error(message); }
   ErrorScope::Collect(std::string(message));
 }

@@ -4,6 +4,7 @@
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
+#include "runtime/Transaction.h"
 
 #include "Temporary.h"
 
@@ -25,7 +26,10 @@ bool HasTableWritePermission(const TableDef &table) {
 void detail::RequireRecordPermission(const void *record,
                                      const TableDef &table,
                                      TableOperation operation) {
-  if (TempOf(record) == nullptr) { RequireTablePermission(table, operation); }
+  if (TempOf(record) == nullptr) {
+    RequireTablePermission(table, operation);
+    if (operation != TableOperation::Read) { RequireWrite(); }
+  }
 }
 
 void RequireTablePermission(const TableDef &table, TableOperation operation) {

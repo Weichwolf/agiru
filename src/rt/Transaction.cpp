@@ -45,7 +45,8 @@ std::string NextName(std::size_t issued) {
 std::size_t Boundaries::Open(const Connection &connection) {
   if (isolationFloor_ > names_.size()) { throw Error(kLostIsolation); }
   ++issued_;
-  Boundary next{.name = NextName(issued_), .inconsistentBefore = inconsistent_};
+  Boundary next{
+      .name = NextName(issued_), .inconsistentBefore = inconsistent_, .writingBefore = writing_};
   names_.reserve(names_.size() + 1);
   if (!connection.InTransaction()) { connection.Run("BEGIN"); }
   connection.Run("SAVEPOINT " + next.name);
@@ -58,6 +59,8 @@ void Boundaries::ClearCommand() noexcept {
   inconsistent_.clear();
   isolationFloor_ = 0;
   autoRollbackTest_ = false;
+  writing_ = false;
+  tryDepth_ = 0;
   type_ = TransactionType::UpdateNoLocks;
   ++cursorEpoch_;
 }
@@ -80,6 +83,7 @@ void Boundaries::Rollback(const Connection &connection, std::size_t depth) {
   connection.Run("ROLLBACK TO SAVEPOINT " + names_[depth - 1].name);
   connection.Run("RELEASE SAVEPOINT " + names_[depth - 1].name);
   std::vector<std::string> restored = std::move(names_[depth - 1].inconsistentBefore);
+  writing_ = names_[depth - 1].writingBefore;
   names_.resize(depth - 1);
   inconsistent_.swap(restored);
   ++cursorEpoch_;
@@ -89,6 +93,11 @@ void Boundaries::MarkConsistent(std::string_view table, bool consistent) {
   const auto held = std::ranges::find(inconsistent_, table);
   if (consistent && held != inconsistent_.end()) { inconsistent_.erase(held); }
   if (!consistent && held == inconsistent_.end()) { inconsistent_.emplace_back(table); }
+}
+
+void Boundaries::Write(const Connection &connection) {
+  if (!connection.InTransaction()) { connection.Run("BEGIN"); }
+  writing_ = true;
 }
 
 void Boundaries::Commit(const Connection &connection) {
@@ -105,7 +114,8 @@ void Boundaries::Commit(const Connection &connection) {
   renewed.reserve(names_.size() - isolationFloor_);
   for (std::size_t i = isolationFloor_; i < names_.size(); ++i) {
     ++issued_;
-    renewed.push_back(Boundary{.name = NextName(issued_), .inconsistentBefore = inconsistent_});
+    renewed.push_back(Boundary{
+        .name = NextName(issued_), .inconsistentBefore = inconsistent_, .writingBefore = false});
   }
   try {
     if (isolationFloor_ == 0) {
@@ -114,6 +124,7 @@ void Boundaries::Commit(const Connection &connection) {
         ++cursorEpoch_;
       }
       names_.clear();
+      writing_ = false;
       if (!renewed.empty()) { connection.Run("BEGIN"); }
     } else if (!renewed.empty()) {
       connection.Run("RELEASE SAVEPOINT " + names_[isolationFloor_].name);
@@ -123,10 +134,12 @@ void Boundaries::Commit(const Connection &connection) {
       connection.Run("SAVEPOINT " + boundary.name);
       names_.push_back(std::move(boundary));
     }
+    writing_ = false;
   } catch (const DatabaseError &) {
     if (!connection.InTransaction()) {
       names_.clear();
       inconsistent_.clear();
+      writing_ = false;
       ++cursorEpoch_;
     }
     throw;
@@ -161,6 +174,48 @@ void Scope::Keep() {
   if (!open_) { return; }
   open_ = false;
   Session::Current().Transaction().Release(Session::Current().Database(), depth_);
+}
+
+void Scope::Rollback() {
+  if (!open_) { return; }
+  open_ = false;
+  Session::Current().Transaction().Rollback(Session::Current().Database(), depth_);
+}
+
+TryScope::TryScope() {
+  Session::Current().Transaction().EnterTry();
+}
+
+TryScope::~TryScope() {
+  Session::Current().Transaction().LeaveTry();
+}
+
+void RequireWrite() {
+  auto &session = Session::Current();
+  if (session.Options().disableWriteInsideTryFunctions && session.Transaction().IsTrying()) {
+    throw Error("Database writes inside a TryFunction are disabled by runtime configuration",
+                "TryFunctionWrite");
+  }
+  session.Transaction().Write(session.Database());
+}
+
+std::size_t BeginCodeunitRun() {
+  auto &transaction = Session::Current().Transaction();
+  if (transaction.IsWriting() && !transaction.IsTestIsolated()) {
+    throw Error("Commit the current write transaction before evaluating Codeunit.Run",
+                "CodeunitRunTransaction");
+  }
+  return ErrorScope::Collected().size();
+}
+
+void EndCodeunitRun(Scope &scope, std::size_t collected) {
+  if (ErrorScope::Collected().size() > collected) {
+    scope.Rollback();
+    return;
+  }
+  auto &session = Session::Current();
+  session.Transaction().Commit(session.Database());
+  scope.Keep();
 }
 
 void Scope::Discard(std::string_view why) {

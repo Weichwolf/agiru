@@ -25,6 +25,7 @@
 #include "runtime/Page.h"
 #include "runtime/RecordRef.h"
 #include "runtime/ReportRegistry.h"
+#include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
 #include "type/Action.h"
 #include "type/Boolean.h"
@@ -297,6 +298,9 @@ inline void RunReportByNumber(std::string_view what, ::agiru::Integer id, Report
 ///       board item that owns it; what is control flow (`Break`, `Skip`, `Quit`) throws; what is
 ///       processing runs.
 template <typename Derived = void> class Report : public Page<Derived> {
+  friend Derived;
+  Report() = default;
+
 public:
   /// \brief Marks a report class for the test runner's handler dispatch.
   using IsReport = void;
@@ -667,6 +671,7 @@ public:
       handler->invoke(Name(), &self);
       return;
     }
+    detail::Scope transaction;
     try {
       if constexpr (requires { self.OnInitReport(); }) { self.OnInitReport(); }
       if (request.requestPage) {
@@ -694,6 +699,7 @@ public:
       detail::WriteReportFile(parametersFile_, detail::ReportParametersXml(Id(), Name()));
     }
     if (request.stream != nullptr) { static_cast<void>(request.stream->WriteText(dataset_.Xml())); }
+    transaction.Keep();
   }
 
 private:

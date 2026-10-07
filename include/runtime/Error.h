@@ -57,6 +57,7 @@ void RememberError(const Error &error);
 }
 
 template <typename Body> [[nodiscard]] bool Tried(Body body) {
+  const detail::TryScope scope;
   try {
     body();
   } catch (const Error &e) {
@@ -123,6 +124,10 @@ void Commit();
 ///       the runtime rather than to the emitted statement (board:0195).
 void RaiseOrCollect(std::string_view message);
 
+/// \brief Collects an explicitly collectible ErrorInfo only inside an ErrorBehavior scope.
+/// \param message Exact error text. \throws Error when no collection scope is active.
+void CollectError(std::string_view message);
+
 /// \brief AL `Error(ErrorInfo)` -- the same, with the info's own message.
 /// \tparam Info Anything carrying a `Message()`, which is what `ErrorInfo` is here.
 /// \param info The error's description.
@@ -130,7 +135,13 @@ void RaiseOrCollect(std::string_view message);
 template <typename Info>
   requires requires(Info info) { std::string_view{info.Message()}; }
 void RaiseOrCollect(Info info) {
-  RaiseOrCollect(std::string_view(info.Message()));
+  if constexpr (requires { info.Collectible(); }) {
+    if (info.Collectible()) {
+      CollectError(std::string_view(info.Message()));
+      return;
+    }
+  }
+  throw Error(std::string_view(info.Message()));
 }
 
 /// \brief Preserves an explicit refusal when AL passes an unsupported .NET result to `Error`.

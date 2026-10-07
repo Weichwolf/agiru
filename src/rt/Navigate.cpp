@@ -7,6 +7,7 @@
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
 #include "runtime/TablePermissions.h"
+#include "runtime/Transaction.h"
 
 #include "Cursor.h"
 #include "FieldMetadata.h"
@@ -331,7 +332,10 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table) {
 }
 
 std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table) {
-  if (TempOf(record) == nullptr) { RequireTablePermission(table, TableOperation::Delete); }
+  if (TempOf(record) == nullptr) {
+    RequireTablePermission(table, TableOperation::Delete);
+    RequireWrite();
+  }
   if (TempOf(record) != nullptr) { return TempDeleteAll(const_cast<void *>(record), table); }
 
   const Selection made = Select(PeekOf(record), table);

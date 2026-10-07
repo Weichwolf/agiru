@@ -4,6 +4,7 @@
 #include "platform/User.h"
 #include "runtime/Database.h"
 #include "runtime/Events.h"
+#include "runtime/SessionOptions.h"
 #include "runtime/Table.h"
 #include "runtime/TablePermissions.h"
 #include "runtime/Transaction.h"
@@ -32,10 +33,11 @@ thread_local Session *g_current = nullptr;
 
 }
 
-Session::Session(const std::string &connectionInfo)
+Session::Session(const std::string &connectionInfo, SessionOptions options)
     : ownedConnection_(std::make_unique<Connection>(connectionInfo)),
       connection_(ownedConnection_.get()),
-      previous_(g_current) {
+      previous_(g_current),
+      options_(options) {
   g_current = this;
   ::agiru::Language::MakeCurrent(language_);
 }
@@ -45,10 +47,11 @@ Session::Session(const std::string &connectionInfo, const Guid &authenticatedUse
   ResolveUser(authenticatedUser);
 }
 
-Session::Session(const Guid &authenticatedUser)
+Session::Session(const Guid &authenticatedUser, SessionOptions options)
     : state_(std::make_unique<detail::SessionState>()),
       userSecurityId_(authenticatedUser),
-      userId_() {
+      userId_(),
+      options_(options) {
   if (authenticatedUser.IsNull()) { throw SessionError("session user is not active"); }
 }
 

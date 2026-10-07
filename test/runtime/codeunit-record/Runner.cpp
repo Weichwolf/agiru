@@ -1,4 +1,5 @@
 #include "runtime/Codeunit.h"
+#include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
@@ -8,12 +9,14 @@
 #include "type/Integer.h"
 
 #include "Check.h"
+#include "OwnedDatabase.h"
 #include "fixture/codeunit/RunCallForms.h"
 #include "fixture/codeunit/RunWriter.h"
 #include "fixture/table/RunBuffer.h"
 #include "fixture/table/RunRow.h"
 
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <type_traits>
 
@@ -23,6 +26,8 @@ using Buffer = agiru::Fixture::RunBuffer_Table;
 using Writer = agiru::Fixture::RunWriter_Codeunit;
 using Forms = agiru::Fixture::RunCallForms_Codeunit;
 constexpr agiru::Integer kWriter = 50261;
+constexpr agiru::Integer kProductionID = 92;
+constexpr agiru::Integer kPendingID = 93;
 constexpr agiru::Integer kSourceSave = 11;
 constexpr agiru::Integer kCopySave = 22;
 constexpr agiru::Integer kConsumedID = 31;
@@ -147,6 +152,74 @@ void NestedAndCursor() {
              rows.Next() == 1 && rows.ID == kCursorSecondID);
   CHECK_TRUE("temporary callers retain their own saved globals", rows.SavedValue(1) == 1);
 }
+
+void GeneratedTryPolicy(const std::string &dsn, bool disabled) {
+  const agiru::Session session(dsn, {.disableWriteInsideTryFunctions = disabled});
+  const agiru::detail::Scope isolation;
+  agiru::CreateTable(session.Database(), agiru::TableTraits<Buffer>::kTable);
+  Forms forms;
+  const Buffer stored;
+  {
+    const agiru::detail::Scope call;
+    CHECK_TRUE("generated try argument errors are caught", !forms.CatchArgument());
+    CHECK_TRUE("generated argument writes obey the runtime policy",
+               stored.Count() == (disabled ? 0 : 1));
+    CHECK_TEXT("argument evaluation happens inside the catch scope",
+               agiru::GetLastErrorText(),
+               disabled
+                   ? "Database writes inside a TryFunction are disabled by runtime configuration"
+                   : "after argument");
+  }
+  CHECK_TRUE("the argument test's caller rollback discards permitted writes", stored.Count() == 0);
+  {
+    const agiru::detail::Scope call;
+    CHECK_TRUE("generated nested try errors are caught", !forms.CatchNested());
+    CHECK_TRUE("ordinary callees inside a consumed try obey the policy",
+               stored.Count() == (disabled ? 0 : 1));
+  }
+  {
+    const agiru::detail::Scope call;
+    bool raised = false;
+    try {
+      forms.DiscardArgument();
+    } catch (const agiru::Error &error) {
+      raised = std::string_view(error.what()) == "after argument";
+    }
+    CHECK_TRUE("discarded generated try calls propagate their errors", raised);
+    CHECK_TRUE("discarded try calls allow ordinary argument writes under both policies",
+               stored.Count() == 1);
+  }
+  CHECK_TRUE("discarded calls remain subject to caller rollback", stored.Count() == 0);
+}
+
+template <typename Call> void ProductionRun(const std::string &dsn, Call call) {
+  const agiru::Session session(dsn);
+  const agiru::Connection observer(dsn);
+  Buffer stored;
+  stored.DeleteAll();
+  agiru::Commit();
+  Row caller;
+  caller.ID = kProductionID;
+  caller.Value = -2;
+  CHECK_TRUE("generated production evaluated errors return false", !call(caller));
+  CHECK_TRUE("generated failed runs actually discard SQL, not merely defer Commit",
+             stored.Count() == 0);
+  caller.Value = 2;
+  CHECK_TRUE("generated production success returns true", call(caller));
+  CHECK_TRUE("generated evaluated success commits independently",
+             observer.Execute(R"(SELECT 1 FROM "Run Buffer" WHERE "ID" = 92)").Rows() == 1);
+  CHECK_TRUE("generated success returns the callee's typed fields", caller.Value == 3);
+  stored.ID = kPendingID;
+  stored.Value = 2;
+  stored.Insert();
+  bool refused = false;
+  try {
+    static_cast<void>(call(caller));
+  } catch (const agiru::Error &error) { refused = error.Code() == "CodeunitRunTransaction"; }
+  CHECK_TRUE("generated evaluated calls refuse pending caller writes", refused);
+  CHECK_TRUE("the refusal cannot implicitly commit unrelated caller rows",
+             observer.Execute(R"(SELECT 1 FROM "Run Buffer" WHERE "ID" = 93)").Rows() == 0);
+}
 }
 
 int main(int argc, char **argv) {
@@ -156,18 +229,32 @@ int main(int argc, char **argv) {
       return;
     }
     if (argc != 2) { throw std::runtime_error("expected dedicated gate database DSN"); }
-    const agiru::Session session(argv[1]);
-    const agiru::detail::Scope isolation;
-    agiru::CreateTable(session.Database(), agiru::TableTraits<Buffer>::kTable);
-    CopyIsNotVarPassing();
+    const gate::OwnedDatabase database("codeunit_record");
+    {
+      const agiru::Session session(database.Dsn());
+      const agiru::detail::Scope isolation;
+      const agiru::detail::IsolationFloor floor(isolation.Depth());
+      agiru::CreateTable(session.Database(), agiru::TableTraits<Buffer>::kTable);
+      CopyIsNotVarPassing();
+      Forms forms;
+      Consumed([&](Row &row) { return forms.Typed(row); });
+      Consumed([&](Row &row) { return forms.Static(row); });
+      Consumed([&](Row &row) { return forms.Dynamic(row, kWriter); });
+      Statement([&](Row &row) { forms.Statement(row); });
+      Statement([&](Row &row) { forms.StaticStatement(row); });
+      Statement([&](Row &row) { forms.DynamicStatement(row, kWriter); });
+      CalleeRestoration();
+      NestedAndCursor();
+    }
+    GeneratedTryPolicy(database.Dsn(), false);
+    GeneratedTryPolicy(database.Dsn(), true);
+    {
+      const agiru::Connection connection(database.Dsn());
+      agiru::CreateTable(connection, agiru::TableTraits<Buffer>::kTable);
+    }
     Forms forms;
-    Consumed([&](Row &row) { return forms.Typed(row); });
-    Consumed([&](Row &row) { return forms.Static(row); });
-    Consumed([&](Row &row) { return forms.Dynamic(row, kWriter); });
-    Statement([&](Row &row) { forms.Statement(row); });
-    Statement([&](Row &row) { forms.StaticStatement(row); });
-    Statement([&](Row &row) { forms.DynamicStatement(row, kWriter); });
-    CalleeRestoration();
-    NestedAndCursor();
+    ProductionRun(database.Dsn(), [&](Row &row) { return forms.Typed(row); });
+    ProductionRun(database.Dsn(), [&](Row &row) { return forms.Static(row); });
+    ProductionRun(database.Dsn(), [&](Row &row) { return forms.Dynamic(row, kWriter); });
   });
 }

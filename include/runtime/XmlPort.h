@@ -16,6 +16,7 @@
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/Page.h"
+#include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
 #include "type/Action.h"
 #include "type/Boolean.h"
@@ -516,6 +517,7 @@ public:
     if (request.destination != nullptr) { destination_ = request.destination; }
     if (request.source != nullptr) { source_ = request.source; }
     const XmlPortDef &def = XmlPortTraits<Derived>::kPort;
+    detail::Scope transaction;
     try {
       if constexpr (requires { self.OnInitXmlPort(); }) { self.OnInitXmlPort(); }
       if (request.requestPage) {
@@ -552,7 +554,11 @@ public:
       static_cast<void>(
           destination_->WriteBytes(detail::EncodeForXmlPort(output_.Finish(), encoding_)));
     }
+    transaction.Keep();
   }
+
+private:
+  friend Derived;
 
   /// \brief What the class declares for its separators, read once into the run's own copies.
   XmlPort()
@@ -563,7 +569,6 @@ public:
         fieldDelimiter_(detail::SeparatorText(XmlPortTraits<Derived>::kPort.fieldDelimiter)),
         tableSeparator_(detail::SeparatorText(XmlPortTraits<Derived>::kPort.tableSeparator)) {}
 
-private:
   [[nodiscard]] Derived &Self_() { return static_cast<Derived &>(*this); }
 
   [[nodiscard]] static constexpr bool UseRequestPage_() {

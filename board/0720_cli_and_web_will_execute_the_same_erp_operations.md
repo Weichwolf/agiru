@@ -1,10 +1,10 @@
 # 0720 — Deliver equivalent web, agent CMD and MCP clients (G2)
 
-Status: in progress | Priority: P0
+Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: inspect the live integration result, then implement session-owned production UI
+Next: finish the priority transaction/session contract in 0741, then implement session-owned production UI
 capabilities for GuiAllowed/dialogs and typed error responses; rerun original Customer
 List → Card → Validate → Save using external CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.

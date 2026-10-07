@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/Session.h"
 #include "runtime/SingleInstance.h"
 #include "runtime/Transaction.h"
 
@@ -149,8 +150,10 @@ void Invoke(const Subscription &subscription,
     return;
   }
   Scope boundary;
+  const std::size_t collected = BeginCodeunitRun();
   try {
     subscription.invoke(instance, args, bound);
+    EndCodeunitRun(boundary, collected);
   } catch (const Error &e) {
     boundary.Discard(e);
     return;
@@ -210,7 +213,13 @@ void RaiseIsolated(EventObject kind,
                    std::string_view event,
                    std::string_view element,
                    const EventArgs &args) {
-  Dispatch(kind, objectId, objectName, event, element, args, true);
+  Dispatch(kind,
+           objectId,
+           objectName,
+           event,
+           element,
+           args,
+           !Session::Current().Transaction().IsWriting());
 }
 
 bool BindSubscriptions(CodeunitId id, void *instance) {

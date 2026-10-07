@@ -56,6 +56,24 @@ public:
   ///          the end of the test codeunit, as the platform TestIsolation property requires.
   void Commit(const Connection &connection);
 
+  /// \brief Enters a write transaction; the caller has already authorized the operation.
+  /// \param connection The exclusively borrowed session connection.
+  void Write(const Connection &connection);
+
+  /// \return Whether the current logical transaction has entered its write phase.
+  [[nodiscard]] bool IsWriting() const { return writing_; }
+
+  /// \return Whether a test runner owns an enclosing rollback floor.
+  [[nodiscard]] bool IsTestIsolated() const { return isolationFloor_ != 0; }
+
+  /// \brief Enters/leaves consumed TryFunction calls; arguments execute inside this scope.
+  void EnterTry() { ++tryDepth_; }
+
+  void LeaveTry() { --tryDepth_; }
+
+  /// \return Whether a consumed TryFunction is active, including nested ordinary calls.
+  [[nodiscard]] bool IsTrying() const { return tryDepth_ != 0; }
+
   /// \return How many boundaries are open.
   [[nodiscard]] std::size_t Depth() const { return names_.size(); }
 
@@ -149,6 +167,7 @@ private:
   struct Boundary {
     std::string name;
     std::vector<std::string> inconsistentBefore;
+    bool writingBefore;
   };
 
   std::vector<Boundary> names_;
@@ -157,6 +176,8 @@ private:
   std::size_t cursorEpoch_ = 0;
   std::size_t isolationFloor_ = 0;
   bool autoRollbackTest_ = false;
+  bool writing_ = false;
+  std::size_t tryDepth_ = 0;
   std::string lastErrorCode_;
   std::size_t issued_ = 0;
   TransactionType type_ = TransactionType::UpdateNoLocks;
@@ -189,6 +210,9 @@ public:
   /// \brief Keeps everything written inside.
   void Keep();
 
+  /// \brief Discards SQL work without clearing collected errors or replacing the last error.
+  void Rollback();
+
   /// \brief Discards everything written inside, and remembers why.
   /// \param why The error's text, which AL `GetLastErrorText()` returns afterwards.
   void Discard(std::string_view why);
@@ -204,6 +228,27 @@ private:
   std::size_t depth_;
   bool open_ = true;
 };
+
+/// \brief Session-owned catch context for a consumed TryFunction, including argument evaluation.
+class TryScope {
+public:
+  TryScope();
+  ~TryScope();
+  TryScope(const TryScope &) = delete;
+  TryScope &operator=(const TryScope &) = delete;
+};
+
+/// \brief Refuses writes inside consumed try calls when the trusted runtime policy disables them.
+/// Starts the session write transaction before triggers, timestamps or sequence allocation.
+void RequireWrite();
+
+/// \brief Validates evaluated Codeunit.Run before invoking AL and snapshots collected errors.
+/// \return The previous collection size; active production write transactions refuse.
+[[nodiscard]] std::size_t BeginCodeunitRun();
+/// \brief Commits a successful evaluated run, or rolls back its newly collected errors.
+/// \param scope The run boundary. \param collected The collection size at entry.
+/// Implicit commits bypass CommitBehavior, but retain the explicit test-isolation floor.
+void EndCodeunitRun(Scope &scope, std::size_t collected);
 
 /// \brief Restores the previous test isolation floor when a runner returns or raises.
 class IsolationFloor {

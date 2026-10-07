@@ -2,6 +2,7 @@
 
 #include "runtime/Database.h"
 #include "runtime/Session.h"
+#include "runtime/Transaction.h"
 #include "type/Boolean.h"
 #include "type/DataScope.h"
 #include "type/SecretText.h"
@@ -48,6 +49,7 @@ Binds Where(std::string_view key, const DataScope &scope) {
 
 Boolean
 IsolatedStorage::Set(const TextArgument &Key, std::string_view Value, const DataScope &DataScope) {
+  detail::RequireWrite();
   Declared();
   Binds bound = Where(std::string_view(Key), DataScope);
   bound.emplace_back(std::string(Value));
@@ -68,6 +70,7 @@ Boolean IsolatedStorage::SetEncrypted(const TextArgument &Key,
 Boolean IsolatedStorage::SetEncrypted(const TextArgument &Key,
                                       const TextArgument &Value,
                                       const DataScope &DataScope) {
+  detail::RequireWrite();
   Declared();
   Binds bound = Where(std::string_view(Key), DataScope);
   bound.emplace_back(std::string(std::string_view(Value)));
@@ -130,6 +133,7 @@ IsolatedStorage::Contains(const TextArgument &Key, const DataScope &DataScope, B
 }
 
 Boolean IsolatedStorage::Delete(const TextArgument &Key, const DataScope &DataScope) {
+  detail::RequireWrite();
   if (!Contains(Key, DataScope)) { return false; }
   Session::Current().Database().Run(
       "DELETE FROM " + std::string(kTable) +

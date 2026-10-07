@@ -3,6 +3,7 @@
 #include "platform/Tenant.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
+#include "runtime/SessionOptions.h"
 #include "runtime/Transaction.h"
 #include "type/Boolean.h"
 #include "type/Date.h"
@@ -52,7 +53,7 @@ public:
   /// \param connectionInfo A libpq connection string or URI.
   /// \warning Not a production client sign-in or an authorization grant.
   /// \throws DatabaseError when the connection cannot be established.
-  explicit Session(const std::string &connectionInfo);
+  explicit Session(const std::string &connectionInfo, SessionOptions options = {});
 
   /// \brief Opens a session for an already authenticated user from the system User table.
   /// \param connectionInfo A libpq connection string or URI.
@@ -71,7 +72,7 @@ public:
   /// \note Every SessionCommand resolves the account name/status from PostgreSQL again.
   ///       Does not authenticate credentials or grant permissions. No UserId is resolved
   ///       until the first accepted command; pages and SingleInstances survive detachment.
-  explicit Session(const Guid &authenticatedUser);
+  explicit Session(const Guid &authenticatedUser, SessionOptions options = {});
 
   ~Session();
 
@@ -202,6 +203,12 @@ public:
   ///       (board:0012), and holding both here is what makes handing the wrong one impossible.
   [[nodiscard]] Boundaries &Transaction() { return boundaries_; }
 
+  /// \return Read-only transaction state for diagnostics; cannot change the session authority.
+  [[nodiscard]] const Boundaries &Transaction() const { return boundaries_; }
+
+  /// \return Immutable host policy, retained when this session moves between workers.
+  [[nodiscard]] const SessionOptions &Options() const { return options_; }
+
 private:
   friend struct detail::SessionState;
   friend class SessionCommand;
@@ -221,6 +228,7 @@ private:
   ::agiru::Integer language_ = kEnglishUnitedStates;
   std::string company_;
   TenantSettings tenant_;
+  SessionOptions options_;
 };
 
 }

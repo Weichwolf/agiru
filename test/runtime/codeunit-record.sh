@@ -11,6 +11,7 @@ cp test/transpiler/native-enums/source/app.json "$proof/source/app.json"
 printf '%s\n' '{"apps":[{"name":"fixture","source":"source"}]}' > "$proof/apps.json"
 printf '%s\n' '{"include":["Microsoft"],"exclude":[],"product_exclude":[]}' > "$proof/scope.json"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate
+  "-DAGIRU_TEST_DSN=\"$dsn\""
   "-I$proof/generated/fixture" "-I$proof/generated/absent" "-I$proof/generated/shared")
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
@@ -62,4 +63,46 @@ for control in no-borrow no-restore assignment-alias; do
 done
 rm -- "$proof/runner" "$proof/runner.o"
 rm -r -- "$proof/mutant"
-printf 'codeunit-record: var-Record globals, SQL rollback, nested/statement/handle/cursor and three compiled controls proved; %s\n' "$proof"
+"$B/gate_TransactionContractGate" > "$proof/transaction-baseline.log" 2>&1
+for control in no-implicit-commit no-rollback try-write-bypass worker-scope-leak; do
+  source=src/rt/Transaction.cpp
+  if [ "$control" = worker-scope-leak ]; then source=src/rt/Scopes.cpp; fi
+  awk -v control="$control" '
+    control == "no-implicit-commit" && /session.Transaction\(\).Commit\(session.Database\(\)\);/ {
+      $0 = "  static_cast<void>(session);"; changed++
+    }
+    control == "no-rollback" && /connection.Run\("ROLLBACK TO SAVEPOINT " \+/ {
+      changed++; next
+    }
+    control == "try-write-bypass" && /if \(session.Options\(\).disableWriteInsideTryFunctions/ {
+      $0 = "  if (false) {"; changed++
+    }
+    control == "worker-scope-leak" && /return detail::SessionState::Current\(\).(commits|errors|collectedErrors);/ {
+      if (/\.commits;/) print "  static thread_local std::vector<::agiru::CommitBehavior> leaked;"
+      if (/\.errors;/) print "  static thread_local std::vector<::agiru::ErrorBehavior> leaked;"
+      if (/\.collectedErrors;/) print "  static thread_local std::vector<std::string> leaked;"
+      $0 = "  return leaked;"; changed++
+    }
+    { print }
+    END { if (changed != (control == "worker-scope-leak" ? 3 : 1)) exit 2 }
+  ' "$source" > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" -Isrc/rt -fPIC -shared "$proof/$control.cpp" \
+    "${links[@]}" -o "$proof/$control.so"
+  status=0
+  LD_PRELOAD="$proof/$control.so" "$B/gate_TransactionContractGate" \
+    > "$proof/$control-execution.log" 2>&1 || status=$?
+  if [ "$status" -ne 1 ]; then
+    printf 'codeunit-record: %s expected failure 1, received %s\n' "$control" "$status" >&2
+    exit 1
+  fi
+  case "$control" in
+    no-implicit-commit) claim='evaluated success is independently durable' ;;
+    no-rollback) claim='failed evaluated writes are removed from the writer' ;;
+    try-write-bypass) claim='configured try policy controls actual database writes' ;;
+    worker-scope-leak) claim='another session on the same worker inherits no CommitBehavior' ;;
+  esac
+  rg -q "$claim" "$proof/$control-execution.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/transaction-controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
+printf 'codeunit-record: generated Run/try policies, transaction contracts, three globals and four transaction controls proved; %s\n' "$proof"
