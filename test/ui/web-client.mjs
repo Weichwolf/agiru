@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { AgentClient } from "../../build/client/http.mjs";
 import { parsePage, commandEnvelope } from "../../build/client/profile.mjs";
+import { assertBrowserPage } from "./browser-client.mjs";
 
 const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
 const { chromium } = require("playwright-core");
@@ -68,6 +69,7 @@ test("actual browser renders original native HTML with exact values, counted gap
   const page = await open();
   await ready(page);
   const agent = await new AgentClient(origin, { authorization: bearer }).read("/?page=50400");
+  await assertBrowserPage(page, agent.page);
   assert.equal(await page.locator("article").getAttribute("data-revision"), agent.page.revision);
   assert.equal(await control(page, "Amount").locator("input[name=text]").getAttribute("data-value"), "1.2300");
   assert.equal(await control(page, "Big").locator("output").getAttribute("data-value"), "9223372036854775807");

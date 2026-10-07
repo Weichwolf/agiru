@@ -111,6 +111,24 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   these gates/fixtures do not execute the source-counted AL UT or qualify actual browsers.
 
 - Original Customer client regression: `make erp-client-test JOBS=2`,
+  current post-bridge image: seven cases, six pass/one failure, zero skipped/cancelled.
+  Actual Chromium/htmx denies the unassigned user and edits the original Customer Name;
+  external CMD and real MCP make earlier edits on the same row. Independent SQL verifies
+  exact Unicode names, authenticated modifier, increased rowversion, unchanged row
+  population, durable receipts and no idle leases. `test/ui/browser-client.mjs` compares
+  actual rendered controls/typed values/command identities with the agent model; its
+  native-HTML browser regression and three compiled controls remain green. The complete
+  native image rebuild exits zero (14,225 slice sources, 1,902 explicit unlinked procedures).
+  Remaining case: Customer Card's No. is absent. Original `CustomerCard.Page.al`
+  OnOpenPage runs OnOpenBackground because HTTP still installs no native UI host;
+  NoFieldVisible remains false instead of running DocumentNoVisibility. The verified
+  seed's CUST series has Manual Nos.=true, so the interactive path should show No.
+  Preserve the failing case; never force GuiAllowed/visibility or bypass original AL.
+  Developer `properties/devenv-visible-property.md` at the revision below distinguishes
+  dynamic visibility from permissions. This is diagnostic existing-customer editing,
+  not interactive page/ERP acceptance, New/template selection or a completed business family.
+
+  Historical pre-bridge failure evidence:
   `test/ui/erp-client.mjs` and the existing CRONUS fixture pipeline: seven cases,
   one pass/six failures, zero skipped/cancelled. Caddy/native service starts and drains
   cleanly; unassigned users are refused over HTTP/CMD/MCP without Customer/context SQL

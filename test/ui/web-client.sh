@@ -4,7 +4,7 @@ cd "$(dirname "$0")/../.."
 proof=$(mktemp -d /tmp/agiru-web-client.XXXXXX)
 trap 'find "$proof" -maxdepth 1 -type f -name "*.mjs" -delete' EXIT
 sha256sum src/client/*.{mts,json} src/client/web/* scripts/build_web.sh \
-  test/ui/web-client.{sh,mjs} test/ui/web-assets.mjs deploy/dev/Caddyfile \
+  test/ui/web-client.{sh,mjs} test/ui/{web-assets,browser-client}.mjs deploy/dev/Caddyfile \
   scripts/dev_container.sh build/web/* > "$proof/inputs.sha256"
 container=${AGIRU_DEV_CONTAINER:-agiru-dev}
 git rev-parse HEAD > "$proof/head.txt"

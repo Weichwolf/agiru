@@ -5,8 +5,9 @@ import { promisify } from "node:util";
 import { chmod, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
-import { commandEnvelope, parsePage } from "../../build/client/profile.mjs";
+import { parsePage } from "../../build/client/profile.mjs";
 import { ServerConfigs } from "./server-config.mjs";
+import { assertBrowserPage, browserSet, launchBrowser, openBrowserPage } from "./browser-client.mjs";
 
 const execute = promisify(execFile);
 const container = process.env.AGIRU_DEV_CONTAINER ?? "agiru-dev";
@@ -59,7 +60,7 @@ async function mcp(name, args, denied = false) {
   finally { await client.close(); }
 }
 
-let server, closed, pid, first, denied, client, list, card, saved, selected, original;
+let server, closed, pid, first, denied, client, list, card, saved, selected, original, browser;
 let output = "", diagnostic = "";
 before(async () => {
   const config = await configurations.write({ database: dsn, company, origin });
@@ -70,6 +71,7 @@ before(async () => {
   first = await readAuth(`${proof}/auth.json`);
   denied = await readAuth(`${proof}/auth.json.denied`);
   client = new AgentClient(origin, first, 30000);
+  browser = await launchBrowser();
   server = spawn("podman", ["exec", "--user", "agiru", container,
     "env", `LD_LIBRARY_PATH=${native}/binaries`,
     ...(process.env.AGIRU_ERP_PRELOAD ? [`LD_PRELOAD=${process.env.AGIRU_ERP_PRELOAD}`] : []), "sh", "-c",
@@ -91,6 +93,7 @@ before(async () => {
   });
 }, { timeout: 35000 });
 after(async () => {
+  await browser?.close();
   if (pid && server.exitCode === null) {
     await execute("podman", ["exec", "--user", "agiru", container, "kill", "-TERM", pid]);
     const timer = setTimeout(() => server.kill(), 15000);
@@ -118,6 +121,11 @@ test("original Customer List denies the unassigned user over web, CMD and MCP wi
   const reply = await mcp("read", { path: target }, true);
   assert.equal(reply.isError, true);
   assert.deepEqual(reply.structuredContent, JSON.parse(error.stderr));
+  const web = await openBrowserPage(browser, origin, target, denied.authorization);
+  assert.equal(web.response.status(), 403);
+  assert.equal(await web.page.locator("#workspace [data-control]").count(), 0);
+  await web.page.screenshot({ path: `${proof}/customer-denied.png`, fullPage: true });
+  await web.page.close();
   assert.equal(await sql('SELECT count(*) FROM "Customer"'), "68");
   assert.equal(await sql("SELECT count(*) FROM agiru_client.page_contexts"), "0");
 });
@@ -146,7 +154,10 @@ test("CMD discovers and opens the original Customer Card with the exact selected
   assert.ok(list, "Customer List prerequisite failed; card was not executed");
   card = JSON.parse((await cmd("execute", operation(list, "$agiru.card"))).stdout);
   assert.equal(card.page.page, "21");
-  assert.equal(field(card, "No."), selected);
+  assert.equal(await sql('SELECT "Manual Nos." FROM "No. Series" WHERE "Code" IN ' +
+    '(SELECT "Customer Nos." FROM "Sales & Receivables Setup")'), "t", "seed requires the interactive No. field");
+  assert.equal(field(card, "No."), selected,
+    "Customer Card interactive OnOpenPage remains unqualified: native HTTP has no UI host");
   assert.equal(field(card, "Name"), original.name);
   assert.deepEqual(await client.read(path(card)), card);
 });
@@ -177,18 +188,15 @@ test("MCP validates and saves the same original Customer through the same comman
   assert.deepEqual(await client.read(path(saved)), saved);
 });
 
-test("the actual HTML form validates and saves the same Customer without agent-only business logic", { timeout: 30000 }, async () => {
+test("actual Chromium and htmx validate and save the same Customer without agent-only business logic", { timeout: 30000 }, async () => {
   assert.ok(saved, "agent Save prerequisite failed; HTML form was not executed");
   const name = "AGIRU WEB QUALIFY Ω 雪";
-  const command = operation(saved, "Name", name);
-  const envelope = commandEnvelope(saved.page, { ...command, enabled: true }, name);
-  const response = await fetch(origin + envelope.path, { method: "POST", headers: {
-    ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded", "HX-Request": "true" },
-    body: new URLSearchParams(envelope.fields), signal: AbortSignal.timeout(30000) });
-  const html = await response.text();
-  await writeFile(`${proof}/customer-card-saved.html`, html);
-  assert.equal(response.status, 200, html);
-  saved = { page: parsePage(html), status: response.status };
+  const web = await openBrowserPage(browser, origin, path(saved), first.authorization);
+  assert.equal(web.response.status(), 200);
+  await assertBrowserPage(web.page, saved.page);
+  saved = await browserSet(web.page, origin, saved.page, "Name", name);
+  await web.page.screenshot({ path: `${proof}/customer-card-saved.png`, fullPage: true });
+  await web.page.close();
   assert.equal(field(saved, "Name"), name);
   const row = await customer(selected);
   assert.equal(row.name, name);

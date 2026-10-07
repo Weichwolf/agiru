@@ -53,7 +53,8 @@ page-host-test: comments client ## execute generated list/card edits over shared
 erp-fixture: ## qualify isolated original CRONUS Company and explicit native client authority, not ERP workflows
 	@bash "$(SELF)/test/ui/erp-fixture.sh"
 
-erp-client-test: client ## execute original Customer List/Card/Name edits over frozen native binaries and disposable CRONUS
+erp-client-test: web ## execute original Customer over external CMD/MCP and Chromium with independent CRONUS SQL
+	@bash "$(SELF)/scripts/dev_container.sh" web
 	@bash "$(SELF)/test/ui/erp-fixture.sh" client
 
 session-identity: comments db ## qualify SQL identity, persistent command leases and compiled refusal controls

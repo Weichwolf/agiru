@@ -2,8 +2,10 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: integrate the session-owned UI bridge with the native image and rerun Customer
-opening/counted AL execution to identify the next client blocker under 0720. Atomic
+Next: provide real HTTP UI-host capability/suspension under 0720; the rebuilt native
+Customer regression now opens/edits but retains its interactive Card lifecycle failure.
+Repeat counted AL execution and repair its current SelectLatestVersion startup refusal
+without implicit commits or no-op cache stubs. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
 do not defer client construction until all transaction acceptance is complete.
 
@@ -39,6 +41,18 @@ do not defer client construction until all transaction acceptance is complete.
   visibility, explicit Commit, cancellation/rollback and nested modal boundaries under 0720.
 
 ## Sources and regression ownership
+
+Post-bridge native rerun at `ea6c922`: `make ut B=/workspace/build/podman JOBS=6
+UT_MASTER_DSN=<same-complete-seed>` retains all 2,314 tests/80 codeunits; zero executed,
+80 incomplete, 623 seconds. The GuiAllowed startup refusal is gone; every sampled
+codeunit now refuses `Database.SelectLatestVersion(Integer)` before test execution.
+No assertion population is dropped. Native build exits zero; seed remains an unsealed
+shared-transfer diagnostic, not equivalent A/B proof. The browser/Customer rerun is
+in 0720. Inspect all active non-locked read caches and transaction boundaries before
+implementing either SelectLatestVersion overload; predecessor `_system.py`'s no-op and
+WI 889's proposed implicit commit are not adopted. Reference overloads:
+`methods-auto/database/database-selectlatestversion{,-integer,--}-method.md` at the
+developer revision below; `src/rt/{RecordChanges,Cursor,Navigate}.cpp` own bounded reads.
 
 Native AL diagnostic at `769399a`: `make ut B=/workspace/build/podman JOBS=6
 UT_MASTER_DSN=<complete-seed>` retains all 2,314 tests over 80 codeunits. Result:
