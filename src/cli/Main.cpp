@@ -6,6 +6,7 @@
 #include "type/Date.h"
 
 #include "ChildExitStatus.h"
+#include "Services.h"
 
 #include <algorithm>
 #include <array>
@@ -67,6 +68,14 @@ void Usage() {
   std::println("");
   std::println("  agiru version");
   std::println("      What this binary is.");
+  std::println("");
+  std::println("  agiru serve --database <dsn> --company <name> --origin <url>");
+  std::println("      Private loopback HTTP listener; optional --port and --workers.");
+  std::println("      Existing original company/permission data and client storage are required.");
+  std::println("  agiru client-init --database <dsn>");
+  std::println("      Trusted operator migration; creates client storage, never users or grants.");
+  std::println("  agiru client-token --database <dsn> --user <guid> [--seconds <1..86400>]");
+  std::println("      Emits a private agent authentication JSON once; redirect with umask 077.");
 }
 
 agiru::Date WorkDateOf(std::string_view text) {
@@ -311,6 +320,7 @@ int main(int argc, char **argv) {
     std::vector<std::string_view> arguments;
     arguments.reserve(static_cast<std::size_t>(argc > 1 ? argc - 1 : 0));
     for (int i = 1; i < argc; ++i) { arguments.emplace_back(argv[i]); }
+    if (const auto service = agiru::cli::Service(arguments); service) { return *service; }
     Options options = Read(arguments);
     options.self = argv[0] == nullptr ? "agiru" : argv[0];
     if (options.command.empty() || options.command == "help" || options.command == "--help") {

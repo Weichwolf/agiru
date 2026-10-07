@@ -7,7 +7,7 @@ dsn=${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}
 proof=$(mktemp -d /tmp/agiru-native-permissions.XXXXXX)
 sha256sum include/runtime/NativePermissions.h src/rt/NativePermissionSnapshot.h \
   src/rt/{NativePermissionSnapshot,NativePermissions}.cpp test/gate/NativePermissionsGate.cpp \
-  test/runtime/native-permissions.sh > "$proof/inputs.sha256"
+  test/gate/NativePermissionFixture.h test/runtime/native-permissions.sh > "$proof/inputs.sha256"
 controls=(user company scope filter missing bytes indirect override)
 cleanup() {
   for control in "${controls[@]}" sanitizers; do

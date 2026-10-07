@@ -1,4 +1,5 @@
 #include "meta/PageDef.h"
+#include "platform/Company.h"
 #include "platform/User.h"
 #include "runtime/ClientCredentials.h"
 #include "runtime/Database.h"
@@ -13,6 +14,7 @@
 #include "type/Guid.h"
 
 #include "Check.h"
+#include "NativePermissionFixture.h"
 #include "OwnedDatabase.h"
 #include "PrivateAuthFile.h"
 #include "fixture/table/NavigationRow.h"
@@ -37,12 +39,37 @@ constexpr std::string_view kCompany = "Fixture + Company";
 constexpr int kInitialValueStep = 11;
 constexpr int kRestrictedValue = 999;
 
+void NativeGrants(const agiru::Connection &connection) {
+  agiru::CreateTable(connection, agiru::platform::kCompanyTable);
+  agiru::platform::Company company;
+  company.Name = kCompany;
+  company.Insert();
+  gate::InstallNativePermissionFixture(connection);
+  connection.Run(R"(INSERT INTO "Tenant Permission Set" VALUES
+    ('10000000-0000-0000-0000-000000000001','EDITOR','Editor',true),
+    ('10000000-0000-0000-0000-000000000001','READER','Reader',true))");
+  connection.Run(R"(INSERT INTO "Access Control" VALUES
+    ('00000000-0000-0000-0000-000000000001','EDITOR','Fixture + Company',1,
+      '10000000-0000-0000-0000-000000000001'),
+    ('00000000-0000-0000-0000-000000000002','READER','Fixture + Company',1,
+      '10000000-0000-0000-0000-000000000001'))");
+  connection.Run(R"(INSERT INTO "Tenant Permission" VALUES
+    ('10000000-0000-0000-0000-000000000001','EDITOR',0,50340,1,1,1,1,0,'',0),
+    ('10000000-0000-0000-0000-000000000001','READER',0,50340,1,0,0,0,0,'',0),
+    ('10000000-0000-0000-0000-000000000001','EDITOR',8,50340,0,0,0,0,1,'',0),
+    ('10000000-0000-0000-0000-000000000001','EDITOR',8,50341,0,0,0,0,1,'',0),
+    ('10000000-0000-0000-0000-000000000001','EDITOR',8,50347,0,0,0,0,1,'',0),
+    ('10000000-0000-0000-0000-000000000001','READER',8,50340,0,0,0,0,1,'',0),
+    ('10000000-0000-0000-0000-000000000001','READER',8,50341,0,0,0,0,1,'',0))");
+}
+
 void Seed(const std::string &dsn, const std::string &authPath) {
   const agiru::Session seed(dsn);
   const auto &connection = seed.Database();
   agiru::CreateTable(connection, agiru::TableTraits<agiru::platform::User>::kTable);
   agiru::CreateTable(connection, agiru::TableTraits<Row>::kTable);
   agiru::CreateTable(connection, agiru::TableTraits<Restricted>::kTable);
+  NativeGrants(connection);
   Restricted restricted;
   restricted.ID = 1;
   restricted.Value = kRestrictedValue;
@@ -127,9 +154,17 @@ public:
   }
 };
 
-void Serve(const std::string &authPath, const std::string &origin) {
+void Serve(const std::string &authPath, const std::string &origin, bool seedOnly) {
   const gate::OwnedDatabase database("page_host");
   Seed(database.Dsn(), authPath);
+  if (seedOnly) {
+    std::fputs("READY\n", stdout);
+    std::fflush(stdout);
+    while (true) {
+      const int command = std::getchar();
+      if (command == 'Q' || command == EOF) { return; }
+    }
+  }
   agiru::PageCommandHost host(
       {.database = database.Dsn(), .company = std::string(kCompany), .origin = origin},
       Authorize,
@@ -147,7 +182,9 @@ void Serve(const std::string &authPath, const std::string &origin) {
 
 int main(int argc, char **argv) {
   return gate::Run("Generated Page HTTP Host", [=] {
-    if (argc != 3) { throw std::runtime_error("expected private auth path and external origin"); }
-    Serve(argv[1], argv[2]);
+    if (argc != 3 && (argc != 4 || std::string_view(argv[3]) != "--seed-only")) {
+      throw std::runtime_error("expected private auth path and external origin");
+    }
+    Serve(argv[1], argv[2], argc == 4);
   });
 }

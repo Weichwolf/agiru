@@ -201,7 +201,7 @@ PageHostOperation Opening(PageOpenMode mode) {
 
 unsigned Status(std::string_view code) {
   if (code == "PageHostAuthentication" || code == "SessionIdentity") { return kUnauthorized; }
-  if (code == "PageHostPermission") { return kForbidden; }
+  if (code == "PageHostPermission" || code == "Permission") { return kForbidden; }
   if (code == "PageHostMissing") { return kNotFound; }
   if (code == "PageHostGone") { return kGone; }
   if (code == "PageHostBusy" || code == "PageHostRevision" || code == "PageHostReceipt") {

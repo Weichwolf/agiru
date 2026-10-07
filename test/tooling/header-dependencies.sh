@@ -64,7 +64,7 @@ compile_header meta/ModuleDef.h "$proof/ModuleDef.h.d"
 for forbidden in ModuleInfo.h Guid.h List.h Text.h Version.h vector; do
   reject_dependency "$proof/ModuleDef.h.d" "$forbidden"
 done
-for header in meta/PermissionSetDef.h runtime/PermissionSets.h runtime/NativePermissions.h; do
+for header in meta/PermissionSetDef.h runtime/PermissionSets.h runtime/NativePermissions.h runtime/PermissionSetRegistry.h runtime/NativeService.h; do
   compile_header "$header" "$proof/$(basename "$header").d"
   for forbidden in Guid.h Session.h Table.h Database.h vector memory mutex functional; do
     reject_dependency "$proof/$(basename "$header").d" "$forbidden"
@@ -235,4 +235,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: twenty-seven standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority/permission/temporary controls refused\n'
+printf 'header-dependencies: twenty-nine standalone headers; filesystem/regex/crypto/Array/JSON/report/module/table/page/Unicode/HTTP/session/credential/authority/permission/temporary controls refused\n'

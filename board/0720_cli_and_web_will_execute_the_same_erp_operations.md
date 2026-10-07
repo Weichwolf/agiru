@@ -4,9 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: wire the original SQL permission authority into the native host, install real system
-permission declarations and an `agiru serve` entrypoint against
-a validated company seed; execute Customer List → Card → Validate → Save using external
+Next: emit/install real system permission declarations and prepare a validated native
+company seed; execute Customer List → Card → Validate → Save using external
 CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
 
@@ -17,6 +16,23 @@ specific working client contracts, not this WI's full acceptance; no dependency 
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
 ## Existing foundation and refreshed implementation review
+
+- Native entry: `src/cli/{Main,Services}.cpp`, `include/runtime/NativeService.h` and
+  `src/rt/NativeService.cpp` provide `serve`, trusted `client-init` and one-time `client-token`.
+  HTTP uses `NativePermissions` for Page Execute/source Read and transitive TableData access.
+  Startup requires one exact original Company in the initial flat profile; multi-company
+  schema routing is not implemented. No implicit provisioning, users, grants or SUPER.
+  `make page-host-test JOBS=2`: 12 fixture-host and 17 actual-entry CMD/MCP/HTTP cases,
+  independent SQL values/modifier/rollback/Commit/revocation checks, clean SIGTERM and
+  three compiled ownership/revision/replay defects. Pages/data are authored fixtures,
+  not Customer ERP, actual-browser acceptance or full object-execution permission proof.
+  Native build, changed-code clang-tidy and 29 standalone header checks pass.
+
+- Installed permission metadata: `include/runtime/PermissionSetRegistry.h` and
+  `src/rt/PermissionSetRegistry.cpp` freeze exact system identities with logarithmic lookup;
+  duplicate/late/tenant registrations refuse. `make permission-sets JOBS=2`: 127 checks,
+  eleven compiled defects and ASan/UBSan. Real generated declarations/extensions still need
+  emission and installation; absent system assignments refuse, never synthesize grants.
 
 - Permission composition: `include/meta/PermissionSetDef.h`,
   `include/runtime/PermissionSets.h`, `src/rt/PermissionSets.cpp` resolve exact app/role/scope
@@ -37,11 +53,11 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   in one bounded SQL snapshot. No cross-user cache, role-name grant or system-table exemption.
   `make native-permissions JOBS=2`: 41 checks, eight compiled defects and ASan/UBSan;
   independent SQL verifies denied writes. `RequirePage` rechecks Page Execute/source Read.
-  Native integration: 14,225 slice sources, `make all`, 176/176 C++/tooling cases and
-  changed-code lint pass; not a current AL UT, HTTP authorization or ERP milestone.
+  Pre-service integration: 14,225 slice sources and 176/176 C++/tooling cases;
+  not a current AL UT or ERP milestone.
   Original Code[20]/Code[30] role widths require explicit text casts in the recursive CTE.
   System catalogue installation, storage/schema migration, indirect AL contexts, row filters,
-  in-flight revocation fencing and actual HTTP wiring remain unqualified. Source references:
+  in-flight revocation fencing and full object-execution authority remain unqualified. Source references:
   original `TenantPermissionSet.Table.al`; user `ui-define-granular-permissions.md` and
   BCApps `System Application/Test/Permission Sets/src/PermissionRelationTests.Codeunit.al`
   (`TestReduceToIndirectPermissionFromPermissionSet`), at the revisions pinned below.

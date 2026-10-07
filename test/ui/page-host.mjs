@@ -12,14 +12,20 @@ const container = process.env.AGIRU_DEV_CONTAINER ?? "agiru-dev";
 const origin = `http://127.0.0.1:${process.env.AGIRU_DEV_HTTP_PORT ?? "8080"}`;
 const native = process.env.AGIRU_PAGE_HOST_NATIVE;
 const proof = process.env.AGIRU_PAGE_HOST_PROOF;
+const nativeApplication = process.env.AGIRU_PAGE_HOST_APPLICATION === "1";
+let application, applicationPid, applicationClosed;
 const server = spawn("make", ["--no-print-directory", "dev-exec",
-  `COMMAND=${process.env.AGIRU_PAGE_HOST_PRELOAD ? `env LD_PRELOAD=${process.env.AGIRU_PAGE_HOST_PRELOAD} ` : ""}${native}/host ${native}/auth.json ${origin}`],
+  `COMMAND=${process.env.AGIRU_PAGE_HOST_PRELOAD ? `env LD_PRELOAD=${process.env.AGIRU_PAGE_HOST_PRELOAD} ` : ""}${native}/host ${native}/auth.json ${origin}${nativeApplication ? " --seed-only" : ""}`],
   { env: { ...process.env, AGIRU_DEV_INTERACTIVE: "1" }, stdio: ["pipe", "pipe", "pipe"] });
 let output = "", diagnostic = "";
 server.stdout.on("data", chunk => { output += chunk; });
 server.stderr.on("data", chunk => { diagnostic += chunk; });
 const closed = new Promise(resolve => server.once("close", resolve));
 after(async () => {
+  if (applicationPid) {
+    await execute("podman", ["exec", "--user", "1000:1001", container, "kill", "-TERM", applicationPid]);
+    assert.equal(await applicationClosed, 0, "agiru serve must drain and shut down cleanly");
+  }
   server.stdin.end("Q");
   const timer = setTimeout(() => server.kill(), 15000);
   try { assert.equal(await closed, 0, "fixture must shut down and drop its owned database"); }
@@ -33,6 +39,25 @@ await new Promise((resolve, reject) => {
 });
 const database = output.match(/^DATABASE (agiru_owned_gate_[0-9]+_page_host)$/m)?.[1];
 assert.ok(database);
+const dsn = `postgresql://agiru:agiru@127.0.0.1:5432/${database}`;
+if (nativeApplication) {
+  application = spawn("podman", ["exec", "--user", "1000:1001", container,
+    `${native}/agiru`, "serve", "--database", dsn, "--company", "Fixture + Company", "--origin", origin],
+    { stdio: ["ignore", "pipe", "pipe"] });
+  applicationClosed = new Promise(resolve => application.once("close", resolve));
+  let ready = "";
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("agiru serve did not start")), 15000);
+    application.once("error", error => { clearTimeout(timer); reject(error); });
+    application.once("close", code => { clearTimeout(timer); reject(new Error(`agiru serve exited: ${code}; ${diagnostic}`)); });
+    application.stderr.on("data", chunk => { diagnostic += chunk; });
+    application.stdout.on("data", chunk => {
+      ready += chunk;
+      const match = ready.match(/^READY ([1-9][0-9]*) 18080$/m);
+      if (match) { applicationPid = match[1]; clearTimeout(timer); resolve(); }
+    });
+  });
+}
 for (const suffix of ["", ".second"]) {
   await execute("podman", ["cp", `${container}:${native}/auth.json${suffix}`, `${proof}/auth.json${suffix}`]);
   await chmod(`${proof}/auth.json${suffix}`, 0o600);
@@ -170,11 +195,15 @@ test("foreign identities, company names, unsupported URLs and forged form author
 });
 
 test("SQL permission revocation affects existing page reads before values are returned", async () => {
-  await sql("UPDATE ui_grants SET readable = false WHERE user_security_id = '00000000-0000-0000-0000-000000000001'");
+  await sql(nativeApplication
+    ? `UPDATE "Tenant Permission" SET "Read Permission" = 0 WHERE "Role ID" = 'EDITOR' AND "Object Type" = 0`
+    : "UPDATE ui_grants SET readable = false WHERE user_security_id = '00000000-0000-0000-0000-000000000001'");
   const response = await fetch(origin + path(saved), { headers: first });
   assert.equal(response.status, 403);
   assert.ok(!(await response.text()).includes('data-value="55"'));
-  await sql("UPDATE ui_grants SET readable = true");
+  await sql(nativeApplication
+    ? `UPDATE "Tenant Permission" SET "Read Permission" = 1 WHERE "Role ID" = 'EDITOR' AND "Object Type" = 0`
+    : "UPDATE ui_grants SET readable = true");
   assert.equal((await fetch(origin + path(saved), { headers: first })).status, 200);
 });
 
@@ -227,3 +256,59 @@ test("a noncommitted AL action rolls back; production Commit survives a later er
   }
   assert.equal(await sql('SELECT count(*) FROM ui_writes WHERE "value" = 111'), "1");
 });
+
+if (nativeApplication) {
+  const operator = (...args) => execute("podman", ["exec", "--user", "1000:1001", container,
+    `${native}/agiru`, ...args, "--database", dsn]);
+
+  test("trusted client storage initialization is idempotent and grants no ERP rights", async () => {
+    await operator("client-init");
+    assert.equal(await sql('SELECT count(*) FROM "User"'), "2");
+    assert.equal(await sql('SELECT count(*) FROM "Access Control"'), "2");
+    assert.equal(await sql('SELECT count(*) FROM "Tenant Permission"'), "7");
+  });
+
+  test("operator credential issuance authenticates an existing account without granting writes", async () => {
+    const issued = await operator("client-token", "--user", "00000000-0000-0000-0000-000000000002");
+    const auth = JSON.parse(issued.stdout);
+    assert.match(auth.authorization, /^Bearer ag1_/);
+    const reader = new AgentClient(origin, auth);
+    const view = await reader.read("/?page=50341");
+    const next = await reader.execute(path(view), operation(view, "$agiru.card"));
+    const denied = await post(next, "Value", "999", auth);
+    assert.equal(denied.response.status, 403);
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1'), "111");
+    for (const seconds of ["0", "86401", "1x"]) {
+      await assert.rejects(operator("client-token", "--user", "00000000-0000-0000-0000-000000000002", "--seconds", seconds));
+    }
+  });
+
+  test("missing compiled system declarations never become a synthetic SUPER grant", async () => {
+    await sql(`UPDATE "Access Control" SET "Scope" = 0, "Role ID" = 'SUPER' WHERE "Role ID" = 'EDITOR'`);
+    const denied = await fetch(origin + "/?page=50341", { headers: first });
+    assert.ok(denied.status >= 400);
+    assert.ok(!(await denied.text()).includes('data-value="111"'));
+    await sql(`UPDATE "Access Control" SET "Scope" = 1, "Role ID" = 'EDITOR' WHERE "Role ID" = 'SUPER'`);
+    assert.equal((await fetch(origin + "/?page=50341", { headers: first })).status, 200);
+  });
+
+  test("service flags and the original Company identity refuse before a listener starts", async () => {
+    for (const [args, message] of [[[], /required option --company/],
+      [["--company", "Missing", "--origin", origin], /configured company/],
+      [["--company", "Fixture + Company", "--origin", origin, "--port", "0"], /invalid positive service bound --port/],
+      [["--company", "Fixture + Company", "--origin", origin, "--workers", "257"], /invalid positive service bound --workers/],
+      [["--company", "Fixture + Company", "--company", "Other", "--origin", origin], /duplicate or missing service option --company/]]) {
+      await assert.rejects(operator("serve", ...args), error => message.test(error.stderr));
+    }
+  });
+
+  test("a flat database with multiple original companies cannot be relabeled as one company", async () => {
+    await sql(`INSERT INTO "Company" ("Name") VALUES ('Other Company')`);
+    try {
+      await assert.rejects(operator("serve", "--company", "Fixture + Company", "--origin", origin),
+        error => error.stderr.includes("configured company must be the only company"));
+    } finally {
+      await sql(`DELETE FROM "Company" WHERE "Name" = 'Other Company'`);
+    }
+  });
+}

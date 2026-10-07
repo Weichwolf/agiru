@@ -13,6 +13,7 @@
 #include "type/Guid.h"
 
 #include "Check.h"
+#include "NativePermissionFixture.h"
 #include "OwnedDatabase.h"
 
 #include <array>
@@ -73,27 +74,7 @@ public:
       row.Insert();
       agiru::Commit();
     }
-    Sql(R"(
-CREATE TABLE "Access Control" (
- "User Security ID" uuid NOT NULL, "Role ID" varchar(20) NOT NULL,
- "Company Name" varchar(30) NOT NULL, "Scope" integer NOT NULL, "App ID" uuid NOT NULL,
- PRIMARY KEY("User Security ID","Role ID","Company Name","Scope","App ID"));
-CREATE TABLE "Tenant Permission Set" (
- "App ID" uuid NOT NULL, "Role ID" varchar(20) NOT NULL, "Name" varchar(30) NOT NULL,
- "Assignable" boolean NOT NULL, PRIMARY KEY("App ID","Role ID"));
-CREATE TABLE "Tenant Permission" (
- "App ID" uuid NOT NULL, "Role ID" varchar(20) NOT NULL, "Object Type" integer NOT NULL,
- "Object ID" integer NOT NULL, "Read Permission" integer NOT NULL,
- "Insert Permission" integer NOT NULL, "Modify Permission" integer NOT NULL,
- "Delete Permission" integer NOT NULL, "Execute Permission" integer NOT NULL,
- "Security Filter" text NOT NULL, "Type" integer NOT NULL,
- PRIMARY KEY("App ID","Role ID","Object Type","Object ID"));
-CREATE TABLE "Tenant Permission Set Rel." (
- "App ID" uuid NOT NULL, "Role ID" varchar(30) NOT NULL, "Related App ID" uuid NOT NULL,
- "Related Role ID" varchar(30) NOT NULL, "Type" integer NOT NULL,
- "Related Scope" integer NOT NULL,
- PRIMARY KEY("App ID","Role ID","Related App ID","Related Role ID"));
-)");
+    gate::InstallNativePermissionFixture(observer_);
     Reset();
   }
 

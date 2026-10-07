@@ -6,6 +6,10 @@ git rev-parse HEAD > "$proof/head.txt"
 sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSession,SessionCommand}.h \
   src/rt/{PageCommandHost,PageHtml,PageInstance,SessionCommand,HtmlText}.cpp src/rt/HtmlText.h \
   include/runtime/TablePermissions.h src/rt/{TablePermissions,Session,Table,Navigate,Query,RecordRef}.cpp \
+  include/runtime/NativePermissions.h src/rt/{NativePermissions,NativePermissionSnapshot}.cpp \
+  include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
+  include/runtime/NativeService.h src/rt/NativeService.cpp \
+  src/cli/{Main,Services}.cpp src/cli/Services.h test/gate/NativePermissionFixture.h \
   test/ui/page-host.{sh,mjs} test/ui/page-host/Runner.cpp test/runtime/page-navigation.sh \
   test/runtime/page-navigation/*.al test/gate/PrivateAuthFile.h \
   src/client/*.{mts,json} > "$proof/inputs.sha256"
@@ -14,7 +18,7 @@ make dev-exec COMMAND='df -h /tmp'
 native=$(make --no-print-directory dev-exec COMMAND='mktemp -d /tmp/agiru-native-page-host.XXXXXX')
 [[ "$native" =~ ^/tmp/agiru-native-page-host\.[A-Za-z0-9]+$ ]]
 cleanup() {
-  make --no-print-directory dev-exec COMMAND="rm -f -- $native/host $native/auth.json $native/auth.json.second $native/owner.cpp $native/owner.so $native/revision.cpp $native/revision.so $native/replay.cpp $native/replay.so" || :
+  make --no-print-directory dev-exec COMMAND="rm -f -- $native/host $native/agiru $native/auth.json $native/auth.json.second $native/owner.cpp $native/owner.so $native/revision.cpp $native/revision.so $native/replay.cpp $native/replay.so" || :
   make --no-print-directory dev-exec COMMAND="rmdir -- $native" || :
   for file in "$proof/auth.json" "$proof/auth.json.second"; do
     if [[ -f "$file" ]]; then unlink "$file"; fi
@@ -30,6 +34,11 @@ cat "$proof/native.log"
 AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" node --test test/ui/page-host.mjs \
   > "$proof/execution.log" 2>&1 || { cat "$proof/execution.log"; exit 1; }
 cat "$proof/execution.log"
+for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
+make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second"
+AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" AGIRU_PAGE_HOST_APPLICATION=1 \
+  node --test test/ui/page-host.mjs > "$proof/application.log" 2>&1 || { cat "$proof/application.log"; exit 1; }
+cat "$proof/application.log"
 for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second"
 mutation='
@@ -66,4 +75,4 @@ for control in owner revision replay; do
   unlink "$proof/$control.cpp"
 done
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'page-host: actual generated-page SQL effects over nginx/C++ and external CMD/MCP; three compiled ownership/revision/replay defects rejected; fixture authorization, not full ERP permission/browser acceptance; %s\n' "$proof"
+printf 'page-host: generated-page SQL effects over nginx/C++, external CMD/MCP and agiru serve with original SQL permissions; three compiled ownership/revision/replay defects rejected; not full ERP/browser acceptance; %s\n' "$proof"

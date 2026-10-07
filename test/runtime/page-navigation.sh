@@ -16,7 +16,10 @@ sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/run
   src/rt/SessionCommand.cpp src/rt/Cursor.cpp src/rt/Transaction.cpp \
   include/runtime/TablePermissions.h src/rt/TablePermissions.cpp src/rt/{Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/PageCommandHost.h src/rt/PageCommandHost.cpp test/ui/page-host/Runner.cpp \
-  test/gate/PrivateAuthFile.h \
+  include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
+  include/runtime/NativeService.h src/rt/NativeService.cpp \
+  src/cli/{Main,Services}.cpp src/cli/Services.h \
+  test/gate/PrivateAuthFile.h test/gate/NativePermissionFixture.h \
   test/gate/PageDispatcherGate.cpp test/runtime/page-navigation/Runner.cpp \
   test/runtime/page-navigation/*.al test/runtime/page-navigation.sh > "$proof/dispatcher-inputs.sha256"
 mkdir -p "$proof/source"
@@ -52,6 +55,8 @@ if [[ -n ${AGIRU_PAGE_HOST_BUILD:-} ]]; then
 fi
 "$CXX" "${flags[@]}" -c test/ui/page-host/Runner.cpp -o "$host_target/host.o"
 "$CXX" "$host_target/host.o" "${objects[@]}" "${links[@]}" -o "$host_target/host"
+"$CXX" "${flags[@]}" "-DAGIRU_DATABASE=\"$dsn\"" src/cli/Main.cpp src/cli/Services.cpp \
+  "${objects[@]}" "${links[@]}" -o "$host_target/agiru"
 mkdir -p "$B/fixture-commands"
 jq -n --arg directory "$PWD" --arg file "$PWD/test/ui/page-host/Runner.cpp" \
     --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
@@ -166,7 +171,10 @@ if LD_PRELOAD="$proof/unbound-integer.so" "$B/gate_PageSourceGate" \
   exit 1
 fi
 rm -- "$proof/unbound-integer.so" "$proof/runner" "$proof/runner.o"
-if [[ -z ${AGIRU_PAGE_HOST_BUILD:-} ]]; then unlink "$host_target/host"; fi
+if [[ -z ${AGIRU_PAGE_HOST_BUILD:-} ]]; then
+  unlink "$host_target/host"
+  unlink "$host_target/agiru"
+fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
