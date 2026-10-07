@@ -31,6 +31,11 @@ with the full native build and counted AL runs; preserve every refusal and failu
 - HTTP defaults to affinity-available CPU workers within an explicit ceiling. Independent
   sessions execute concurrently; one session never executes two commands simultaneously.
   Worker reuse/migration must not leak identity, policy, errors, restrictions or SQL effects.
+- UI callbacks follow AllowSessionCallSuspendWhenWriteTransactionStarted (BC default enabled).
+  Trusted server configuration, never a client parameter, owns the policy. A permitted
+  write-transaction pause retains its SQL lease and rollback boundary without an implicit
+  Commit; disabled policy refuses before displaying a blocking question. Qualify independent
+  visibility, explicit Commit, cancellation/rollback and nested modal boundaries under 0720.
 
 ## Sources and regression ownership
 
@@ -45,7 +50,8 @@ Developer docs at `f928288ee840334be73142e5fc0202c0e19b246d`:
 `properties/devenv-{transactiontype,readstate}-property.md`,
 `methods-auto/database/database-currenttransactiontype-method.md`,
 `methods-auto/record/record-{locktable,readisolation}-method.md`.
-`administration/server-instance-settings.md` defines the try-write switch and on-premises
+`administration/server-instance-settings.md` defines the callback-in-write-transaction
+policy (enabled by default), still unimplemented, and the try-write switch and on-premises
 default true (online allows writes). agiru preserves its previous allow-writes default
 and exposes both policies. Predecessor `openerp/board/1220_*` identifies pending-write
 isolated-event fallback; its Python session/thread machinery is not adopted.

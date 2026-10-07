@@ -15,6 +15,38 @@ sandbox reference execution and agiru replication. Their agiru prerequisites are
 specific working client contracts, not this WI's full acceptance; no dependency cycle.
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
+## Production UI suspension contract
+
+- Authorize and durably identify the opening operation before company login/OnOpenPage
+  can ask a question. `PageCommandHost::Open` currently registers its public context only
+  after both execute; opening admission and uncertain-write reconciliation remain missing.
+- Bind the real UI host before AL executes. GuiAllowed is true only with working
+  capabilities; preserve separate UT handlers and false for background execution.
+- Preserve the suspended AL stack, variables and rollback boundaries. Confirm/StrMenu
+  defaults are presentation, never answers; modal pages accept commands only on the active
+  child and return the exact Action/selected record. Never replay AL up to a question.
+- Queue Message until completion or the next user-interaction pause. Progress Open/Update/
+  Close is separate, not a swallowed Message or an automatic answer.
+- Completed idle commands release workers/connections. A callback inside an open write
+  transaction retains that transaction/lease; pause itself never commits or rolls back.
+  Bound suspended execution, deadlines and leases without a dedicated thread per user.
+  Abandonment unwinds and rolls back unfinished work, preserving any prior explicit Commit.
+- Qualify opening-time questions, nested modal selection/cancel, deferred messages and
+  write-before-question visibility/rollback through HTTP/CMD/MCP/browser and independent
+  SQL. Reject foreign/stale answers; reconcile identical retries without resuming twice.
+  Errors preserve typed AL identity safely.
+
+Developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
+`methods-auto/system/system-guiallowed-method.md`, `methods-auto/dialog/dialog-{message,
+confirm,strmenu,open}-method.md`, `methods-auto/page/page-runmodal--method.md`,
+`methods-auto/database/database-commit-method.md` and
+`administration/server-instance-settings.md::AllowSessionCallSuspendWhenWriteTransactionStarted`
+(enabled by default). Predecessor `openerp/board/1713_arc-headless-client-protocol.md`
+and `openerp/web/client/session.py::wait_for_answer` identify nested execution; their
+actor thread and nested-call commits are not evidence of BC transaction boundaries.
+Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}.cpp`,
+`include/{runtime/PageSession,type/Dialog}.h`; acceptance belongs in `test/ui/`.
+
 ## Existing foundation and refreshed implementation review
 
 - Original Customer client regression: `make erp-client-test JOBS=2`,
@@ -248,7 +280,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   factories over authenticated HTTP, not authored static HTML. PostgreSQL owns exact
   user/company/host identity, expiry, revisions and started/complete/failed command
   receipts. Bounded private AL state and list/card stacks survive request-local
-  connections; think time retains neither a worker nor a connection. Identical completed
+  connections; idle time after completed commands retains neither worker nor connection.
+  UI suspension inside an unfinished transaction is not implemented. Identical completed
   bodies replay after snapshot reauthorization; changed bodies, stale revisions, forged
   CSRF/Origin and foreign handles refuse. Failed writes invalidate private pages; a failed
   receipt never implies rollback of explicit AL Commit. Back rereads the selected list row.
@@ -458,7 +491,8 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 4. Add a thin C++ HTTP adapter and semantic HTML/htmx rendering over that registry.
    Run blocking AL/libpq on a bounded executor, not the event loop. Sessions remain
    private; PostgreSQL owns shared permission revisions, fencing and receipts.
-   No connection or transaction during user think time; modal suspension is explicit.
+   Completed idle commands retain no connection. Suspended write transactions keep their
+   lease and boundaries; modal suspension never adds an implicit Commit.
    Native HTTP uses the adopted libmicrohttpd/Caddy boundary; daisyUI/Tailwind remain
    unadopted presentation proposals.
 5. Extend the Node.js/TypeScript HTML-to-ASCII agent client to production HTTP;
