@@ -1706,6 +1706,204 @@ class FirstGapGate(unittest.TestCase):
 
 
 class SeedTransferGate(unittest.TestCase):
+    def test_large_sql_uses_stdin_not_operating_system_arguments(self):
+        with tempfile.TemporaryDirectory() as folder:
+            program = Path(folder) / 'podman'
+            program.write_text('''#!/bin/sh
+bytes=$(wc -c)
+if [ "$bytes" -lt 262144 ]; then exit 17; fi
+printf 'delivered\\n'
+''')
+            program.chmod(0o755)
+            with patch.dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}'):
+                result, why = seed.psql('fixture', ' ' * 262144 + 'SELECT 1;')
+        self.assertEqual((result, why), ('delivered\n', ''))
+
+    def readback(self, source, target):
+        database = os.environ.get('AGIRU_TEST_DSN',
+                                  'postgresql://agiru:agiru@localhost:5433/agiru_gate')
+        with patch.object(seed, 'psql_command', return_value=[
+                'psql', '-X', '-d', database, '-v', 'ON_ERROR_STOP=1']):
+            return seed.verify_rows(source, target, 'source', 'target', None, None)
+
+    def test_readback_preserves_typed_values_and_ignores_row_order_and_numeric_scale(self):
+        source = ('\\copy (SELECT to_jsonb(ROW(trim_scale(number), text)) FROM '
+                  "(VALUES (9007199254740993::numeric, 'Möbel'), (1.20, 'two')) "
+                  'AS rows(number, text)) TO STDOUT')
+        target = ('\\copy (SELECT to_jsonb(ROW(trim_scale(number), text)) FROM '
+                  "(VALUES (1.20000000000000000000::numeric, 'two'), "
+                  "(9007199254740993, 'Möbel')) AS rows(number, text)) TO STDOUT")
+        self.assertEqual(self.readback(source, target), (0, 0, 'COPY 2\n'))
+        changed = target.replace('9007199254740993', '9007199254740992')
+        self.assertEqual(self.readback(source, changed),
+                         (1, 1, 'ERROR: typed source/target rows differ'))
+        self.assertEqual(self.readback(source, target.replace('Möbel', 'Mobel')),
+                         (1, 1, 'ERROR: typed source/target rows differ'))
+
+    def test_readback_refuses_missing_and_extra_rows_and_query_failures(self):
+        one = '\\copy (SELECT to_jsonb(ROW(1))) TO STDOUT'
+        empty = '\\copy (SELECT to_jsonb(ROW(1)) WHERE false) TO STDOUT'
+        self.assertEqual(self.readback(empty, empty), (0, 0, 'COPY 0\n'))
+        self.assertEqual(self.readback(one, empty),
+                         (1, 1, 'ERROR: typed source/target rows differ'))
+        self.assertEqual(self.readback(empty, one),
+                         (1, 1, 'ERROR: typed source/target rows differ'))
+        status, _, reason = self.readback('SELECT 1 / 0;', one)
+        self.assertNotEqual(status, 0)
+        self.assertIn('division by zero', reason)
+
+    def test_time_readback_compares_time_not_the_sql_server_carrier_date(self):
+        values = seed.canonical('value', 'time without time zone')
+        source = (f'\\copy (SELECT to_jsonb(ROW({values})) FROM '
+                  "(VALUES ('1754-01-01 12:40:06.917'::timestamp), "
+                  "('1753-01-01 00:00:00'::timestamp)) AS rows(value)) TO STDOUT")
+        target = (f'\\copy (SELECT to_jsonb(ROW({values})) FROM '
+                  "(VALUES ('12:40:06.917'::time), ('00:00:00'::time)) AS rows(value)) TO STDOUT")
+        self.assertEqual(self.readback(source, target), (0, 0, 'COPY 2\n'))
+        self.assertEqual(self.readback(source, target.replace('06.917', '06.918')),
+                         (1, 1, 'ERROR: typed source/target rows differ'))
+
+    def test_datetime_readback_never_discards_the_date(self):
+        values = seed.canonical('value', 'timestamp without time zone')
+        source = (f'\\copy (SELECT to_jsonb(ROW({values})) FROM '
+                  "(VALUES ('1754-01-01 12:40:06.917'::timestamp)) AS rows(value)) TO STDOUT")
+        self.assertEqual(self.readback(source, source), (0, 0, 'COPY 1\n'))
+        self.assertEqual(self.readback(source, source.replace('1754-01-01', '1754-01-02')),
+                         (1, 1, 'ERROR: typed source/target rows differ'))
+
+    def test_recovery_retains_nonce_and_refuses_changed_source_or_finished_seed(self):
+        for status in ('building', 'failed'):
+            details = {'id': 'new', 'artefact_sha256': 'original'}
+            with patch.object(seed, 'psql', return_value=(
+                    status + '\t{"id":"existing","artefact_sha256":"original"}\n', '')):
+                seed.resume_seed('target', details, seed.Endpoint())
+            self.assertEqual(details['id'], 'existing')
+        for record in [
+                'building\t{"id":"existing","artefact_sha256":"changed"}\n',
+                'complete\t{"id":"existing","artefact_sha256":"original"}\n']:
+            with self.subTest(record=record), patch.object(seed, 'psql', return_value=(record, '')), \
+                    redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    seed.resume_seed('target', details, seed.Endpoint())
+
+    def test_failed_seed_recovery_rechecks_every_table_and_never_copies(self):
+        tables = {'A': ['id'], 'B': ['id']}
+        for second, expected in [((0, 0, 'COPY 2\n'), 'complete'),
+                                 ((1, 1, 'ERROR: typed source/target rows differ'), 'failed')]:
+            with self.subTest(expected=expected), \
+                    patch.object(seed, 'columns', side_effect=[tables, tables]), \
+                    patch.object(seed, 'provenance', return_value={'id': 'new'}), \
+                    patch.object(seed, 'psql', return_value=('failed\t{"id":"existing"}\n', '')), \
+                    patch.object(seed, 'verify_rows', side_effect=[(0, 0, 'COPY 1\n'), second]) as read, \
+                    patch.object(seed, 'transfer') as copy, \
+                    patch.object(seed, 'begin_seed') as begin, \
+                    patch.object(seed, 'reconcile_rowversions'), \
+                    patch.object(seed, 'finish_seed') as finish, \
+                    patch.object(sys, 'argv', ['seed_demo.py', '--verify']), \
+                    redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                if expected == 'failed':
+                    with self.assertRaises(SystemExit):
+                        seed.main()
+                else:
+                    seed.main()
+            self.assertEqual(read.call_count, 2)
+            copy.assert_not_called()
+            begin.assert_not_called()
+            self.assertEqual(finish.call_args.args[1]['id'], 'existing')
+            self.assertTrue(finish.call_args.args[1]['typed_readback'])
+            self.assertEqual(finish.call_args.kwargs['status'], expected)
+
+    def test_independent_container_commands_preserve_identity_and_failure_handling(self):
+        source = seed.Endpoint('source-container', 'source-user')
+        target = seed.Endpoint('target-container', 'target-user')
+        reading = seed.psql_command('source-db', source)
+        writing = seed.psql_command('target-db', target, stdin=True)
+        self.assertEqual(reading[:5], ['podman', 'exec', '--user', 'source-user',
+                                      'source-container'])
+        self.assertEqual(writing[:6], ['podman', 'exec', '-i', '--user', 'target-user',
+                                      'target-container'])
+        self.assertEqual(reading[-2:], ['-d', 'source-db'])
+        self.assertEqual(writing[-2:], ['-d', 'target-db'])
+        self.assertIn('ON_ERROR_STOP=1', reading)
+        self.assertIn('ON_ERROR_STOP=1', writing)
+        self.assertIn('-X', writing)
+
+    def test_column_types_do_not_leak_between_equal_database_names(self):
+        source = seed.Endpoint('source')
+        target = seed.Endpoint('target')
+        with patch.dict(seed.TYPES, clear=True), \
+                patch.object(seed, 'psql', side_effect=[
+                    ('A\ttimestamp\tbytea\n', ''), ('A\ttimestamp\tbigint\n', '')]):
+            seed.columns('same-name', 'company', source)
+            seed.columns('same-name', 'public', target)
+            self.assertEqual(seed.column_kind('same-name', 'A', 'timestamp', source), 'bytea')
+            self.assertEqual(seed.column_kind('same-name', 'A', 'timestamp', target), 'bigint')
+
+    def rowversion_query(self, value):
+        with patch.dict(seed.TYPES, {
+                (seed.Endpoint(), 'source', 'A', 'timestamp'): 'bytea'}, clear=True):
+            expression = seed.blanked('source', 'A', 'timestamp', 'bigint', 'b.')
+        sql = f'SELECT ({expression})::bigint FROM (SELECT {value} AS timestamp) AS b'
+        return subprocess.run(['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-d',
+                               os.environ.get('AGIRU_TEST_DSN',
+                                   'postgresql://agiru:agiru@localhost:5433/agiru_gate'),
+                               '-c', sql], capture_output=True, text=True, check=False)
+
+    def test_original_binary_rowversions_preserve_full_integer_values(self):
+        for encoded, expected in [('0000000000000000', 0), ('0000000000000001', 1),
+                                  ('000000000001321b', 78363),
+                                  ('0102030405060708', 72623859790382856),
+                                  ('7fffffffffffffff', 9223372036854775807)]:
+            with self.subTest(encoded=encoded):
+                result = self.rowversion_query(f"decode('{encoded}', 'hex')")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), str(expected))
+
+    def test_malformed_or_out_of_range_binary_rowversions_refuse(self):
+        for encoded in ['', '01', '000000000000000001', '8000000000000000',
+                        'ffffffffffffffff']:
+            with self.subTest(encoded=encoded):
+                result = self.rowversion_query(f"decode('{encoded}', 'hex')")
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn('invalid input syntax for type bigint', result.stderr)
+
+    def test_only_the_original_timestamp_has_a_binary_integer_adapter(self):
+        with patch.dict(seed.TYPES, {
+                (seed.Endpoint(), 'source', 'A', 'Payload'): 'bytea'}, clear=True):
+            self.assertEqual(seed.blanked('source', 'A', 'Payload', 'bigint', 'b.'),
+                             'b."Payload"')
+
+    def test_imported_rowversions_advance_without_resetting_the_counter(self):
+        target = seed.Endpoint('native', 'agiru')
+        with patch.dict(seed.TYPES, {
+                (target, 'target', 'A', 'timestamp'): 'bigint',
+                (target, 'target', 'Blob', 'timestamp'): 'bytea'}, clear=True), \
+                patch.object(seed, 'psql', return_value=('', '')) as run:
+            seed.reconcile_rowversions('target', {'A': [], 'Blob': []}, target)
+        query = run.call_args.args[1]
+        self.assertIn('GREATEST(agiru_platform.last_rowversion_v1(), value)', query)
+        self.assertIn('MAX("timestamp")', query)
+        self.assertIn('FROM public."A"', query)
+        self.assertNotIn('FROM public."Blob"', query)
+        self.assertIn('WHERE value > 0', query)
+        self.assertEqual(run.call_args.kwargs['endpoint'], target)
+
+    def test_source_database_cannot_be_the_import_target(self):
+        with patch.object(sys, 'argv', ['seed_demo.py', '--into', seed.SOURCE]), \
+                patch.object(seed, 'columns') as read, redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                seed.main()
+        read.assert_not_called()
+
+    def test_ambiguous_table_folds_refuse_before_writes(self):
+        with patch.object(sys, 'argv', ['seed_demo.py']), \
+                patch.object(seed, 'columns', side_effect=[{'A_': ['id']},
+                                                         {'A.': ['id'], 'A/': ['id']}]), \
+                patch.object(seed, 'begin_seed') as begin, redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                seed.main()
+        begin.assert_not_called()
+
     def test_provenance_records_artefact_source_and_schema_hashes(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -1785,6 +1983,7 @@ esac
                                                           (17, 0, 'ERROR: source refused\n')]), \
                 patch.object(seed, 'provenance', return_value={'id': 'fixture'}), \
                 patch.object(seed, 'begin_seed'), \
+                patch.object(seed, 'finish_seed') as finish, \
                 patch.object(sys, 'argv', ['seed_demo.py']), \
                 redirect_stdout(output), redirect_stderr(errors):
             with self.assertRaises(SystemExit) as refused:
@@ -1792,6 +1991,9 @@ esac
         self.assertEqual(refused.exception.code, 1)
         self.assertIn('1 table(s) carry 1 row(s)', output.getvalue())
         self.assertIn('the seed is incomplete', errors.getvalue())
+        self.assertEqual(finish.call_args.kwargs['status'], 'failed')
+        self.assertEqual(finish.call_args.args[1]['refused_tables'],
+                         [('B', 'reader 17, writer 0: ERROR: source refused')])
 
 
 class ReportRegistryHeaderGate(unittest.TestCase):

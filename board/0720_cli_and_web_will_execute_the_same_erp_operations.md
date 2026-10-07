@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: emit/install real system permission declarations and prepare a validated native
-company seed; execute Customer List → Card → Validate → Save using external
+Next: emit/install real system permission declarations and provision original Company/User
+and persisted permission storage over the verified shared CRONUS transfer; execute Customer List → Card → Validate → Save using external
 CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
 
@@ -16,6 +16,27 @@ specific working client contracts, not this WI's full acceptance; no dependency 
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
 ## Existing foundation and refreshed implementation review
+
+- Native CRONUS transfer: `scripts/seed_demo.py` supports separate container/database/user
+  endpoints, stdin SQL, checked bytea-to-Int64 rowversions, monotonic allocator reconciliation
+  and complete sorted typed read-back. `--verify` rechecks every shared table after building/failed
+  imports without copying or changing the original provenance nonce; complete/changed identities refuse.
+  Native `agiru_client_seed_20261007b`: 1,864 source tables, 1,726 target tables, 1,363 shared;
+  555 populated/808 empty tables, 49,893 rows, zero refused tables, `typed_readback=true` and
+  `status=complete`. Rowversion allocator: 163,961. Original `agiru-pg/cronus` remains unchanged.
+  Retain all 501 source-only/363 target-only table and 915 dropped/67 defaulted column identities
+  in `agiru_seed_provenance`; this is shared-transfer proof, not a version-equivalent full ERP seed
+  or sealed A/B template. Original Company/User and four permission tables are not transferred yet.
+  `make verify-check VERIFY_CHECKS=SeedTransferGate`: 19 checks; full tooling: 251 checks;
+  `make gate GATE=SqlRowVersionGate`: 123 checks, all green. Exact numbers/Unicode/row multiplicity,
+  milliseconds and DateTime dates remain checked; no tolerance or uncounted normalization.
+  Time uses the target SQL type to discard BC's documented 1754-01-01 carrier date only for Time.
+  References: developer `methods-auto/time/time-data-type.md` at `f928288ee840334be73142e5fc0202c0e19b246d`;
+  BCApps `Layers/W1/BaseApp/Inventory/Item/Item.Table.al`, fields 61/63, at
+  `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`; predecessor
+  `openerp/scripts/setup/cronus_bak_loader.py::_coerce` distinguishes Time from DateTime.
+  Reproduce with `python3 scripts/seed_demo.py --verify --source-container agiru-pg
+  --source-database cronus --target-container agiru-dev --target-exec-user agiru --into <interrupted-seed>`.
 
 - Native entry: `src/cli/{Main,Services}.cpp`, `include/runtime/NativeService.h` and
   `src/rt/NativeService.cpp` provide `serve`, trusted `client-init` and one-time `client-token`.
