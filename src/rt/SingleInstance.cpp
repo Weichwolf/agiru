@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
+#include "runtime/UiHost.h"
 
 #include "SessionState.h"
 
@@ -11,6 +12,9 @@
 #include <vector>
 
 namespace agiru::detail {
+
+SessionState::SessionState() = default;
+SessionState::~SessionState() = default;
 
 SessionState &SessionState::Current() {
   return For(Session::Current());

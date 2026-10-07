@@ -61,8 +61,8 @@ erp-client-test: web ## execute original Customer over external CMD/MCP and Chro
 	@bash "$(SELF)/scripts/dev_container.sh" web
 	@bash "$(SELF)/test/ui/erp-fixture.sh" client
 
-session-identity: comments db ## qualify SQL identity, persistent command leases and compiled refusal controls
-	@cmake --build "$(B)" -j "$(JOBS)" --target gate_SessionIdentityGate gate_SessionCommandGate gate_ClientCredentialsGate
+session-identity: comments db ## qualify SQL identity, isolated session values and persistent command leases
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_SessionIdentityGate gate_SessionCommandGate gate_ClientCredentialsGate gate_SessionValuesGate gate_GenReceiverGate
 	@B="$(B)" bash "$(SELF)/test/runtime/session-identity.sh"
 
 table-permissions: comments db ## qualify session-owned table rights and compiled refusal controls

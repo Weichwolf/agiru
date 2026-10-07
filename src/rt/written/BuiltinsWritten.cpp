@@ -43,6 +43,9 @@
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
+#include "SessionRandom.h"
+#include "SessionState.h"
+
 #include <array>
 #include <cctype>
 #include <cmath>
@@ -51,6 +54,7 @@
 #include <filesystem>
 #include <format>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <print>
 #include <string>
@@ -551,8 +555,7 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
 namespace {
 
 std::string &CurrentApplicationArea() {
-  thread_local std::string current;
-  return current;
+  return detail::SessionState::Current().applicationArea;
 }
 
 }
@@ -873,82 +876,31 @@ InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Pos
 
 namespace {
 
-class DotNetRandom {
-public:
-  explicit DotNetRandom(std::int32_t seed) { Reseed(seed); }
-
-  void Reseed(std::int32_t seed) {
-    const std::int64_t subtraction = seed == std::numeric_limits<std::int32_t>::min()
-                                         ? std::numeric_limits<std::int32_t>::max()
-                                         : std::abs(static_cast<std::int64_t>(seed));
-    std::int64_t mj = kSeed - subtraction;
-    state_[kLag] = mj;
-    std::int64_t mk = 1;
-    for (std::size_t i = 1; i < kLag; ++i) {
-      const std::size_t ii = (kStride * i) % kLag;
-      state_[ii] = mk;
-      mk = mj - mk;
-      if (mk < 0) { mk += kBig; }
-      mj = state_[ii];
-    }
-    for (int round = 1; round < kWarmups; ++round) {
-      for (std::size_t i = 1; i < kSlots; ++i) {
-        state_[i] -= state_[1 + ((i + kSecondLag) % kLag)];
-        if (state_[i] < 0) { state_[i] += kBig; }
-      }
-    }
-    next_ = 0;
-    nextp_ = kStride;
-  }
-
-  [[nodiscard]] std::int32_t Between(std::int32_t low, std::int32_t high) {
-    const double drawn = static_cast<double>(Sample()) * (1.0 / static_cast<double>(kBig));
-    return static_cast<std::int32_t>(drawn * static_cast<double>(high - low)) + low;
-  }
-
-private:
-  [[nodiscard]] std::int64_t Sample() {
-    std::size_t at = next_ + 1;
-    if (at >= kSlots) { at = 1; }
-    std::size_t other = nextp_ + 1;
-    if (other >= kSlots) { other = 1; }
-    std::int64_t drawn = state_[at] - state_[other];
-    if (drawn == kBig) { drawn -= 1; }
-    if (drawn < 0) { drawn += kBig; }
-    state_[at] = drawn;
-    next_ = at;
-    nextp_ = other;
-    return drawn;
-  }
-
-  static constexpr std::int64_t kBig = 2147483647;
-  static constexpr std::int64_t kSeed = 161803398;
-  static constexpr std::size_t kLag = 55;
-  static constexpr std::size_t kSecondLag = 30;
-  static constexpr std::size_t kStride = 21;
-  static constexpr std::size_t kSlots = kLag + 1;
-  static constexpr int kWarmups = 5;
-  std::array<std::int64_t, kSlots> state_{};
-  std::size_t next_ = 0;
-  std::size_t nextp_ = 0;
-};
-
 constexpr ::agiru::Integer kDefaultSeed = 1;
 
-DotNetRandom &Sequence() {
-  static thread_local DotNetRandom sequence{kDefaultSeed};
-  return sequence;
+detail::SessionRandom &Sequence() {
+  auto &sequence = detail::SessionState::Current().random;
+  if (sequence == nullptr) { sequence = std::make_unique<detail::SessionRandom>(kDefaultSeed); }
+  return *sequence;
 }
 
 }
 
 void Randomize(::agiru::Integer Seed) {
-  Sequence().Reseed(Seed != 0 ? Seed : kDefaultSeed);
+  Sequence().Reseed(Seed);
+}
+
+void Randomize() {
+  Randomize(CurrentTime().AsMilliseconds());
 }
 
 ::agiru::Integer Random(::agiru::Integer MaxNumber) {
-  const ::agiru::Integer largest = MaxNumber < 1 ? 1 : MaxNumber;
-  return Sequence().Between(1, largest + 1);
+  const std::int64_t magnitude = MaxNumber < 0 ? -static_cast<std::int64_t>(MaxNumber) : MaxNumber;
+  if (magnitude > std::numeric_limits<::agiru::Integer>::max()) {
+    throw Error("Random bound exceeds the positive Integer range", "RandomBoundRange");
+  }
+  const auto largest = magnitude == 0 ? 1 : static_cast<::agiru::Integer>(magnitude);
+  return Sequence().Bounded(largest);
 }
 
 ::agiru::Guid CreateGuid() {

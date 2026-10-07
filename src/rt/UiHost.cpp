@@ -12,9 +12,6 @@
 
 namespace agiru {
 
-detail::SessionState::SessionState() = default;
-detail::SessionState::~SessionState() = default;
-
 void InstallUiHost(Session &session, std::unique_ptr<UiHost> host) {
   auto &state = detail::SessionState::For(session);
   if (state.commandActive.test() || session.Transaction().Depth() != 0) {

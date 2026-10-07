@@ -9,8 +9,9 @@ controls=(state guid name)
 command_controls=(rollback commit epoch cursor-owner)
 credential_controls=(credential-expiry credential-revocation credential-owner)
 provider_controls=(random-fallback digest-fallback)
+value_controls=(area-thread random-thread zero-seed negative-bound clock-seed wide-bound)
 cleanup() {
-  for control in "${controls[@]}" "${command_controls[@]}" "${credential_controls[@]}" "${provider_controls[@]}"; do
+  for control in "${controls[@]}" "${command_controls[@]}" "${credential_controls[@]}" "${provider_controls[@]}" "${value_controls[@]}"; do
     for extension in cpp bin; do
       input="$proof/$control.$extension"
       if [[ -f "$input" ]]; then unlink "$input"; fi
@@ -18,6 +19,7 @@ cleanup() {
   done
   if [[ -f "$proof/provider-failure.so" ]]; then unlink "$proof/provider-failure.so"; fi
   if [[ -f "$proof/provider-failure.o" ]]; then unlink "$proof/provider-failure.o"; fi
+  find "$proof" -maxdepth 1 -type f \( -name '*.so' -o -name 'clock.o' \) -delete
 }
 trap cleanup EXIT
 git rev-parse HEAD > "$proof/head"
@@ -30,10 +32,14 @@ sha256sum src/rt/Session.cpp include/runtime/Session.h include/platform/User.h \
   test/gate/AccountFixturePermissions.h include/runtime/TablePermissions.h src/rt/TablePermissions.cpp \
   include/runtime/{SecureToken,ClientCredentials}.h src/net/SecureToken.cpp src/rt/ClientCredentials.cpp \
   test/gate/ClientCredentialsGate.cpp test/runtime/client-credentials/ProviderFailure.cpp \
+  include/BuiltinsWritten.h src/rt/written/BuiltinsWritten.cpp src/rt/SessionRandom.{h,cpp} \
+  src/rt/UiHost.cpp test/gate/{SessionValues,GenReceiver}Gate.cpp test/runtime/session-values/Clock.cpp \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" "$B/libagiru_db.so" > "$proof/inputs.sha256"
 "$B/gate_SessionIdentityGate" > "$proof/current.log" 2>&1
 "$B/gate_SessionCommandGate" > "$proof/commands.log" 2>&1
 "$B/gate_ClientCredentialsGate" > "$proof/credentials.log" 2>&1
+"$B/gate_SessionValuesGate" > "$proof/values.log" 2>&1
+"$B/gate_GenReceiverGate" > "$proof/values-generator.log" 2>&1
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Isrc/rt \
   -Itest/gate "-DAGIRU_TEST_DSN=\"$dsn\"" --rtlib=compiler-rt --unwindlib=libunwind \
   -fuse-ld=lld-19 "-L$B" "-Wl,-rpath,$B")
@@ -164,8 +170,66 @@ for control in "${provider_controls[@]}"; do
   [[ "$status" = 1 ]]
   rg -q 'provider failure explicitly refuses without fallback' "$proof/$control.log"
 done
+clock_flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -fPIC -Iinclude -c)
+"$CXX" "${clock_flags[@]}" test/runtime/session-values/Clock.cpp -o "$proof/clock.o" \
+  > "$proof/clock.compile.log" 2>&1
+"$CXX" -stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 -shared \
+  "$proof/clock.o" -o "$proof/clock.so" > "$proof/clock.link.log" 2>&1
+jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/session-values/Clock.cpp" \
+  --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
+  "$CXX" "${clock_flags[@]}" test/runtime/session-values/Clock.cpp -o "$proof/clock.o" \
+  > "$B/fixture-commands/session-values-clock.json"
+LD_PRELOAD="$proof/clock.so" "$B/gate_SessionValuesGate" --clock-fixture > "$proof/clock.log" 2>&1
+for control in "${value_controls[@]}"; do
+  source=src/rt/written/BuiltinsWritten.cpp
+  claim='nested randomization cannot change the outer sequence'
+  case "$control" in
+    area-thread) claim='nested application-area changes do not overwrite the outer session';;
+    zero-seed) claim='explicit seed zero is not silently replaced with one';;
+    negative-bound) claim='negative and positive bounds preserve exactly the same draw';;
+    clock-seed) claim='parameterless Randomize uses the current clock seed';;
+    wide-bound)
+      source=src/rt/SessionRandom.cpp
+      claim='Random accepts representable inclusive positive or negative bounds'
+      ;;
+  esac
+  awk -v control="$control" '
+    control == "area-thread" && /return detail::SessionState::Current\(\).applicationArea;/ {
+      print "  static thread_local std::string area; return area;"; changed++; next
+    }
+    control == "random-thread" && /auto &sequence = detail::SessionState::Current\(\).random;/ {
+      print "  static thread_local std::unique_ptr<detail::SessionRandom> sequence;"; changed++; next
+    }
+    control == "zero-seed" && /Sequence\(\).Reseed\(Seed\);/ {
+      sub(/Reseed\(Seed\)/, "Reseed(Seed != 0 ? Seed : kDefaultSeed)"); changed++
+    }
+    control == "negative-bound" && /return Sequence\(\).Bounded\(largest\);/ {
+      sub(/Bounded\(largest\)/, "Bounded(MaxNumber < 0 ? 1 : largest)"); changed++
+    }
+    control == "clock-seed" && /Randomize\(CurrentTime\(\).AsMilliseconds\(\)\);/ {
+      sub(/CurrentTime\(\).AsMilliseconds\(\)/, "kDefaultSeed"); changed++
+    }
+    control == "wide-bound" && /static_cast<double>\(maximum\)/ {
+      sub(/static_cast<double>\(maximum\)/, "static_cast<double>(maximum + 1)"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' "$source" > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" -fPIC -shared "$proof/$control.cpp" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so" \
+    > "$proof/$control.compile.log" 2>&1
+  status=0
+  LD_PRELOAD="$proof/clock.so:$proof/$control.so" "$B/gate_SessionValuesGate" --clock-fixture \
+    > "$proof/$control.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+done
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
 cat "$proof/current.log"
 cat "$proof/commands.log"
 cat "$proof/credentials.log"
+cat "$proof/values.log"
+cat "$proof/values-generator.log"
+cat "$proof/clock.log"
+printf 'session-values: six compiled ownership/seed/bound/clock defects reject; indirect-minimum Random bound remains unqualified\n'
 printf 'session-identity: twelve identity/command/credential/provider defects reject; secure random/digest provider failures refuse; receipts %s\n' "$proof"

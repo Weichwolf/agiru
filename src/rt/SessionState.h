@@ -4,6 +4,8 @@
 #include "type/CommitBehavior.h"
 #include "type/ErrorBehavior.h"
 
+#include "SessionRandom.h"
+
 #include <atomic>
 #include <cstdint>
 #include <map>
@@ -26,6 +28,8 @@ struct SessionState {
   ~SessionState();
   std::atomic_flag commandActive = ATOMIC_FLAG_INIT;
   std::unique_ptr<UiHost> uiHost;
+  std::string applicationArea;
+  std::unique_ptr<SessionRandom> random;
 
   struct Binding {
     CodeunitId id;

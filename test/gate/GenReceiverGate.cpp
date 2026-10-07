@@ -175,6 +175,26 @@ void RecordRefreshUsesItsRuntimeProvider() {
              source.contains("SelectLatestVersion()"));
 }
 
+void RandomOverloadsRetainTheirArguments() {
+  const auto unit = agiru::al::ParseCodeunit(R"(codeunit 50273 "Random Caller" {
+    procedure Draw(): Integer
+    begin
+      Randomize();
+      Randomize(0);
+      System.Randomize();
+      System.Randomize(11);
+      exit(Random(-100));
+    end;
+  })");
+  const auto source = agiru::gen::WriteCodeunitSource(unit, "RandomCaller.Codeunit.al", {});
+  CHECK_TRUE("an omitted AL random seed stays omitted rather than becoming zero",
+             source.contains("Randomize()"));
+  CHECK_TRUE("an explicit AL zero random seed stays explicit", source.contains("Randomize(0)"));
+  CHECK_TRUE("a qualified explicit AL random seed survives lowering",
+             source.contains("Randomize(11)"));
+  CHECK_TRUE("AL random bounds retain their sign", source.contains("Random(-100)"));
+}
+
 }
 
 int main() {
@@ -185,5 +205,6 @@ int main() {
     ConversionResultNamesItsArrayDependency();
     QualifiedConversionNamesRemainHiddenByRuntimeMembers();
     RecordRefreshUsesItsRuntimeProvider();
+    RandomOverloadsRetainTheirArguments();
   });
 }

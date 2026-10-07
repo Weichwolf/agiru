@@ -2,9 +2,7 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: move ApplicationArea and random-generator authority into private session state;
-prove nested sessions, worker reuse/migration, explicit seeds and documented random
-bounds with C++ gates and compiled negative controls. Then provide real HTTP UI-host
+Next: provide real HTTP UI-host
 capability/suspension under 0720; the rebuilt native Customer regression now opens/edits
 but retains its interactive Card lifecycle failure.
 Repeat counted AL execution after the verified SelectLatestVersion increment below;
@@ -40,7 +38,8 @@ do not defer client construction until all transaction acceptance is complete.
   ApplicationArea and random sequences belong to the session, not the executing thread.
   Randomize preserves explicit seeds including zero; its omitted seed uses milliseconds
   since midnight. Random treats negative bounds as positive, zero as one and accepts the
-  full AL Integer range without signed overflow. Posting determinism does not override
+  representable positive/negative bounds without signed overflow; qualify the indirectly
+  reachable minimum Integer bound separately. Posting determinism does not override
   these platform contracts; the AL test library explicitly controls its own seed.
 - UI callbacks follow AllowSessionCallSuspendWhenWriteTransactionStarted (BC default enabled).
   Trusted server configuration, never a client parameter, owns the policy. A permitted
@@ -77,18 +76,28 @@ pass with the native compiler/database environment. The full manifest rerun, ful
 and unchanged 2,314-test AL diagnostic remain due; these checks do not qualify session
 migration or financial integrity.
 
-Session-state defects observed against the native runtime at `f232cfb`:
-
-- Nested sessions overwrite another session's ApplicationArea and seeded random sequence.
-- Two sequential worker activations retain the authenticated identity but lose both values.
-- Reseeding with 11: Random(100) returns 48; Random(-100) incorrectly returns 1.
-- `BuiltinsWritten.cpp` stores both in thread_local; its Random bound adds one in signed
-  Integer arithmetic, and Randomize conflates omitted/zero seeds with one. Durable
-  regression gates and repairs are the next increment, not claimed completed work.
+Session ApplicationArea and the lazy random generator now belong to `SessionState`,
+not thread-local values. `make session-identity JOBS=2` passes 48 SessionValues checks,
+84 generator checks and the existing identity/command/credential gates. Six new compiled
+ownership/seed/bound/clock defects fail named claims; the twelve existing controls remain.
+Nested, reused, migrated and simultaneous authenticated sessions retain independent values.
+Explicit zero seeds remain zero; omitted Randomize uses milliseconds since midnight,
+including a compiled fixed-clock proof. Positive/negative bounds draw identically and
+Integer maximum no longer overflows. Seed 11 still produces Random(100) = 48.
+The indirectly reachable Integer minimum bound explicitly refuses `RandomBoundRange`:
+its positive magnitude is unrepresentable; actual BC behaviour remains unqualified.
+Do not count this gap as an approved exclusion. Parameterless generated callers must
+be rebuilt for the new overload; previous binaries are not qualification of clock seeding.
+Tests: `test/gate/SessionValuesGate.cpp`, `test/runtime/session-values/Clock.cpp` and
+the existing `test/runtime/session-identity.sh`; no additional orchestration script.
+Seven affected units pass clang-tidy; builtin reproduction retains 109 written overloads.
+UiHost 60, RecordRefresh 149, Transaction 12, DynamicRecord 7,493 and SessionParallel 14
+checks pass. Full manifest, full lint and counted AL execution remain pending.
 
 Contracts at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
 `methods-auto/session/session-applicationarea-method.md`,
-`methods-auto/system/system-{random,randomize}-method.md`.
+`methods-auto/system/system-{random,randomize}-method.md`,
+`methods-auto/integer/integer-data-type.md` (minimum reached through arithmetic).
 BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`:
 `src/Layers/W1/Tests/ApplicationTestLibrary/LibraryRandom.Codeunit.al` explicitly sets
 the test seed; `src/Layers/W1/BaseApp/Modules/System/ApplicationArea/ApplicationAreaMgmt.Codeunit.al`
@@ -96,7 +105,7 @@ sets/reads the current session area. Predecessor `board/1479_applicationarea-sic
 identifies session ownership but retracts inferred TestPage visibility rules; do not
 port that visibility hypothesis. Its `_math.py` clock/negative-bound shortcuts contradict
 the developer contracts and are not adopted. Runtime owners:
-`src/rt/{SessionState.h,SingleInstance.cpp,written/BuiltinsWritten.cpp}`.
+`src/rt/{SessionState.h,SessionRandom.h,SessionRandom.cpp,SingleInstance.cpp,written/BuiltinsWritten.cpp}`.
 
 Post-bridge native rerun at `ea6c922`: `make ut B=/workspace/build/podman JOBS=6
 UT_MASTER_DSN=<same-complete-seed>` retains all 2,314 tests/80 codeunits; zero executed,

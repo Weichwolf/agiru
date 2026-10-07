@@ -150,9 +150,8 @@ namespace agiru {
 
 /// \brief AL `Session.ApplicationArea()`. Gets the application areas for the current session.
 /// \return The areas, `#Basic,#Suite` style.
-/// \note PER SESSION, held with the session's other per-thread state; a test that sets
-///       `ApplicationArea('#Basic')` and reads it back sees its own value (12 UT cases,
-///       2026-09-09). Nothing here decides what an area SHOWS -- that is the page renderer's.
+/// \note Owned by the logical session across worker changes, not a worker or SQL lease.
+///       Does not decide page/control visibility.
 std::string ApplicationArea();
 
 /// \brief AL `Session.ApplicationArea(Text)`. Sets the application areas for the current session.
@@ -603,27 +602,23 @@ DMY2Date(::agiru::Integer Day, ::agiru::Integer Month = {}, ::agiru::Integer Yea
 ///          this function; where a rounding matters, `Round` is what AL writes next to it.
 [[nodiscard]] ::agiru::Decimal Power(::agiru::Decimal Number, ::agiru::Decimal Power);
 
-/// \brief AL `System.Randomize([Seed])`. Seeds the session's random generator.
-/// \param Seed The seed; 1 when omitted.
-///
-/// \note THE OMITTED SEED IS 1 AND NOT THE CLOCK. `randomize-method.md` says BC seeds from "the
-///       total number of milliseconds since midnight" when the seed is omitted -- and DETERMINISM
-///       IS COMPULSORY here (CLAUDE.md), so the same run must produce the same entries twice. The
-///       BaseApp's own `Library - Random` calls `SetSeed` with 1, which is where the number comes
-///       from; a test that wants a different sequence passes one.
-void Randomize(::agiru::Integer Seed = {});
+/// \brief AL `System.Randomize(Integer)`. Restarts the current session's random sequence.
+/// \param Seed Exact signed seed, including zero; identical seeds reproduce the sequence.
+/// \throws SessionError when no session is active.
+void Randomize(::agiru::Integer Seed);
+
+/// \brief AL `System.Randomize()`. Seeds from current time's milliseconds since midnight.
+/// \throws SessionError when no session is active.
+void Randomize();
 
 /// \brief AL `System.Random(Number)`. A pseudo-random integer between 1 and Number.
-/// \param MaxNumber The largest number that may come back.
-/// \return A number in `[1, MaxNumber]`.
-///
-/// \note IT IS .NET'S OWN GENERATOR, REBUILT. BC's `Random` is `System.Random.Next`, whose
-///       algorithm is a subtractive lagged-Fibonacci generator with a documented seeding step --
-///       and a test that seeds it and compares a SEQUENCE fails against any other generator. The
-///       predecessor rebuilt the same one for the same reason.
-///
-/// \note THE GENERATOR IS PER SESSION, which the page states outright: "the random generator is
-///       specific to each connection". It is `thread_local` here, which is what a session owns.
+/// \param MaxNumber Inclusive bound; negatives act positive, zero returns one.
+/// \return A number in `[1, abs(MaxNumber)]`, or one for zero.
+/// \throws SessionError when no session is active.
+/// \throws Error with RandomBoundRange when the magnitude exceeds positive Integer range.
+/// \note The indirect Integer minimum's BC behaviour remains unqualified and refuses.
+///       Preserves the existing subtractive .NET-compatible sequence; owns it per logical
+///       session across worker and SQL-lease changes. This is not a security RNG.
 [[nodiscard]] ::agiru::Integer Random(::agiru::Integer MaxNumber);
 
 /// \brief AL `System.Abs(Number)`. The absolute value of a number.

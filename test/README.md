@@ -27,6 +27,13 @@ random/digest provider failures explicitly refuse. The provider fixture has a su
 compile receipt before lint. This is not browser/password sign-in, a connection pool or page/table authorization;
 container qualifiers need `AGIRU_TEST_DSN` pointing at container-local PostgreSQL.
 
+The same target checks session-owned ApplicationArea and random sequences through
+nested, reused, migrated and concurrent workers. Six compiled ownership/seed/bound/clock
+defects must fail named checks. Explicit zero seeds and a compiled fixed-clock fixture
+distinguish both Randomize overloads; generated callers preserve omitted arguments.
+Integer maximum is covered; Random's minimum Integer bound explicitly refuses and
+remains unqualified against BC. This is not suspended AL-stack migration or full lint/UT.
+
 `make ui-host JOBS=2` qualifies the session-owned native dialog bridge: 60 C++ checks
 and six compiled capability/answer/test-fallback/implicit-commit/live-binding defects.
 Background GuiAllowed is false; actual host callbacks and explicit AL handlers are
