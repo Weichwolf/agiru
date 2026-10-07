@@ -4,8 +4,7 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: rebuild generated production factories for the expanded PageInstance API, then
-integrate the session-owned native UI bridge from 0741 with real HTTP dialog
+Next: integrate the session-owned native UI bridge from 0741 with real HTTP dialog
 admission/suspension and typed error responses; rerun original Customer
 List → Card → Validate → Save using external CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
@@ -189,7 +188,14 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   these gates/fixtures do not execute the source-counted AL UT or qualify actual browsers.
 
 - Original Customer client regression: `make erp-client-test JOBS=2`,
-  current post-bridge image: seven cases, six pass/one failure, zero skipped/cancelled.
+  current configured-list image at `003a48b`: seven cases, six pass/one failure,
+  zero skipped/cancelled. `make slice-check all B=/workspace/build/podman JOBS=6`
+  rebuilt production factories for the expanded PageInstance API: 14,225 diagnostic
+  slice sources, zero missing, native build exit 0 in 2,377 seconds; not full-app or UT
+  acceptance. The 40-row Customer window independently matches SQL primary-key order
+  and every No./Name value, preserves exact Code/Text types and one selected row,
+  and agrees across external CMD/MCP and actual Chromium. The seed/source revision
+  and SQL_ASCII/collation limitations below remain unchanged.
   Actual Chromium/htmx denies the unassigned user and edits the original Customer Name;
   external CMD and real MCP make earlier edits on the same row. Independent SQL verifies
   exact Unicode names, authenticated modifier, increased rowversion, unchanged row

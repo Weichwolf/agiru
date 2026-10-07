@@ -137,7 +137,23 @@ test("original Customer List opens over Caddy and retains identical web/CMD/MCP 
   assert.equal(response.status, 200, html);
   list = { page: parsePage(html), status: response.status };
   assert.equal(list.page.page, "22");
+  assert.equal(list.page.profile, "2");
+  assert.equal(list.page.view, "list");
+  assert.deepEqual(list.page.window, { limit: "40", more: true, direction: "forward" });
+  const expectedRows = JSON.parse(await sql(`SELECT json_agg(row_to_json(c)) FROM
+    (SELECT "No." AS number,"Name" AS name FROM "Customer" ORDER BY "No." LIMIT 40) c`));
+  assert.equal(expectedRows.length, 40);
+  assert.deepEqual(list.page.rows.map(row => {
+    const number = row.controls.find(control => control.identity === "No.")?.scalar;
+    const name = row.controls.find(control => control.identity === "Name")?.scalar;
+    assert.equal(number?.type, "Code");
+    assert.equal(name?.type, "Text");
+    return { number: number.value, name: name.value };
+  }), expectedRows, "the original Customer window must match independent PostgreSQL key order and values");
+  assert.equal(list.page.rows.filter(row => row.selected).length, 1);
+  assert.equal(list.page.rows[0].selected, true);
   selected = field(list, "No.");
+  assert.equal(selected, expectedRows[0].number);
   assert.ok(selected, "original customer key must be exposed exactly");
   original = await customer(selected);
   assert.equal(field(list, "Name"), original.name);
@@ -147,6 +163,11 @@ test("original Customer List opens over Caddy and retains identical web/CMD/MCP 
   const reply = await mcp("read", { path: path(list) });
   assert.ok(!reply.isError);
   assert.deepEqual(reply.structuredContent, list);
+  const web = await openBrowserPage(browser, origin, path(list), first.authorization);
+  assert.equal(web.response.status(), 200);
+  await assertBrowserPage(web.page, list.page);
+  await web.page.screenshot({ path: `${proof}/customer-list-window.png`, fullPage: true });
+  await web.page.close();
   await writeFile(`${proof}/customer-list.json`, JSON.stringify(list));
 });
 
