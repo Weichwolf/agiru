@@ -1,5 +1,6 @@
 #include "meta/PermissionSetDef.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/PermissionSetRegistry.h"
 #include "runtime/PermissionSets.h"
 
 #include "Check.h"
@@ -378,6 +379,41 @@ void InvalidPolicy() {
   }
 }
 
+void InstalledMetadata() {
+  static constexpr Set root{.identity = kRoot};
+  static constexpr Set leaf{.identity = kLeaf};
+  static constexpr Set tenant{
+      .identity = {.app = kApp, .role = "TENANT", .scope = agiru::PermissionScope::Tenant}};
+  static constexpr Set late{.identity = {.app = kApp, .role = "LATE"}};
+  Refuses(
+      "null installed declaration refuses",
+      [] { agiru::RegisterPermissionSet(nullptr); },
+      "PermissionRegistry");
+  Refuses(
+      "tenant policy cannot become global system metadata",
+      [] { agiru::RegisterPermissionSet(&tenant); },
+      "PermissionRegistry");
+  agiru::RegisterPermissionSet(&root);
+  agiru::RegisterPermissionSet(&leaf);
+  Refuses(
+      "duplicate installed identity refuses",
+      [] { agiru::RegisterPermissionSet(&root); },
+      "PermissionRegistry");
+  const agiru::InstalledPermissionSets catalog;
+  CHECK_TRUE("compiled original identity resolves exactly", catalog.Find(kRoot) == &root);
+  CHECK_TRUE("different app remains absent",
+             catalog.Find({.app = kOtherApp, .role = kRoot.role}) == nullptr);
+  CHECK_TRUE("different scope remains absent", catalog.Find(tenant.identity) == nullptr);
+  CHECK_TRUE("missing installed role does not select its next neighbor",
+             catalog.Find({.app = kApp, .role = "A"}) == nullptr);
+  CHECK_TRUE("metadata view retains deterministic ordering",
+             agiru::InstalledPermissionSetDefinitions().front() == &leaf);
+  Refuses(
+      "late metadata registration refuses",
+      [] { agiru::RegisterPermissionSet(&late); },
+      "PermissionRegistry");
+}
+
 }
 
 int main() {
@@ -390,5 +426,6 @@ int main() {
     TenantOverrides();
     Bounds();
     InvalidPolicy();
+    InstalledMetadata();
   });
 }

@@ -6,8 +6,9 @@ CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-permission-sets.XXXXXX)
 sha256sum include/meta/PermissionSetDef.h include/runtime/PermissionSets.h \
   src/rt/PermissionSets.cpp test/gate/PermissionSetsGate.cpp \
+  include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
   test/runtime/permission-sets.sh > "$proof/inputs.sha256"
-controls=(precedence exclude filter identity cycle entries edges override)
+controls=(precedence exclude filter identity cycle entries edges override registry-duplicate registry-frozen registry-identity)
 cleanup() {
   for control in "${controls[@]}"; do
     for suffix in cpp bin; do
@@ -20,8 +21,15 @@ trap cleanup EXIT
 "$B/gate_PermissionSetsGate" > "$proof/execution.log" 2>&1
 cat "$proof/execution.log"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate)
-links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
+links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
+  "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 for control in "${controls[@]}"; do
+  source=src/rt/PermissionSets.cpp
+  companion=src/rt/PermissionSetRegistry.cpp
+  if [[ "$control" = registry-* ]]; then
+    source=src/rt/PermissionSetRegistry.cpp
+    companion=src/rt/PermissionSets.cpp
+  fi
   awk -v control="$control" '
     control == "precedence" && /return PermissionLevel::Direct;/ {
       sub(/PermissionLevel::Direct/, "PermissionLevel::Indirect"); changed++
@@ -51,10 +59,20 @@ for control in "${controls[@]}"; do
     control == "override" && /result.level = PermissionLevel::Indirect;/ {
       sub(/PermissionLevel::Indirect/, "PermissionLevel::None"); changed++
     }
+    control == "registry-duplicate" && /if \(!definitions_.emplace\(declaration->identity, declaration\).second\)/ {
+      sub(/!definitions_.emplace\(declaration->identity, declaration\).second/,
+          "(static_cast<void>(definitions_.emplace(declaration->identity, declaration)), false)"); changed++
+    }
+    control == "registry-frozen" && /if \(frozen_\)/ {
+      sub(/frozen_/, "(static_cast<void>(frozen_), false)"); changed++
+    }
+    control == "registry-identity" && /definitions_.find\(identity\)/ {
+      sub(/definitions_.find\(identity\)/, "definitions_.lower_bound(identity)"); changed++
+    }
     { print }
     END { if (changed != 1) exit 2 }
-  ' src/rt/PermissionSets.cpp > "$proof/$control.cpp"
-  "$CXX" "${flags[@]}" "$proof/$control.cpp" test/gate/PermissionSetsGate.cpp \
+  ' "$source" > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" "$companion" test/gate/PermissionSetsGate.cpp \
     "${links[@]}" -o "$proof/$control.bin" > "$proof/$control.compile.log" 2>&1
   status=0
   "$proof/$control.bin" > "$proof/$control.log" 2>&1 || status=$?
@@ -68,13 +86,16 @@ for control in "${controls[@]}"; do
     entries) claim='entry bound refuses excess permission arrays' ;;
     edges) claim='edge bound counts repeated cached references' ;;
     override) claim='tenant override reduces a direct modify permission to indirect' ;;
+    registry-duplicate) claim='duplicate installed identity refuses' ;;
+    registry-frozen) claim='late metadata registration refuses' ;;
+    registry-identity) claim='missing installed role does not select its next neighbor' ;;
   esac
   rg -q "^FAIL .*${claim}" "$proof/$control.log"
 done
 "$CXX" "${flags[@]}" -fsanitize=address,undefined -fno-omit-frame-pointer \
-  src/rt/PermissionSets.cpp test/gate/PermissionSetsGate.cpp "${links[@]}" \
+  src/rt/PermissionSets.cpp src/rt/PermissionSetRegistry.cpp test/gate/PermissionSetsGate.cpp "${links[@]}" \
   -o "$proof/sanitizers.bin" > "$proof/sanitizers.compile.log" 2>&1
 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
   "$proof/sanitizers.bin" > "$proof/sanitizers.log" 2>&1
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'permission-sets: BC composition, ASan/UBSan and eight compiled defects; native SQL assignment/execution-context providers remain unqualified; %s\n' "$proof"
+printf 'permission-sets: BC composition/immutable registry, ASan/UBSan and eleven compiled defects; not full ERP authorization acceptance; %s\n' "$proof"
