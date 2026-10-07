@@ -120,6 +120,8 @@ bool IsBlank(const void *record, const FieldDef &def) {
     case FieldType::RecordId: return reinterpret_cast<const RecordId *>(At(record, def))->IsEmpty();
     case FieldType::DateFormula:
       return reinterpret_cast<const DateFormula *>(At(record, def))->IsEmpty();
+    case FieldType::TableFilter:
+      return reinterpret_cast<const TableFilter *>(At(record, def))->IsEmpty();
     case FieldType::Integer: return *reinterpret_cast<const Integer *>(At(record, def)) == 0;
     case FieldType::BigInteger: return *reinterpret_cast<const BigInteger *>(At(record, def)) == 0;
     case FieldType::Boolean: return !*reinterpret_cast<const Boolean *>(At(record, def));

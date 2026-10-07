@@ -69,6 +69,43 @@ void Declarations() {
   }
 }
 
+std::string Diagnostic(auto &&operation) {
+  try {
+    operation();
+  } catch (const agiru::Error &error) {
+    CHECK_TEXT("TableFilter checks preserve TestField error identity", error.Code(), "TestField");
+    return error.what();
+  }
+  return {};
+}
+
+void FilterChecks() {
+  constexpr std::string_view kExpression = "Unicode Ω|雪 & <>";
+  const std::string owned = agiru::TableFilter{kExpression}.ToText();
+  CHECK_TEXT("filter diagnostics own the original Unicode expression", owned, kExpression);
+  Permissions record;
+  CHECK_SILENT("equal empty TableFilter fields pass TestField",
+               Diagnostic([&] { record.TestField(record.SecurityFilter, agiru::TableFilter{}); }));
+  const auto blank = Diagnostic([&] { record.TestField(record.SecurityFilter); });
+  CHECK_TRUE("empty TableFilter uses the ordinary missing-value diagnostic",
+             blank.starts_with("Security Filter must have a value") &&
+                 blank.ends_with("It cannot be zero or empty."));
+  record.SecurityFilter = agiru::TableFilter{kExpression};
+  CHECK_SILENT("nonempty TableFilter passes the single-argument TestField",
+               Diagnostic([&] { record.TestField(record.SecurityFilter); }));
+  CHECK_SILENT("equal nonempty TableFilter fields pass TestField", Diagnostic([&] {
+                 record.TestField(record.SecurityFilter, agiru::TableFilter{kExpression});
+               }));
+  const auto mismatch = Diagnostic(
+      [&] { record.TestField(record.SecurityFilter, agiru::TableFilter{"Name=OTHER"}); });
+  CHECK_TRUE("mismatched filters retain both exact expressions in the ordinary diagnostic",
+             mismatch.starts_with("Security Filter must be equal to 'Name=OTHER'") &&
+                 mismatch.ends_with("Current value is 'Unicode Ω|雪 & <>'."));
+  record.Init();
+  CHECK_SILENT("Init restores empty equality rather than parsing a security predicate",
+               Diagnostic([&] { record.TestField(record.SecurityFilter, agiru::TableFilter{}); }));
+}
+
 void Seed(const std::string &dsn) {
   const agiru::Session session(dsn);
   const auto &db = session.Database();
@@ -225,6 +262,7 @@ WHERE "Object ID"=2000000120)");
 int main() {
   return gate::Run("NativeStorage", [] {
     Declarations();
+    FilterChecks();
     const gate::OwnedDatabase database("native_storage");
     Seed(database.Dsn());
     const agiru::Connection observer(database.Dsn());

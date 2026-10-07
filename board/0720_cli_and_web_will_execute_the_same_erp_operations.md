@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: fix the current integration compile failure, then execute Customer List → Card → Validate → Save using external
+Next: complete the integration build after the TableFilter diagnostic repair, then execute Customer List → Card → Validate → Save using external
 CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
 HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
 
@@ -42,8 +42,13 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   retaining original System module ownership; no duplicate runtime field dictionaries.
   `src/rt/Table.cpp` now resets and reads TableFilter as its exact stored expression;
   this does not implement row-security enforcement or FieldRef value coercion.
+  `include/type/TableFilter.h::ToText` and `src/rt/Record.cpp::IsBlank` fix typed TestField
+  diagnostics/blank checks without widening includes. Empty/nonempty equality, missing values,
+  mismatches with both exact Unicode expressions, error identity and Init are executed;
+  the original failing `TestEditingPermissions.cpp` instantiation remains subject to the
+  complete integration rerun. Targeted tidy for runtime/runner: zero findings (324 available units).
   `make native-storage JOBS=2 AGIRU_SYSTEM_SYMBOLS=<verified-package>`: four original
-  sources, 53 C++/SQL checks and two rejected source mutations (InitValue/Code width).
+  sources, 62 C++/SQL checks and two rejected source mutations (InitValue/Code width).
   Original R/I/M/D/X ordinals, Unicode filter roundtrip/reset, actual denied SQL writes,
   indirect rights, company isolation and revocation pass in an owned disposable database.
   Nonempty security filters still refuse explicitly. `GenNativeBindingGate`: 183 checks;
@@ -53,8 +58,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   source refusals. Existing product exclusion remains separately counted. Translation stays
   red (5,683 property refusals and other retained gaps), not a green subset. Slice check:
   14,225 sources, zero missing. The actual platform library compiles/links all four new tables;
-  complete integration build failed after 740/1,064 steps with a generated C++ type
-  conversion error; diagnosis/fix and a successful rerun remain required. Thirty native-source tooling tests pass;
+  complete integration build failed after 740/1,064 steps because TableFilter expected-value
+  diagnostics attempted `std::string(TableFilter)`; the focused repair is qualified above,
+  but a successful integration rerun remains required. Thirty native-source tooling tests pass;
   changed-code clang-tidy: 6/323 units checked, zero findings, no new suppression.
   This is not seed provisioning, virtual permission metadata, generated system roles,
   native Customer/browser execution, complete System inventory or AL UT acceptance.
@@ -62,8 +68,11 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   TenantPermission,TenantPermissionSetRel}.Table.al`, package 29.0.55365.0 SHA-256
   `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`;
   developer `properties/devenv-{datapercompany,tabletype,replicatedata,initvalue}-property.md`
-  and `methods-auto/record/record-init-method.md` at
+  and `methods-auto/record/record-{init,testfield-joker,testfield-joker-joker}-method.md` at
   `f928288ee840334be73142e5fc0202c0e19b246d` (TableFilter defaults to empty).
+  BCApps `Layers/W1/Tests/Permissions/TestEditingPermissions.Codeunit.al`,
+  `AssertTenantPermissionSetupEqualsTenantPermissionSetup`, at
+  `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17` compares the original Security Filter fields.
   Predecessor `openerp/board/1810_permission_set_relation_tables.md` identifies missing
   relation/metadata providers; WI 1700's implicit SUPER/system-table exemptions are rejected.
 

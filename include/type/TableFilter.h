@@ -30,6 +30,10 @@ public:
   /// \return It, empty when the field is blank.
   [[nodiscard]] std::string_view Value() const { return expression_; }
 
+  /// \brief Copies the exact stored expression for field-comparison diagnostics.
+  /// \return Owned expression text, without parsing or applying its security predicate.
+  [[nodiscard]] std::string ToText() const { return expression_; }
+
   /// \brief Whether the field is blank, which is what `TestField` asks.
   /// \return True when no filter is stored.
   [[nodiscard]] bool IsEmpty() const { return expression_.empty(); }
