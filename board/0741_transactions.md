@@ -75,31 +75,22 @@ Production generated consumers have been rebuilt after the expanded SessionOptio
 value ABI: `make slice-check all B=/workspace/build/podman JOBS=6` exits zero,
 14,225 slice sources, 2,901 seconds. The 1,902 unlinked AL procedures remain gaps;
 this is not complete-app compilation, full AL execution or a working client dialog.
-The complete `make test JOBS=2` manifest retains 185 cases: one XMLport fixture compile
-failure, all other cases pass, including 257 tooling tests. The fixture now calls an AL
-`ValidateValue` procedure instead of a generated `Row` member; its five mutation controls
-resolve the generated binding rather than guessing its name. Focused `make xmlport-import
-JOBS=2`: four profiles, 90 checks, five execution defects and the constructor defect rejected;
-GenXmlPort 28 and XmlPort 161 checks, zero red. Runner clang-tidy has zero findings.
-The frozen rerun at `375a80e` retains 185 cases but has 62 red: its cold CMake build
-ignored the explicitly supplied gate DSN/source roots and compiled the default
-localhost:5433 connection and absent local AL path. PostgreSQL in the development
-container is on 5432. XMLport import now passes all four profiles in that run.
-`scripts/verify_snapshot.py` now pins selected-build database/source/app/slice settings
-in private hash-checked configuration and invokes `make configure` before targets,
-including reused builds. Explicit database/source roots override the selected cache;
-inherited B/Make overrides cannot redirect the lane. SnapshotGate passes 21 checks,
-including exact quoted/dollar values, source refusal, private storage, changed configuration
-and configure failure. `make verify-check`: 29 checks, zero red; the complete tooling
-suite passes 261 tests. The corrected frozen `make test JOBS=2` rerun passes all
-185 manifest cases, zero red, in 2,042 seconds including configuration/build.
-Its cache selects PostgreSQL 5432, the verified AL source and the diagnostic slice
-independently of live B. Frozen source SHA-256
-`0325ab8c0e296014c5507ad454911f6a81b4df52033c47096a8871a1530e650e`
-and system-symbol/configuration hashes remain unchanged; the input includes the
-configuration repair committed as `1a07829`, not subsequent asynchronous client work.
-This closes the local manifest failure, not source-counted AL UT, complete-app,
-interactive client or financial posting acceptance.
+Latest frozen native baseline: clean `280917453b8cc12549872a50c4a9b1bfcd8cb436`;
+`make verify-start B=/workspace/build/podman JOBS=2 VERIFY_TARGETS=test`:
+185 manifest cases, zero red, exit 0, 1,930 seconds including configuration/build.
+The run includes the bounded asynchronous executor, not later question/message work.
+Source, selected PostgreSQL-5432/AL/slice configuration and system symbols retain their
+SHA-256 before/after: respectively
+`5e68d7a21dbd3d5eca34ddccef7baa90413e10dcb40245625e4890c8d4be301b`,
+`681c0520e14721d4b0875729c614c0c39e1e65ed4ffbc31b8f991225d5db05c0`,
+`34c40f0dcc839eb4d244398715e11a801194bfcea69a21257c5de20a9833a955`.
+`scripts/verify_snapshot.py` pins private selected-build settings and configures its
+own lane before targets, including reused builds; inherited B cannot redirect it.
+The earlier wrong-DSN/source configuration defect is repaired in `1a07829`;
+SnapshotGate 21, verify-check 29 and tooling 261 checks pass. XMLport fixtures use
+their generated AL binding rather than a guessed Row member; all four import profiles
+and constructor/execution controls pass. This is native regression evidence, not
+source-counted AL UT, complete-app, interactive client or financial posting acceptance.
 
 Native command failures now require affected-row proof for durable page invalidation
 and the failed SQL receipt before returning `failed`. Cleanup uncertainty returns
