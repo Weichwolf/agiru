@@ -70,6 +70,13 @@ tests and agent business workflows on sealed disposable databases.
   validate paths, size, publisher/app/runtime/ABI/dependencies; versioned immutable
   native packages, schema/data migration, session drain and rollback evidence.
   Reference 1999's Python ZIP import is not native loading or a security proof.
+  agiru extensions are native C++ source ZIPs, not AL/transpiler inputs; Linux/Podman
+  only, with no WASM-demo requirement. Their sole application dependency is the public
+  agiru runtime SDK: no internal headers, additional libraries or arbitrary build scripts.
+  Fix include/link inputs and audit ELF dependencies against runtime/toolchain dependencies;
+  dependency checks do not sandbox native code. Compile only the extension in an isolated
+  builder. Versioned module ABI and generation-owned registries must precede activation;
+  this contract is not evidence of an implemented loader or an approved hot-unload design.
 
 - No matched BC benchmark, 2 TB / 10,000-user or complete aarch64 qualification exists.
   Existing `make native-report-layouts` proves declaration/link/package controls
