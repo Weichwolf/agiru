@@ -1450,6 +1450,18 @@ public:
     return found == sub->second.fields.end() ? std::string{} : found->second;
   }
 
+  [[nodiscard]] bool AbsentPart(const OfVariable &member) const override {
+    const al::VarDecl *declared = Declaration(member.variable);
+    if (declared == nullptr || declared->subtype.empty()) { return false; }
+    const std::string type = TypeName(declared->type);
+    if (type != "TestPage" && type != "Page") { return false; }
+    const TableIndex &index = PageIndexFor(objects_, type);
+    const auto page = index.find(LowerKey(declared->subtype));
+    if (page == index.end()) { return false; }
+    const auto part = page->second.parts.find(LowerKey(std::string(member.field)));
+    return part != page->second.parts.end() && !index.contains(part->second);
+  }
+
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     const al::VarDecl *declared = Declaration(member.variable);
     if (const QueryColumn column = QueryColumnOf(objects_, declared, member.field);

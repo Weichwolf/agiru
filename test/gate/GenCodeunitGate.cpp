@@ -687,6 +687,45 @@ void RecordFieldNumbersKeepThePlatformReturnType() {
              body.contains("#include \"type/Integer.h\""));
 }
 
+void UnavailablePartsAreNotOrdinaryFields() {
+  auto objects = Tables();
+  agiru::gen::TableRef host;
+  host.identifier = "::agiru::System::Fixture::PartHost_Page";
+  host.header = "PartHost.h";
+  host.parts = {{"missingpart", "unselected part page"}, {"loadedpart", "loaded part page"}};
+  objects.pages.emplace("part host", std::move(host));
+  agiru::gen::TableRef child;
+  child.identifier = "::agiru::System::Fixture::LoadedPart_Page";
+  child.header = "LoadedPart.h";
+  child.fields.emplace("name", "Name");
+  objects.pages.emplace("loaded part page", std::move(child));
+  const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
+    codeunit 50317 PartCalls {
+      procedure Read()
+      var Host: TestPage "Part Host";
+      begin
+        Host.MissingPart.First();
+        Host.MissingPart.Page().Name.Visible();
+        Host.MissingPart.Name.SetValue(Value());
+        Host.LoadedPart.Name.Visible();
+      end;
+      local procedure Value(): Text
+      begin
+        exit('argument');
+      end;
+    })");
+  const auto body = agiru::gen::WriteCodeunitSource(unit, "PartCalls.Codeunit.al", objects);
+  CHECK_TRUE("a missing part First call is an explicit control refusal",
+             body.contains("::agiru::AbsentControl(\"Host.MissingPart.First\")"));
+  CHECK_TRUE("chained part-page fields retain their original refusal path",
+             body.contains("::agiru::AbsentControl(\"Host.MissingPart.Page.Name.Visible\")"));
+  CHECK_TRUE("unavailable control arguments retain evaluation before refusal",
+             body.contains("static_cast<void>(Value()), ::agiru::AbsentControl("));
+  CHECK_TRUE("a selected part retains its actual field call rather than refusal",
+             body.contains("Host.LoadedPart.Name.Visible()") &&
+                 !body.contains("AbsentControl(\"Host.LoadedPart"));
+}
+
 } // namespace
 
 int main() {
@@ -711,5 +750,6 @@ int main() {
     ImplicitRecordFieldsMatchBodyLowering();
     UnselectedNamedPagesDoNotNeedInventedClasses();
     RecordFieldNumbersKeepThePlatformReturnType();
+    UnavailablePartsAreNotOrdinaryFields();
   });
 }

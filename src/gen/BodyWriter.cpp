@@ -720,11 +720,20 @@ private:
             SameName(scope_.DeclaredType(receiver->text), "Record"));
   }
 
-  std::string RefusedControlCall(const al::Expr &callee) const {
+  struct ControlRefusal {
+    std::string call;
+    std::vector<const al::Expr *> arguments;
+  };
+
+  std::optional<ControlRefusal> RefusedControlCall(const al::Expr &expression) const {
     std::vector<std::string> names;
-    const al::Expr *walk = &callee;
+    ControlRefusal out;
+    const al::Expr *walk = &expression;
     while (true) {
       if (walk->kind == al::ExprKind::Call && !walk->children.empty()) {
+        for (std::size_t i = walk->children.size(); i > 1; --i) {
+          out.arguments.insert(out.arguments.begin(), &walk->children[i - 1]);
+        }
         walk = &walk->children.front();
       } else if (walk->kind == al::ExprKind::Binary && walk->text == "." &&
                  walk->children.size() == 2 && walk->children[1].kind == al::ExprKind::Name) {
@@ -739,13 +748,18 @@ private:
     }
     std::size_t first = 0;
     if (!names.empty() && SameName(names.front(), "CurrPage")) { first = 1; }
-    if (names.size() < first + 2 || !scope_.AbsentControl(names[first])) { return {}; }
+    if (names.size() < first + 2 ||
+        (!scope_.AbsentControl(names[first]) &&
+         !scope_.AbsentPart({.variable = names[first], .field = names[first + 1]}))) {
+      return {};
+    }
     std::string whole;
     for (std::size_t i = first; i < names.size(); ++i) {
       if (i != first) { whole += "."; }
       whole += names[i];
     }
-    return "::agiru::AbsentControl(\"" + whole + "\")";
+    out.call = "::agiru::AbsentControl(" + Literal(whole) + ")";
+    return out;
   }
 
   static bool ScopesThroughItsSubtype(std::string_view type) {
@@ -913,8 +927,12 @@ private:
 
   std::string Call(const al::Expr &expression, ValueUse use) {
     const al::Expr &callee = expression.children.front();
-    if (const std::string refused = RefusedControlCall(callee); !refused.empty()) {
-      return refused;
+    if (const auto refused = RefusedControlCall(expression)) {
+      std::string out = "(";
+      for (const al::Expr *argument : refused->arguments) {
+        out += "static_cast<void>(" + Expression(*argument, 0) + "), ";
+      }
+      return out + refused->call + ")";
     }
     if (const std::string tried = Tried(expression, use); !tried.empty()) { return tried; }
     if (callee.kind == al::ExprKind::Name && SameName(callee.text, "Error") &&

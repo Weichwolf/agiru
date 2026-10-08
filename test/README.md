@@ -252,6 +252,15 @@ resolution. Four unavailable-record/array cases refuse before later AL effects; 
 selected record reaches the Integer overload and a Codeunit FieldNo retains Text.
 Removing the result typing must fail compilation with an ambiguous Integer/JsonArray
 overload. Side-effecting indexed method receivers remain a separate qualification gap.
+Unavailable TestPage parts compile First, Visible, DrillDown and SetValue calls,
+including a chained Page() receiver. Reaching them throws with the original AL path;
+side-effecting arguments run once before refusal, while an untaken branch stays inert.
+Removing the refusal or argument evaluation must fail the compiled runner. Selected
+parts keep their declared field calls. AbsentControl never supplies successful defaults,
+including direct Boolean/integer conversions and chained calls. This deliberately removes
+the old unqualified headless/add-in no-op: any lost AL UT identities remain regressions,
+not an approved scope exclusion. Actual add-in/chart execution and live part-entry
+trigger/transaction behavior remain separate requirements.
 Unselected named Page.Run/RunModal calls compile through the numbered runtime API,
 including optional records, field numbers, Action results and case-insensitive names.
 They throw with the original AL identity before subsequent effects, not through an

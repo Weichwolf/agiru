@@ -178,4 +178,35 @@ codeunit 50311 NativeFixture
     begin
         exit(-1);
     end;
+
+    procedure UnavailablePart(Operation: Integer; var Counter: Integer)
+    var
+        Host: TestPage "Part Host";
+        Value: Boolean;
+    begin
+        Counter := 41;
+        case Operation of
+            0: Host.MissingPart.First();
+            1: Value := Host.MissingPart.Name.Visible();
+            2: Host.MissingPart.Opportunities.DrillDown();
+            3: Host.MissingPart.Name.SetValue(PartArgument(Counter));
+            4: Host.MissingPart.Page().Name.SetValue(PartArgument(Counter));
+        end;
+        Counter := 99;
+    end;
+
+    procedure UnavailablePartInUntakenBranch(): Integer
+    var
+        Host: TestPage "Part Host";
+    begin
+        if false then
+            Host.MissingPart.First();
+        exit(7);
+    end;
+
+    local procedure PartArgument(var Counter: Integer): Text
+    begin
+        Counter += 1;
+        exit('argument');
+    end;
 }

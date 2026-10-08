@@ -151,6 +151,25 @@ void FieldNumbersRetainTheirIntegerContract() {
              "own-field-number");
 }
 
+void UnavailablePartsRefuseWithoutDefaultAnswers() {
+  constexpr agiru::Integer kOperationCount = 5;
+  constexpr agiru::Integer kArgumentOperation = 3;
+  agiru::System::Fixture::NativeFixture_Codeunit unit;
+  for (agiru::Integer operation = 0; operation < kOperationCount; ++operation) {
+    agiru::Integer counter = kValue;
+    std::string message;
+    try {
+      unit.UnavailablePart(operation, counter);
+    } catch (const agiru::Error &error) { message = error.what(); }
+    CHECK_TRUE("an unavailable TestPage part refuses with its original control path",
+               message.contains("Host.MissingPart.") && message.contains("board:0034"));
+    CHECK_TRUE("part arguments execute once but later AL effects never execute",
+               counter == (operation >= kArgumentOperation ? 42 : 41));
+  }
+  CHECK_TRUE("an untaken unavailable part branch does not refuse a working path",
+             unit.UnavailablePartInUntakenBranch() == kValue);
+}
+
 }
 
 int main() {
@@ -161,5 +180,6 @@ int main() {
     UnavailableFieldOperationsCompileAndRefuse();
     UnavailableNamedPagesCompileAndRefuse();
     FieldNumbersRetainTheirIntegerContract();
+    UnavailablePartsRefuseWithoutDefaultAnswers();
   });
 }

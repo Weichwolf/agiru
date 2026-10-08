@@ -12,6 +12,7 @@ links=(--rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
 sha256sum src/gen/{BodyWriter,CodeunitWriter,RuntimeSurface,NativeSource,NativeMethods,Refused}.{cpp,h} src/tc/Main.cpp \
   include/runtime/{NativeBase64,Error}.h src/net/NativeBase64.cpp \
   include/BuiltinsWritten.h include/dotnet/Refused.h \
+  include/runtime/Page.h \
   "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" > "$proof/inputs.sha256"
 find "$input" -type f -exec sha256sum {} + >> "$proof/inputs.sha256"
@@ -49,6 +50,43 @@ record_command native-codeunits "$input/Runner.cpp" \
   -c "$input/Runner.cpp" -o "$proof/runner.o"
 link_generated "$proof/generated" "$proof/runner.o" "$proof/runner"
 "$proof/runner" | tee "$proof/execution.log"
+
+cp -a "$proof/generated" "$proof/no-part-refusal"
+awk '
+  /AbsentControl\("Host.MissingPart./ {
+    sub(/^[[:space:]]*.*/, "      static_cast<void>(0);"); changed++
+  }
+  { print }
+  END { if (changed != 6) exit 2 }
+' "$proof/generated/fixture/system/fixture/codeunit/NativeFixture.cpp" \
+  > "$proof/no-part-refusal/fixture/system/fixture/codeunit/NativeFixture.cpp"
+if link_generated "$proof/no-part-refusal" "$proof/runner.o" "$proof/no-part-refusal-runner" \
+  > "$proof/no-part-refusal.compile.log" 2>&1; then
+  if "$proof/no-part-refusal-runner" > "$proof/no-part-refusal-control.log" 2>&1; then
+    printf 'native-codeunits: successful unavailable parts escaped execution control\n' >&2
+    exit 1
+  fi
+else
+  printf 'native-codeunits: unavailable-part execution control did not compile\n' >&2
+  exit 1
+fi
+rg -q 'an unavailable TestPage part refuses with its original control path' "$proof/no-part-refusal-control.log"
+rg -q 'part arguments execute once but later AL effects never execute' "$proof/no-part-refusal-control.log"
+rm -r -- "$proof/no-part-refusal"
+
+cp -a "$proof/generated" "$proof/no-part-arguments"
+awk '
+  { changed += gsub(/static_cast<void>\(PartArgument\(Counter\)\), /, ""); print }
+  END { if (changed != 2) exit 2 }
+' "$proof/generated/fixture/system/fixture/codeunit/NativeFixture.cpp" \
+  > "$proof/no-part-arguments/fixture/system/fixture/codeunit/NativeFixture.cpp"
+link_generated "$proof/no-part-arguments" "$proof/runner.o" "$proof/no-part-arguments-runner"
+if "$proof/no-part-arguments-runner" > "$proof/no-part-arguments-control.log" 2>&1; then
+  printf 'native-codeunits: discarded control arguments escaped execution control\n' >&2
+  exit 1
+fi
+rg -q 'part arguments execute once but later AL effects never execute' "$proof/no-part-arguments-control.log"
+rm -r -- "$proof/no-part-arguments"
 
 cp -a "$proof/generated" "$proof/untyped-field-number"
 awk '

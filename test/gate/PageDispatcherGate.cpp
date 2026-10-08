@@ -9,6 +9,7 @@
 #include "runtime/PageSession.h"
 #include "runtime/test/TestPage.h"
 #include "type/Boolean.h"
+#include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/StringValue.h"
 
@@ -348,6 +349,37 @@ void InstalledFactoriesDoNotRunHeadlessPages() {
   }
 }
 
+template <typename Call> bool UnavailableControlRefuses(Call call) {
+  try {
+    call();
+  } catch (const agiru::Error &error) {
+    return std::string_view(error.what()).contains("page control") &&
+           std::string_view(error.what()).contains("board:0034");
+  }
+  return false;
+}
+
+void UnavailableControlsNeverSupplyDefaults() {
+  int effects = 0;
+  bool named = false;
+  try {
+    static_cast<void>(agiru::AbsentControl("Fixture.Missing.First"));
+    ++effects;
+  } catch (const agiru::Error &error) {
+    named = std::string_view(error.what()).contains("Fixture.Missing.First");
+  }
+  CHECK_TRUE("missing controls retain their original AL path", named);
+  CHECK_TRUE("an unavailable control statement refuses before later effects", effects == 0);
+  const agiru::AbsentControlValue shape;
+  CHECK_TRUE("the unavailable result shape cannot supply false",
+             UnavailableControlRefuses([&] { static_cast<void>(static_cast<bool>(shape)); }));
+  CHECK_TRUE(
+      "the unavailable result shape cannot supply integer zero",
+      UnavailableControlRefuses([&] { static_cast<void>(static_cast<agiru::Integer>(shape)); }));
+  CHECK_TRUE("chained unavailable results cannot succeed",
+             UnavailableControlRefuses([&] { static_cast<void>(shape("argument")); }));
+}
+
 }
 
 int main() {
@@ -356,5 +388,6 @@ int main() {
     CurrentStateAndIdentityAreAuthoritative();
     ProductionSessionsUseTheSharedKernel();
     InstalledFactoriesDoNotRunHeadlessPages();
+    UnavailableControlsNeverSupplyDefaults();
   });
 }

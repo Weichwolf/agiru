@@ -209,16 +209,41 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Four compiled refusal cases retain member identity and stop before later effects;
   selected Record FieldNo reaches Integer, while a Codeunit FieldNo retains Text.
   Removing the cast restores the Integer/JsonArray ambiguity and must fail compilation.
-  `make native-codeunits lint JOBS=2` with the verified System package: generator 70,
-  executable refusals 83, source-bound 8, original Base64 61 checks, zero red; all
-  existing negative controls reject. Three affected compiled units pass clang-tidy,
-  format passes and the suppression baseline remains 12. Side-effecting indexed method
+  The combined native-codeunit qualifier below retains this typing control.
+  Side-effecting indexed method
   receivers remain unqualified; constant-index typing is not a once-only evaluation proof.
   References: developer `methods-auto/record/record-fieldno-method.md` at the revision
   above; BCApps `main` `src/System Application/App/Retention Policy/src/Retention Policy
   Allowed Tables/RetenPolAllowedTables.Codeunit.al` at the revision above. Predecessor
   1094 distinguishes intrinsic AL names from similarly spelled fields/procedures.
   Durable fixtures: `test/transpiler/native-codeunits/{source/*.al,Runner.cpp}`.
+
+- Unavailable TestPage parts: `BodyWriter.cpp` and `CodeunitWriter.cpp` refuse
+  First, nested Visible/DrillDown and SetValue calls at their actual execution point,
+  retaining the original AL path. Compiled fixtures prove argument evaluation once,
+  no subsequent effects and an untouched untaken branch; selected parts retain their
+  declared field calls. Removing refusals or argument evaluation fails execution.
+  `runtime/Page.h` no longer returns successful defaults for absent controls/add-ins.
+  The former headless no-op and its historical nine-UT justification were not a
+  platform guarantee. Keep any resulting AL UT losses visible; implement required
+  charts/add-ins rather than restoring successful stubs or expanding exclusions.
+  Actual part-entry host writes/triggers remain unqualified, as predecessor 803 warns.
+  `make native-codeunits JOBS=2` with the verified System package: generator 74,
+  executable refusals 94, source-bound 8 and original Base64 61 checks, zero red;
+  all existing negative controls reject. `make gate GATE=PageDispatcherGate JOBS=2`:
+  110 checks, zero red. The affected-unit clang-tidy analysis records 25/344 units
+  with exit 0; the missing direct Integer include in the new gate is fixed.
+  References at the pinned revisions above: developer
+  `methods-auto/testpart/testpart-first-method.md` and
+  `methods-auto/testfield/testfield-{visible,setvalue}-method.md`; BCApps `main`
+  `src/Layers/W1/BaseApp/Modules/System/User/UserCard.Page.al` and
+  `src/Layers/W1/BaseApp/Sales/Customer/CustomerCard.Page.al`.
+  Local headless/no-op evidence was missing; official
+  [control add-in asynchronous considerations](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-control-addin-asynchronous-considerations),
+  consulted 2026-10-08, specify asynchronous void calls/events, not this fallback's
+  correctness. A real add-in transport must preserve that contract.
+  Durable tests: `test/gate/{GenCodeunit,PageDispatcher}Gate.cpp` and
+  `test/transpiler/native-codeunits/{source/PartHost.Page.al,source/NativeFixture.Codeunit.al,Runner.cpp}`.
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.
@@ -236,9 +261,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   kind/name refusal before dispatch instead of an invented absent class or object zero.
   Compiled fixtures cover optional records/field numbers, Action results and mixed-case
   calls; known-page execution remains a separate regression.
-  `make native-codeunits JOBS=2`: generator 60, executable refusals 51, source-bound
-  calls 8 and original Base64 61 checks, zero red. Removing all six named-page calls
-  fails both identity and subsequent-effect assertions; existing controls still reject.
+  Removing all six named-page calls fails both identity and subsequent-effect assertions;
+  the combined native-codeunit qualifier above retains these controls.
   `make page-navigation JOBS=2` with the container-local gate DSN: 270 navigation,
   105 dispatcher and 15 source checks, zero red; all 29 execution controls and one
   compile refusal reject. The deliberately removed unbound-integer guard crashes its

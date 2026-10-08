@@ -132,6 +132,11 @@ public:
     return false;
   }
 
+  [[nodiscard]] virtual bool AbsentPart(const OfVariable &member) const {
+    static_cast<void>(member);
+    return false;
+  }
+
   [[nodiscard]] virtual std::string TableOf(std::string_view variable) const {
     static_cast<void>(variable);
     return {};

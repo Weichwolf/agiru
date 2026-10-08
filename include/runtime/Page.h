@@ -60,43 +60,39 @@ template <typename Derived> class Page;
               "(board:0034)");
 }
 
-/// \brief What a call through a control with nothing behind it answers when the call is NOT
-///        refused: nothing, and the caller's default wherever a value is read.
-///
-/// \note A `usercontrol` RUNS IN THE CLIENT, and a headless session has none: BC's own test
-///       framework runs an add-in method as a no-op (`BarcodeControl.RequestBarcodeAsync`,
-///       `BusinessChart.SetValue`), so refusing it stopped a page every test of that table needs.
-///       A PART WHOSE PAGE IS CARVED OUT OF THE SCOPE (`scope.json`, a decision: `Power BI
-///       Embedded Report Part` sits in the excluded `System.Integration.PowerBI`) is treated the
-///       same -- a part with nothing behind it shows nothing, and `Job List.OnOpenPage`'s
-///       `SetPageContext` on it did nothing worth stopping 9 UT cases for (2026-09-12). The
-///       predecessor answered the same with its `_NilValue` sentinel.
+/// \brief Compile-time result shape of an unavailable page control, never a default value.
 class AbsentControlValue {
 public:
-  /// \brief The default of whatever type reads it. \tparam T The type. \return `T{}`.
+  /// \brief Refuses a read in a declared value context. \tparam T The type.
+  /// \return Never. \throws Error always.
   template <typename T>
     requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>)
   operator T() const {
-    return T{};
+    Refuse();
   }
 
-  /// \brief A call chained on the answer answers the same. \tparam A The arguments.
-  /// \return Another absent answer.
+  /// \brief Refuses a chained call. \tparam A The arguments.
+  /// \param arguments Already evaluated arguments. \return Never. \throws Error always.
   template <typename... A> AbsentControlValue operator()(const A &...arguments) const {
     (static_cast<void>(arguments), ...);
-    return {};
+    Refuse();
   }
 
-  /// \brief AL `if Control.X() then`: false. \return False.
-  explicit operator bool() const { return false; }
+  /// \brief Refuses a Boolean read. \return Never. \throws Error always.
+  explicit operator bool() const { Refuse(); }
+
+private:
+  [[noreturn]] static void Refuse() {
+    throw Error("an unavailable page control was evaluated (board:0034)");
+  }
 };
 
-/// \brief A call through a control with nothing behind it: a no-op, see `AbsentControlValue`.
-/// \param what The call as AL wrote it, `Part.Page().Method`, for a trace.
-/// \return An absent answer.
-inline AbsentControlValue AbsentControl(std::string_view what) {
-  static_cast<void>(what);
-  return {};
+/// \brief Refuses an unavailable page-control call at its actual execution point.
+/// \param what The original AL control/member path.
+/// \return Never. \throws Error always; unselected parts and unimplemented add-ins are not no-ops.
+[[noreturn]] inline AbsentControlValue AbsentControl(std::string_view what) {
+  throw Error("the page control " + std::string(what) +
+              " has no selected implementation (board:0034)");
 }
 
 /// \brief One control's triggers, as a page's `PageTraits` tabulates them.
