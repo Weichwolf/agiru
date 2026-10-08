@@ -130,4 +130,9 @@ xmlport 50264 "Import Validation Consumer"
     begin
         exit(BeforeInsertCount);
     end;
+
+    procedure ValidateValue(NewValue: Integer)
+    begin
+        Row.Validate(Value, NewValue);
+    end;
 }

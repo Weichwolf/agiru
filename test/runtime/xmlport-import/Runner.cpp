@@ -86,7 +86,7 @@ void ErrorsAndExplicitValidation(bool temporary) {
   if (temporary) {
     bool explicitRefused = false;
     try {
-      consumer.Row->Validate(consumer.Row->Value, kRejectedFixtureValue);
+      consumer.ValidateValue(kRejectedFixtureValue);
     } catch (const agiru::Error &error) {
       explicitRefused = std::string_view(error.what()) == "Rejected import value";
     }

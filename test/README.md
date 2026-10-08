@@ -134,7 +134,9 @@ caption selection and broader native conversion/culture guarantees remain open.
 `make xmlport-import JOBS=2` executes generated AL field/attribute assignment before
 validation, Yes/No/Undefined/default inheritance, temporary XMLport source nodes
 and propagated validation errors. Explicit Record.Validate still runs on temporary
-records. Five compiled defects must fail; fixtures use AutoSave=false and do not
+records through an explicit AL procedure, not a generated C++ member name. Mutation
+anchors resolve the emitted record binding and refuse missing/ambiguous matches.
+Five compiled defects must fail; fixtures use AutoSave=false and do not
 write SQL rows. This profile does not qualify every XMLport import/trigger policy.
 
 `make rowversions JOBS=2` qualifies allocator fences and SQL record/SystemId paths.

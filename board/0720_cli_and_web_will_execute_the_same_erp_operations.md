@@ -197,7 +197,8 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   `methods-auto/dialog/dialog-{update,close}-method.md`; predecessor threading is not adopted.
   The earlier native `make test JOBS=2` rerun passed 181 cases, zero red, including
   257 tooling tests. Changed-code `make lint JOBS=2`: 28/330 units, zero findings,
-  unchanged suppression count. The current post-callback-policy full manifest is running;
+  unchanged suppression count. Current post-callback-policy manifest: 185 cases, one
+  XMLport fixture compile failure; the focused repair and pending rerun are owned by 0741.
   these gates/fixtures do not execute the source-counted AL UT or qualify actual browsers.
 
 - Original Customer client regression: `make erp-client-test JOBS=2`,

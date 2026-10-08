@@ -41,6 +41,13 @@ for profile in default-false default-true omitted temporary; do
   mapfile -t sources < <(rg --files --no-ignore "$case_root/generated" -g '*.cpp' | LC_ALL=C sort)
   [ "${#sources[@]}" -eq 4 ]
   port="$case_root/generated/fixture/fixture/xmlport/ImportValidationConsumer.cpp"
+  binding=$(awk '
+    /ObservedValue = [A-Za-z_][A-Za-z0-9_]*->Value;/ {
+      sub(/.*ObservedValue = /, ""); sub(/->Value;.*/, ""); print; found++
+    }
+    END { if (found != 1) exit 2 }
+  ' "$port")
+  [[ "$binding" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]
   objects=()
   for source in "${sources[@]}"; do
     if [ "$source" = "$port" ]; then continue; fi
@@ -64,22 +71,22 @@ for profile in default-false default-true omitted temporary; do
     temporary) controls=(validate-temporary) ;;
   esac
   for control in "${controls[@]}"; do
-    awk -v control="$control" '
+    awk -v control="$control" -v binding="$binding" '
       control == "early-validation" && /OnAfterAssignFieldValue\(\);/ {
-        print "    Row->Validate(Row->Value);"; changed++
+        print "    " binding "->Validate(" binding "->Value);"; changed++
       }
-      control == "early-validation" && /Row->Validate\(Row->Value\);/ { next }
-      control == "swallowed-error" && /Row->Validate\(Row->Value\);/ {
-        print "    try { Row->Validate(Row->Value); } catch (const ::agiru::Error &) {}";
+      control == "early-validation" && index($0, binding "->Validate(" binding "->Value);") { next }
+      control == "swallowed-error" && index($0, binding "->Validate(" binding "->Value);") {
+        print "    try { " binding "->Validate(" binding "->Value); } catch (const ::agiru::Error &) {}";
         changed++; next
       }
-      control == "undefined-no" && /Row->Validate\(Row->Other\);/ { changed++; next }
+      control == "undefined-no" && index($0, binding "->Validate(" binding "->Other);") { changed++; next }
       { print }
       control == "ignore-default" && /OnAfterAssignFieldOther\(\);/ {
-        print "    Row->Validate(Row->Other);"; changed++
+        print "    " binding "->Validate(" binding "->Other);"; changed++
       }
       control == "validate-temporary" && /OnAfterAssignFieldValue\(\);/ {
-        print "    Row->Validate(Row->Value);"; changed++
+        print "    " binding "->Validate(" binding "->Value);"; changed++
       }
       END { if (changed != 1) exit 2 }
     ' "$port" > "$case_root/mutant.cpp"

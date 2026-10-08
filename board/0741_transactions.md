@@ -74,7 +74,13 @@ Production generated consumers have been rebuilt after the expanded SessionOptio
 value ABI: `make slice-check all B=/workspace/build/podman JOBS=6` exits zero,
 14,225 slice sources, 2,901 seconds. The 1,902 unlinked AL procedures remain gaps;
 this is not complete-app compilation, full AL execution or a working client dialog.
-The complete `make test JOBS=2` manifest rerun is in progress, not a pass.
+The complete `make test JOBS=2` manifest retains 185 cases: one XMLport fixture compile
+failure, all other cases pass, including 257 tooling tests. The fixture now calls an AL
+`ValidateValue` procedure instead of a generated `Row` member; its five mutation controls
+resolve the generated binding rather than guessing its name. Focused `make xmlport-import
+JOBS=2`: four profiles, 90 checks, five execution defects and the constructor defect rejected;
+GenXmlPort 28 and XmlPort 161 checks, zero red. Runner clang-tidy has zero findings.
+Full manifest rerun remains due; no runtime or generator semantics were changed.
 
 `make refresh-records JOBS=2`: 149 C++ checks, 80 generator checks and six compiled
 defects rejected. `runtime/RecordRefresh.h` owns both official overloads;
