@@ -4,9 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: qualify the repaired unavailable Record identity in the original production group,
-repair missing selected extension fields, then repeat the original Customer workflow;
-never patch apps or guess declarations.
+Next: repair missing selected extension fields, link the native app and repeat the
+original Customer workflow; never patch apps or guess declarations.
 ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
 The previous keep-going build exposed mixed-case unavailable record references, indexed
 fields and unselected TestPage parts/extension fields. The original TestPage groups
@@ -263,7 +262,11 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   controls plus default-copy assignment, unrelated `var` type and missing merged-member
   mutations reject. GenNamesGate has 39 checks, GenPageGate 58 and GenInterfaceGate 35,
   zero red. Changed-code lint covers 31 of 344 units with zero failures; format passes
-  and suppression baseline stays 12. Original group 526 and full linking are pending.
+  and suppression baseline stays 12. Original group 526 containing
+  `CopyPriceDataTest.cpp` now compiles with production headers/PCH and warning policy:
+  `make dev-exec COMMAND='cmake --build /workspace/build/podman -j 2 --target
+  CMakeFiles/agiru_slice.dir/Unity/unity_stable/526/root_cxx.cxx.o'`.
+  This is original-callsite compile proof, not storage/integration execution or full linking.
   References at the pinned revisions above: developer `devenv-al-variables.md` and
   `devenv-namespaces-structure.md`; BCApps `main`
   `src/Layers/W1/Tests/{ERM/CopyPriceDataTest,TestLibraries/LibraryCRMIntegration}.Codeunit.al`.
@@ -273,7 +276,10 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.
-  It writes 18,378 objects, with 25 changed and zero swept. Parser test populations
+  It writes 18,378 objects, with 1,035 changed and zero swept after the identity repair.
+  Canonical unavailable declarations contain 283 AL types/2,492 members; separate
+  .NET declarations contain 383 types/1,279 members. These are refusal declarations,
+  not implemented objects or accepted tests. Parser test populations
   stay at 38,421 and the 77-codeunit/2,298-method milestone subset; the independent
   0058 source census remains separate, not a parser or executed-test result. Slice-check:
   14,225 raw entries, 13,592 selected, 101 product-excluded, 532 omitted, zero missing.
