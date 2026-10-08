@@ -237,6 +237,10 @@ Ordinary AL calls on an unavailable Record compile implicit/quoted field argumen
 for ten methods and refuse with the original member identity before subsequent effects.
 Removing the implicit field declaration must fail compilation; no table schema or
 successful fallback is invented. Emitter and dependency collection share one signature table.
+Unselected named Page.Run/RunModal calls compile through the numbered runtime API,
+including optional records, field numbers, Action results and case-insensitive names.
+They throw with the original AL identity before subsequent effects, not through an
+invented absent class or object zero. Removing these calls must fail the compiled runner.
 An explicit verified `AGIRU_SYSTEM_SYMBOLS` compiles all nine original Base64
 overloads: five text-input bindings execute; four InStream overloads retain named
 refusals. Wrong-encoding and terminated-output controls must fail. The text-output

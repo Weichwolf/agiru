@@ -4,10 +4,10 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: regenerate the production tree with the qualified implicit-field dependency repair,
-rebuild the native app and repeat the original Customer workflow; never patch apps or
-guess missing fields. The last production build still stops at ExchangeSync.Enabled;
-the new production rebuild remains pending, not proved by fixture compilation.
+Next: regenerate production with the named-page refusal repair, rebuild the native app
+and repeat the original Customer workflow; never patch apps or guess missing declarations.
+The latest production build stops at GlobalAdminMessage's unselected Azure AD page,
+not ExchangeSync.Enabled; native build/workflow recovery is not proved by fixture compilation.
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
@@ -164,6 +164,31 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Verified System manifest is 29.0.55365.0/runtime 18.0; artifact directory
   29.0.54011.55407 is not that manifest version. Package SHA-256 remains
   `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`.
+
+- Production regeneration retains 21 unresolved control anchors, 618 unsupported
+  object kinds and 122 refused properties: translator exit 1, source-origin check 0.
+  The 14,225-file slice check passes; the native build fails on the missing named-page
+  declaration in GlobalAdminMessage. These remain counted gaps, not green acceptance.
+  Named Page.Run/RunModal now lower through the numbered runtime API, with an explicit
+  kind/name refusal before dispatch instead of an invented absent class or object zero.
+  Compiled fixtures cover optional records/field numbers, Action results and mixed-case
+  calls; known-page execution remains a separate regression.
+  `make native-codeunits JOBS=2`: generator 60, executable refusals 51, source-bound
+  calls 8 and original Base64 61 checks, zero red. Removing all six named-page calls
+  fails both identity and subsequent-effect assertions; existing controls still reject.
+  `make page-navigation JOBS=2` with the container-local gate DSN: 270 navigation,
+  105 dispatcher and 15 source checks, zero red; all 29 execution controls and one
+  compile refusal reject. The deliberately removed unbound-integer guard crashes its
+  mutant; production checks do not crash. Native integration remains pending.
+  Affected lint covers 144 handwritten consumers; it exposes the existing Load_
+  cognitive complexity in three PageSession consumers. Generator/collector checks are
+  clean; the fixture's operation-count finding is fixed and its focused lint is zero.
+  Simplify Load_ and rerun its consumers; do not raise the complexity threshold.
+  References: developer `methods-auto/page/page-{run,runmodal}-integer-table-integer-method.md`
+  at the revision above; BCApps `main` `src/Layers/W1/BaseApp/GlobalAdminMessage.Page.al`
+  and `src/System Application/App/Azure AD User Management/src/User sync/AzureADUserUpdateWizard.Page.al`
+  at the revision above. Predecessor 1713 retains explicit unknown-platform refusals.
+  Do not broaden exclusions or install a successful integration placeholder for compilation.
 
 - P0, before sales/purchase replay: each row owns its OnAfterGetRecord-derived
   variables, arrays and totals; rendering a pending input row must not reset them.

@@ -526,28 +526,32 @@ private:
   NamedObjectRun(const al::Expr &expression, std::string_view kind, const std::string &member) {
     const al::Expr &named = expression.children[1];
     const std::size_t first = 2;
+    const std::string object = scope_.ObjectNamed(kind, named.text);
+    const std::string_view qualifier = named.children.front().text;
+    if (object.starts_with("absent::") &&
+        (member == "Run" || member == "RunModal" || member == "Ok_Run") &&
+        !PlatformObject(qualifier).empty()) {
+      return std::string(PlatformObject(qualifier)) + "::" + member +
+             "(::agiru::AbsentObjectId({.kind = " + Literal(TypeName(qualifier)) +
+             ", .name = " + Literal(named.text) + "})" + ObjectArguments(expression, first, true) +
+             ")";
+    }
     if (kind == "codeunits" && (member == "Run" || member == "Ok_Run")) {
-      const std::string unit = scope_.ObjectNamed(kind, named.text);
-      std::string out =
-          "::agiru::Codeunit<>::" + member + "(" +
-          (unit.starts_with("absent::") ? "::agiru::AbsentObjectId(\"" + named.text + "\")"
-                                        : "::agiru::CodeunitTraits<" + unit + ">::kId.Value()");
+      std::string out = "::agiru::Codeunit<>::" + member + "(::agiru::CodeunitTraits<" + object +
+                        ">::kId.Value()";
       out += ObjectArguments(expression, first, true);
       return out + ")";
     }
     if (kind == "pages" && (member == "Run" || member == "RunModal") &&
         expression.children.size() == first) {
-      const std::string object = scope_.ObjectNamed(kind, named.text);
-      if (!object.starts_with("absent::")) {
-        return object + "::" + member + "(::agiru::kByNumber)";
-      }
+      return object + "::" + member + "(::agiru::kByNumber)";
     }
     return {};
   }
 
   std::string RunObject(const al::Expr &expression, const al::Expr &callee, ValueUse use) {
     const al::Expr &named = expression.children[1];
-    std::string member = Identifier(callee.children[1].text);
+    std::string member = RuntimeSpelling(Identifier(callee.children[1].text));
     if (use == ValueUse::Consumed && member == "Run" &&
         SameName(callee.children[0].text, "Codeunit")) {
       member = "Ok_Run";

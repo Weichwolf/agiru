@@ -595,6 +595,27 @@ void ImplicitRecordFieldsMatchBodyLowering() {
                      agiru::gen::kAllRecordFieldArguments);
 }
 
+void UnselectedNamedPagesDoNotNeedInventedClasses() {
+  const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
+    codeunit 50314 MissingPage {
+      procedure Open()
+      begin
+        Page.Run(Page::"Unselected Page");
+        Page.RunModal(Page::"Unselected Page");
+        page.rUn(page::"Unselected Page");
+      end;
+    })");
+  const auto body = agiru::gen::WriteCodeunitSource(unit, "MissingPage.Codeunit.al", Tables());
+  CHECK_TRUE("unselected named pages use the numbered production Page API",
+             body.contains("::agiru::Page<>::Run(::agiru::AbsentObjectId({.kind = \"Page\", .name "
+                           "= \"Unselected Page\"}))"));
+  CHECK_TRUE("modal named pages retain the same explicit missing-number boundary",
+             body.contains("::agiru::Page<>::RunModal(::agiru::AbsentObjectId({.kind = \"Page\", "
+                           ".name = \"Unselected Page\"}))"));
+  CHECK_TRUE("no absent class or zero identity is invented for a named page",
+             !body.contains("absent::UnselectedPage{}") && !body.contains("::Run(0"));
+}
+
 } // namespace
 
 int main() {
@@ -616,5 +637,6 @@ int main() {
     ANativeFieldCannotCaptureARecordMethod();
     NativeDeclarationsNeverBecomeSuccessfulEmptyMethods();
     ImplicitRecordFieldsMatchBodyLowering();
+    UnselectedNamedPagesDoNotNeedInventedClasses();
   });
 }

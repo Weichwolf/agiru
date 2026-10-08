@@ -79,4 +79,21 @@ codeunit 50311 NativeFixture
         end;
         Counter := 99;
     end;
+
+    procedure UnavailablePage(Operation: Integer; var Counter: Integer)
+    var
+        Row: Record "Available Row" temporary;
+        Choice: Action;
+    begin
+        Counter := 41;
+        case Operation of
+            0: Page.Run(Page::"Unselected Page");
+            1: Page.RunModal(Page::"Unselected Page");
+            2: Choice := Page.RunModal(Page::"Unselected Page");
+            3: Page.Run(Page::"Unselected Page", Row);
+            4: Choice := Page.RunModal(Page::"Unselected Page", Row, Row.FieldNo(ID));
+            5: page.rUn(page::"Unselected Page");
+        end;
+        Counter := 99;
+    end;
 }

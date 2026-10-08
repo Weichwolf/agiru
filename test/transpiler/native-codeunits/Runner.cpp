@@ -80,11 +80,28 @@ void UnavailableRecordFieldsCompileAndRefuse() {
   }
 }
 
+void UnavailableNamedPagesCompileAndRefuse() {
+  constexpr agiru::Integer kOperationCount = 6;
+  agiru::System::Fixture::NativeFixture_Codeunit unit;
+  for (agiru::Integer operation = 0; operation < kOperationCount; ++operation) {
+    agiru::Integer counter = kValue;
+    std::string message;
+    try {
+      unit.UnavailablePage(operation, counter);
+    } catch (const agiru::Error &error) { message = error.what(); }
+    CHECK_TRUE("unselected Page Run and RunModal refuse with their original AL identity",
+               message ==
+                   "Page::Unselected Page names an object this run does not carry (board:0034)");
+    CHECK_TRUE("unselected named pages never execute subsequent AL effects", counter == 41);
+  }
+}
+
 }
 
 int main() {
   return gate::Run("Generated Native Codeunit Refusals", [] {
     NativeMethodsRefuseBeforeEffects();
     UnavailableRecordFieldsCompileAndRefuse();
+    UnavailableNamedPagesCompileAndRefuse();
   });
 }

@@ -114,6 +114,21 @@ void Commit();
               " names a table this run does not carry (board:0034)");
 }
 
+/// \brief Source identity of an object whose declaration is not selected.
+struct MissingObjectNumber {
+  std::string_view kind; ///< AL object qualifier, such as Page or Codeunit.
+  std::string_view name; ///< Original AL object name, not a guessed numeric ID.
+};
+
+/// \brief Refuses an unresolved named object number before runtime dispatch.
+/// \param object The original AL kind and name.
+/// \return Never.
+/// \throws Error always; absence is not object zero or successful execution.
+[[noreturn]] inline std::int32_t AbsentObjectId(MissingObjectNumber object) {
+  throw Error(std::string(object.kind) + "::" + std::string(object.name) +
+              " names an object this run does not carry (board:0034)");
+}
+
 /// \brief AL `Error(...)` -- raises, unless a `[ErrorBehavior(ErrorBehavior::Collect)]` scope is
 ///        standing, in which case the error is COLLECTED and the call returns.
 /// \param message The text AL wrote.

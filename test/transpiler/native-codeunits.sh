@@ -10,7 +10,7 @@ flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Ite
 links=(--rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 sha256sum src/gen/{BodyWriter,CodeunitWriter,RuntimeSurface,NativeSource,NativeMethods,Refused}.{cpp,h} src/tc/Main.cpp \
-  include/runtime/NativeBase64.h src/net/NativeBase64.cpp \
+  include/runtime/{NativeBase64,Error}.h src/net/NativeBase64.cpp \
   "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" > "$proof/inputs.sha256"
 find "$input" -type f -exec sha256sum {} + >> "$proof/inputs.sha256"
@@ -62,6 +62,24 @@ if link_generated "$proof/missing-field" "$proof/runner.o" "$proof/missing-field
 fi
 rg -q "no member named 'Enabled'" "$proof/missing-field-control.log"
 rm -r -- "$proof/missing-field"
+
+cp -a "$input" "$proof/missing-page-boundary"
+awk '
+  /: (Choice := )?(Page|page)\.(Run|RunModal|rUn)\(/ {
+    sub(/:.*/, ": Counter := 41;"); removed++
+  }
+  { print }
+  END { if (removed != 6) exit 2 }
+' "$input/source/NativeFixture.Codeunit.al" > "$proof/missing-page-boundary/source/NativeFixture.Codeunit.al"
+generate "$proof/missing-page-boundary" "$proof/missing-page-boundary/generated" 1
+link_generated "$proof/missing-page-boundary/generated" "$proof/runner.o" "$proof/missing-page-boundary/runner"
+if "$proof/missing-page-boundary/runner" > "$proof/missing-page-boundary-control.log" 2>&1; then
+  printf 'native-codeunits: missing named-page refusal escaped execution control\n' >&2
+  exit 1
+fi
+rg -q 'unselected Page Run and RunModal refuse with their original AL identity' "$proof/missing-page-boundary-control.log"
+rg -q 'unselected named pages never execute subsequent AL effects' "$proof/missing-page-boundary-control.log"
+rm -f "$proof/missing-page-boundary/runner"
 
 cp -a "$input" "$proof/non-native"
 sed -i '/\[Native\]/d; /\[nAtIvE\]/d' "$proof/non-native/source/NativeFixture.Codeunit.al"
