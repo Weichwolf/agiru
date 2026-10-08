@@ -4,11 +4,23 @@
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/PageWindow.h"
+#include "type/Action.h"
 
 #include <cstddef>
 #include <memory>
 
 namespace agiru {
+
+void PageInstance::PrepareBorrowed(void *object, PageId identity) {
+  static_cast<void>(object);
+  static_cast<void>(identity);
+  throw Error("The page factory has no borrowed AL adapter.", "UiModalUnsupported");
+}
+
+Action PageInstance::CloseModal(Action action) {
+  static_cast<void>(action);
+  throw Error("The page factory has no modal close adapter.", "UiModalUnsupported");
+}
 
 PageWindowState PageInstance::OpenWindow([[maybe_unused]] PageOpenMode mode,
                                          [[maybe_unused]] std::size_t limit,

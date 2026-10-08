@@ -1,5 +1,6 @@
 #pragma once
 
+#include "type/Action.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Variant.h"
@@ -13,6 +14,7 @@
 namespace agiru {
 
 class Session;
+class PageInstance;
 
 /// \brief A live progress variable, read only on its owning AL execution worker.
 /// The host may retain this binding until the dialog/object closes, not after its AL
@@ -33,7 +35,7 @@ struct UiValueBinding {
 /// Calls execute on the owning AL worker. Questions return explicit client answers,
 /// never defaults; an unavailable or cancelled transport must throw and unwind.
 /// Message delivery is deferred until execution completes or pauses for interaction.
-/// This interface does not implement HTTP admission, AL stack suspension or modal pages.
+/// Transport implementations own HTTP admission and modal suspension, not this interface.
 class UiHost {
 public:
   virtual ~UiHost() = default;
@@ -53,6 +55,14 @@ public:
   /// \throws Error for transport failure; no implicit/default selection is allowed.
   virtual Integer
   StrMenu(std::string_view options, Integer defaultChoice, std::string_view instruction) = 0;
+
+  /// \brief Runs the original borrowed AL page modally without replay or automatic closure.
+  /// \param page Closed, prepared adapter; owned by the waiting AL caller.
+  /// \return Explicit normalized close action; the page variable remains usable by AL.
+  /// \throws Error for an unavailable transport, cancellation or unqualified native capability.
+  /// \note The host authorizes before opening and every operation, runs AL only on its owner
+  /// worker, restricts input to the active modal and preserves the caller transaction/stack.
+  virtual Action RunModal(PageInstance &page);
 
   /// \brief Open a progress window, retaining live variable bindings until closure.
   /// \param owner Private live-dialog identity; never expose its address to a client.

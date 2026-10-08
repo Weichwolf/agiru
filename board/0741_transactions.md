@@ -2,7 +2,8 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: implement native modal execution for Customer New/template under 0720;
+Next: wire the qualified borrowed-page core into native modal HTTP execution for
+Customer New/template under 0720;
 qualify disabled native callbacks, shutdown rollback, progress execution and the
 remaining optimistic-write/isolation contracts. Original Customer retains seven
 passing list/card/edit/permission/receipt cases and one new, unsuppressed modal failure.
@@ -50,6 +51,13 @@ do not defer client construction until all transaction acceptance is complete.
   visibility, explicit Commit, cancellation/rollback and nested modal boundaries under 0720.
 
 ## Sources and regression ownership
+
+Borrowed modal lifecycle is qualified in 0720: 219 generated navigation, 105 dispatcher
+and 15 source checks pass; twenty execution defects and one compile defect reject.
+The caller's original AL page/filters survive; false/error close attempts can retry;
+disabled callbacks refuse before opening. Native modal HTTP suspension, authority,
+SQL receipts and nested transaction behaviour remain unimplemented. This increment
+does not turn the known original Customer template failure into acceptance.
 
 Blocking Confirm/StrMenu now enforce trusted
 `transactions.allow_session_call_suspend_when_write_transaction_started`, default true,

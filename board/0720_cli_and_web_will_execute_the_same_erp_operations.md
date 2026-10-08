@@ -15,6 +15,37 @@ sandbox reference execution and agiru replication. Their agiru prerequisites are
 specific working client contracts, not this WI's full acceptance; no dependency cycle.
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
+## Borrowed modal prerequisite
+
+- `Page.RunModal` now gives the trusted host a closed production adapter over the original
+  AL object, preserving its variables, record, filters and LookupMode. Numbered calls retain
+  writable record-argument writeback. Explicit AL test handlers keep precedence; missing
+  declared handlers cannot fall back to native interaction.
+- `PageInstance::CloseModal` uses an explicit action. Query-close false/errors leave the
+  page open and retryable; reopening resets lifecycle flags, not AL variables. Callback
+  policy refuses before opening during a prohibited write phase.
+- `make page-navigation JOBS=2` with the container gate DSN on port 5432: 219 navigation,
+  105 dispatcher and 15 source checks, zero red; twenty compiled execution defects and
+  one AL-control-shadow compile defect rejected. Four new controls cover object replacement,
+  lost veto retries, default close actions and callback-policy bypass.
+  `make ui-host JOBS=2` retains 154 UI/242 configuration checks and eleven compiled
+  defects, zero red. Three affected compiled C++ consumers pass targeted clang-tidy.
+  Three-round no-PCH header frontend means, before/after in milliseconds: UiHost
+  1016.9/1018.4, Page 1689.2/1723.8, PageSession 1956.9/1961.6; not throughput evidence.
+- Sources: `include/runtime/{Page,PageSession,PageInstance,UiHost}.h`,
+  `src/rt/{PageInstance,UiHost}.cpp`, `test/runtime/page-navigation/{Modal.Page.al,Runner.cpp}`
+  and its Bash harness. This is a generated-factory/trusted-host gate, not HTTP parity.
+  The real native host still refuses `UiModalUnsupported`; original Customer New remains
+  unaccepted. Active-modal HTTP authority, receipts, nested dialogs, child-close order and
+  BC's modal-only query-close rule remain to qualify. Rebuild generated consumers after
+  the PageInstance virtual-interface change before rerunning original Customer.
+- Developer `methods-auto/page/page-{runmodal-,getrecord,lookupmode}-method.md` and
+  `triggers-auto/page/devenv-onqueryclosepage-page-trigger.md` at
+  `f928288ee840334be73142e5fc0202c0e19b246d`.
+  Predecessor findings: `openerp/board/1705_lookupmode-bestimmt-schliessaktion.md` and
+  `1231_onqueryclosepage-wurde-nie-gefeuert-currpage-lookupmode-war.md`; no Python
+  threading or implicit modal commits adopted.
+
 ## Native command diagnostics
 
 - `src/rt/PageCommandHost.cpp` emits bounded error HTML with exact AL text/classification,

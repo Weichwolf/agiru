@@ -1,7 +1,9 @@
 #include "runtime/UiHost.h"
 
+#include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 #include "runtime/test/Handlers.h"
+#include "type/Action.h"
 
 #include "SessionState.h"
 
@@ -11,6 +13,11 @@
 #include <utility>
 
 namespace agiru {
+
+Action UiHost::RunModal(PageInstance &page) {
+  static_cast<void>(page);
+  throw Error("Native modal page transport is not available.", "UiModalUnsupported");
+}
 
 void InstallUiHost(Session &session, std::unique_ptr<UiHost> host) {
   auto &state = detail::SessionState::For(session);

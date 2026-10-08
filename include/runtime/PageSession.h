@@ -147,6 +147,31 @@ public:
   /// \throws Error when the page is already open, as AL does.
   void OpenView() { Open_(false, false); }
 
+  /// \brief Prepares a closed compiler-owned AL page without cloning its record or variables.
+  /// \param page The original AL variable; remains alive until this adapter is released.
+  /// \throws Error for double preparation or an already open adapter.
+  /// \note Only the production factory uses this; it is not an AL TestPage operation.
+  void Prepare_Borrowed(P &page) {
+    if (page_ != nullptr || prepared_ != nullptr) {
+      throw Error(Diagnostics::kAlreadyOpen, Diagnostics::kAlreadyOpenCode);
+    }
+    prepared_ = &page;
+  }
+
+  /// \brief Saves/closes with the explicit AL action while retaining refused close attempts.
+  /// \param action The actual client choice. \return Existing LookupMode-normalized action.
+  /// \throws Error for invalid choices or AL close/save failures; no implicit transaction change.
+  [[nodiscard]] Action Close_Modal(Action action) {
+    if (action < Action::OK || action > Action::RunSystem) {
+      throw Error("Unknown modal close action.", "UiModalAction");
+    }
+    auto &page = Page_();
+    static_cast<Page<P> &>(page).CloseWith(action);
+    const Action result = static_cast<Page<P> &>(page).ClosedWith();
+    Close_(action != Action::Cancel && action != Action::LookupCancel && action != Action::No);
+    return result;
+  }
+
   /// \brief `PageSession.Close()` -- runs `OnQueryClosePage` and `OnClosePage`, then lets go.
   void Close() { Close_(true); }
 
@@ -1000,8 +1025,8 @@ private:
   template <typename Initialize> void OpenWith_(bool isNew, Initialize initialize) {
     if (page_ != nullptr) { throw Error(Diagnostics::kAlreadyOpen, Diagnostics::kAlreadyOpenCode); }
     if constexpr (requires { PageTraits<P>::kPage; }) {
-      page_ = new P();
-      owned_ = true;
+      owned_ = prepared_ == nullptr;
+      page_ = owned_ ? new P() : std::exchange(prepared_, nullptr);
       Bind_();
       try {
         initialize(*page_);
@@ -1030,6 +1055,7 @@ private:
   }
 
   void Take_(PageSession &o) {
+    prepared_ = std::exchange(o.prepared_, nullptr);
     page_ = o.page_;
     owned_ = o.owned_;
     o.page_ = nullptr;
@@ -1037,6 +1063,7 @@ private:
   }
 
   void Share_(const PageSession &o) {
+    prepared_ = nullptr;
     page_ = o.page_;
     owned_ = false;
   }
@@ -1045,6 +1072,7 @@ private:
     if (page_ != nullptr && owned_) { delete page_; }
     page_ = nullptr;
     owned_ = false;
+    prepared_ = nullptr;
   }
 
   void Bind_() { BindPresentation(); }
@@ -1338,6 +1366,7 @@ protected:
 private:
   friend class PageWindowSession<P>;
   P *page_ = nullptr;
+  P *prepared_ = nullptr;
   bool owned_ = false;
   bool newRecord_ = false;
   bool edited_ = false;
@@ -1542,6 +1571,19 @@ template <typename P> PageInstance *MakePageSession() {
     [[nodiscard]] PageCore &Controls() override { return session_; }
 
     [[nodiscard]] const PageDef &Declaration() const override { return PageTraits<P>::kPage; }
+
+    void PrepareBorrowed(void *object, PageId identity) override {
+      if (object == nullptr || identity != PageTraits<P>::kId) {
+        throw Error("Invalid borrowed page identity.", "UiModalIdentity");
+      }
+      session_.Prepare_Borrowed(*static_cast<P *>(object));
+    }
+
+    [[nodiscard]] Action CloseModal(Action action) override {
+      const auto result = session_.Close_Modal(action);
+      session_.Forget_Window();
+      return result;
+    }
 
     void Open(PageOpenMode mode) override {
       switch (mode) {

@@ -215,6 +215,52 @@ for control in no-card wrong-row no-policy collect-production-errors; do
   esac
   rm -- "$proof/$control"
 done
+modal_source="$proof/generated/fixture/fixture/page/NavigationModal.def.cpp"
+[[ -f "$modal_source" ]]
+modal_objects=()
+for object in "${objects[@]}"; do
+  if [[ "$object" != "$proof/objects/NavigationModal.def.cpp.o" ]]; then
+    modal_objects+=("$object")
+  fi
+done
+for control in modal-copy modal-veto modal-action modal-callback-policy; do
+  cp include/runtime/Page.h "$proof/mutant/include/runtime/Page.h"
+  cp include/runtime/PageSession.h "$proof/mutant/include/runtime/PageSession.h"
+  case "$control" in
+    modal-copy|modal-action) header=PageSession.h ;;
+    modal-veto|modal-callback-policy) header=Page.h ;;
+  esac
+  awk -v control="$control" '
+    control == "modal-copy" && /owned_ = prepared_ == nullptr;/ {
+      sub(/owned_ = prepared_ == nullptr;/, "owned_ = true;"); changed++
+    }
+    control == "modal-veto" && /void RetryClose\(\) \{ closing_ = false; \}/ {
+      sub(/closing_ = false/, "closing_ = true"); changed++
+    }
+    control == "modal-action" && /static_cast<Page<P> &>\(page\).CloseWith\(action\);/ {
+      sub(/CloseWith\(action\)/, "CloseWith(Action::OK)"); changed++
+    }
+    control == "modal-callback-policy" && /if \(modal\) \{ RequireUiCallback\(\); \}/ {
+      sub(/RequireUiCallback\(\);/, "static_cast<void>(modal);"); changed++
+    }
+    { print }
+    END { if (changed != (control == "modal-callback-policy" ? 2 : 1)) exit 2 }
+  ' "include/runtime/$header" > "$proof/mutant/include/runtime/$header"
+  "$CXX" "-I$proof/mutant/include" "${flags[@]}" -c "$modal_source" \
+    -o "$proof/mutant-modal.o"
+  "$CXX" "-I$proof/mutant/include" "${flags[@]}" test/runtime/page-navigation/Runner.cpp \
+    "$proof/mutant-modal.o" "${modal_objects[@]}" "${links[@]}" -o "$proof/$control"
+  status=0
+  "$proof/$control" "$dsn" > "$proof/$control-execution.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  case "$control" in
+    modal-copy) rg -q 'modal opening preserves caller variables' "$proof/$control-execution.log" ;;
+    modal-veto) rg -q 'an error on a later query-close leaves the modal open' "$proof/$control-execution.log" ;;
+    modal-action) rg -q 'a card cancellation is not consent' "$proof/$control-execution.log" ;;
+    modal-callback-policy) rg -q 'disabled modal callbacks refuse before native opening' "$proof/$control-execution.log" ;;
+  esac
+  rm -- "$proof/$control" "$proof/mutant-modal.o"
+done
 awk '
   /Integer TestField::AsInteger\(\)/ { method = 1 }
   method && /if \(core_ == nullptr\) \{ Unbound\(\); \}/ { changed++; next }
@@ -237,4 +283,4 @@ fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; sixteen execution controls and one control-name compile refusal reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; twenty execution controls and one control-name compile refusal reject; %s\n' "$proof"

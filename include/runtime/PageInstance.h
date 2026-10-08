@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "runtime/PageWindow.h"
+#include "type/Action.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -109,6 +110,21 @@ public:
   /// \throws Error for absent windows/providers or AL failures. AL selection errors
   /// release the page without running close/save triggers.
   [[nodiscard]] virtual bool SelectWindowRecord(const RecordId &record);
+
+  /// \brief Binds a trusted, closed AL object without copying or taking ownership.
+  /// \param object Typed compiler-owned page; must outlive this adapter and its modal call.
+  /// \param identity Exact page declaration, checked before the erased pointer is cast.
+  /// \throws Error for wrong identities, null objects, double binding or unsupported factories.
+  /// \note No AL trigger runs; the host must authorize before Open/OpenWindow. Never pass
+  /// client addresses or borrow an object whose AL stack can unwind concurrently.
+  virtual void PrepareBorrowed(void *object, PageId identity);
+
+  /// \brief Closes a modal with the explicit action through AL close/save triggers.
+  /// \param action Actual choice; None/unknown choices refuse, never default to consent.
+  /// \return The AL action after the page's existing LookupMode normalization.
+  /// \throws Error on refusal; the adapter remains open for another explicit attempt.
+  /// \note Cancellation does not roll back earlier writes or commit the caller's transaction.
+  [[nodiscard]] virtual Action CloseModal(Action action);
 };
 
 /// \brief Creates a closed interactive handle from the same installed page catalogue.

@@ -6,7 +6,9 @@
 #include "runtime/Codeunit.h"
 #include "runtime/Error.h"
 #include "runtime/PageCore.h"
+#include "runtime/PageInstance.h"
 #include "runtime/RecordRef.h"
+#include "runtime/UiHost.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/PageTraps.h"
 #include "runtime/test/TestAction.h"
@@ -43,6 +45,8 @@ namespace agiru {
 /// wrote -- its controls, its actions, its variables and its procedures. The number, the name and
 /// the page type live here, the way a table's field table does.
 template <typename T> struct PageTraits;
+
+template <typename Derived> class Page;
 
 /// \brief A call through a control whose object this build does not carry: a `usercontrol`'s
 ///        add-in, or a `part` whose page is outside the translated scope.
@@ -518,21 +522,26 @@ template <typename P> void ClosePage(P &page) {
   if constexpr (requires { page.BeginClose(); }) {
     if (!page.BeginClose()) { return; }
   }
-  if constexpr (requires(::agiru::Action action) {
-                  { page.OnQueryClosePage(action) } -> std::convertible_to<bool>;
-                }) {
-    if (!page.OnQueryClosePage(page.ClosedWith())) {
-      throw Error("the page refused to close (OnQueryClosePage)");
+  try {
+    if constexpr (requires(::agiru::Action action) {
+                    { page.OnQueryClosePage(action) } -> std::convertible_to<bool>;
+                  }) {
+      if (!page.OnQueryClosePage(page.ClosedWith())) {
+        throw Error("the page refused to close (OnQueryClosePage)");
+      }
     }
+    if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
+      static constexpr std::array<std::string_view, 2> kNames{"Rec", "AllowClose"};
+      ::agiru::Boolean allowClose = true;
+      RaisePageEvent(page, "OnQueryClosePageEvent", {}, kNames, page.Rec, allowClose);
+      if (!allowClose) { throw Error("the page refused to close (OnQueryClosePageEvent)"); }
+    }
+    if constexpr (requires { page.OnClosePage(); }) { page.OnClosePage(); }
+    RaisePageRecordEvent(page, "OnClosePageEvent");
+  } catch (...) {
+    if constexpr (std::is_base_of_v<Page<P>, P>) { static_cast<Page<P> &>(page).RetryClose(); }
+    throw;
   }
-  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
-    static constexpr std::array<std::string_view, 2> kNames{"Rec", "AllowClose"};
-    ::agiru::Boolean allowClose = true;
-    RaisePageEvent(page, "OnQueryClosePageEvent", {}, kNames, page.Rec, allowClose);
-    if (!allowClose) { throw Error("the page refused to close (OnQueryClosePageEvent)"); }
-  }
-  if constexpr (requires { page.OnClosePage(); }) { page.OnClosePage(); }
-  RaisePageRecordEvent(page, "OnClosePageEvent");
 }
 
 /// \brief Hands the record a `Page.Run(Rec)` names to the page: its filters, and its position.
@@ -624,9 +633,18 @@ template <typename P>::agiru::Action RunHandled(P &page, bool modal) {
 
 template <typename P, typename... Arguments>
 ::agiru::Action RunPage(bool modal, Arguments &&...arguments) {
+  if (modal) { RequireUiCallback(); }
   auto page = std::make_unique<P>();
   (AdoptRecord(*page, arguments), ...);
   page->RunsByNumber();
+  if (modal && CurrentUiHost() != nullptr && !HandlerTable::Installed()) {
+    page->RunsModally();
+    auto adapter = MakeInstalledPage(PageTraits<P>::kId);
+    adapter->PrepareBorrowed(page.get(), PageTraits<P>::kId);
+    const auto action = CurrentUiHost()->RunModal(*adapter);
+    (GiveBackRecord(*page, arguments), ...);
+    return action;
+  }
   OpenPage(*page, true, false);
   const std::int32_t id = PageTraits<P>::kId.Value();
   if (!modal && ReleaseTrap(id, page.get(), true)) {
@@ -652,6 +670,13 @@ template <typename P, typename... Arguments>
 ///          crashed with SIGSEGV in chain 86, 2026-09-10). So a pending trap takes a COPY the
 ///          harness owns, and only a page that cannot be copied is handed over unowned.
 template <typename P>::agiru::Action RunInstance(P &page, bool modal) {
+  if (modal) { RequireUiCallback(); }
+  if (modal && CurrentUiHost() != nullptr && !HandlerTable::Installed()) {
+    page.RunsModally();
+    auto adapter = MakeInstalledPage(PageTraits<P>::kId);
+    adapter->PrepareBorrowed(&page, PageTraits<P>::kId);
+    return CurrentUiHost()->RunModal(*adapter);
+  }
   OpenPage(page, true, false);
   if (!modal && TrapPending(PageTraits<P>::kId.Value())) {
     if constexpr (std::is_copy_constructible_v<P>) {
@@ -804,7 +829,12 @@ template <typename Derived = void> class Page {
 public:
   /// \brief Marks the page opened, in the mode a runner chose.
   /// \param editable Whether `OpenEdit`/`OpenNew` (true) or `OpenView` (false).
-  void OpenedAs(bool editable) { editable_ = editable; }
+  void OpenedAs(bool editable) {
+    editable_ = editable;
+    closed_ = false;
+    closing_ = false;
+    closeAction_ = ::agiru::Action::OK;
+  }
 
   /// \brief Whether the page was opened for editing.
   /// \return True after `OpenEdit` or `OpenNew`.
@@ -1022,6 +1052,10 @@ public:
     closing_ = true;
     return first;
   }
+
+  /// \brief A refused/failed close leaves the page open for another explicit attempt.
+  /// \note Called by the close kernel, never a user confirmation or transaction operation.
+  void RetryClose() { closing_ = false; }
 
   /// \brief AL `Page.Editable(Boolean)`. Gets or sets the default editability of the page.
   /// \param NewEditable The AL `Boolean`.

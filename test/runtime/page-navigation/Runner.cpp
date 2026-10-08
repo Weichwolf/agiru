@@ -18,9 +18,12 @@
 #include "runtime/Storage.h"
 #include "runtime/TablePermissions.h"
 #include "runtime/Transaction.h"
+#include "runtime/UiHost.h"
+#include "runtime/test/Handlers.h"
 #include "runtime/test/TestPage.h"
 #include "runtime/test/TestRequestPage.h"
 #include "type/Action.h"
+#include "type/Boolean.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/RecordId.h"
@@ -33,6 +36,7 @@
 #include "fixture/page/NavigationCard.h"
 #include "fixture/page/NavigationDelayed.h"
 #include "fixture/page/NavigationList.h"
+#include "fixture/page/NavigationModal.h"
 #include "fixture/page/NavigationOverride.h"
 #include "fixture/page/NavigationWindow.h"
 #include "fixture/page/NavigationWindowError.h"
@@ -42,7 +46,9 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -54,12 +60,14 @@ namespace {
 using Row = agiru::Fixture::NavigationRow_Table;
 using Card = agiru::Fixture::NavigationCard_Page;
 using List = agiru::Fixture::NavigationList_Page;
+using Modal = agiru::Fixture::NavigationModal_Page;
 constexpr agiru::Integer kFirstValue = 11;
 constexpr agiru::Integer kSecondValue = 22;
 constexpr agiru::Integer kOverrideIncrement = 100;
 constexpr agiru::Integer kCopiedValue = 55;
 constexpr agiru::Integer kRequestLimit = 7;
 constexpr std::size_t kListRows = 40;
+constexpr agiru::Integer kCallerModalMarker = 41;
 
 class HtmlAuthorization final : public agiru::PageAuthorization {
 public:
@@ -108,6 +116,232 @@ void Prepare() {
   row.ID = 2;
   row.Value = kSecondValue;
   row.Insert();
+}
+
+class ModalHost final : public agiru::UiHost {
+public:
+  void QueueMessage([[maybe_unused]] std::string_view text) override {
+    throw agiru::Error("Unexpected message");
+  }
+
+  agiru::Boolean Confirm([[maybe_unused]] std::string_view text,
+                         [[maybe_unused]] agiru::Boolean defaultButton) override {
+    throw agiru::Error("Unexpected confirmation");
+  }
+
+  agiru::Integer StrMenu([[maybe_unused]] std::string_view options,
+                         [[maybe_unused]] agiru::Integer defaultChoice,
+                         [[maybe_unused]] std::string_view instruction) override {
+    throw agiru::Error("Unexpected menu");
+  }
+
+  agiru::Action RunModal(agiru::PageInstance &page) override {
+    ++calls;
+    return run ? run(page) : UiHost::RunModal(page);
+  }
+
+  void OpenProgress([[maybe_unused]] const void *owner,
+                    [[maybe_unused]] std::string_view text,
+                    [[maybe_unused]] std::span<const agiru::UiValueBinding> values) override {
+    throw agiru::Error("Unexpected progress");
+  }
+
+  void UpdateProgress([[maybe_unused]] const void *owner,
+                      [[maybe_unused]] agiru::Integer number,
+                      [[maybe_unused]] const agiru::Variant &value) override {
+    throw agiru::Error("Unexpected progress");
+  }
+
+  void CloseProgress([[maybe_unused]] const void *owner) override {
+    throw agiru::Error("Unexpected progress");
+  }
+
+  std::function<agiru::Action(agiru::PageInstance &)> run;
+  int calls = 0;
+};
+
+template <typename Call> bool ModalRefused(std::string_view code, Call call) {
+  try {
+    call();
+  } catch (const agiru::Error &error) { return error.Code() == code; }
+  return false;
+}
+
+void BorrowedModalCloseRetries(ModalHost &host) {
+  Modal page;
+  page.SetMarker(kCallerModalMarker);
+  page.RequireCloseRetries();
+  page.LookupMode(true);
+  Row source;
+  source.SetRange(source.ID, 2);
+  page.SetTableView(source);
+  host.run = [](agiru::PageInstance &adapter) {
+    CHECK_TRUE("the modal host receives a closed prepared adapter", !adapter.IsOpen());
+    adapter.Open(agiru::PageOpenMode::Edit);
+    CHECK_TEXT("modal opening preserves caller variables",
+               adapter.Controls().ControlText("OwnerMarker"),
+               "42");
+    CHECK_TEXT("modal opening preserves caller filters", adapter.Controls().ControlText("ID"), "2");
+    CHECK_TRUE(
+        "false query-close leaves the modal open",
+        ModalRefused({}, [&] { static_cast<void>(adapter.CloseModal(agiru::Action::OK)); }) &&
+            adapter.IsOpen());
+    CHECK_TEXT("the first explicit close attempt ran AL",
+               adapter.Controls().ControlText("CloseAttempts"),
+               "1");
+    CHECK_TRUE(
+        "an error on a later query-close leaves the modal open",
+        ModalRefused({}, [&] { static_cast<void>(adapter.CloseModal(agiru::Action::OK)); }) &&
+            adapter.IsOpen());
+    CHECK_TEXT("query-close runs again after a veto",
+               adapter.Controls().ControlText("CloseAttempts"),
+               "2");
+    CHECK_TEXT("close triggers have not run after refusals",
+               adapter.Controls().ControlText("ClosedCount"),
+               "0");
+    CHECK_TRUE("invalid modal actions cannot implicitly close",
+               ModalRefused("UiModalAction",
+                            [&] { static_cast<void>(adapter.CloseModal(agiru::Action::None)); }) &&
+                   adapter.IsOpen());
+    const auto answer = adapter.CloseModal(agiru::Action::OK);
+    CHECK_TRUE("explicit LookupMode normalizes the actual choice",
+               answer == agiru::Action::LookupOK);
+    CHECK_TRUE("the successful third attempt releases only the adapter", !adapter.IsOpen());
+    return answer;
+  };
+  CHECK_TRUE("AL receives the original modal's explicit result",
+             page.RunModal() == agiru::Action::LookupOK);
+  Row selected;
+  page.GetRecord(selected);
+  CHECK_TRUE("GetRecord remains usable on the original AL variable", selected.ID == 2);
+  CHECK_TRUE("opening did not lose the caller's filtered view",
+             page.Rec.GetFilter(page.Rec.ID).Value() == "2");
+  auto inspect = agiru::MakeInstalledPage(agiru::PageTraits<Modal>::kId);
+  inspect->PrepareBorrowed(&page, agiru::PageTraits<Modal>::kId);
+  inspect->Open(agiru::PageOpenMode::View);
+  CHECK_TEXT("reopening retains the original object's variable",
+             inspect->Controls().ControlText("OwnerMarker"),
+             "43");
+  CHECK_TEXT("both refusals were retried on the original object",
+             inspect->Controls().ControlText("CloseAttempts"),
+             "3");
+  CHECK_TEXT("OnClosePage ran exactly once", inspect->Controls().ControlText("ClosedCount"), "1");
+  static_cast<void>(inspect->CloseModal(agiru::Action::Cancel));
+  CHECK_TRUE("each reopening runs its own successful close exactly once",
+             page.GetCloseCount() == 2);
+}
+
+void BorrowedModalChoices(ModalHost &host) {
+  host.run = [](agiru::PageInstance &adapter) {
+    adapter.Open(agiru::PageOpenMode::View);
+    CHECK_TRUE("explicit modal selection moves through the SQL cursor",
+               adapter.Move(agiru::PagePosition::Last));
+    return adapter.CloseModal(agiru::Action::Cancel);
+  };
+  Modal page;
+  CHECK_TRUE("a card cancellation is not consent", page.RunModal() == agiru::Action::Cancel);
+  page.LookupMode(true);
+  CHECK_TRUE("lookup cancellation is not lookup acceptance",
+             page.RunModal() == agiru::Action::LookupCancel);
+  Row source;
+  source.Get(1);
+  CHECK_TRUE("numbered modal cancellation uses the existing AL action normalization",
+             agiru::Page<>::RunModal(agiru::PageTraits<Modal>::kId.Value(), source) ==
+                 agiru::Action::LookupCancel);
+  CHECK_TRUE("numbered modal writes its selected record back to the AL argument", source.ID == 2);
+  auto adapter = agiru::MakeInstalledPage(agiru::PageTraits<Modal>::kId);
+  CHECK_TRUE("borrowed factory checks declaration identity before casting",
+             ModalRefused("UiModalIdentity",
+                          [&] { adapter->PrepareBorrowed(&page, agiru::PageTraits<Card>::kId); }));
+  CHECK_TRUE("borrowed factory refuses a null original object",
+             ModalRefused("UiModalIdentity", [&] {
+               adapter->PrepareBorrowed(nullptr, agiru::PageTraits<Modal>::kId);
+             }));
+  adapter->PrepareBorrowed(&page, agiru::PageTraits<Modal>::kId);
+  CHECK_TRUE("a prepared adapter cannot silently replace its AL object",
+             ModalRefused("PageAlreadyOpen",
+                          [&] { adapter->PrepareBorrowed(&page, agiru::PageTraits<Modal>::kId); }));
+  host.run = {};
+  CHECK_TRUE("an installed host without modal transport refuses instead of selecting",
+             ModalRefused("UiModalUnsupported", [&] { static_cast<void>(page.RunModal()); }));
+  const int before = host.calls;
+  agiru::HandlerTable::Install({}, {});
+  try {
+    CHECK_TRUE("undeclared AL modal handlers never fall back to a native host",
+               ModalRefused({}, [&] { static_cast<void>(page.RunModal()); }) &&
+                   host.calls == before);
+  } catch (...) {
+    agiru::HandlerTable::Reset();
+    throw;
+  }
+  CHECK_TRUE("undeclared modal handlers do not invent used declarations",
+             agiru::HandlerTable::Uninstall().empty());
+}
+
+void ModalTestHandlerPrecedence(ModalHost &host);
+
+void BorrowedModalLifecycle(const std::string &dsn) {
+  agiru::Session session(dsn);
+  auto host = std::make_unique<ModalHost>();
+  auto &installed = *host;
+  agiru::InstallUiHost(session, std::move(host));
+  const agiru::detail::Scope isolation;
+  Prepare();
+  BorrowedModalCloseRetries(installed);
+  BorrowedModalChoices(installed);
+  ModalTestHandlerPrecedence(installed);
+}
+
+void ModalTestHandlerPrecedence(ModalHost &host) {
+  constexpr std::array handlers{agiru::TestHandler{.name = "Modal",
+                                                   .kind = agiru::HandlerKind::ModalPage,
+                                                   .object = agiru::PageTraits<Modal>::kId.Value(),
+                                                   .invoke =
+                                                       +[](std::string_view, void *object) {
+                                                         static_cast<agiru::Page<Modal> &>(
+                                                             *static_cast<Modal *>(object))
+                                                             .CloseWith(agiru::Action::Cancel);
+                                                       },
+                                                   .optional = false}};
+  constexpr std::array<std::string_view, 1> declared{"Modal"};
+  const int before = host.calls;
+  Modal page;
+  agiru::HandlerTable::Install(handlers, declared);
+  try {
+    CHECK_TRUE("explicit AL modal handlers retain precedence over the native host",
+               page.RunModal() == agiru::Action::Cancel && host.calls == before);
+  } catch (...) {
+    agiru::HandlerTable::Reset();
+    throw;
+  }
+  CHECK_TRUE("the explicit modal handler is counted as used",
+             agiru::HandlerTable::Uninstall().empty());
+}
+
+void ModalCallbacksRefuseBeforeOpening(const std::string &dsn) {
+  agiru::Session session(dsn, {.allowSessionCallSuspendWhenWriteTransactionStarted = false});
+  auto host = std::make_unique<ModalHost>();
+  const auto &installed = *host;
+  agiru::InstallUiHost(session, std::move(host));
+  const agiru::detail::Scope boundary;
+  agiru::detail::RequireWrite();
+  const auto depth = session.Transaction().Depth();
+  const auto epoch = session.Transaction().CursorEpoch();
+  Modal page;
+  page.SetMarker(kCallerModalMarker);
+  CHECK_TRUE("disabled modal callbacks refuse before native opening",
+             ModalRefused("UiWriteTransaction", [&] { static_cast<void>(page.RunModal()); }) &&
+                 installed.calls == 0 && page.GetMarker() == kCallerModalMarker);
+  CHECK_TRUE("disabled numbered callbacks refuse before constructing a native modal",
+             ModalRefused("UiWriteTransaction",
+                          [&] {
+                            static_cast<void>(
+                                agiru::Page<>::RunModal(agiru::PageTraits<Modal>::kId.Value()));
+                          }) &&
+                 installed.calls == 0);
+  CHECK_TRUE("modal refusal preserves the caller's write phase and boundary",
+             session.Transaction().IsWriting() && session.Transaction().Depth() == depth &&
+                 session.Transaction().CursorEpoch() == epoch);
 }
 
 void PageRunArgumentsBorrowTheLastUsableRecord() {
@@ -679,6 +913,8 @@ void PagesSurviveSeparateClientCommands() {
 int main(int argc, char **argv) {
   return gate::Run("Generated Page Navigation", [argc, argv] {
     if (argc != 2) { throw std::runtime_error("expected the dedicated gate database DSN"); }
+    BorrowedModalLifecycle(argv[1]);
+    ModalCallbacksRefuseBeforeOpening(argv[1]);
     const agiru::Session session(argv[1]);
     const agiru::detail::Scope isolation;
     Prepare();
