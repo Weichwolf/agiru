@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: qualify missing-field refusals in original group 421, link the native app and
-repeat the original Customer workflow; never patch apps or guess declarations.
+Next: link the native app and repeat the original Customer workflow; never patch
+apps or guess declarations.
 ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
 The previous keep-going build exposed mixed-case unavailable record references, indexed
 fields and unselected TestPage parts/extension fields. The original TestPage groups
@@ -287,7 +287,12 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   mutation reject. GenTableGate has 105 checks and GenPageGate 58, zero red.
   Changed-code lint covers 25 of 344 units with zero failures; format passes and the
   suppression baseline stays 12. This is not full-surface lint acceptance.
-  Production group 421 and full linking remain pending. Implicit field-method arguments,
+  Original group 421 containing `UserDetailsTestLibrary.cpp` now compiles with production
+  headers/PCH and warning policy:
+  `make dev-exec COMMAND='cmake --build /workspace/build/podman -j 2 --target
+  CMakeFiles/agiru_slice.dir/Unity/unity_stable/421/root_cxx.cxx.o'`.
+  Its Get/HasSuperPermissionSet bodies and pre-access Get/error checks remain intact.
+  Full linking remains pending. Implicit field-method arguments,
   chained results and nonconst var binding to missing fields remain unqualified.
   References at the pinned revisions above: developer `devenv-table-ext-object.md`;
   BCApps `main` the extension above and
@@ -300,7 +305,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.
-  It writes 18,378 objects, with 1,035 changed and zero swept after the identity repair.
+  It writes 18,378 objects, with 37 changed and zero swept after the missing-field repair.
   Canonical unavailable declarations contain 283 AL types/2,492 members; separate
   .NET declarations contain 383 types/1,279 members. These are refusal declarations,
   not implemented objects or accepted tests. Parser test populations
