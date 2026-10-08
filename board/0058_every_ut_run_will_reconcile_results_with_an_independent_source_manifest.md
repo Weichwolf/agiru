@@ -67,10 +67,11 @@ business workflows are active in 0720; full G1 acceptance does not block their i
   transpile wrapper retains original AL identities across successful sweeps. Required
   missing, unverified or stale inputs refuse; handwritten gates/transpiler remain buildable.
   Source selection is not a successful generation or full-app compilation claim.
-  `make slice-check`: 14,225 raw / 13,537 selected / 99 approved product exclusions /
-  589 selection omissions, zero missing/errors; every raw slice identity remains unchanged.
-  All configured apps plus platform: 14,655 raw / 13,938 selected / 107 product exclusions /
-  610 omissions, zero errors. Native declarations follow bounded product rules, not the
+  After required Privacy activation, `make slice-check`: 14,225 raw / 13,594 selected /
+  99 approved product exclusions / 532 selection omissions, zero missing/errors; every
+  raw slice identity remains unchanged. All configured apps plus platform: 14,655 raw /
+  13,996 selected / 107 product exclusions / 552 omissions, zero errors.
+  Native declarations follow bounded product rules, not the
   configured BCApps namespace reachability filter, matching `gen/NativeSource.cpp`.
   Original UTF-8 BOMs previously bypassed namespace selection in eleven slice CPPs;
   `tc/Main.cpp` now handles the BOM. Examples: BCApps `d99152ee35f0` paths
@@ -79,6 +80,19 @@ business workflows are active in 0720; full G1 acceptance does not block their i
   required inputs, exact exclusions, removed origins, separate omissions and native domain
   selection. Reproduce with `make verify-check VERIFY_CHECKS=BuildSourcesGate`;
   `ProductSourceGate` and `NativeSourceCompilerGate` cover actual generated manifests.
+  Native integration exposed selected `CustomerConsentTests` requesting `Accept` from
+  untyped `TestPage<>`: required page 1820 was omitted with `System.Privacy`.
+  `scope.json` now activates genuine privacy/consent declarations; explicit product
+  exclusions are unchanged. Generated handlers bind typed page 1820, its declared Accept
+  and Cancel actions, not an invented UnknownPage action or a dropped test. Reference:
+  BCApps `Layers/W1/BaseApp/{CustConsentConfirmation.Page,CustomerConsentMgt.Codeunit}.al`
+  and `Layers/W1/Tests/Misc/CustomerConsentTests.Codeunit.al` at `d99152ee35f0`;
+  developer `methods-auto/testaction/testaction-invoke-method.md` at `f928288ee840`;
+  predecessor `openerp/board/1232_deklarierte-aktion-ok-cancel-wurde-vom-eingebauten-schluss.md`
+  requires declared actions to outrank built-in closing. Inventory/ProductSource/BuildSources
+  gates pass 19/7/10 cases. Regeneration retains 77/2,298 parsed UT identities and classifies
+  307,067 properties with zero silent drops. Original-page execution and full native
+  compilation remain due; generation still exits one for the known refusals below.
   Current regeneration still refuses 122 properties, 67 native methods and 21 anchors;
   77 UT codeunits / 2,298 methods remain parser inventory, not execution.
   Full tooling run: `make verify-check VERIFY_CHECKS=` passes 279 tests with the explicit
