@@ -46,10 +46,9 @@ template <typename T> const T &At(const void *record, const FieldDef &field) {
 
 }
 
-PageValue ReadPageValue(const void *record, const TableDef &table, const FieldDef &field) {
-  if (record == nullptr || Field(table, field.no) != &field) {
-    throw Error("Page value requires its owning field declaration", "PageValueDeclaration");
-  }
+namespace {
+
+PageValue ReadScalar(const void *record, const FieldDef &field, std::string_view domain) {
   if (field.fieldClass == FieldClass::FlowFilter) {
     throw Error("A FlowFilter requires its filter-state transport", "PageValueUnsupported");
   }
@@ -62,8 +61,7 @@ PageValue ReadPageValue(const void *record, const TableDef &table, const FieldDe
     case FieldType::Enum: {
       const auto ordinal = At<OrdinalValue>(record, field).AsInteger();
       result.value = std::to_string(ordinal);
-      result.domain = "table/" + std::to_string(table.id.Value()) + "/field/" +
-                      std::to_string(field.no.Value());
+      result.domain = domain;
       if (const EnumValueDef *member = ValueOf(field.values, ordinal)) {
         result.member = member->name;
       }
@@ -90,6 +88,26 @@ PageValue ReadPageValue(const void *record, const TableDef &table, const FieldDe
     default: result.value = FieldText(record, field); break;
   }
   return result;
+}
+
+}
+
+PageValue ReadPageValue(const void *record, const TableDef &table, const FieldDef &field) {
+  if (record == nullptr || Field(table, field.no) != &field) {
+    throw Error("Page value requires its owning field declaration", "PageValueDeclaration");
+  }
+  return ReadScalar(record,
+                    field,
+                    "table/" + std::to_string(table.id.Value()) + "/field/" +
+                        std::to_string(field.no.Value()));
+}
+
+PageValue ReadPageScalar(const void *value, const FieldDef &declaration, std::string_view domain) {
+  if (value == nullptr || declaration.offset != 0 || domain.empty()) {
+    throw Error("Page scalar requires typed storage and its declaration identity",
+                "PageValueDeclaration");
+  }
+  return ReadScalar(value, declaration, domain);
 }
 
 }

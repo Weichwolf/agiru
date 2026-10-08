@@ -15,6 +15,28 @@ sandbox reference execution and agiru replication. Their agiru prerequisites are
 specific working client contracts, not this WI's full acceptance; no dependency cycle.
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
+## Typed variable bindings
+
+- Generated control getters read the original declared scalar storage through
+  `ReadPageVariable`, sharing the record-field transport. Decimal scale, Int64 digits,
+  Unicode, temporal flags and declared Option/Enum members remain exact. Domains identify
+  the object kind, ID and control; display text is not a type oracle. Unsupported storage
+  refuses explicitly. Computed-expression transport remains unqualified.
+- Sources: `include/runtime/{PageVariableValue,PageValue,Page,PageSession}.h`,
+  `src/rt/PageValue.cpp`, `src/gen/{PageWriter,RuntimeSurface}.cpp` and
+  `test/gate/PageValueGate.cpp`. PageValue has 43 checks, zero red; affected scalar/generator
+  units pass targeted clang-tidy. Generated navigation has 220 checks, zero red;
+  the Card's six direct variable bindings now have exact values rather than scalar gaps.
+  This is not original Customer, full generated-tree or source-counted UT acceptance.
+- Reference: developer `properties/properties/devenv-sourceexpr-property.md` at
+  `f928288ee840334be73142e5fc0202c0e19b246d`; BCApps `CustomerCard.Page.al`
+  (LastPaymentAmount) and `SalesOrderStatistics.Page.al` (indexed totals) at
+  `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. Predecessor WIs 1799 and 1894 retain
+  Decimal/array lessons; no predecessor implementation copied.
+- Three no-PCH rounds measured Page 1948.9 ms, PageSession 2070.8 ms and the new
+  PageVariableValue helper 839.3 ms during concurrent fixture compilation. No before/after
+  build-speed or ERP performance claim. Rebuild generated consumers before use.
+
 ## Borrowed modal prerequisite
 
 - `Page.RunModal` now gives the trusted host a closed production adapter over the original

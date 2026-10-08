@@ -181,6 +181,9 @@ void BorrowedModalCloseRetries(ModalHost &host) {
     CHECK_TEXT("modal opening preserves caller variables",
                adapter.Controls().ControlText("OwnerMarker"),
                "42");
+    const auto marker = adapter.Controls().Control_Value("OwnerMarker");
+    CHECK_TRUE("original page variables have declared exact scalar bindings",
+               marker.type == "Integer" && marker.value == "42");
     CHECK_TEXT("modal opening preserves caller filters", adapter.Controls().ControlText("ID"), "2");
     CHECK_TRUE(
         "false query-close leaves the modal open",
@@ -420,8 +423,10 @@ void InstalledPageLifecycle() {
       {.pageHandle = "card_1", .revision = "1", .commandPrefix = "render_1", .csrf = "fixture"});
   CHECK_TRUE("generated factory supplies exact record values to semantic HTML",
              html.html.contains("data-type=\"Integer\" data-value=\"22\""));
-  CHECK_TRUE("semantic HTML keeps unqualified computed values visible as gaps",
-             html.unsupported == 6 && authority.calls == 17);
+  CHECK_TRUE("semantic HTML qualifies bound variables without bypassing authority",
+             html.unsupported == 0 && authority.calls == 17 &&
+                 card->Controls().Control_Value("LoadedValue").value == "22" &&
+                 card->Controls().Control_Value("OpeningMode").value == "true");
   CHECK_TRUE("rendering a generated page preserves its selected record",
              card->CurrentRecord() == selected);
   bool refused = false;

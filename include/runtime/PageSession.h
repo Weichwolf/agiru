@@ -619,6 +619,10 @@ public:
     AttachedForReading_();
     static_cast<void>(Page_());
     const ControlDef *def = ControlNamed_(control);
+    if (const ControlTrigger<P> *row = TriggerRow_(control);
+        row != nullptr && row->value != nullptr) {
+      return row->value(*page_);
+    }
     if constexpr (kHasRecord) {
       if (def != nullptr && def->field.Value() != 0) {
         const auto &table = RecordTraits_().kTable;

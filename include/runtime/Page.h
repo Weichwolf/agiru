@@ -7,6 +7,7 @@
 #include "runtime/Error.h"
 #include "runtime/PageCore.h"
 #include "runtime/PageInstance.h"
+#include "runtime/PageValue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/UiHost.h"
 #include "runtime/test/Handlers.h"
@@ -133,6 +134,8 @@ template <typename P> struct ControlTrigger {
   ///       calculate their FlowFields
   ///       (`devenv-calcfields-calcsums-fielderror-fieldname-init-testfield-and-validate-methods.md`).
   ::agiru::Text<0> (P::*sourceText)() = nullptr;
+  /// \brief Reads a variable-bound scalar directly from its declared typed storage.
+  PageValue (*value)(const P &page) = nullptr;
 };
 
 /// \brief What every AL page can do, without the generated class saying any of it.

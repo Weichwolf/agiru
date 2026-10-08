@@ -317,6 +317,15 @@ std::string TriggerTable(const al::PageObject &page,
       out += ")); }";
     }
     if (!row.sourceText.empty()) { out += ", .sourceText = " + member(row.sourceText); }
+    if (!row.variable.empty()) {
+      out += ", .value = [](const " + pageClass +
+             " &page) { return ::agiru::ReadPageVariable(page." + row.variable + ", " +
+             Literal(std::string(page.xmlport  ? "xmlport"
+                                 : page.report ? "report"
+                                               : "page") +
+                     "/" + std::to_string(page.id) + "/control/" + row.control) +
+             "); }";
+    }
     out += "}";
   }
   out += rows.empty() ? "}};\n" : "\n  }};\n";

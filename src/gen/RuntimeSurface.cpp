@@ -250,7 +250,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 164> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 165> kElsewhere{{
     {"LogicalAnd", "type/BooleanExpression.h"},
     {"LogicalOr", "type/BooleanExpression.h"},
     {"LogicalXor", "type/BooleanExpression.h"},
@@ -293,6 +293,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 164> kElsewh
     {"dotnet::StreamReader", "dotnet/StreamReader.h"},
     {"Query", "runtime/Query.h"},
     {"QueryTraits", "runtime/Query.h"},
+    {"ReadPageVariable", "runtime/PageVariableValue.h"},
     {"QueryHandle", "runtime/Query.h"},
     {"QueryDef", "meta/QueryDef.h"},
     {"GenericList1", "dotnet/Generic.h"},

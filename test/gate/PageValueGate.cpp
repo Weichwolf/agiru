@@ -3,6 +3,8 @@
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/PageValue.h"
+#include "runtime/PageVariableValue.h"
+#include "type/Action.h"
 #include "type/Base64.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -208,6 +210,45 @@ void RemainingScalars() {
   }
 }
 
+void VariableValues() {
+  const Row row;
+  constexpr std::string_view kDomain = "page/50352/control/Scalar";
+  CHECK_TRUE("page Decimal preserves its declared type and scale",
+             agiru::ReadPageVariable(row.amount, kDomain).type == "Decimal" &&
+                 agiru::ReadPageVariable(row.amount, kDomain).value == "1.2300");
+  CHECK_TEXT("page Int64 keeps all digits",
+             agiru::ReadPageVariable(row.large, kDomain).value,
+             "9223372036854775807");
+  CHECK_TEXT("page Unicode text is not reparsed",
+             agiru::ReadPageVariable(row.text, kDomain).value,
+             row.text.Value());
+  CHECK_TEXT("page Code retains its AL normalization",
+             agiru::ReadPageVariable(row.code, kDomain).value,
+             "ABC");
+  CHECK_TRUE("page closing Date retains both flags",
+             agiru::ReadPageVariable(row.date, kDomain).closing &&
+                 !agiru::ReadPageVariable(row.date, kDomain).undefined);
+  CHECK_TRUE("page sparse Enum uses its declared storage identity",
+             agiru::ReadPageVariable(row.choice, kDomain).type == "Enum" &&
+                 agiru::ReadPageVariable(row.choice, kDomain).value == "10" &&
+                 agiru::ReadPageVariable(row.choice, kDomain).domain == kDomain);
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::ReadPageVariable(agiru::Action::OK, kDomain));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageValueUnsupported"; }
+  CHECK_TRUE("undeclared platform enum transport refuses rather than guessing", refused);
+  refused = false;
+  try {
+    static_cast<void>(agiru::ReadPageVariable('x', kDomain));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageValueUnsupported"; }
+  CHECK_TRUE("character storage cannot be read as a wider Integer", refused);
+  refused = false;
+  try {
+    static_cast<void>(agiru::ReadPageVariable(row.integer, {}));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageValueDeclaration"; }
+  CHECK_TRUE("standalone scalar requires its declaration identity", refused);
+}
+
 }
 
 int main() {
@@ -215,5 +256,6 @@ int main() {
     ExactValues();
     Refusals();
     RemainingScalars();
+    VariableValues();
   });
 }
