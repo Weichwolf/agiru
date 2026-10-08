@@ -308,9 +308,11 @@ std::string TriggerTable(const al::PageObject &page,
     if (!row.variable.empty()) {
       out += ", .set = [](";
       out += pageClass;
-      out += " &page, std::string_view text) { static_cast<void>(::agiru::Evaluate(page.";
+      out += " &page, std::string_view text) { if (!::agiru::Evaluate(page.";
       out += row.variable;
-      out += ", text)); }, .text = [](const ";
+      out += ", text)) { throw ::agiru::Error(";
+      out += Literal("Invalid value for page control '" + row.control + "'.");
+      out += ", \"TestValidation\"); } }, .text = [](const ";
       out += pageClass;
       out += " &page) { return std::string(::agiru::AsText(page.";
       out += row.variable;

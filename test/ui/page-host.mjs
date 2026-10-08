@@ -132,10 +132,10 @@ async function modalAdapter(name, fresh) {
     await mcp.connect(new StdioClientTransport({ command: process.execPath, args: ["build/client/mcp.mjs"], env }));
   }
   return {
-    async failure(current, identity) {
-      if (web) return browserFailure(web.page, origin, current.page, identity);
+    async failure(current, identity, text) {
+      if (web) return browserFailure(web.page, origin, current.page, identity, text);
       const { enabled: _enabled, ...command } = operation(current, identity);
-      const input = { path: path(current), ...command };
+      const input = { path: path(current), ...command, ...(text === undefined ? {} : { text }) };
       if (mcp) {
         const result = await mcp.callTool({ name: "agiru_execute", arguments: input });
         assert.equal(result.isError, true);
@@ -143,11 +143,11 @@ async function modalAdapter(name, fresh) {
       }
       try {
         await execute(process.execPath, ["build/client/cmd.mjs", "--json", "execute", JSON.stringify(input)], { env });
-        assert.fail("CMD must report the delayed modal error");
       } catch (error) {
         assert.equal(error.code, 2);
         return JSON.parse(error.stderr);
       }
+      assert.fail("CMD must report the native modal error");
     },
     async action(current, identity, text) {
       if (web) return text === undefined ? browserAction(web.page, origin, current.page, identity)
@@ -969,6 +969,69 @@ test("CMD MCP and Chromium edit exact original modal variables without independe
       assert.equal(field(final, "Value"), "123");
       assert.deepEqual(final.page.messages, modal.page.messages);
       assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "123");
+    } finally { await driver.close(); }
+  }
+});
+
+test("CMD MCP and Chromium refuse invalid typed modal input and retain the caller for explicit correction", { timeout: 60000 }, async () => {
+  const diagnostics = new Map();
+  const values = result => result.page.controls.filter(control => control.scalar)
+    .map(control => ({ identity: control.identity, scalar: control.scalar }));
+  const families = [
+    [["OwnerMarker", "invalid-integer", "122"], ["OwnerMarker", "2147483648", "123"]],
+    [["ExactAmount", "invalid-decimal", "1.23456789012345678901"]],
+    [["ExactInteger", "9223372036854775808", "9223372036854775806"],
+      ["ExactInteger", "-9223372036854775809", "-9223372036854775807"]],
+    [["ArrayValue", "1.5", "17"]],
+    [["Choice", "absent-member", "0"], ["Choice", "2147483648", "1"], ["Choice", "1-2", "0"]],
+  ];
+  for (const adapter of ["CMD", "MCP", "Web"]) {
+    await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
+    const fresh = await client.read("/?page=50347&mode=Edit");
+    const driver = await modalAdapter(adapter, fresh);
+    try {
+      let current = fresh;
+      for (const inputs of families) {
+        const stored = field(current, "Value");
+        let modal = await driver.action(current, "ModalNested");
+        const writes = await sql('SELECT count(*) FROM ui_writes');
+        for (const [identity, invalid, corrected] of inputs) {
+          const before = await client.read(path(modal));
+          assert.deepEqual(before, modal, "a fresh native read retains the adapter's exact state");
+          const command = operation(before, identity).command;
+          const failure = await driver.failure(before, identity, invalid);
+          assert.equal(failure.outcome, "failed", `${adapter} must refuse invalid ${identity}`);
+          assert.equal(failure.command, command);
+          assert.ok(failure.message.length > 0);
+          const diagnostic = { error: failure.error, message: failure.message, outcome: failure.outcome };
+          const key = `${identity}:${invalid}`;
+          if (adapter === "CMD") diagnostics.set(key, diagnostic);
+          else assert.deepEqual(diagnostic, diagnostics.get(key), "all clients retain the same AL diagnostic");
+          modal = await client.read(path(before));
+          assert.equal(modal.page.interaction.state, "modal");
+          assert.equal(modal.page.interaction.dialog, before.page.interaction.dialog);
+          assert.notEqual(modal.page.revision, before.page.revision);
+          assert.deepEqual(values(modal), values(before), "failed conversion must not alter any original AL variable");
+          assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), stored);
+          assert.equal(await sql('SELECT count(*) FROM ui_writes'), writes, "invalid input must not commit caller writes");
+          assert.equal(await sql(`SELECT outcome FROM agiru_client.page_modal_commands WHERE command_id='${command}'`), "failed");
+          const replay = await post(before, identity, invalid);
+          assert.equal(replay.response.status, 500);
+          const repeated = parseFailure(replay.html);
+          assert.deepEqual({ error: repeated.code, message: repeated.message, outcome: repeated.outcome, command: repeated.command }, failure,
+            "replaying the rejected command must retain its receipt, not apply another input");
+          assert.deepEqual(await client.read(path(modal)), modal);
+          modal = await driver.action(modal, identity, corrected);
+          assert.equal(field(modal, identity), corrected);
+          assert.equal(field(modal, "ValidationCount"), String(Number(field(before, "ValidationCount")) +
+            (identity === "OwnerMarker" ? 1 : 0)), "valid input runs its AL validation exactly once");
+        }
+        await driver.screenshot(`native-invalid-variable-${inputs[0][0]}-corrected`);
+        const selected = field(modal, "OwnerMarker");
+        current = await driver.action(modal, "$agiru.modal_ok");
+        assert.equal(field(current, "Value"), selected);
+        assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), selected);
+      }
     } finally { await driver.close(); }
   }
 });

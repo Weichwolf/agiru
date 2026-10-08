@@ -17,6 +17,7 @@
 #include "Check.h"
 
 #include <array>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -170,6 +171,68 @@ void ScalarEvaluationKeepsItsExistingReaders() {
              !agiru::Evaluate(unsupported, "1") && unsupported.value == 1);
 }
 
+void IntegralEvaluationRefusesRangeLoss() {
+  constexpr agiru::Integer kPrior = 37;
+  for (const std::string_view text : {"2147483648", "-2147483649"}) {
+    agiru::Integer integer = kPrior;
+    CHECK_TRUE("Integer evaluation refuses narrowing without changing the destination",
+               !agiru::Evaluate(integer, text) && integer == kPrior);
+    auto option = agiru::Option<void>::FromInteger(kPrior);
+    CHECK_TRUE("untyped Option evaluation shares the checked Integer reader",
+               !agiru::Evaluate(option, text) && option.AsInteger() == kPrior);
+    Type declared{ResourceCostType::All};
+    CHECK_TRUE("declared ordinal evaluation refuses Integer overflow",
+               !agiru::Evaluate(declared, text) && declared == ResourceCostType::All);
+  }
+  for (const std::string_view text : {"9223372036854775808", "-9223372036854775809"}) {
+    agiru::BigInteger integer = kPrior;
+    CHECK_TRUE("BigInteger evaluation refuses overflow without clamping",
+               !agiru::Evaluate(integer, text) && integer == kPrior);
+    agiru::Duration duration{kPrior};
+    CHECK_TRUE("Duration evaluation refuses overflowing milliseconds",
+               !agiru::Evaluate(duration, text) && duration.Milliseconds() == kPrior);
+  }
+  for (const std::string_view text : {"65536", "-1"}) {
+    std::uint16_t unsignedValue = kPrior;
+    CHECK_TRUE("unsigned integral evaluation refuses wraparound",
+               !agiru::Evaluate(unsignedValue, text) && unsignedValue == kPrior);
+  }
+  constexpr char split[] = "12\0suffix";
+  const std::string_view partial(split, sizeof(split) - 1);
+  agiru::Integer integer = kPrior;
+  CHECK_TRUE("Integer evaluation consumes the complete input including embedded NUL",
+             !agiru::Evaluate(integer, partial) && integer == kPrior);
+  auto option = agiru::Option<void>::FromInteger(kPrior);
+  CHECK_TRUE("untyped Option cannot silently accept a NUL-terminated prefix",
+             !agiru::Evaluate(option, partial) && option.AsInteger() == kPrior);
+  CHECK_TRUE("the declared Integer maximum remains readable",
+             agiru::Evaluate(integer, "2147483647") &&
+                 integer == std::numeric_limits<agiru::Integer>::max());
+  CHECK_TRUE("the full Integer minimum remains readable",
+             agiru::Evaluate(integer, "-2147483648") &&
+                 integer == std::numeric_limits<agiru::Integer>::lowest());
+  agiru::BigInteger wide{};
+  CHECK_TRUE("the full BigInteger minimum remains readable",
+             agiru::Evaluate(wide, "-9223372036854775808") &&
+                 wide == std::numeric_limits<agiru::BigInteger>::lowest());
+  std::uint16_t unsignedValue{};
+  CHECK_TRUE("the unsigned integral maximum remains readable",
+             agiru::Evaluate(unsignedValue, "65535") &&
+                 unsignedValue == std::numeric_limits<std::uint16_t>::max());
+  errno = ERANGE;
+  CHECK_TRUE("valid integral input does not inherit an earlier conversion error",
+             agiru::Evaluate(integer, " \t+123") && integer == 123);
+  CHECK_TRUE("empty integral input retains the existing zero-value policy",
+             agiru::Evaluate(integer, "") && integer == 0);
+  Type declared{ResourceCostType::All};
+  for (const std::string_view text : {"-", "1-2", "--1"}) {
+    CHECK_TRUE("declared ordinal evaluation refuses partially parsed digits",
+               !agiru::Evaluate(declared, text) && declared == ResourceCostType::All);
+  }
+  CHECK_TRUE("representable undeclared ordinals retain their existing value contract",
+             agiru::Evaluate(declared, "123") && declared.AsInteger() == 123);
+}
+
 void FactoryAndTemporalEvaluationKeepsItsExistingReaders() {
   agiru::Guid identity;
   constexpr std::string_view guid = "{01234567-89AB-CDEF-0123-456789ABCDEF}";
@@ -204,6 +267,7 @@ int main() {
     OptionsOrderByOrdinal();
     EvaluateReadsAMemberByNameCaptionOrOrdinal();
     ScalarEvaluationKeepsItsExistingReaders();
+    IntegralEvaluationRefusesRangeLoss();
     FactoryAndTemporalEvaluationKeepsItsExistingReaders();
   });
 }

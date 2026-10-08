@@ -17,6 +17,7 @@ cleanup() {
 }
 trap cleanup EXIT
 sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
+  include/BuiltinsWritten.h test/gate/OptionGate.cpp \
   src/rt/PageCore.cpp src/rt/PageValue.cpp include/runtime/{PageValue,PageVariableValue}.h \
   src/rt/PageHtml.cpp src/rt/HtmlText.{h,cpp} include/runtime/PageHtml.h \
   src/rt/PageListHtml.h \
@@ -238,13 +239,21 @@ for object in "${objects[@]}"; do
     modal_objects+=("$object")
   fi
 done
-for control in modal-copy modal-veto modal-action modal-callback-policy modal-values; do
+for control in modal-copy modal-veto modal-action modal-callback-policy modal-values variable-conversion; do
   cp include/runtime/Page.h "$proof/mutant/include/runtime/Page.h"
   cp include/runtime/PageSession.h "$proof/mutant/include/runtime/PageSession.h"
   case "$control" in
     modal-copy|modal-action|modal-values) header=PageSession.h ;;
     modal-veto|modal-callback-policy) header=Page.h ;;
+    variable-conversion) header=fixture/page/NavigationModal.h ;;
   esac
+  source="include/runtime/$header"
+  destination="$proof/mutant/include/runtime/$header"
+  if [[ "$control" = variable-conversion ]]; then
+    source="$proof/generated/fixture/$header"
+    destination="$proof/mutant/include/$header"
+    mkdir -p "$(dirname "$destination")"
+  fi
   awk -v control="$control" '
     control == "modal-copy" && /owned_ = prepared_ == nullptr;/ {
       sub(/owned_ = prepared_ == nullptr;/, "owned_ = true;"); changed++
@@ -261,10 +270,18 @@ for control in modal-copy modal-veto modal-action modal-callback-policy modal-va
     control == "modal-values" && /row != nullptr && row->value != nullptr/ {
       sub(/row->value != nullptr/, "false"); changed++
     }
+    control == "variable-conversion" && /if \(!::agiru::Evaluate\(page.OwnerMarker_Var, text\)\)/ {
+      sub(/!::agiru::Evaluate\(page.OwnerMarker_Var, text\)/, "(::agiru::Evaluate(page.OwnerMarker_Var, text), false)"); changed++
+    }
     { print }
     END { if (changed != (control == "modal-callback-policy" ? 2 : 1)) exit 2 }
-  ' "include/runtime/$header" > "$proof/mutant/include/runtime/$header"
-  "$CXX" "-I$proof/mutant/include" "${flags[@]}" -c "$modal_source" \
+  ' "$source" > "$destination"
+  modal_compile_source="$modal_source"
+  if [[ "$control" = variable-conversion ]]; then
+    modal_compile_source="$proof/mutant/include/fixture/page/NavigationModal.def.cpp"
+    cp "$modal_source" "$modal_compile_source"
+  fi
+  "$CXX" "-I$proof/mutant/include" "${flags[@]}" -c "$modal_compile_source" \
     -o "$proof/mutant-modal.o"
   "$CXX" "-I$proof/mutant/include" "${flags[@]}" test/runtime/page-navigation/Runner.cpp \
     "$proof/mutant-modal.o" "${modal_objects[@]}" "${links[@]}" -o "$proof/$control"
@@ -277,8 +294,39 @@ for control in modal-copy modal-veto modal-action modal-callback-policy modal-va
     modal-action) rg -q 'a card cancellation is not consent' "$proof/$control-execution.log" ;;
     modal-callback-policy) rg -q 'disabled modal callbacks refuse before native opening' "$proof/$control-execution.log" ;;
     modal-values) rg -q 'Control has no exact typed value binding' "$proof/$control-execution.log" ;;
+    variable-conversion) rg -q 'invalid modal variables refuse before their AL validation trigger' "$proof/$control-execution.log" ;;
   esac
   rm -- "$proof/$control" "$proof/mutant-modal.o"
+done
+
+for control in integer-range integer-overflow integer-prefix; do
+  awk -v control="$control" '
+    control == "integer-range" && /if \(read < std::numeric_limits<T>::lowest\(\)/ {
+      sub(/read < std::numeric_limits<T>::lowest\(\) \|\| read > std::numeric_limits<T>::max\(\)/, "false"); changed++
+    }
+    control == "integer-range" && /else if \(read < 0 \|\| static_cast<unsigned long long>\(read\)/ {
+      sub(/read < 0 \|\| static_cast<unsigned long long>\(read\) > std::numeric_limits<T>::max\(\)/, "false"); changed++
+    }
+    control == "integer-overflow" && /errno == ERANGE \|\| end != held.c_str\(\)/ {
+      sub(/errno == ERANGE \|\| /, ""); changed++
+    }
+    control == "integer-prefix" && /errno == ERANGE \|\| end != held.c_str\(\)/ {
+      sub(/end != held.c_str\(\) \+ held.size\(\)/, "*end != char{}"); changed++
+    }
+    { print }
+    END { if (changed != (control == "integer-range" ? 2 : 1)) exit 2 }
+  ' include/BuiltinsWritten.h > "$proof/mutant/include/BuiltinsWritten.h"
+  "$CXX" "-I$proof/mutant/include" "${flags[@]}" test/gate/OptionGate.cpp \
+    "${links[@]}" -o "$proof/$control" > "$proof/$control-compile.log" 2>&1
+  status=0
+  "$proof/$control" > "$proof/$control-execution.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  case "$control" in
+    integer-range) claim='Integer evaluation refuses narrowing without changing the destination' ;;
+    integer-overflow) claim='BigInteger evaluation refuses overflow without clamping' ;;
+    integer-prefix) claim='Integer evaluation consumes the complete input including embedded NUL' ;;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control-execution.log"
 done
 awk '
   /Integer TestField::AsInteger\(\)/ { method = 1 }
@@ -302,4 +350,4 @@ fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; twenty-five execution controls and one control-name compile refusal reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; twenty-nine execution controls and one control-name compile refusal reject; %s\n' "$proof"

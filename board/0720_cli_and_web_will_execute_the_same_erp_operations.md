@@ -5,8 +5,8 @@ Depends on: existing generated page declarations, typed record/session primitive
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
 Next: expand setup/master-data workflows under 0727, retaining the accepted original
-Customer template (1380) → create → edit → independent reopen regression. Fix invalid
-variable-input success and qualify the remaining client/runtime contracts below.
+Customer template (1380) → create → edit → independent reopen regression. Regenerate
+production variable setters and qualify original invalid-input/lookup/dimension cases.
 Never substitute a default template, UT handler or client rule.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
@@ -58,11 +58,23 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Unicode, temporal flags and declared Option/Enum members remain exact. Domains identify
   the object kind, ID and control; display text is not a type oracle. Unsupported storage
   refuses explicitly. Computed-expression transport remains unqualified.
-- Remaining input defect: `PageWriter.cpp::TriggerTable` discards the Boolean returned
-  by the variable setter's Evaluate call. Invalid variable input can therefore succeed
-  without changing its value. After the modal increment, require an explicit validation
-  failure and qualify retry/rollback through CMD/MCP/web; do not claim complete input parity.
-- Sources: `include/runtime/{PageVariableValue,PageValue,Page,PageSession}.h`,
+- Generated variable setters check Evaluate and refuse failed conversion as TestValidation
+  before OnValidate. The shared Integer reader rejects destination-width overflow, ERANGE
+  and embedded-NUL prefixes without changing storage. Untyped Option/Duration share it;
+  declared Option/Enum numeric ordinals cannot accept partially parsed digits.
+- `make gate GATE=OptionGate JOBS=2`: 75 checks; GenPageGate: 58 checks, zero red.
+  Generated navigation: 270 checks, dispatcher: 105 and source: 15, zero red;
+  29 execution defects and one control-name compile refusal reject. Three new integer
+  defects independently remove width, overflow and complete-input checks; another
+  discards the generated setter result. Five affected compiled units pass clang-tidy.
+- Native modal TestValidation inputs roll back their child SQL boundary, persist a failed
+  child-command receipt and retain the caller/page for explicit correction. Fatal/action
+  errors still unwind the caller; input receipts are not root commits. The HTTP proof below
+  covers Integer/Decimal/BigInteger/indexed Integer/Option refusal, identical replay,
+  unchanged original values, validation exactly once and independently visible SQL effects.
+  BC inline invalid-text retention/discard UI, all conversion types, discarded AL Evaluate
+  value-context semantics and regenerated original-production setters remain unqualified.
+- Sources: `include/BuiltinsWritten.h`, `include/runtime/{PageVariableValue,PageValue,Page,PageSession}.h`,
   `src/rt/PageValue.cpp`, `src/gen/{PageWriter,RuntimeSurface}.cpp` and
   `test/gate/PageValueGate.cpp`. PageValue has 43 checks, zero red; affected scalar/generator
   units pass targeted clang-tidy. Generated navigation has 220 checks, zero red;
@@ -71,8 +83,12 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 - Reference: developer `properties/properties/devenv-sourceexpr-property.md` at
   `f928288ee840334be73142e5fc0202c0e19b246d`; BCApps `CustomerCard.Page.al`
   (LastPaymentAmount) and `SalesOrderStatistics.Page.al` (indexed totals) at
-  `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. Predecessor WIs 1799 and 1894 retain
-  Decimal/array lessons; no predecessor implementation copied.
+  `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. The same developer revision supplies
+  `methods-auto/system/system-evaluate-method.md`,
+  `methods-auto/{integer/integer,biginteger/biginteger}-data-type.md`
+  and `triggers-auto/pagefield/devenv-onvalidate-pagefield-trigger.md`. Predecessor
+  WIs 1799/1894 retain Decimal/array lessons, 1198 typed writeback and 1946 correctable
+  field errors; 1084's wrong-typed text fallback is rejected. No implementation copied.
 - Three no-PCH rounds measured Page 1948.9 ms, PageSession 2070.8 ms and the new
   PageVariableValue helper 839.3 ms during concurrent fixture compilation. No before/after
   build-speed or ERP performance claim. Rebuild generated consumers before use.
@@ -116,8 +132,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   HTTP workers consume immutable snapshots, never AL page pointers. PostgreSQL fences
   ownership, changed-payload replay and receipts; each HTTP operation reauthorizes access.
   Child receipts mean processed input, not a committed caller transaction.
-- Authored generated-page HTTP proof: 34 fixture-host cases and 40 actual `agiru serve`
-  cases for each of limits 40/7/80, including both TryFunction write policies: 154 pass,
+- Authored generated-page HTTP proof: 35 fixture-host cases and 41 actual `agiru serve`
+  cases for each of limits 40/7/80, including both TryFunction write policies: 158 pass,
   zero red. Independent SQL covers explicit selection/GetRecord, original-variable edits,
   nested modals/questions, query-close veto/error retries, cancellation/timeout and later
   caller rollback without undoing an earlier explicit Commit. Message replay preserves
@@ -126,21 +142,24 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   working snapshots; authenticated GET polling reads the SQL receipt without executing AL.
   CMD/MCP/web follow that receipt, retain the original error and require explicit retry.
   Fresh reads retain the open modal and updated revision without replaying the failed input.
-  All eighteen compiled defect controls reject at named assertions; `make page-host-test
+  Typed input failures also retain their exact child receipt, original values and open
+  modal; CMD/MCP/Chromium explicitly correct all nine invalid cases. Tests reuse one root
+  page per client rather than widening server context limits or callback deadlines.
+  All nineteen compiled defect controls reject at named assertions; `make page-host-test
   JOBS=2` exits zero and verifies input hashes. Normal matrices remain complete; each
   mutant executes its affected case and required predecessors, not unrelated timeouts.
   Close-trigger SQL delay uses fixture-only
   PostgreSQL triggers; it does not depend on the unimplemented AL Sleep method.
 - `make client-test JOBS=2`: 44 cases and eight executable defects rejected;
   `make web-test JOBS=2`: 14 browser cases, three defects and actual Caddy asset delivery.
-  Generated navigation 220, dispatcher 105 and source 15 checks pass; 21 execution
+  Generated navigation 270, dispatcher 105 and source 15 checks pass; 29 execution
   defects and one compile refusal reject. Native configuration has 242 checks, zero red.
-  Ten affected compiled C++ units pass targeted clang-tidy without suppressions.
+  Five units affected by the typed-input increment pass targeted clang-tidy without suppressions.
 - Sources: `src/rt/PageModal.{h,cpp}`, `src/rt/{PageCommandHost,PageInteraction,PageHtml}.cpp`,
   `include/runtime/PageHtml.h`, `src/client/{profile,http,ascii,web}.mts`,
   `test/ui/{page-host.sh,page-host.mjs,browser-client.mjs}` and authored AL fixtures in
   `test/runtime/page-navigation/`. Reproduce with `make page-host-test JOBS=2`.
-- Production regeneration uses an AL-file-hash-equal copy of BCApps
+- Previous production regeneration uses an AL-file-hash-equal copy of BCApps
   `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`, verified System symbols 29.0.54011.55407
   (package `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`) and
   host runtime 18.0. `make transpile` exits 1: 21 unresolved extension anchors,

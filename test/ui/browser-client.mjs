@@ -136,11 +136,12 @@ export async function finishedResponse(page, origin, response) {
   return finishedResponse(page, origin, next);
 }
 
-export async function browserFailure(page, origin, model, identity) {
+export async function browserFailure(page, origin, model, identity, text) {
   const escaped = await page.evaluate(value => CSS.escape(value), identity);
   const endpoint = `/modal-commands/${model.interaction.dialog}`;
   const received = page.waitForResponse(response => response.url() === origin + endpoint &&
     response.request().method() === "POST");
+  if (text !== undefined) await page.locator(`[data-control="${escaped}"] input[name=text]`).fill(text);
   await page.locator(`[data-control="${escaped}"] button`).click();
   const response = await finishedResponse(page, origin, await received);
   assert.equal(response.status(), 500);

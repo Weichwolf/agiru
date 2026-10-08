@@ -100,15 +100,18 @@ BCApps `CustomerCard.Page.al::CreateCustomerFromTemplate` and
 Predecessor WIs 1554/1395 retain trigger/delayed-insert findings. This is not optimistic
 write, financial posting or original Customer HTTP acceptance.
 
-Borrowed modal lifecycle and native transport are qualified in 0720: 220 generated
-navigation, 105 dispatcher and 15 source checks pass; 21 execution defects and one
+Borrowed modal lifecycle and native transport are qualified in 0720: 270 generated
+navigation, 105 dispatcher and 15 source checks pass; 29 execution defects and one
 compile defect reject. The caller's original AL page/filters survive; false/error close
 attempts can retry; disabled callbacks refuse before opening. Actual HTTP proof has
-154 cases, zero red, across limits 40/7/80 and both TryFunction policies after the
-delayed-error repair. Eighteen compiled defect controls reject at named assertions;
+158 cases, zero red, across limits 40/7/80 and both TryFunction policies after the
+delayed-error and typed-input repairs. Nineteen compiled defect controls reject at named assertions;
 `make page-host-test JOBS=2` exits zero with verified input hashes. Failed close inputs preserve
 their own receipt identity after the HTTP worker returns, never masquerade as successful
-root polling. Independent
+root polling. Classified TestValidation field inputs roll back their own SQL boundary,
+retain the original typed values/caller and require explicit correction; other execution
+errors still unwind. Production setter regeneration and BC inline-error UI remain due.
+Independent
 SQL verifies nested modal/question suspension, explicit cancellation/timeout rollback,
 no implicit modal commit, and durability of a prior explicit Commit after caller failure.
 Child-input receipts do not establish root durability. The production ABI rebuild

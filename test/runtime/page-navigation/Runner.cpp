@@ -285,6 +285,49 @@ void BorrowedModalChoices(ModalHost &host) {
 
 void ModalTestHandlerPrecedence(ModalHost &host);
 
+void BorrowedModalInputRefusals(ModalHost &host) {
+  Modal page;
+  page.SetMarker(kCallerModalMarker);
+  host.run = [](agiru::PageInstance &adapter) {
+    adapter.Open(agiru::PageOpenMode::Edit);
+    auto &controls = adapter.Controls();
+    using Input = std::pair<std::string_view, std::string_view>;
+    constexpr std::array inputs{Input{"OwnerMarker", "invalid-integer"},
+                                Input{"OwnerMarker", "2147483648"},
+                                Input{"ExactAmount", "invalid-decimal"},
+                                Input{"ExactInteger", "9223372036854775808"},
+                                Input{"ExactInteger", "-9223372036854775809"},
+                                Input{"ArrayValue", "1.5"},
+                                Input{"Choice", "absent-member"},
+                                Input{"Choice", "2147483648"},
+                                Input{"Choice", "1-2"}};
+    for (const auto input : inputs) {
+      const std::string before = controls.ControlText(input.first);
+      CHECK_TRUE("invalid modal variables refuse before their AL validation trigger",
+                 ModalRefused("TestValidation", [&controls, input] {
+                   controls.SetControlText(input.first, input.second);
+                 }));
+      CHECK_TEXT("failed modal conversion preserves the original AL value",
+                 controls.ControlText(input.first),
+                 before);
+      CHECK_TEXT("failed conversion never runs the AL validation trigger",
+                 controls.ControlText("ValidationCount"),
+                 "0");
+    }
+    controls.SetControlText("OwnerMarker", "123");
+    CHECK_TEXT("explicit valid correction updates the original variable",
+               controls.ControlText("OwnerMarker"),
+               "123");
+    CHECK_TEXT("valid correction runs its AL validation exactly once",
+               controls.ControlText("ValidationCount"),
+               "1");
+    return adapter.CloseModal(agiru::Action::Cancel);
+  };
+  CHECK_TRUE("invalid inputs do not close the original modal",
+             page.RunModal() == agiru::Action::Cancel);
+  CHECK_TRUE("the caller retains the corrected AL variable", page.GetMarker() == 123);
+}
+
 void BorrowedModalLifecycle(const std::string &dsn) {
   agiru::Session session(dsn);
   auto host = std::make_unique<ModalHost>();
@@ -294,6 +337,7 @@ void BorrowedModalLifecycle(const std::string &dsn) {
   Prepare();
   BorrowedModalCloseRetries(installed);
   BorrowedModalChoices(installed);
+  BorrowedModalInputRefusals(installed);
   ModalTestHandlerPrecedence(installed);
 }
 

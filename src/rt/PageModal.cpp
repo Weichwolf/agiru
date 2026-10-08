@@ -391,7 +391,10 @@ private:
         result = Execute(*input);
         boundary.Keep();
       } catch (const Error &executionError) {
-        if ((input->control != "$agiru.modal_ok" && input->control != "$agiru.modal_cancel") ||
+        const bool validation =
+            input->operation == "set" && executionError.Code() == "TestValidation";
+        if ((!validation && input->control != "$agiru.modal_ok" &&
+             input->control != "$agiru.modal_cancel") ||
             !page_.IsOpen()) {
           throw;
         }

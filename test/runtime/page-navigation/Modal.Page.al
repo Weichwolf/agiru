@@ -9,7 +9,14 @@ page 50352 "Navigation Modal"
         area(Content)
         {
             field(ID; Rec.ID) { }
-            field(OwnerMarker; OwnerMarker) { }
+            field(OwnerMarker; OwnerMarker)
+            {
+                trigger OnValidate()
+                begin
+                    ValidationCount += 1;
+                end;
+            }
+            field(ValidationCount; ValidationCount) { Editable = false; }
             field(CloseAttempts; CloseAttempts) { }
             field(ClosedCount; ClosedCount) { }
             field(SeenAction; SeenAction) { }
@@ -102,6 +109,7 @@ page 50352 "Navigation Modal"
     end;
     var
         OwnerMarker: Integer;
+        ValidationCount: Integer;
         CloseAttempts: Integer;
         ClosedCount: Integer;
         SeenAction: Action;

@@ -37,9 +37,11 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <concepts>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -653,6 +655,33 @@ template <typename T>
 
 namespace detail {
 
+/// \brief Reads signed integral text with the existing Evaluate conversion policy.
+/// \tparam T The integral destination type.
+/// \param into Destination, unchanged on lexical or range failure.
+/// \param text Decimal text; empty means zero.
+/// \return Whether the complete input was consumed without overflow or narrowing.
+template <typename T>
+[[nodiscard]] ::agiru::Boolean EvaluatedInteger(T &into, std::string_view text) {
+  if (text.empty()) {
+    into = 0;
+    return true;
+  }
+  const std::string held(text);
+  char *end = nullptr;
+  errno = 0;
+  const long long read = std::strtoll(held.c_str(), &end, kDecimal);
+  if (errno == ERANGE || end != held.c_str() + held.size()) { return false; }
+  if constexpr (std::is_signed_v<T>) {
+    if (read < std::numeric_limits<T>::lowest() || read > std::numeric_limits<T>::max()) {
+      return false;
+    }
+  } else if (read < 0 || static_cast<unsigned long long>(read) > std::numeric_limits<T>::max()) {
+    return false;
+  }
+  into = static_cast<T>(read);
+  return true;
+}
+
 /// \brief Reads one value out of its text form, for `Evaluate`.
 ///
 /// \tparam T The value's type.
@@ -688,8 +717,9 @@ MemberOrdinalOf(std::span<const EnumValueDef> members, std::string_view text) {
     return std::nullopt;
   }
   if (text.find_first_not_of("-0123456789") == std::string_view::npos) {
-    const std::string held(text);
-    return static_cast<std::int32_t>(std::strtol(held.c_str(), nullptr, 10));
+    ::agiru::Integer ordinal{};
+    if (!EvaluatedInteger(ordinal, text)) { return std::nullopt; }
+    return ordinal;
   }
   for (const EnumValueDef &member : members) {
     if (same(member.name, text)) { return member.ordinal; }
@@ -815,25 +845,6 @@ template <typename T>
   return true;
 }
 
-/// \brief Reads signed integral text with the existing Evaluate conversion policy.
-/// \tparam T The integral destination type.
-/// \param into Destination, unchanged on lexical failure.
-/// \param text Decimal text; empty means zero.
-/// \return Whether the complete input was consumed.
-template <typename T>
-[[nodiscard]] ::agiru::Boolean EvaluatedInteger(T &into, std::string_view text) {
-  if (text.empty()) {
-    into = 0;
-    return true;
-  }
-  const std::string held(text);
-  char *end = nullptr;
-  const long long read = std::strtoll(held.c_str(), &end, kDecimal);
-  if (end == nullptr || *end != '\0') { return false; }
-  into = static_cast<T>(read);
-  return true;
-}
-
 /// \brief Reads Duration as signed milliseconds, sharing the integral reader.
 /// \param into Destination, unchanged on lexical failure.
 /// \param text Decimal milliseconds; empty means zero.
@@ -852,15 +863,9 @@ template <typename T>
 /// \return Whether the input was read.
 [[nodiscard]] inline ::agiru::Boolean EvaluatedOption(::agiru::Option<void> &into,
                                                       std::string_view text) {
-  if (text.empty()) {
-    into = ::agiru::Option<void>::FromInteger(0);
-    return true;
-  }
-  const std::string held(text);
-  char *end = nullptr;
-  const long read = std::strtol(held.c_str(), &end, kDecimal);
-  if (end == nullptr || *end != '\0') { return false; }
-  into = ::agiru::Option<void>::FromInteger(static_cast<std::int32_t>(read));
+  ::agiru::Integer read{};
+  if (!EvaluatedInteger(read, text)) { return false; }
+  into = ::agiru::Option<void>::FromInteger(read);
   return true;
 }
 

@@ -146,6 +146,10 @@ void ComputedSourcesUseTheNormalBodyWriter() {
   CHECK_TRUE("writable page variables retain their existing path",
              header.contains("Evaluate(page.Total, text)") &&
                  !source.contains("OnSourceTextVariable()"));
+  CHECK_TRUE("variable setters refuse failed conversion before validation",
+             header.contains("if (!::agiru::Evaluate(page.Total, text))") &&
+                 header.contains("Invalid value for page control 'Variable'.") &&
+                 header.contains("\"TestValidation\""));
   CHECK_TRUE("quoted page variables preserve their type and writeback",
              header.contains("Evaluate(page.QuotedTotal, text)") &&
                  !source.contains("OnSourceTextQuoted()"));

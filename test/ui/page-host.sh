@@ -35,7 +35,7 @@ cleanup() {
     if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
     make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
   done
-  for control in dialog-default dialog-commit dialog-replay modal-poll-receipt modal-commit modal-replay modal-cancel modal-message-replay; do
+  for control in dialog-default dialog-commit dialog-replay modal-poll-receipt modal-commit modal-replay modal-cancel modal-message-replay modal-input-validation; do
     make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
     if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
   done
@@ -144,11 +144,12 @@ for control in owner revision replay policy list-limit failure-receipt blocking-
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
   unlink "$proof/$control.cpp"
 done
-for control in modal-commit modal-replay modal-cancel modal-message-replay; do
+for control in modal-commit modal-replay modal-cancel modal-message-replay modal-input-validation; do
   case "$control" in
     modal-commit) pattern='CMD MCP and Chromium explicitly select' ;;
     modal-replay|modal-cancel) pattern='modal SQL ownership revisions CSRF replay and permissions' ;;
     modal-message-replay) pattern='CMD MCP and Chromium edit exact original modal variables' ;;
+    modal-input-validation) pattern='CMD MCP and Chromium refuse invalid typed modal input' ;;
   esac
   podman exec --user agiru "${AGIRU_DEV_CONTAINER:-agiru-dev}" awk -v control="$control" '
     control == "modal-commit" && /void PublishSnapshot\(\) \{/ {
@@ -162,6 +163,9 @@ for control in modal-commit modal-replay modal-cancel modal-message-replay; do
     }
     control == "modal-message-replay" && /^[[:space:]]+receiptHtml,$/ {
       sub(/receiptHtml/, "html"); changed++
+    }
+    control == "modal-input-validation" && /input->operation == "set" && executionError.Code\(\) == "TestValidation";/ {
+      sub(/input->operation == "set" && executionError.Code\(\) == "TestValidation"/, "false"); changed++
     }
     { print }
     END { if (changed != 1) exit 2 }
@@ -177,6 +181,7 @@ for control in modal-commit modal-replay modal-cancel modal-message-replay; do
     modal-commit) rg -q '^not ok .*CMD MCP and Chromium explicitly select' "$proof/$control.log" ;;
     modal-replay|modal-cancel) rg -q '^not ok .*modal SQL ownership revisions CSRF replay and permissions' "$proof/$control.log" ;;
     modal-message-replay) rg -q '^not ok .*CMD MCP and Chromium edit exact original modal variables' "$proof/$control.log" ;;
+    modal-input-validation) rg -q '^not ok .*CMD MCP and Chromium refuse invalid typed modal input' "$proof/$control.log" ;;
   esac
   for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
@@ -238,4 +243,4 @@ rg -q 'FAIL.*duplicate configuration keys refuse' "$proof/duplicates.log"
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/duplicates.cpp $native/duplicates.so"
 unlink "$proof/duplicates.cpp"
 sha256sum --check "$proof/inputs.sha256" "$proof/scalar-inputs.sha256" > "$proof/integrity.log"
-printf 'page-host: generated-page SQL effects, asynchronous AL calls, explicit questions/messages/modals, linked-card creation and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; eighteen compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt/blocking-AL/default-answer/implicit-commit/changed-answer/creation-mode/creation-policy/modal-commit/modal-replay/modal-cancel/modal-message-replay/modal-poll-receipt defects rejected; not full ERP acceptance; %s\n' "$proof"
+printf 'page-host: generated-page SQL effects, asynchronous AL calls, explicit questions/messages/modals, linked-card creation and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; nineteen compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt/blocking-AL/default-answer/implicit-commit/changed-answer/creation-mode/creation-policy/modal-commit/modal-replay/modal-cancel/modal-message-replay/modal-poll-receipt/modal-input-validation defects rejected; not full ERP acceptance; %s\n' "$proof"
