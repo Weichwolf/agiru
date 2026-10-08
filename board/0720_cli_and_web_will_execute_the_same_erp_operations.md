@@ -4,10 +4,11 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: regenerate production with the named-page refusal repair, rebuild the native app
-and repeat the original Customer workflow; never patch apps or guess missing declarations.
-The latest production build stops at GlobalAdminMessage's unselected Azure AD page,
-not ExchangeSync.Enabled; native build/workflow recovery is not proved by fixture compilation.
+Next: finish the keep-going native build inventory, repair generic missing-type/member
+emission and repeat the original Customer workflow; never patch apps or guess declarations.
+ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
+The continuing build exposes mixed-case unavailable record references, indexed fields,
+unselected TestPage parts and unsupported refusal operations; the native app is not linked.
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
@@ -134,6 +135,11 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Consequently limits 7/80 and the 22 page-host mutation runs were not executed.
   Preserve this failure; rerun/diagnose it, never count cancellation as green or increase
   the timeout/defect baseline. Native TLS/SQL gates are not complete client acceptance.
+  `test/ui/page-host.mjs` now checks row value, write count and failed receipt in one
+  independent SQL statement per rejection, preserving all assertions and exact text values.
+  Adapter diagnostics locate the unchanged native deadline during the Web cases after
+  CMD/MCP progress. Fixture 38/38 remains green; native 43/44 still cancels under concurrent
+  compiler load. Repeat the entire matrix without that load before claiming recovery.
 - References: [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
   consulted 2026-10-08. Sources/tests: `src/rt/{ClientCredentials,PageCommandHost}.cpp`,

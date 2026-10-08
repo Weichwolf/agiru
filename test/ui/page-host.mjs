@@ -1048,7 +1048,7 @@ test("CMD MCP and Chromium edit exact original modal variables without independe
   }
 });
 
-test("CMD MCP and Chromium refuse invalid typed modal input and retain the caller for explicit correction", { timeout: 60000 }, async () => {
+test("CMD MCP and Chromium refuse invalid typed modal input and retain the caller for explicit correction", { timeout: 60000 }, async context => {
   const diagnostics = new Map();
   const values = result => result.page.controls.filter(control => control.scalar)
     .map(control => ({ identity: control.identity, scalar: control.scalar }));
@@ -1061,6 +1061,7 @@ test("CMD MCP and Chromium refuse invalid typed modal input and retain the calle
     [["Choice", "absent-member", "0"], ["Choice", "2147483648", "1"], ["Choice", "1-2", "0"]],
   ];
   for (const adapter of ["CMD", "MCP", "Web"]) {
+    const started = performance.now();
     await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
     const fresh = await client.read("/?page=50347&mode=Edit");
     const driver = await modalAdapter(adapter, fresh);
@@ -1087,9 +1088,13 @@ test("CMD MCP and Chromium refuse invalid typed modal input and retain the calle
           assert.equal(modal.page.interaction.dialog, before.page.interaction.dialog);
           assert.notEqual(modal.page.revision, before.page.revision);
           assert.deepEqual(values(modal), values(before), "failed conversion must not alter any original AL variable");
-          assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), stored);
-          assert.equal(await sql('SELECT count(*) FROM ui_writes'), writes, "invalid input must not commit caller writes");
-          assert.equal(await sql(`SELECT outcome FROM agiru_client.page_modal_commands WHERE command_id='${command}'`), "failed");
+          const databaseState = JSON.parse(await sql(`SELECT json_build_object(
+            'value',(SELECT "Value"::text FROM "Navigation Row" WHERE "ID"=1),
+            'writes',(SELECT count(*)::text FROM ui_writes),
+            'outcome',(SELECT outcome FROM agiru_client.page_modal_commands WHERE command_id='${command}'))`));
+          assert.equal(databaseState.value, stored);
+          assert.equal(databaseState.writes, writes, "invalid input must not commit caller writes");
+          assert.equal(databaseState.outcome, "failed");
           const replay = await post(before, identity, invalid);
           assert.equal(replay.response.status, 500);
           const repeated = parseFailure(replay.html);
@@ -1100,6 +1105,7 @@ test("CMD MCP and Chromium refuse invalid typed modal input and retain the calle
           assert.equal(field(modal, identity), corrected);
           assert.equal(field(modal, "ValidationCount"), String(Number(field(before, "ValidationCount")) +
             (identity === "OwnerMarker" ? 1 : 0)), "valid input runs its AL validation exactly once");
+          context.diagnostic(`${adapter} ${identity}: refusal/replay/correction verified at ${Math.round(performance.now() - started)} ms`);
         }
         await driver.screenshot(`native-invalid-variable-${inputs[0][0]}-corrected`);
         const selected = field(modal, "OwnerMarker");
