@@ -349,6 +349,9 @@ selected-record identity, opening triggers, explicit-action precedence and card
 ModifyAllowed policy. `PageDispatcherGate` drives the shared command primitive over
 existing page bindings: per-command authorization, exact identities, current inherited
 and computed control state, refusal before effects and unchanged AL errors/text.
+`Page.ObjectId([UseNames])` uses declared metadata without requiring a running UI:
+exact numeric identity, caption/name fallback, Unicode and explicit missing-metadata
+refusal. Five compiled identity defects must reject, including fabricated Page zero.
 The production `PageSession` and AL `TestPage` adapter share validation/save/trigger
 execution. Generated delayed insertion and edit cases reconcile direct SQL results;
 production save errors propagate while AL test error collection remains explicit.
@@ -364,7 +367,7 @@ bounds at 0/1/39/40/41/80 and limits 7/40/80, block trigger order, retained sele
 post-trigger record values/original images and rollback after loaded-row errors. It does not clone whole
 pages or use TestPage.Next to enumerate rows. New/custom/temporary providers, refresh,
 selected globals/xRec and full ERP providers remain unqualified.
-Sixteen execution mutants and a control-shadowing compile refusal must reject;
+Thirty-four execution mutants and a control-shadowing compile refusal must reject;
 the narrow PageInstance interface must not pull in typed page/control/record headers.
 `make page-host-test JOBS=2` additionally exercises shared native profile-2 list rows
 through Caddy, external CMD/MCP and actual Chromium. Trusted `pages.list_rows` defaults

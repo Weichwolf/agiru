@@ -44,6 +44,16 @@ private:
   int hits_ = 0;
 };
 
+class CaptionPage : public agiru::Page<CaptionPage> {
+public:
+  CaptionPage() = default;
+};
+
+class MissingMetadataPage : public agiru::Page<MissingMetadataPage> {
+public:
+  MissingMetadataPage() = default;
+};
+
 struct Controls {};
 
 constexpr std::array kDisabledFields{agiru::ControlDef{
@@ -122,6 +132,12 @@ template <> struct agiru::PageTraits<CommandPage> {
   static constexpr const agiru::PageDef &kPage = ::kPage;
   static constexpr auto kControlTriggers = kBindings;
   template <typename, typename, template <typename> class> using Controls = ::Controls;
+};
+
+template <> struct agiru::PageTraits<CaptionPage> {
+  static constexpr agiru::PageId kId{50135};
+  static constexpr std::string_view kName = "Different AL Name";
+  static constexpr agiru::PageDef kPage{.id = kId, .name = kName, .caption = "Declared Ö 雪"};
 };
 
 static_assert(agiru::PageTraits<CommandPage>::kId == kPage.id);
@@ -391,6 +407,41 @@ void UnavailableControlsNeverSupplyDefaults() {
   CHECK_TRUE("ordinary Variant values still reach their callee", variantCalls == 1);
 }
 
+void ObjectIdentityUsesDeclaredPageMetadata() {
+  const CommandPage unnamedCaption;
+  CHECK_TEXT("ObjectId defaults to the declared numeric Page identity",
+             unnamedCaption.ObjectId(),
+             "Page 50131");
+  CHECK_TEXT("ObjectId false retains the Page prefix and declared number",
+             unnamedCaption.ObjectId(false),
+             "Page 50131");
+  CHECK_TEXT("ObjectId true falls back to the AL name when no caption exists",
+             unnamedCaption.ObjectId(true),
+             "Page Command Fixture");
+  CaptionPage page;
+  CHECK_TEXT("ObjectId true uses the declared caption, not its different AL name",
+             page.ObjectId(true),
+             "Page Declared Ö 雪");
+  CHECK_TEXT("another page retains its own numeric identity", page.ObjectId(), "Page 50135");
+  page.Caption("Changed Ω 雪");
+  const CaptionPage &read = page;
+  CHECK_TEXT("ObjectId true retains the current caption exactly",
+             read.ObjectId(true),
+             "Page Changed Ω 雪");
+  CHECK_TEXT(
+      "a changed caption cannot replace the numeric identity", read.ObjectId(false), "Page 50135");
+  page.Caption("");
+  CHECK_TEXT("cleared caption override restores declared-caption identity",
+             read.ObjectId(true),
+             "Page Declared Ö 雪");
+  bool refused = false;
+  try {
+    const MissingMetadataPage unknown;
+    static_cast<void>(unknown.ObjectId());
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageIdentityUnavailable"; }
+  CHECK_TRUE("missing Page metadata refuses instead of fabricating Page zero", refused);
+}
+
 }
 
 int main() {
@@ -400,5 +451,6 @@ int main() {
     ProductionSessionsUseTheSharedKernel();
     InstalledFactoriesDoNotRunHeadlessPages();
     UnavailableControlsNeverSupplyDefaults();
+    ObjectIdentityUsesDeclaredPageMetadata();
   });
 }

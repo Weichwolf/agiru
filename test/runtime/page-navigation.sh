@@ -111,6 +111,42 @@ for control in no-authorization no-enabled no-editable no-visible unknown-contro
   rg -q 'invalid commands refuse with the expected diagnostic' "$proof/dispatcher-$control.log"
   rm -- "$proof/dispatcher-$control" "$proof/dispatcher-$control.cpp"
 done
+for control in object-id-number object-id-prefix object-id-caption object-id-fallback object-id-metadata; do
+  awk -v control="$control" '
+    control == "object-id-number" && /if \(!UseNames\) \{ return "Page " \+ std::to_string\(declaration.id.Value\(\)\); \}/ {
+      sub(/declaration.id.Value\(\)/, "50131"); changed++
+    }
+    control == "object-id-prefix" && /if \(!UseNames\) \{ return "Page " \+ std::to_string\(declaration.id.Value\(\)\); \}/ {
+      sub(/"Page " \+ /, ""); changed++
+    }
+    control == "object-id-caption" && /auto caption = Caption\(\);/ {
+      sub(/Caption\(\)/, "std::string(declaration.name)"); changed++
+    }
+    control == "object-id-fallback" && /if \(caption.empty\(\)\) \{ caption = declaration.name; \}/ {
+      sub(/caption = declaration.name/, "caption.clear()"); changed++
+    }
+    control == "object-id-metadata" && /throw Error\("Page.ObjectId requires declared page metadata", "PageIdentityUnavailable"\);/ {
+      $0 = "      return \"Page 0\";"; changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' include/runtime/Page.h > "$proof/mutant/include/runtime/Page.h"
+  "$CXX" "-I$proof/mutant/include" "${flags[@]}" test/gate/PageDispatcherGate.cpp \
+    "${links[@]}" -o "$proof/$control"
+  status=0
+  "$proof/$control" > "$proof/$control.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  case "$control" in
+    object-id-number) claim='another page retains its own numeric identity' ;;
+    object-id-prefix) claim='ObjectId defaults to the declared numeric Page identity' ;;
+    object-id-caption) claim='ObjectId true uses the declared caption, not its different AL name' ;;
+    object-id-fallback) claim='ObjectId true falls back to the AL name when no caption exists' ;;
+    object-id-metadata) claim='missing Page metadata refuses instead of fabricating Page zero' ;;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+  unlink "$proof/$control"
+done
+cp include/runtime/Page.h "$proof/mutant/include/runtime/Page.h"
 for control in window-no-row-trigger window-row-is-current window-no-current-trigger window-lose-current window-no-original-image; do
   awk -v control="$control" '
     control == "window-no-row-trigger" && /detail::AfterReadPageRecord\(page\);/ {
@@ -352,4 +388,4 @@ fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; twenty-nine execution controls and one control-name compile refusal reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; thirty-four execution controls and one control-name compile refusal reject; %s\n' "$proof"

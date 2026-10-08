@@ -4,19 +4,41 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: link the native app and repeat the original Customer workflow; never patch
-apps or guess declarations.
-ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
-The previous keep-going build exposed mixed-case unavailable record references, indexed
-fields and unselected TestPage parts/extension fields. The original TestPage groups
-551/028 now compile after the named-part/Variant repairs; the FieldNo group compiled
-in the preceding increment. The native app is not linked. The pure O365 credentials page is explicitly excluded
-by bounded product policy (0058) and the generated build selection; full native linking remains pending.
+Next: classify and remove explicitly product-excluded Power BI page parts/calls through
+the shared source-selection policy, retaining raw identities and generic charts. Never
+silence unselected controls with successful no-ops or patch generated apps. Regenerate,
+link and repeat the original Customer workflow, including concurrent-edit rejection.
+The native diagnostic-slice integration now compiles and links with `make dev-exec
+COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1761 AL procedures
+still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
+`make erp-client-test JOBS=2` against that image passes preparation 22/22 and client
+1/14. Customer List opening fails at `Page.ObjectId(Boolean)`; the subsequent master-data
+and three concurrent-edit cases do not reach their prerequisites. Historical 11/11 is
+not current acceptance. The next call is the unavailable Power BI part's SetPageContext.
+The pure O365 credentials page remains bounded-product-excluded (0058).
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
 production variable setters and qualify original invalid-input/lookup/dimension cases.
 Never substitute a default template, UT handler or client rule.
+`Page.ObjectId([UseNames])` now uses declared metadata before page opening: exact
+`Page <ID>`, current caption or AL-name fallback; missing metadata refuses. The
+`make page-navigation B=/workspace/build/podman JOBS=2` in the development container
+passes 15 Source, 270 generated navigation and 122 Dispatcher checks, zero red;
+all 34 execution controls and the control-name compile refusal reject, including five
+new identity controls. This does not implement excluded Power BI. Integration and
+original Customer replay after the header change remain pending. The changed
+Dispatcher consumer passes targeted clang-tidy: 1/344 units, zero failures, not FULL.
+Contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
+`methods-auto/page/page-objectid-method.md`; BCApps main
+`d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`,
+`Layers/W1/BaseApp/Sales/Customer/CustomerList.Page.al` OnInit and
+`Modules/System/PowerBI/Embedding/PowerBIEmbeddedReportPart.Page.al`;
+predecessor board 1356 distinguishes CurrPage metadata from static object resolution.
+Sources: `include/runtime/Page.h`, `test/gate/PageDispatcherGate.cpp`,
+`test/runtime/page-navigation.sh`. Client rowversion conflicts remain unqualified;
+`Storage.cpp` currently updates by primary key without an observed-version predicate,
+and `PageSession.h::RereadBeforeEdit_` refreshes the stored record before entry.
 Immediate security prerequisite: qualify browser session transport below before accepting
 externally accessible client workflows; retain the credential-specific ownership regression.
 

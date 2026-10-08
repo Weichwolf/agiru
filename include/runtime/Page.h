@@ -1149,22 +1149,20 @@ public:
     return lookupMode_;
   }
 
-  /// \brief AL `Page.ObjectId()` -- the READING form, which the documentation's syntax
-  /// block brackets: `[X := ] Page.ObjectId([NewX])`.
-  /// \return The value it holds.
-  /// \throws Error until the UI runs (board:0030).
-  [[nodiscard]] std::string ObjectId() const {
-    throw Error("Page.ObjectId() needs a running UI (board:0030)");
-  }
-
-  /// \brief AL `Page.ObjectId(Boolean)`. Returns a string in the "Page xxx" format, where xxx is
-  /// the caption or ID of the application object.
-  /// \param UseNames The AL `Boolean`.
-  /// \return The AL `Text`.
-  /// \throws Error until the UI runs (board:0030).
-  std::string ObjectId(::agiru::Boolean UseNames) {
-    static_cast<void>(UseNames);
-    throw Error("Page.ObjectId(Boolean) needs a running UI (board:0030)");
+  /// \brief AL `Page.ObjectId([UseNames])`, available from declared metadata before opening.
+  /// \param UseNames False selects the declared ID; true selects caption, falling back to name.
+  /// \return Exact AL text with the "Page " prefix, preserving caption/name Unicode.
+  /// \throws Error with PageIdentityUnavailable when the page has no declared identity.
+  [[nodiscard]] std::string ObjectId(::agiru::Boolean UseNames = false) const {
+    if constexpr (requires { PageTraits<Derived>::kPage; }) {
+      const auto &declaration = PageTraits<Derived>::kPage;
+      if (!UseNames) { return "Page " + std::to_string(declaration.id.Value()); }
+      auto caption = Caption();
+      if (caption.empty()) { caption = declaration.name; }
+      return "Page " + caption;
+    } else {
+      throw Error("Page.ObjectId requires declared page metadata", "PageIdentityUnavailable");
+    }
   }
 
   /// \brief AL `Page.PromptMode()` -- the READING form, which the documentation's syntax
