@@ -257,8 +257,11 @@ including a chained Page() receiver. Reaching them throws with the original AL p
 side-effecting arguments run once before refusal, while an untaken branch stays inert.
 Removing the refusal or argument evaluation must fail the compiled runner. Selected
 parts keep their declared field calls. AbsentControl never supplies successful defaults,
-including direct Boolean/integer conversions and chained calls. This deliberately removes
-the old unqualified headless/add-in no-op: any lost AL UT identities remain regressions,
+including direct Boolean/integer conversions and chained calls.
+Variant assignment and typed Variant arguments also refuse before the callee; removing
+the shared refusal marker must restore the ambiguous C++ conversion and fail compilation.
+This deliberately removes the old unqualified headless/add-in no-op:
+any lost AL UT identities remain regressions,
 not an approved scope exclusion. Actual add-in/chart execution and live part-entry
 trigger/transaction behavior remain separate requirements.
 Unselected named Page.Run/RunModal calls compile through the numbered runtime API,

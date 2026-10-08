@@ -4,12 +4,14 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: repair the remaining native groups' generic missing-type/member
-emission and repeat the original Customer workflow; never patch apps or guess declarations.
+Next: repair generic mixed-case unavailable Record reference identity and missing
+selected extension fields, then repeat the original Customer workflow; never patch apps
+or guess declarations.
 ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
 The previous keep-going build exposed mixed-case unavailable record references, indexed
-fields and unselected TestPage parts/extension fields. The regenerated FieldNo group now compiles;
-the native app is not linked. The pure O365 credentials page is now explicitly excluded
+fields and unselected TestPage parts/extension fields. The original TestPage groups
+551/028 now compile after the named-part/Variant repairs; the FieldNo group compiled
+in the preceding increment. The native app is not linked. The pure O365 credentials page is explicitly excluded
 by bounded product policy (0058) and the generated build selection; full native linking remains pending.
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
@@ -224,15 +226,18 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   no subsequent effects and an untouched untaken branch; selected parts retain their
   declared field calls. Removing refusals or argument evaluation fails execution.
   `runtime/Page.h` no longer returns successful defaults for absent controls/add-ins.
+  Its shared `IsAlRefusal` marker prevents Variant fallback/conversion ambiguity.
+  Compiled AL Variant assignment/arguments refuse before callee effects; removing
+  the marker must fail compilation with the original ambiguity.
   The former headless no-op and its historical nine-UT justification were not a
   platform guarantee. Keep any resulting AL UT losses visible; implement required
   charts/add-ins rather than restoring successful stubs or expanding exclusions.
   Actual part-entry host writes/triggers remain unqualified, as predecessor 803 warns.
   `make native-codeunits JOBS=2` with the verified System package: generator 74,
-  executable refusals 94, source-bound 8 and original Base64 61 checks, zero red;
+  executable refusals 98, source-bound 8 and original Base64 61 checks, zero red;
   all existing negative controls reject. `make gate GATE=PageDispatcherGate JOBS=2`:
-  110 checks, zero red. The affected-unit clang-tidy analysis records 25/344 units
-  with exit 0; the missing direct Integer include in the new gate is fixed.
+  113 checks, zero red. Ten affected compiled units pass clang-tidy; format passes
+  and the suppression baseline remains 12. This is not a FULL=1 claim over all 344 units.
   References at the pinned revisions above: developer
   `methods-auto/testpart/testpart-first-method.md` and
   `methods-auto/testfield/testfield-{visible,setvalue}-method.md`; BCApps `main`
@@ -247,7 +252,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.
-  Current regeneration preserves generator exit 1 and source-origin check 0. Slice-check:
+  It writes 18,378 objects, with 25 changed and zero swept. Parser test populations
+  stay at 38,421 and the 77-codeunit/2,298-method milestone subset; the independent
+  0058 source census remains separate, not a parser or executed-test result. Slice-check:
   14,225 raw entries, 13,592 selected, 101 product-excluded, 532 omitted, zero missing.
   Do not confuse these diagnostic source entries with the full AL test population.
   The previous keep-going build failed six groups (526/650/551/028/421/140).
@@ -255,7 +262,12 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   with the production PCH, warning policy and source-selection checks:
   `make dev-exec COMMAND='cmake --build /workspace/build/podman -j 2 --target
   CMakeFiles/agiru_slice.dir/Unity/unity_stable/140/root_cxx.cxx.o'`.
-  The O365 credentials source is explicitly excluded; remaining generic field/part/type
+  Current original `UserCardTest.cpp` and `LibraryCRMIntegration.cpp` groups also compile
+  with the production PCH, warning policy and unchanged source-selection counts:
+  `make dev-exec COMMAND='cmake --build /workspace/build/podman -j 2 --target
+  CMakeFiles/agiru_slice.dir/Unity/unity_stable/551/root_cxx.cxx.o
+  CMakeFiles/agiru_slice.dir/Unity/unity_stable/028/root_cxx.cxx.o'`.
+  The O365 credentials source is explicitly excluded; remaining generic field/type
   repairs and full linking remain open. This narrow compile is not full native/ERP acceptance.
   Named Page.Run/RunModal now lower through the numbered runtime API, with an explicit
   kind/name refusal before dispatch instead of an invented absent class or object zero.

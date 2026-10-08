@@ -63,6 +63,9 @@ template <typename Derived> class Page;
 /// \brief Compile-time result shape of an unavailable page control, never a default value.
 class AbsentControlValue {
 public:
+  /// \brief Keeps value-container fallback constructors out of refusal conversion.
+  using IsAlRefusal = void;
+
   /// \brief Refuses a read in a declared value context. \tparam T The type.
   /// \return Never. \throws Error always.
   template <typename T>

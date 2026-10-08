@@ -12,6 +12,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/StringValue.h"
+#include "type/Variant.h"
 
 #include "Check.h"
 
@@ -378,6 +379,16 @@ void UnavailableControlsNeverSupplyDefaults() {
       UnavailableControlRefuses([&] { static_cast<void>(static_cast<agiru::Integer>(shape)); }));
   CHECK_TRUE("chained unavailable results cannot succeed",
              UnavailableControlRefuses([&] { static_cast<void>(shape("argument")); }));
+  int variantCalls = 0;
+  const auto consumeVariant = [&](const agiru::Variant &value) {
+    static_cast<void>(value);
+    ++variantCalls;
+  };
+  CHECK_TRUE("a Variant argument refuses without an ambiguous container conversion",
+             UnavailableControlRefuses([&] { consumeVariant(shape); }));
+  CHECK_TRUE("the Variant callee never runs after a refusal", variantCalls == 0);
+  consumeVariant(agiru::Variant{true});
+  CHECK_TRUE("ordinary Variant values still reach their callee", variantCalls == 1);
 }
 
 }

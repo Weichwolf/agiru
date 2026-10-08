@@ -183,6 +183,7 @@ codeunit 50311 NativeFixture
     var
         Host: TestPage "Part Host";
         Value: Boolean;
+        Actual: Variant;
     begin
         Counter := 41;
         case Operation of
@@ -191,6 +192,8 @@ codeunit 50311 NativeFixture
             2: Host.MissingPart.Opportunities.DrillDown();
             3: Host.MissingPart.Name.SetValue(PartArgument(Counter));
             4: Host.MissingPart.Page().Name.SetValue(PartArgument(Counter));
+            5: Actual := Host.MissingPart.Name.Visible();
+            6: ConsumePartValue(Host.MissingPart.Name.Visible(), Counter);
         end;
         Counter := 99;
     end;
@@ -208,5 +211,10 @@ codeunit 50311 NativeFixture
     begin
         Counter += 1;
         exit('argument');
+    end;
+
+    local procedure ConsumePartValue(Value: Variant; var Counter: Integer)
+    begin
+        Counter += 1;
     end;
 }

@@ -25,10 +25,11 @@ generate() {
 
 link_generated() {
   local output=$1 object=$2 runner=$3
-  local sources=()
+  local sources=() overrides=()
+  if [ -n "${4:-}" ]; then overrides=("-I$4"); fi
   mapfile -t sources < <(rg --files --no-ignore "$output" -g '*.cpp' | LC_ALL=C sort)
   [ "${#sources[@]}" -gt 0 ]
-  "$CXX" "${flags[@]}" "-I$output/fixture" "-I$output/platform" "-I$output/shared" "-I$output/absent" \
+  "$CXX" "${overrides[@]}" "${flags[@]}" "-I$output/fixture" "-I$output/platform" "-I$output/shared" "-I$output/absent" \
     "-I$output" "$object" "${sources[@]}" "${links[@]}" -o "$runner"
 }
 
@@ -51,13 +52,27 @@ record_command native-codeunits "$input/Runner.cpp" \
 link_generated "$proof/generated" "$proof/runner.o" "$proof/runner"
 "$proof/runner" | tee "$proof/execution.log"
 
+mkdir -p "$proof/no-part-refusal-marker/runtime"
+awk '
+  /using IsAlRefusal = void;/ { removed++; next }
+  { print }
+  END { if (removed != 1) exit 2 }
+' include/runtime/Page.h > "$proof/no-part-refusal-marker/runtime/Page.h"
+if link_generated "$proof/generated" "$proof/runner.o" "$proof/no-part-refusal-marker-runner" \
+  "$proof/no-part-refusal-marker" > "$proof/no-part-refusal-marker-control.log" 2>&1; then
+  printf 'native-codeunits: unavailable part Variant conversion escaped compilation control\n' >&2
+  exit 1
+fi
+rg -q "conversion from 'AbsentControlValue'.*Variant.*ambiguous" "$proof/no-part-refusal-marker-control.log"
+rm -r -- "$proof/no-part-refusal-marker"
+
 cp -a "$proof/generated" "$proof/no-part-refusal"
 awk '
   /AbsentControl\("Host.MissingPart./ {
     sub(/^[[:space:]]*.*/, "      static_cast<void>(0);"); changed++
   }
   { print }
-  END { if (changed != 6) exit 2 }
+  END { if (changed != 8) exit 2 }
 ' "$proof/generated/fixture/system/fixture/codeunit/NativeFixture.cpp" \
   > "$proof/no-part-refusal/fixture/system/fixture/codeunit/NativeFixture.cpp"
 if link_generated "$proof/no-part-refusal" "$proof/runner.o" "$proof/no-part-refusal-runner" \
