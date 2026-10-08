@@ -2,11 +2,14 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: rebuild production generated consumers and execute Customer New/template under 0720;
+Next: finish the native HTTP regression matrix, rebuild production generated consumers
+and execute Customer New/template/save/reopen under 0720;
 qualify disabled native callbacks, shutdown rollback, progress execution and the
-remaining optimistic-write/isolation contracts. Original Customer retains seven
-passing list/card/edit/permission/receipt cases and one new, unsuppressed modal failure.
-The New command's failed AL boundary retains all 68 customers in independent SQL.
+remaining optimistic-write/isolation contracts. The rebuilt original Customer opens
+the real template modal and inserts the explicitly selected template. Expanded workflow
+acceptance currently has eight passes and three persistence failures: Address, Country
+and Credit Limit stay only in the page buffer. The generic state repair below is gate-
+qualified; its production rebuild and original workflow acceptance remain pending.
 Repeat counted AL execution after the verified SelectLatestVersion increment below;
 retain every startup refusal and test identity. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
@@ -51,6 +54,28 @@ do not defer client construction until all transaction acceptance is complete.
 
 ## Sources and regression ownership
 
+`PageSession.h` now reconciles source-AL insertion with both pending-new markers.
+Native storage probes both primary key and immutable SystemId with bounded `SELECT 1`,
+without replacing the live buffer, image, filters or rowversion. Temporary storage uses
+its indexed key lookup and typed GUID equality; it never reads/writes PostgreSQL.
+Nonblank/copied IDs alone are not insertion receipts; rolled-back inserts remain pending.
+`make page-navigation JOBS=2` in the development container: 239 generated navigation,
+105 dispatcher and 15 source checks, zero red; 25 execution defects and one compile
+refusal reject. The 19 added checks cover source insertion during OnNewRecord,
+OnAfterGetCurrRecord/Copy and OnValidate, ordinary field persistence, duplicate prevention,
+pending identity/key mismatches, rollback and temporary rows. DelayedInsert regressions
+remain green. The changed runner passes targeted clang-tidy without suppressions.
+Sources: `test/runtime/page-navigation/{Created.Page.al,Runner.cpp}` and its Bash harness.
+References at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
+`methods-auto/page/page-saverecord-method.md`, `methods-auto/record/record-copy-method.md`,
+`devenv-table-system-fields.md`, `properties/devenv-delayedinsert-property.md` and
+`triggers-auto/page/devenv-on{insert,modify}record-page-trigger.md`.
+BCApps `CustomerCard.Page.al::CreateCustomerFromTemplate` and
+`CustomerTemplMgt.Codeunit.al::InsertCustomerFromTemplate` at
+`d99152ee35f0ca8cfec43ba6334b7247a0ee6b17` expose the same general lifecycle.
+Predecessor WIs 1554/1395 retain trigger/delayed-insert findings. This is not optimistic
+write, financial posting or original Customer HTTP acceptance.
+
 Borrowed modal lifecycle and native transport are qualified in 0720: 220 generated
 navigation, 105 dispatcher and 15 source checks pass; 21 execution defects and one
 compile defect reject. The caller's original AL page/filters survive; false/error close
@@ -62,8 +87,10 @@ their own receipt identity after the HTTP worker returns, never masquerade as su
 root polling. Independent
 SQL verifies nested modal/question suspension, explicit cancellation/timeout rollback,
 no implicit modal commit, and durability of a prior explicit Commit after caller failure.
-Child-input receipts do not establish root durability. Original Customer template
-execution still requires the generated production ABI rebuild; no finance acceptance.
+Child-input receipts do not establish root durability. The production ABI rebuild
+at `d31bb87` passes slice-check/all (14,225 slice sources, 1,526 seconds); the new
+source-insertion repair still needs a rebuilt image and original workflow proof.
+No finance acceptance.
 
 Blocking Confirm/StrMenu now enforce trusted
 `transactions.allow_session_call_suspend_when_write_transaction_started`, default true,

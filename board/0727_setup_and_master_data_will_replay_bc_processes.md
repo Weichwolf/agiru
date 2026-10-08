@@ -3,7 +3,7 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: resolve the native modal-template contract in 0720/0741, then reproduce the
+Next: qualify the source-insertion state repair in 0720/0741, then reproduce the
 captured template → customer → edit → reopen sequence through external CMD/MCP and
 sample the agiru browser; expand the remaining master-data cases.
 
@@ -25,9 +25,13 @@ sample the agiru browser; expand the remaining master-data cases.
   List/Card/edit cases across external CMD/MCP and actual Chromium, independently
   checking the 40-row SQL window, exact Unicode saves, permissions and durable receipts.
   This does not replay the captured New/template sequence or accept this process family.
-- The expanded eight-case run retains those seven passes; New fails explicitly at
-  original `Select Customer Templ. List` (1380), without inserting a customer.
-  The seed has three templates; choosing one automatically is not an implementation.
+- The expanded eleven-case run retains eight passes; original modal 1380 exposes all
+  three templates. CMD/MCP/Chromium explicitly select the second template, create one
+  customer through original AL, and independently verify creator plus five inherited
+  posting/payment/currency fields. Three cases fail because Address/Country/Credit Limit
+  stay only in the page buffer after Name saves. The generic new-record reconciliation
+  repair is gate-qualified in 0741; its production rebuild, independent reopen and ledger
+  acceptance remain pending. Choosing a template automatically is not an implementation.
 - Docs revision `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`, under
   `~/Git/dynamics365smb-docs/business-central/`: `setup.md`,
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,

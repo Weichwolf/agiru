@@ -16,6 +16,7 @@
 #include "runtime/Session.h"
 #include "runtime/SessionCommand.h"
 #include "runtime/Storage.h"
+#include "runtime/Table.h"
 #include "runtime/TablePermissions.h"
 #include "runtime/Transaction.h"
 #include "runtime/UiHost.h"
@@ -34,6 +35,7 @@
 #include "fixture/codeunit/NavigationPropertyConsumer.h"
 #include "fixture/page/NavigationBlockedList.h"
 #include "fixture/page/NavigationCard.h"
+#include "fixture/page/NavigationCreated.h"
 #include "fixture/page/NavigationDelayed.h"
 #include "fixture/page/NavigationList.h"
 #include "fixture/page/NavigationModal.h"
@@ -762,6 +764,93 @@ void ProductionLifecycleAndTestErrorPolicy() {
   CHECK_TEXT("independent SQL confirms the validated edit", stored.Value(0, 1).value_or(""), "44");
 }
 
+void SourceInsertedRecordsBecomeExistingPageRows() {
+  using Created = agiru::Fixture::NavigationCreated_Page;
+  constexpr agiru::Integer kCreatedBase = 910;
+  constexpr agiru::Integer kEnteredValue = 71;
+  for (agiru::Integer mode = 1; mode <= 3; ++mode) {
+    Created original;
+    original.Configure(mode, kCreatedBase + mode);
+    agiru::PageSession<Created> page;
+    page.Prepare_Borrowed(original);
+    page.OpenNew();
+    const auto identity = original.Rec.SystemId;
+    page.SetControlText("Value", "71");
+    Row observed;
+    CHECK_TRUE("source-inserted new pages persist an ordinary field before leaving",
+               observed.Get(kCreatedBase + mode) && observed.Value == kEnteredValue);
+    CHECK_TRUE("source-inserted pages retain their original SystemId",
+               mode == 3 || observed.SystemId == identity);
+    CHECK_TRUE("source insertion reconciles both page new-record markers",
+               !original.StandsOnNewRecord());
+    page.RowLeft();
+    page.Close();
+    CHECK_TRUE("leaving a source-inserted page never inserts a duplicate",
+               observed.Get(kCreatedBase + mode) && observed.Value == kEnteredValue);
+  }
+}
+
+void PendingNewRowsDoNotBecomeUnrelatedExistingRows() {
+  using Created = agiru::Fixture::NavigationCreated_Page;
+  constexpr agiru::Integer kPendingId = 940;
+  constexpr agiru::Integer kStoredValue = 19;
+  Row existing;
+  existing.ID = kPendingId;
+  existing.Value = kStoredValue;
+  existing.Insert();
+  for (const bool matchingId : {false, true}) {
+    Created original;
+    original.Configure(0, matchingId ? kPendingId + 1 : kPendingId);
+    agiru::PageSession<Created> page;
+    page.Prepare_Borrowed(original);
+    page.OpenNew();
+    original.Rec.SystemId = matchingId ? existing.SystemId : agiru::Guid::Create();
+    bool refused = false;
+    try {
+      page.SetControlText("Value", "72");
+    } catch (const agiru::Error &) { refused = true; }
+    CHECK_TRUE("pending pages require both stored primary key and SystemId",
+               !refused && original.StandsOnNewRecord() && existing.Get(kPendingId) &&
+                   existing.Value == kStoredValue);
+    CHECK_TRUE("a copied SystemId does not create the changed primary key",
+               !existing.Get(kPendingId + 1));
+    static_cast<void>(page.Close_Modal(agiru::Action::Cancel));
+  }
+  Created original;
+  original.Configure(0, kPendingId + 2);
+  agiru::PageSession<Created> page;
+  page.Prepare_Borrowed(original);
+  page.OpenNew();
+  {
+    agiru::detail::Scope rollback;
+    original.Rec.Insert();
+    rollback.Rollback();
+  }
+  page.SetControlText("Value", "73");
+  CHECK_TRUE("rolled-back source insertion leaves a pending page, not a stored row",
+             original.StandsOnNewRecord() && !existing.Get(kPendingId + 2));
+  static_cast<void>(page.Close_Modal(agiru::Action::Cancel));
+}
+
+void TemporarySourceInsertedRowsRemainTemporary() {
+  using Created = agiru::Fixture::NavigationCreated_Page;
+  constexpr agiru::Integer kTemporaryId = 950;
+  agiru::Temporary<Row> temporary;
+  Created original;
+  agiru::detail::RuntimeAdoptTemporary(&original.Rec, &temporary);
+  original.Configure(1, kTemporaryId);
+  agiru::PageSession<Created> page;
+  page.Prepare_Borrowed(original);
+  page.OpenNew();
+  page.SetControlText("Value", "74");
+  Row observed;
+  CHECK_TRUE("source-inserted temporary pages save within their own rows",
+             original.Rec.Get(kTemporaryId) && original.Rec.Value == 74);
+  CHECK_TRUE("temporary source insertion never persists a SQL row", !observed.Get(kTemporaryId));
+  page.RowLeft();
+  page.Close();
+}
+
 void TestHandlesRebindTheirGeneratedControls() {
   agiru::TestPage<Card> owner;
   owner.OpenEdit();
@@ -933,6 +1022,9 @@ int main(int argc, char **argv) {
     CardModificationPolicy();
     EmptyListDoesNotCreateACard();
     ProductionLifecycleAndTestErrorPolicy();
+    SourceInsertedRecordsBecomeExistingPageRows();
+    PendingNewRowsDoNotBecomeUnrelatedExistingRows();
+    TemporarySourceInsertedRowsRemainTemporary();
     TestHandlesRebindTheirGeneratedControls();
     RequestPageAdaptersRetainFieldsAndFilters();
     PagesSurviveSeparateClientCommands();

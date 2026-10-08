@@ -4,10 +4,10 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: rebuild production generated consumers after the PageInstance/control ABI changes,
-then execute original Customer New/template (1380), explicit selection/cancel and GetRecord
-writeback for 0727. The native modal transport proof uses authored generated pages,
-not this business workflow. Never substitute a default template, UT handler or client rule.
+Next: rebuild production generated consumers after the source-insertion state repair
+in 0741, then qualify original Customer template (1380) → create → edit → independent
+reopen for 0727. The expanded workflow run has eight passes and three stored-field
+failures before this repair. Never substitute a default template, UT handler or client rule.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -61,9 +61,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 - Sources: `include/runtime/{Page,PageSession,PageInstance,UiHost}.h`,
   `src/rt/{PageInstance,UiHost}.cpp`, `test/runtime/page-navigation/{Modal.Page.al,Runner.cpp}`
   and its Bash harness. This is a generated-factory/trusted-host gate, not HTTP parity.
-  The native host now uses the transport below; original Customer New remains unaccepted.
-  Rebuild generated consumers after the PageInstance/control virtual-interface changes
-  before rerunning original Customer. Non-modal query-close behaviour remains unqualified.
+  The native host now uses the transport below; original Customer opens its modal and
+  inserts the chosen template, but ordinary-field persistence/reopen remains unaccepted.
+  Non-modal query-close behaviour remains unqualified.
 - Developer `methods-auto/page/page-{runmodal-,getrecord,lookupmode}-method.md` and
   `triggers-auto/page/devenv-onqueryclosepage-page-trigger.md` at
   `f928288ee840334be73142e5fc0202c0e19b246d`.
@@ -111,9 +111,10 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   5,683 refused properties and 625 untranslated in-scope object kinds remain counted.
   Native declarations select 233/234 tables (one approved licensing exclusion), with
   22 bound/211 unbound; all 35 codeunits are selected but 67 methods remain unbound.
-  `make slice-check all JOBS=6` stopped deliberately at 535/1,075 compiler steps to
-  repair the observed delayed modal-error transport loss. Keep incremental outputs and
-  rebuild after HTTP qualification; generation is not complete AL execution.
+  The resumed `make slice-check all JOBS=6` completes at `d31bb87`: 14,225 slice sources,
+  exit zero, 1,526 seconds; 1,902 unlinked procedures remain diagnostic stand-ins.
+  The later source-insertion state repair still requires rebuilding generated consumers.
+  Generation/slice linking is not complete AL execution.
 - Remaining: original Customer creation/reopen, computed control values, variable input
   validation/retry, automatic AL CurrPage.Close, dynamic Editable, progress/report callbacks,
   modal error-string quotas and expired-receipt cleanup. This is not source-BC collation,
@@ -411,9 +412,15 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   recorded in `e67438a`/0741; it predates native questions and linked-card creation.
   These gates/fixtures do not execute the source-counted AL UT.
 
-- Original Customer regression: `make erp-client-test JOBS=2`, eight cases,
-  **seven pass/one failure**, none skipped/cancelled. New/template remains red above;
-  all seven existing list/card/edit/permission/receipt cases still pass.
+- Original Customer regression after the production modal rebuild: `make erp-client-test
+  JOBS=2`, eleven cases, **eight pass/three failures**, none skipped/cancelled. Original
+  New/template display and all seven existing cases pass. CMD/MCP/Chromium each explicitly
+  select the second template, receive original Card 21 and create one numbered customer;
+  SQL confirms creator and five inherited posting/payment/currency fields. Name persists,
+  but Address/Country/Credit Limit only change the buffer; per-field independent SQL retains
+  the previous rowversion. Independent reopen/ledger assertions remain unexecuted after
+  these failures. The generic state repair and its focused proof belong to 0741; rebuild
+  the production image before claiming workflow acceptance.
   `test/ui/erp-client.mjs` follows the existing asynchronous opening call without
   reopening; `browser-client.mjs` recognizes typed server errors and compares their
   exact text/outcome. Real NativePermissions denial is `Permission/refused` before

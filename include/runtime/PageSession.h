@@ -526,6 +526,7 @@ public:
   /// record has nothing to save. Openerp WI-1113 measured the round trip at +17.
   void SaveExistingRecord_() {
     if constexpr (kHasRecord) {
+      ReconcileNewRecord_();
       if (newRecord_ || page_ == nullptr) { return; }
       const detail::RecordState *state =
           reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
@@ -546,6 +547,7 @@ public:
   /// to re-read and a temporary one keeps what the page put in it.
   void RereadBeforeEdit_() {
     if constexpr (kHasRecord) {
+      ReconcileNewRecord_();
       if (newRecord_ || page_ == nullptr) { return; }
       const detail::RecordState *state =
           reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
@@ -939,8 +941,39 @@ private:
     }
   }
 
+  /// \brief Reconciles source AL insertion with the client's pending-new-record marker.
+  /// \note A nonblank SystemId alone is not proof: both its immutable identity and the
+  ///       current primary key must exist in the current storage/transaction. The bounded
+  ///       existence probe preserves the live buffer, filters, image and rowversion.
+  ///       Pending, copied-to-another-key and rolled-back rows remain pending.
+  void ReconcileNewRecord_() {
+    if constexpr (kHasRecord) {
+      if constexpr (requires { Record_().SystemId.IsNull(); }) {
+        if (!newRecord_ || page_ == nullptr || Record_().SystemId.IsNull()) { return; }
+        using Source = std::remove_cvref_t<decltype(Record_())>;
+        Source probe = Record_();
+        auto &platform = Platform_(probe);
+        if (detail::RuntimeIsTemporary(&Record_())) {
+          if (!detail::RuntimeGet(&probe, RecordTraits_().kTable) ||
+              probe.SystemId != Record_().SystemId) {
+            return;
+          }
+        } else {
+          platform.Reset();
+          platform.SetRecFilter();
+          platform.SetRange(probe.SystemId, probe.SystemId);
+          if (platform.IsEmpty()) { return; }
+        }
+        newRecord_ = false;
+        page_->LandedOnRecord();
+        reinterpret_cast<detail::StateHandle *>(&Record_())->Ensure().positioned = true;
+      }
+    }
+  }
+
   void SaveNewRecord_() {
     if constexpr (kHasRecord) {
+      ReconcileNewRecord_();
       if (!newRecord_ || page_ == nullptr) { return; }
       newRecord_ = false;
       edited_ = false;
@@ -1034,11 +1067,12 @@ private:
       Bind_();
       try {
         initialize(*page_);
+        newRecord_ = isNew;
+        ReconcileNewRecord_();
       } catch (...) {
         Release_();
         throw;
       }
-      newRecord_ = isNew;
     } else {
       static_cast<void>(initialize);
       static_cast<void>(isNew);

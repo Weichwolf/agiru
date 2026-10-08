@@ -185,7 +185,7 @@ if "$CXX" "-I$proof/mutant/include" "${flags[@]}" -c test/runtime/page-navigatio
   exit 1
 fi
 rg -q "member 'Open' found in multiple base classes" "$proof/shadowed-controls.log"
-for control in no-card wrong-row no-policy collect-production-errors; do
+for control in no-card wrong-row no-policy collect-production-errors source-insert source-identity source-key source-existence; do
   awk -v control="$control" '
     control == "no-card" && /if \(edit && EditCard_\(\)\)/ {
       sub(/edit && EditCard_\(\)/, "false"); changed++
@@ -198,6 +198,18 @@ for control in no-card wrong-row no-policy collect-production-errors; do
     }
     control == "collect-production-errors" && /static constexpr bool kCollectSaveErrors = false/ {
       sub(/kCollectSaveErrors = false/, "kCollectSaveErrors = true"); changed++
+    }
+    control == "source-insert" && /void ReconcileNewRecord_\(\) \{/ {
+      sub(/\{/, "{ return;"); changed++
+    }
+    control == "source-identity" && /platform.SetRange\(probe.SystemId, probe.SystemId\);/ {
+      sub(/platform.SetRange\(probe.SystemId, probe.SystemId\);/, "static_cast<void>(probe);"); changed++
+    }
+    control == "source-key" && /platform.SetRecFilter\(\);/ {
+      sub(/platform.SetRecFilter\(\);/, "static_cast<void>(platform);"); changed++
+    }
+    control == "source-existence" && /if \(platform.IsEmpty\(\)\) \{ return; \}/ {
+      sub(/if \(platform.IsEmpty\(\)\) \{ return; \}/, "static_cast<void>(platform);"); changed++
     }
     { print }
     END { if (changed != 1) exit 2 }
@@ -213,6 +225,8 @@ for control in no-card wrong-row no-policy collect-production-errors; do
     wrong-row) rg -q 'system Edit opens the declared card on the selected row' "$proof/$control-execution.log" ;;
     no-policy) rg -q 'system Edit honors the card.s ModifyAllowed policy' "$proof/$control-execution.log" ;;
     collect-production-errors) rg -q 'production row-save errors propagate instead of successful collection' "$proof/$control-execution.log" ;;
+    source-insert) rg -q 'source-inserted new pages persist an ordinary field before leaving' "$proof/$control-execution.log" ;;
+    source-identity|source-key|source-existence) rg -q 'pending pages require both stored primary key and SystemId' "$proof/$control-execution.log" ;;
   esac
   rm -- "$proof/$control"
 done
@@ -288,4 +302,4 @@ fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; twenty-one execution controls and one control-name compile refusal reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; twenty-five execution controls and one control-name compile refusal reject; %s\n' "$proof"
