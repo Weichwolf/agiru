@@ -42,6 +42,7 @@ struct TableRef {
   std::vector<std::string> interfaceBases{};
   std::string declarationAssertions{};
   bool native = false;
+  bool fieldSchemaKnown = false;
   std::optional<SystemFieldProfile> hostProfile{};
 };
 

@@ -719,6 +719,40 @@ void UnavailableTypeIdentityRetainsKindsAndRawNames() {
              body.contains(type + " First{}") && body.contains(type + " Second{}"));
 }
 
+void MissingFieldsDoNotInventSelectedTableStorage() {
+  auto objects = Tables();
+  objects.tables.at("line number buffer").fieldSchemaKnown = true;
+  objects.tables.at("line number buffer").fields.emplace("line no.", "LineNo");
+  objects.tables.at("line number buffer").procedures.emplace("answer", "Answer");
+  const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
+    codeunit 50319 MissingFields {
+      procedure Read()
+      var Row: Record "Line Number Buffer"; Rows: array[2] of Record "Line Number Buffer";
+          Value: Integer;
+      begin
+        Value := Row."Missing Field";
+        Value := Rows[1]."Missing Field";
+        Value := Row."Line No.";
+        Value := Row.Count;
+        Value := Row.Answer();
+      end;
+    })");
+  const auto body = agiru::gen::WriteCodeunitSource(unit, "MissingFields.Codeunit.al", objects);
+  CHECK_TRUE("missing selected Record fields refuse with table metadata and raw field name",
+             body.contains("::LineNumberBuffer_Table::kName, .member = \"Missing Field\""));
+  CHECK_TRUE("indexed missing field receivers remain evaluated",
+             body.contains("static_cast<void>(At(Rows, 1))"));
+  CHECK_TRUE("known fields and record methods retain their actual storage and calls",
+             body.contains("Value = Row.LineNo") && body.contains("Value = Row.Count()") &&
+                 body.contains("Value = Row.Answer()"));
+  CHECK_TRUE("missing field refusal carries its direct runtime header",
+             body.contains("#include \"dotnet/Refused.h\""));
+  objects.tables.at("line number buffer").fieldSchemaKnown = false;
+  const auto unknown = agiru::gen::WriteCodeunitSource(unit, "MissingFields.Codeunit.al", objects);
+  CHECK_TRUE("an incomplete table index is not treated as an authoritative missing schema",
+             !unknown.contains("::agiru::dotnet::Refused") && unknown.contains("Row.MissingField"));
+}
+
 void UnavailablePartsAreNotOrdinaryFields() {
   auto objects = Tables();
   agiru::gen::TableRef host;
@@ -783,6 +817,7 @@ int main() {
     UnselectedNamedPagesDoNotNeedInventedClasses();
     RecordFieldNumbersKeepThePlatformReturnType();
     UnavailableTypeIdentityRetainsKindsAndRawNames();
+    MissingFieldsDoNotInventSelectedTableStorage();
     UnavailablePartsAreNotOrdinaryFields();
   });
 }

@@ -730,6 +730,7 @@ TableRef BindTable(const al::TableObject &table,
                .interfaceReturns = {},
                .tryFunctions = {},
                .procedureDeclarations = {}};
+  ref.fieldSchemaKnown = true;
   for (const al::FieldDecl &field : table.fields) {
     ref.fields.emplace(LowerKey(field.name), FieldIdentifier(table, field.name));
   }

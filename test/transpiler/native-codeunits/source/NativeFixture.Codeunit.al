@@ -235,6 +235,39 @@ codeunit 50311 NativeFixture
         Counter := 99;
     end;
 
+    procedure MissingSelectedField(Operation: Integer; var Counter: Integer)
+    var
+        Row: Record "Available Row";
+        Rows: array[2] of Record "Available Row";
+        Value: Text;
+        Flag: Boolean;
+    begin
+        Counter := 41;
+        case Operation of
+            0: Value := Row."Missing Text";
+            1: Flag := Row."Missing Flag";
+            2: Value := Rows[PartArgumentIndex(Counter)]."Missing Text";
+        end;
+        Counter := 99;
+    end;
+
+    local procedure PartArgumentIndex(var Counter: Integer): Integer
+    begin
+        Counter += 1;
+        exit(1);
+    end;
+
+    procedure MissingSelectedFieldInUntakenBranch(): Integer
+    var
+        Row: Record "Available Row";
+        Value: Text;
+    begin
+        Row.ID := 7;
+        if false then
+            Value := Row."Missing Text";
+        exit(Row.ID);
+    end;
+
     procedure DistinctUnavailableTypes(): Integer
     var
         Row: Record "Case Row";

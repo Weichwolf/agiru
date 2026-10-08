@@ -241,6 +241,13 @@ Unavailable array members also compile for direct, nested and multidimensional i
 including a bracket string literal in an index call and an implicit Validate field.
 The compiled runner proves a side-effecting index runs once before the named refusal;
 removing the matrix-only declaration must fail compilation.
+Selected Record schemas are authoritative only after binding parsed table declarations.
+Missing direct/scalar/indexed fields then refuse at their reached branch with the original
+table and field names; no storage column or default value is invented. A side-effecting
+index executes once, and an untaken branch preserves real selected-field storage.
+Replacing these refusals with successful defaults must fail execution. Incomplete indexes
+are not missing-field evidence. Implicit field-method arguments, chained results and
+nonconst var binding to such missing fields remain unqualified.
 Unavailable AL type identities encode kind and case-normalized raw name bytes, not a
 scrubbed C++ identifier. Their declarations merge member uses across case aliases;
 diagnostics retain the deterministic original AL spelling. Compiled scalar/array var
@@ -255,7 +262,7 @@ Unavailable scalar fields compile compound assignments and both Clear forms, the
 refuse with their original member identity before subsequent AL effects. Removing all
 six operations must fail the compiled runner. RefusedGate retains Decimal operands,
 unknown-option Clear and an ordinary Integer Clear control. Whole absent-record Clear
-and same-type refusal assignment are separate gaps, not qualified by these checks.
+and same-type Refused member assignment are separate gaps, not qualified by these checks.
 Record FieldNo calls retain the platform Integer result shape before C++ overload
 resolution. Four unavailable-record/array cases refuse before later AL effects; a
 selected record reaches the Integer overload and a Codeunit FieldNo retains Text.

@@ -173,6 +173,27 @@ void UnavailablePartsRefuseWithoutDefaultAnswers() {
              unit.UnavailablePartInUntakenBranch() == kValue);
 }
 
+void MissingSelectedFieldsRefuseAtTheirReachedBranch() {
+  constexpr agiru::Integer kOperationCount = 3;
+  constexpr agiru::Integer kIndexedOperation = 2;
+  constexpr std::array<std::string_view, kOperationCount> kFields{
+      "Missing Text", "Missing Flag", "Missing Text"};
+  agiru::System::Fixture::NativeFixture_Codeunit unit;
+  for (agiru::Integer operation = 0; operation < kOperationCount; ++operation) {
+    agiru::Integer counter = kValue;
+    std::string message;
+    try {
+      unit.MissingSelectedField(operation, counter);
+    } catch (const agiru::Error &error) { message = error.what(); }
+    CHECK_TRUE("missing selected fields retain original table and member identity",
+               message.contains("Available Row." + std::string(kFields[operation])));
+    CHECK_TRUE("missing selected field receiver executes once before refusal and stops AL",
+               counter == (operation == kIndexedOperation ? 42 : 41));
+  }
+  CHECK_TRUE("untaken missing field branches preserve actual selected field storage",
+             unit.MissingSelectedFieldInUntakenBranch() == kValue);
+}
+
 void CaseAliasesShareReferenceIdentity() {
   constexpr agiru::Integer kOperationCount = 4;
   constexpr std::array<std::string_view, kOperationCount> kMembers{
@@ -206,5 +227,6 @@ int main() {
     FieldNumbersRetainTheirIntegerContract();
     UnavailablePartsRefuseWithoutDefaultAnswers();
     CaseAliasesShareReferenceIdentity();
+    MissingSelectedFieldsRefuseAtTheirReachedBranch();
   });
 }

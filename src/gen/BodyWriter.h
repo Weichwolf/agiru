@@ -87,6 +87,11 @@ public:
     return false;
   }
 
+  [[nodiscard]] virtual bool FieldSchemaKnown(std::string_view variable) const {
+    static_cast<void>(variable);
+    return false;
+  }
+
   [[nodiscard]] virtual bool MemberIsCall(const OfVariable &member) const {
     return MembersAreCalls(member.variable);
   }

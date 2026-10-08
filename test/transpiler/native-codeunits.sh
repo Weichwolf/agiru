@@ -52,6 +52,27 @@ record_command native-codeunits "$input/Runner.cpp" \
 link_generated "$proof/generated" "$proof/runner.o" "$proof/runner"
 "$proof/runner" | tee "$proof/execution.log"
 
+cp -a "$proof/generated" "$proof/no-selected-field-refusal"
+awk '
+  /::agiru::dotnet::Refused.*AvailableRow_Table::kName/ {
+    if (/PartArgumentIndex\(Counter\)/) print "      static_cast<void>(PartArgumentIndex(Counter));"
+    if (/Flag =/) print "      Flag = false;"
+    else print "      Value = \"\";"
+    changed++; next
+  }
+  { print }
+  END { if (changed != 4) exit 2 }
+' "$proof/generated/fixture/system/fixture/codeunit/NativeFixture.cpp" \
+  > "$proof/no-selected-field-refusal/fixture/system/fixture/codeunit/NativeFixture.cpp"
+link_generated "$proof/no-selected-field-refusal" "$proof/runner.o" "$proof/no-selected-field-refusal-runner"
+if "$proof/no-selected-field-refusal-runner" > "$proof/no-selected-field-refusal-control.log" 2>&1; then
+  printf 'native-codeunits: missing selected field defaults escaped execution control\n' >&2
+  exit 1
+fi
+rg -q 'missing selected fields retain original table and member identity' "$proof/no-selected-field-refusal-control.log"
+rg -q 'missing selected field receiver executes once before refusal and stops AL' "$proof/no-selected-field-refusal-control.log"
+rm -r -- "$proof/no-selected-field-refusal"
+
 cp -a "$proof/generated" "$proof/default-case-assignment"
 awk '
   /^  Al_7265636f7264_6361736520726f77 &operator=\(const Al_7265636f7264_6361736520726f77 &\) \{/ {

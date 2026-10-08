@@ -1512,13 +1512,47 @@ private:
     return out;
   }
 
-  std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
-    if (expression.text == "in") { return Membership(expression, outer); }
-    if (expression.text == "?:") { return Conditional(expression, outer); }
+  std::string MissingRecordField(const al::Expr &expression, bool asCallee) {
+    if (asCallee || expression.text != "." || expression.children.size() != 2 ||
+        expression.children.back().kind != al::ExprKind::Name) {
+      return {};
+    }
+    const al::Expr &receiver = expression.children.front();
+    const al::Expr *variable = &receiver;
+    while (variable->kind == al::ExprKind::Index && !variable->children.empty()) {
+      variable = &variable->children.front();
+    }
+    if (variable->kind != al::ExprKind::Name ||
+        (!scope_.IsRecord(variable->text) &&
+         !SameName(scope_.DeclaredType(variable->text), "Record"))) {
+      return {};
+    }
+    const auto &field = expression.children.back().text;
+    const OfVariable member{.variable = variable->text, .field = field};
+    const std::string table = scope_.TableOf(variable->text);
+    if (table.empty() || !scope_.FieldSchemaKnown(variable->text) || scope_.HasField(member) ||
+        IsSystemFieldName(field) || RuntimeCallable(field) || !scope_.ProcedureOf(member).empty()) {
+      return {};
+    }
+    return "(static_cast<void>(" + Expression(receiver, 0) +
+           "), ::agiru::dotnet::Refused{{.type = " + table +
+           "::kName, .member = " + Literal(field) + "}}())";
+  }
+
+  static void ValidateBinaryShape(const al::Expr &expression) {
     if (expression.children.size() != 2) {
       throw std::runtime_error("a binary operator with " +
                                std::to_string(expression.children.size()) +
                                " operands has no translation");
+    }
+  }
+
+  std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
+    if (expression.text == "in") { return Membership(expression, outer); }
+    if (expression.text == "?:") { return Conditional(expression, outer); }
+    ValidateBinaryShape(expression);
+    if (const auto missing = MissingRecordField(expression, asCallee); !missing.empty()) {
+      return missing;
     }
     ValidateImplicitAssignment(expression);
     if (const std::string logical = BooleanExpression(expression); !logical.empty()) {
@@ -1780,6 +1814,16 @@ public:
       return found == table->second.procedures.end() ? std::string{} : found->second;
     }
     return {};
+  }
+
+  [[nodiscard]] bool FieldSchemaKnown(std::string_view variable) const override {
+    if (IsRecord(variable)) { return true; }
+    for (const al::VarDecl *where : {Local(variable), Global(variable)}) {
+      if (where == nullptr || TypeName(where->type) != "Record") { continue; }
+      const auto table = objects_.tables.find(LowerKey(where->subtype));
+      return table != objects_.tables.end() && table->second.fieldSchemaKnown;
+    }
+    return false;
   }
 
   [[nodiscard]] std::string TableOf(std::string_view variable) const override {
@@ -2542,6 +2586,13 @@ public:
       });
     }
     return false;
+  }
+
+  [[nodiscard]] bool FieldSchemaKnown(std::string_view variable) const override {
+    if (const TableRef *table = RecordOf(variable); table != nullptr) {
+      return table->fieldSchemaKnown;
+    }
+    return IsRecord(variable) && source_ != nullptr;
   }
 
   [[nodiscard]] std::string TableOf(std::string_view variable) const override {

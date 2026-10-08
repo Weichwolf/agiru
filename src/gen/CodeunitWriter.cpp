@@ -1435,6 +1435,14 @@ public:
                                [&](const auto &field) { return field.second == spelled; });
   }
 
+  [[nodiscard]] bool FieldSchemaKnown(std::string_view variable) const override {
+    const std::string subtype = SubtypeOfRecord(variable).empty() && SameName(variable, "Rec")
+                                    ? unit_.tableNo
+                                    : SubtypeOfRecord(variable);
+    const auto table = objects_.tables.find(LowerKey(subtype));
+    return table != objects_.tables.end() && table->second.fieldSchemaKnown;
+  }
+
   [[nodiscard]] std::string TableOf(std::string_view variable) const override {
     const std::string subtype =
         SubtypeOfRecord(variable).empty() && LowerKey(std::string(variable)) == "rec"

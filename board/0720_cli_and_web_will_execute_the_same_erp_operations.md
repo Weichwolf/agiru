@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: repair missing selected extension fields, link the native app and repeat the
-original Customer workflow; never patch apps or guess declarations.
+Next: qualify missing-field refusals in original group 421, link the native app and
+repeat the original Customer workflow; never patch apps or guess declarations.
 ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
 The previous keep-going build exposed mixed-case unavailable record references, indexed
 fields and unselected TestPage parts/extension fields. The original TestPage groups
@@ -273,6 +273,30 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Predecessors 779/850/810 warn against normalized-name collisions, miss-only guesses
   and counting source matches as emitter proof. Durable fixtures:
   `test/transpiler/native-codeunits/{source/AbsentPeer.Codeunit.al,source/NativeFixture.Codeunit.al,Runner.cpp}`.
+
+- Missing selected-schema fields: `BindTable` marks parsed field schemas explicitly;
+  incomplete indexes are not evidence of absence. `BodyWriter.cpp` refuses missing
+  scalar/indexed field access at its reached branch, retaining the original table/member
+  and evaluating the receiver once. Known storage, declared procedures and intrinsic
+  Record methods remain unchanged. No column, license default or whole-method refusal
+  is invented. The license-plan fields come from the unselected
+  `System Application/App/Azure AD Plan/src/User Details/PlanUserDetails.TableExt.al`;
+  keep the mixed `UserDetailsTestLibrary` and its core user/SUPER-permission operations.
+  `make native-codeunits JOBS=2`: generator 83, executable 114, source-bound 8 and
+  original Base64 61 checks, zero red; all existing controls and a successful-default
+  mutation reject. GenTableGate has 105 checks and GenPageGate 58, zero red.
+  Changed-code lint covers 25 of 344 units with zero failures; format passes and the
+  suppression baseline stays 12. This is not full-surface lint acceptance.
+  Production group 421 and full linking remain pending. Implicit field-method arguments,
+  chained results and nonconst var binding to missing fields remain unqualified.
+  References at the pinned revisions above: developer `devenv-table-ext-object.md`;
+  BCApps `main` the extension above and
+  `System Application/Test Library/User Details/src/UserDetailsTestLibrary.Codeunit.al`;
+  user intent `business-central/ui-how-users-permissions.md`. Predecessor 1173 warns
+  against successful defaults shifting the actual error; donor
+  `scripts/transpiler/generator/body_emitter/_emitter.py` keeps unknown receiver types
+  conservative. Durable tests: `test/gate/GenCodeunitGate.cpp` and
+  `test/transpiler/native-codeunits/{source/NativeFixture.Codeunit.al,Runner.cpp}`.
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.
