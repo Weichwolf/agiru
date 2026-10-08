@@ -5,6 +5,7 @@ Depends on: [0720](0720_cli_and_web_will_execute_the_same_erp_operations.md)
 acceptance (G2); retain 0058 as the mandatory UT regression gate.
 Next after G2: reconcile all test apps/build variants, then execute full AL
 tests and agent business workflows on sealed disposable databases.
+Client/session security is P0 under 0720 now, not deferred to this G3 milestone.
 
 ## Remaining implementation
 
@@ -90,6 +91,9 @@ tests and agent business workflows on sealed disposable databases.
   dependency checks do not sandbox native code. Compile only the extension in an isolated
   builder. Versioned module ABI and generation-owned registries must precede activation;
   this contract is not evidence of an implemented loader or an approved hot-unload design.
+  Untrusted tenant native extensions cannot execute in a shared ERP process: runtime-only
+  imports are not a security boundary. Qualify trusted-publisher admission or isolated
+  tenant execution with explicit database/resource authority before SaaS activation.
 
 - No matched BC benchmark, 2 TB / 10,000-user or complete aarch64 qualification exists.
   Existing `make native-report-layouts` proves declaration/link/package controls

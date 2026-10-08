@@ -128,6 +128,11 @@ prove the narrow header's dependency profile with negative controls.
 
 ## Client contract
 
+- Security is P0 during development, not deferred to G3. Any no-login development
+  access stays loopback-only; preserve existing authentication and authorization checks.
+  Require protected browser cookies, client-session-bound handles, CSRF/origin defenses,
+  expiry/revocation and negative HTTP/browser/SQL tests. IP/User-Agent are risk signals,
+  not client identity or proof that stolen credentials cannot be replayed (0720).
 - C++ owns ERP execution, authorization and sessions. Node.js/TypeScript is a thin
   agent-client dependency, not a production ERP-server dependency (0720).
 - One generated typed page/action model supplies semantic HTML and exact machine values.

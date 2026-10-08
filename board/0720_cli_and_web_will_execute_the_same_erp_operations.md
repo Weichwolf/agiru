@@ -8,12 +8,52 @@ Next: expand setup/master-data workflows under 0727, retaining the accepted orig
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
 production variable setters and qualify original invalid-input/lookup/dimension cases.
 Never substitute a default template, UT handler or client rule.
+Immediate security prerequisite: qualify client-session ownership and browser session
+transport below before accepting externally accessible client workflows.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
 sandbox reference execution and agiru replication. Their agiru prerequisites are
 specific working client contracts, not this WI's full acceptance; no dependency cycle.
 BC capture can proceed while client construction is underway. Keep one WI in progress.
+
+## P0 security acceptance
+
+- Login UX may wait; security does not. Preserve bearer/account/page/TableData checks.
+  Any no-login development access is loopback-only and cannot become a public profile.
+- Browser sessions: server-issued opaque CSPRNG tokens, hashed PostgreSQL verifiers;
+  `__Host-agiru` cookie with `Secure; HttpOnly; SameSite=Strict; Path=/`, no Domain.
+  No authentication secrets in URLs, HTML, logs or browser storage. Native development
+  HTTP remains explicitly local; qualify cookies over actual Caddy HTTPS, not fake flags.
+- Bind every page, call, dialog and command receipt to its client-session identity,
+  user and company. Two credentials for the SAME user must not adopt each other's handles.
+  CLI/MCP keep separate private credentials; sharing an authorized identity is not
+  sharing its AL state. A copied bearer/cookie remains replayable: opaque tokens and
+  IP/User-Agent checks are not sender-constrained cryptographic device binding.
+- Server-enforced configurable idle/absolute deadlines, logout/revocation and account
+  disable; rotate on login/privilege change, invalidate the old identity, fence suspended
+  operations. Reconciliation of an uncertain write must never repeat its business effects.
+- Session-bound CSRF plus exact trusted Origin for writes; Fetch Metadata defense and
+  explicit absent-header policy for agents. SameSite alone is insufficient. Opening an
+  AL page can execute writing triggers: audit GET/deep-link/prefetch entry points before
+  cookie support, reject cross-site execution and keep initial navigation a static shell.
+- Reauthorize every operation; qualify same-user/different-client and different-user/
+  company/tenant access, stale/forged handles, replay and concurrent revocation. Also
+  prove XSS/HTML escaping/CSP, no-store, bounded admission/rate/body/output/storage,
+  upload/archive/XML limits, trusted proxy/TLS policy and secret-free diagnostics.
+  Preserve atomic SQL effects under denial, timeout, disconnect and exhaustion.
+- Current code inspection: `ClientCredentials.cpp` checks bearer expiry/revocation;
+  `PageCommandHost.cpp` binds ownership to user/company/host and checks write CSRF/Origin.
+  `HttpServer.cpp` emits no-store; Caddy declares CSP. Browser uses an in-memory bearer
+  (`src/client/web.mts`), not an HttpOnly cookie. Credential-specific ownership, browser
+  cookie lifecycle and full SaaS isolation remain unqualified; existing fixture counts
+  are not this acceptance. Next coherent increment: same-user client-isolation proof
+  across read/write/poll/dialog/receipt paths, then HTTPS cookie/CSRF lifecycle.
+- References: [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+  and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
+  consulted 2026-10-08. Sources/tests: `src/rt/{ClientCredentials,PageCommandHost}.cpp`,
+  `src/net/HttpServer.cpp`, `src/client/{http,web}.mts`, `deploy/dev/{Caddyfile,agiru.json}`,
+  `test/gate/ClientCredentialsGate.cpp`, `test/ui/{page-host,http-server,web-client}.*`.
 
 ## Refreshed client contracts (2026-10-08)
 
