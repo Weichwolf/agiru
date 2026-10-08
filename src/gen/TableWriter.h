@@ -17,7 +17,7 @@ struct TableHeader {
   std::string text;
   std::vector<std::string> unresolvedEnums;
   DotNetUse dotnet;
-  DotNetUse absent;
+  AbsentUse absent;
 };
 
 [[nodiscard]] TableRef BindTable(const al::TableObject &table,

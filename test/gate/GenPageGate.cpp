@@ -2,6 +2,7 @@
 #include "BodyWriter.h"
 #include "Check.h"
 #include "CodeunitWriter.h"
+#include "Names.h"
 #include "PageWriter.h"
 #include "Parser.h"
 
@@ -31,10 +32,12 @@ void UserControlsArePageMembers() {
              header.text.find("#include \"absent/Types.h\"") != std::string::npos);
   CHECK_TRUE("generated pages construct their guarded runtime base from the derived context",
              header.text.contains("ControlHost_Page() = default;"));
-  CHECK_TRUE("CurrPage's user control is a typed page member",
-             header.text.find("absent::BusinessChart Chart;") != std::string::npos);
+  CHECK_TRUE(
+      "CurrPage's user control is a typed page member",
+      header.text.contains(
+          "absent::" + agiru::gen::AbsentIdentifier("ControlAddIn", "BusinessChart") + " Chart;"));
   CHECK_TRUE("a user control contributes its type to the absent contract",
-             header.absent.contains("BusinessChart"));
+             header.absent.contains(agiru::gen::AbsentIdentifier("ControlAddIn", "BusinessChart")));
 }
 
 void PartNamesDoNotHidePageProcedures() {

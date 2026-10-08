@@ -3,6 +3,7 @@
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
 #include "Format.h"
+#include "Names.h"
 #include "Parser.h"
 #include "Refused.h"
 #include "RuntimeSurface.h"
@@ -571,7 +572,8 @@ void ImplicitRecordFieldsMatchBodyLowering() {
       end;
     })");
   const auto header = agiru::gen::WriteCodeunit(unit, "FieldArguments.Codeunit.al", Tables());
-  const auto &members = header.absent.at("UnavailableRow");
+  const auto &members =
+      header.absent.at(agiru::gen::AbsentIdentifier("Record", "Unavailable Row")).members;
   CHECK_TRUE("ModifyAll's implicit field remains an explicit unavailable member",
              members.contains("Enabled"));
   CHECK_TRUE("variadic and quoted field arguments remain explicit unavailable members",
@@ -617,7 +619,8 @@ void IndexedUnavailableRecordMembersRemainExplicit() {
       end;
     })");
   const auto header = agiru::gen::WriteCodeunit(unit, "IndexedFields.Codeunit.al", Tables());
-  const auto &members = header.absent.at("IndexedRow");
+  const auto &members =
+      header.absent.at(agiru::gen::AbsentIdentifier("Record", "Indexed Row")).members;
   CHECK_TRUE("array-only reads retain their unavailable record member",
              members.contains("ArrayOnly"));
   CHECK_TRUE("nested and multidimensional indices preserve their receiver's members",
@@ -681,10 +684,39 @@ void RecordFieldNumbersKeepThePlatformReturnType() {
              body.contains("Peer.FieldNo()") &&
                  !body.contains("static_cast<::agiru::Integer>(Peer.FieldNo())"));
   CHECK_TRUE("typed FieldNo still retains its missing field and method descriptors",
-             header.absent.at("NumberRow").contains("OnlyNumberField") &&
-                 header.absent.at("NumberRow").contains("FieldNo"));
+             header.absent.at(agiru::gen::AbsentIdentifier("Record", "Number Row"))
+                     .members.contains("OnlyNumberField") &&
+                 header.absent.at(agiru::gen::AbsentIdentifier("Record", "Number Row"))
+                     .members.contains("FieldNo"));
   CHECK_TRUE("Integer casts name their own runtime header",
              body.contains("#include \"type/Integer.h\""));
+}
+
+void UnavailableTypeIdentityRetainsKindsAndRawNames() {
+  const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
+    codeunit 50319 Identities {
+      procedure Read()
+      var
+        First: Record "Case Row";
+        Second: Record "CASE ROW";
+        Compact: Record CaseRow;
+        Unit: Codeunit "Case Row";
+      begin
+        First.CallerOnly();
+        Second.CalleeOnly();
+      end;
+    })");
+  const auto header = agiru::gen::WriteCodeunit(unit, "Identities.Codeunit.al", Tables());
+  const auto &same = header.absent.at(agiru::gen::AbsentIdentifier("Record", "Case Row"));
+  CHECK_TRUE("case variants merge their unavailable member declarations",
+             same.members.contains("CallerOnly") && same.members.contains("CalleeOnly"));
+  CHECK_TEXT("the diagnostic spelling is deterministic across case aliases", same.name, "CASE ROW");
+  CHECK_TRUE("raw spacing and object kind retain distinct unavailable definitions",
+             header.absent.size() == 3);
+  const auto body = agiru::gen::WriteCodeunitSource(unit, "Identities.Codeunit.al", Tables());
+  const auto type = "absent::" + agiru::gen::AbsentIdentifier("Record", "Case Row");
+  CHECK_TRUE("both case aliases use the same generated C++ type",
+             body.contains(type + " First{}") && body.contains(type + " Second{}"));
 }
 
 void UnavailablePartsAreNotOrdinaryFields() {
@@ -750,6 +782,7 @@ int main() {
     ImplicitRecordFieldsMatchBodyLowering();
     UnselectedNamedPagesDoNotNeedInventedClasses();
     RecordFieldNumbersKeepThePlatformReturnType();
+    UnavailableTypeIdentityRetainsKindsAndRawNames();
     UnavailablePartsAreNotOrdinaryFields();
   });
 }

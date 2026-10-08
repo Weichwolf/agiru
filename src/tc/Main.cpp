@@ -287,7 +287,7 @@ bool IsMoved(const std::vector<agiru::al::Property> &properties) {
 struct Gathered {
   agiru::gen::ReportAssetRequests reportAssets;
   agiru::gen::DotNetUse dotnet;
-  agiru::gen::DotNetUse absent;
+  agiru::gen::AbsentUse absent;
   std::vector<agiru::gen::RefusedProperty> refused;
   std::map<std::string, std::size_t> attributes;
   std::map<std::string, std::vector<std::string>> options;
@@ -936,6 +936,16 @@ void Absorb(std::vector<agiru::gen::RefusedProperty> &into,
 
 void Absorb(agiru::gen::DotNetUse &into, const agiru::gen::DotNetUse &from) {
   for (const auto &[type, members] : from) { into[type].insert(members.begin(), members.end()); }
+}
+
+void Absorb(agiru::gen::AbsentUse &into, const agiru::gen::AbsentUse &from) {
+  for (const auto &[type, definition] : from) {
+    auto [found, inserted] = into.try_emplace(type, definition);
+    if (!inserted) {
+      found->second.name = std::min(found->second.name, definition.name);
+      found->second.members.insert(definition.members.begin(), definition.members.end());
+    }
+  }
 }
 
 struct Interfaces {
@@ -2726,10 +2736,10 @@ std::string NearestPresent(const std::string &type, const agiru::gen::DotNetUse 
   return {};
 }
 
-std::string StubBase(const std::string &type, const agiru::gen::DotNetUse &use, bool alObjects) {
+std::string StubBase(const std::string &type, const agiru::gen::DotNetUse &use) {
   std::string base = NearestPresent(type, use);
   if (!base.empty()) { return base; }
-  return alObjects ? "AbsentObject" : "AbsentType";
+  return "AbsentType";
 }
 
 std::vector<std::string> BasesFirst(const agiru::gen::DotNetUse &use) {
@@ -2758,51 +2768,69 @@ struct Counted {
   std::size_t members = 0;
 };
 
-Counted Stubs(std::string &text,
-              const agiru::gen::DotNetUse &use,
-              bool skipRebuilt,
-              bool alObjects = false) {
+void AppendStub(std::string &text,
+                const std::string &type,
+                const std::string &base,
+                const std::string &name,
+                const std::set<std::string> &named) {
+  text += "\nstruct ";
+  text += type;
+  text += " : ::agiru::dotnet::";
+  text += base;
+  text += " {\n";
+  if (!named.contains(type)) {
+    text += "  using ::agiru::dotnet::";
+    text += base;
+    text += "::";
+    text += base;
+    text += ";\n";
+    text += "  ";
+    text += type;
+    text += "() = default;\n";
+  }
+  for (const std::string &member : named) {
+    text += "  ::agiru::dotnet::Refused ";
+    text += member;
+    text += "{{.type = " + agiru::gen::Literal(name) +
+            ", .member = " + agiru::gen::Literal(member) + "}};\n";
+  }
+  if (base == "AbsentObject") {
+    text += "  " + type + "(const " + type + " &) = default;\n";
+    text += "  " + type + " &operator=(const " + type + " &) {\n";
+    text += "    ::agiru::dotnet::Refused{{.type = " + agiru::gen::Literal(name) +
+            ", .member = \"=\"}}();\n    return *this;\n  }\n";
+  }
+  text += "  [[nodiscard]] const ::agiru::dotnet::RefusedResult *begin() const {\n";
+  text += "    return ::agiru::dotnet::Refused{{.type = " + agiru::gen::Literal(name) +
+          ", .member = \"GetEnumerator\"}}();\n  }\n";
+  text += "  [[nodiscard]] const ::agiru::dotnet::RefusedResult *end() const { return begin(); "
+          "}\n";
+  text += "  template <typename T> auto &operator=(const T &) {\n";
+  text += "    ::agiru::dotnet::Refused{{.type = " + agiru::gen::Literal(name) +
+          ", .member = \"=\"}}();\n";
+  text += "    return *this;\n  }\n";
+
+  text += "};\n";
+}
+
+Counted Stubs(std::string &text, const agiru::gen::DotNetUse &use, bool skipRebuilt) {
   Counted counted;
   for (const std::string &type : BasesFirst(use)) {
     if (skipRebuilt && agiru::gen::RebuiltDotNet().contains(type)) { continue; }
     const std::set<std::string> &named = use.at(type);
+    AppendStub(text, type, StubBase(type, use), type, named);
     ++counted.types;
-    text += "\nstruct ";
-    text += type;
-    const std::string base = StubBase(type, use, alObjects);
-    text += " : ::agiru::dotnet::";
-    text += base;
-    text += " {\n";
-    if (!named.contains(type)) {
-      text += "  using ::agiru::dotnet::";
-      text += base;
-      text += "::";
-      text += base;
-      text += ";\n";
-      text += "  ";
-      text += type;
-      text += "() = default;\n";
-    }
-    for (const std::string &member : named) {
-      ++counted.members;
-      text += "  ::agiru::dotnet::Refused ";
-      text += member;
-      text += "{{.type = \"";
-      text += type;
-      text += "\", .member = \"";
-      text += member;
-      text += "\"}};\n";
-    }
-    text += "  [[nodiscard]] const ::agiru::dotnet::RefusedResult *begin() const {\n";
-    text += "    return ::agiru::dotnet::Refused{{.type = \"" + type +
-            "\", .member = \"GetEnumerator\"}}();\n  }\n";
-    text += "  [[nodiscard]] const ::agiru::dotnet::RefusedResult *end() const { return begin(); "
-            "}\n";
-    text += "  template <typename T> auto &operator=(const T &) {\n";
-    text += "    ::agiru::dotnet::Refused{{.type = \"" + type + "\", .member = \"=\"}}();\n";
-    text += "    return *this;\n  }\n";
+    counted.members += named.size();
+  }
+  return counted;
+}
 
-    text += "};\n";
+Counted Stubs(std::string &text, const agiru::gen::AbsentUse &use) {
+  Counted counted;
+  for (const auto &[type, definition] : use) {
+    AppendStub(text, type, "AbsentObject", definition.name, definition.members);
+    ++counted.types;
+    counted.members += definition.members.size();
   }
   return counted;
 }
@@ -2839,14 +2867,14 @@ void WriteOptions(const std::filesystem::path &out, const OptionsInScope &option
 
 void WriteAbsent(const std::filesystem::path &out,
                  const agiru::gen::DotNetUse &dotnet,
-                 const agiru::gen::DotNetUse &absent) {
+                 const agiru::gen::AbsentUse &absent) {
   if (out.empty()) { return; }
   std::string text = "// Generated from every AL body that names a type this run does not have.\n";
   text += "// Do not edit.\n\n#pragma once\n\n#include \"dotnet/Refused.h\"\n";
   text += "\nnamespace agiru::dotnet {\n";
   const Counted net = Stubs(text, dotnet, true);
   text += "\n} // namespace agiru::dotnet\n\nnamespace agiru::absent {\n";
-  const Counted objects = Stubs(text, absent, false, true);
+  const Counted objects = Stubs(text, absent);
   text += "\n} // namespace agiru::absent\n";
 
   const std::filesystem::path path = out / "absent" / "absent" / "Types.h";

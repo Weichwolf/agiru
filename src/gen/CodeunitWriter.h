@@ -51,13 +51,22 @@ using TableIndex = std::map<std::string, TableRef>;
 
 using DotNetUse = std::map<std::string, std::set<std::string>>;
 
+struct AbsentDefinition {
+  std::string name;
+  std::set<std::string> members;
+};
+
+using AbsentUse = std::map<std::string, AbsentDefinition>;
+
+std::string NoteAbsentType(AbsentUse &use, std::string_view kind, std::string_view name);
+
 struct CodeunitHeader {
   std::string text;
   std::vector<std::string> unresolvedTables;
 
   DotNetUse dotnet;
 
-  DotNetUse absent;
+  AbsentUse absent;
 };
 
 using FieldEnums = std::map<std::string, std::map<std::string, std::string>>;
@@ -135,7 +144,7 @@ struct InterfaceOutput {
   std::string text;
   std::string source;
 
-  DotNetUse absent;
+  AbsentUse absent;
   DotNetUse dotnet;
 };
 
@@ -235,7 +244,7 @@ void GatherAbsentIn(const std::vector<al::VarDecl> &variables,
                     const std::vector<al::ProcedureDecl> &procedures,
                     const Objects &objects,
                     DotNetUse &dotnet,
-                    DotNetUse &absent);
+                    AbsentUse &absent);
 
 bool NamesAbsentIn(const std::vector<al::VarDecl> &variables,
                    const std::vector<al::ProcedureDecl> &procedures,

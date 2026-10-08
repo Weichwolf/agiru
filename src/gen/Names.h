@@ -12,6 +12,8 @@ namespace agiru::gen {
 
 std::string Identifier(std::string_view alName);
 
+std::string AbsentIdentifier(std::string_view kind, std::string_view alName);
+
 std::string Unprefixed(std::string_view identifier);
 
 std::vector<std::string> Distinct(const std::vector<std::string> &alNames,

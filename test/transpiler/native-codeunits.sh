@@ -9,7 +9,7 @@ printf 'native-codeunits: receipts %s\n' "$proof"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate)
 links=(--rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
-sha256sum src/gen/{BodyWriter,CodeunitWriter,RuntimeSurface,NativeSource,NativeMethods,Refused}.{cpp,h} src/tc/Main.cpp \
+sha256sum src/gen/{BodyWriter,CodeunitWriter,RuntimeSurface,NativeSource,NativeMethods,Refused,Names,PageWriter,TableWriter}.{cpp,h} src/tc/Main.cpp \
   include/runtime/{NativeBase64,Error}.h src/net/NativeBase64.cpp \
   include/BuiltinsWritten.h include/dotnet/Refused.h \
   include/runtime/Page.h \
@@ -51,6 +51,56 @@ record_command native-codeunits "$input/Runner.cpp" \
   -c "$input/Runner.cpp" -o "$proof/runner.o"
 link_generated "$proof/generated" "$proof/runner.o" "$proof/runner"
 "$proof/runner" | tee "$proof/execution.log"
+
+cp -a "$proof/generated" "$proof/default-case-assignment"
+awk '
+  /^  Al_7265636f7264_6361736520726f77 &operator=\(const Al_7265636f7264_6361736520726f77 &\) \{/ {
+    print "  Al_7265636f7264_6361736520726f77 &operator=(const Al_7265636f7264_6361736520726f77 &) = default;"
+    removed++; skip = 1; next
+  }
+  skip { if (/^  }$/) skip = 0; next }
+  { print }
+  END { if (removed != 1 || skip != 0) exit 2 }
+' "$proof/generated/absent/absent/Types.h" > "$proof/default-case-assignment/absent/absent/Types.h"
+link_generated "$proof/default-case-assignment" "$proof/runner.o" "$proof/default-case-assignment-runner"
+if "$proof/default-case-assignment-runner" > "$proof/default-case-assignment-control.log" 2>&1; then
+  printf 'native-codeunits: successful absent-record assignment escaped execution control\n' >&2
+  exit 1
+fi
+rg -q 'case aliases merge members and refuse with their original AL name' "$proof/default-case-assignment-control.log"
+rg -q 'scalar and array aliases preserve var binding before the actual refusal' "$proof/default-case-assignment-control.log"
+rm -r -- "$proof/default-case-assignment"
+
+cp -a "$proof/generated" "$proof/split-case-identity"
+awk '
+  /absent::Al_7265636f7264_6361736520726f77 Row\{\}/ {
+    changed += sub(/Al_7265636f7264_6361736520726f77/, "Al_7265636f7264_63617365726f77")
+  }
+  { print }
+  END { if (changed != 2) exit 2 }
+' "$proof/generated/fixture/system/fixture/codeunit/NativeFixture.cpp" \
+  > "$proof/split-case-identity/fixture/system/fixture/codeunit/NativeFixture.cpp"
+if link_generated "$proof/split-case-identity" "$proof/runner.o" "$proof/split-case-identity-runner" \
+  > "$proof/split-case-identity-control.log" 2>&1; then
+  printf 'native-codeunits: unrelated case-alias references escaped compilation control\n' >&2
+  exit 1
+fi
+rg -q 'non-const lvalue reference.*cannot bind.*unrelated type' "$proof/split-case-identity-control.log"
+rm -r -- "$proof/split-case-identity"
+
+cp -a "$proof/generated" "$proof/missing-case-member"
+awk '
+  /::agiru::dotnet::Refused CallerOnly\{/ { removed++; next }
+  { print }
+  END { if (removed != 1) exit 2 }
+' "$proof/generated/absent/absent/Types.h" > "$proof/missing-case-member/absent/absent/Types.h"
+if link_generated "$proof/missing-case-member" "$proof/runner.o" "$proof/missing-case-member-runner" \
+  > "$proof/missing-case-member-control.log" 2>&1; then
+  printf 'native-codeunits: lost case-alias member escaped compilation control\n' >&2
+  exit 1
+fi
+rg -q "no member named 'CallerOnly'" "$proof/missing-case-member-control.log"
+rm -r -- "$proof/missing-case-member"
 
 mkdir -p "$proof/no-part-refusal-marker/runtime"
 awk '

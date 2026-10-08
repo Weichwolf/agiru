@@ -217,4 +217,67 @@ codeunit 50311 NativeFixture
     begin
         Counter += 1;
     end;
+
+    procedure UnavailableCaseIdentity(Operation: Integer; var Counter: Integer)
+    var
+        Row: Record "Case Row";
+        Rows: array[2] of Record "CASE ROW";
+        Peer: Codeunit "Absent Peer";
+        Value: Integer;
+    begin
+        Counter := 41;
+        case Operation of
+            0: Peer.Use(Row, Counter);
+            1: Peer.Use(Rows[1], Counter);
+            2: Value := Row.CallerOnly;
+            3: Rows[1] := Row;
+        end;
+        Counter := 99;
+    end;
+
+    procedure DistinctUnavailableTypes(): Integer
+    var
+        Row: Record "Case Row";
+        Compact: Record CaseRow;
+        Unit: Codeunit "Case Row";
+        Qualified: Record "North.Row";
+        Unqualified: Record NorthRow;
+    begin
+        if WhichType(Row) <> 1 then
+            Error('record identity changed');
+        if WhichType(Compact) <> 2 then
+            Error('a space in a name was discarded');
+        if WhichType(Unit) <> 3 then
+            Error('object kind was discarded');
+        if WhichType(Qualified) <> 4 then
+            Error('a dot in a name was discarded');
+        if WhichType(Unqualified) <> 5 then
+            Error('a qualified name collided');
+        exit(7);
+    end;
+
+    local procedure WhichType(var Row: Record "Case Row"): Integer
+    begin
+        exit(1);
+    end;
+
+    local procedure WhichType(var Row: Record CaseRow): Integer
+    begin
+        exit(2);
+    end;
+
+    local procedure WhichType(var Unit: Codeunit "Case Row"): Integer
+    begin
+        exit(3);
+    end;
+
+    local procedure WhichType(var Row: Record "North.Row"): Integer
+    begin
+        exit(4);
+    end;
+
+    local procedure WhichType(var Row: Record NorthRow): Integer
+    begin
+        exit(5);
+    end;
 }

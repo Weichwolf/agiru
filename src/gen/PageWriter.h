@@ -13,7 +13,7 @@ namespace agiru::gen {
 struct PageHeader {
   std::string text;
   DotNetUse dotnet;
-  DotNetUse absent;
+  AbsentUse absent;
 };
 
 PageHeader

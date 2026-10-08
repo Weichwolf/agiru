@@ -24,6 +24,29 @@ void AnAlNameBecomesAnIdentifier() {
   CHECK_TEXT("a leading digit is escaped", Identifier("3 Way Match"), "_3WayMatch");
 }
 
+void AbsentIdentityDoesNotScrubALNames() {
+  using agiru::gen::AbsentIdentifier;
+  CHECK_TEXT("unavailable type IDs encode the canonical kind and raw name bytes",
+             AbsentIdentifier("Record", "Row"),
+             "Al_7265636f7264_726f77");
+  CHECK_TEXT("case aliases retain one unavailable type identity",
+             AbsentIdentifier("Record", "Case Row"),
+             AbsentIdentifier("record", "CASE ROW"));
+  CHECK_TEXT("object lookup collections use the same identity as AL declarations",
+             AbsentIdentifier("tables", "Case Row"),
+             AbsentIdentifier("Record", "Case Row"));
+  CHECK_TRUE("spaces cannot collapse into an unspaced unavailable name",
+             AbsentIdentifier("Record", "Case Row") != AbsentIdentifier("Record", "CaseRow"));
+  CHECK_TRUE("object kinds cannot collapse into a common base type",
+             AbsentIdentifier("Record", "Case Row") != AbsentIdentifier("Codeunit", "Case Row"));
+  CHECK_TRUE("qualified-name punctuation cannot collapse into a plain name",
+             AbsentIdentifier("Record", "North.Row") != AbsentIdentifier("Record", "NorthRow"));
+  CHECK_TRUE("different qualifiers cannot collapse",
+             AbsentIdentifier("Record", "North.Row") != AbsentIdentifier("Record", "South.Row"));
+  CHECK_TRUE("AL missing primitives do not collapse into object declarations",
+             AbsentIdentifier("Type", "Unknown") != AbsentIdentifier("Record", "Unknown"));
+}
+
 void AnOptionMemberBecomesAnEnumerator() {
   // The two members of table 202 that no identifier can spell.
   CHECK_TEXT("parentheses close up", EnumeratorName("Group(Resource)"), "GroupResource");
@@ -106,6 +129,7 @@ void AGeneratorOwnedNameCannotCollideWithAnAlName() {
 int main() {
   return gate::Run("GenNames", [] {
     AnAlNameBecomesAnIdentifier();
+    AbsentIdentityDoesNotScrubALNames();
     AnOptionMemberBecomesAnEnumerator();
     AnOptionFieldGetsItsOwnEnumeration();
     AlTextSurvivesBecomingACppLiteral();

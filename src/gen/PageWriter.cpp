@@ -471,7 +471,7 @@ std::string SourceTable(const al::PageObject &object, const Objects &objects) {
   for (const al::Token &token : source->value) { name += token.text; }
   const auto found = objects.tables.find(LowerKey(name));
   if (found != objects.tables.end()) { return found->second.identifier; }
-  return "absent::" + Identifier(name);
+  return "absent::" + AbsentIdentifier("Record", name);
 }
 
 }
@@ -1820,7 +1820,7 @@ private:
       const std::string sourceType = PartSource(*control);
       const std::string member = ControlIdentifier(named_, control->name);
       if (sourceType.empty() || member.empty()) { continue; }
-      out_ += "  absent::" + Identifier(sourceType) + " " + member + ";\n";
+      out_ += "  absent::" + AbsentIdentifier("ControlAddIn", sourceType) + " " + member + ";\n";
     }
     if (hasUserControl_) { out_ += "\n"; }
 
@@ -1877,7 +1877,7 @@ private:
 
   PageHeader BoundHeader_() const {
     DotNetUse dotnet;
-    DotNetUse absent;
+    AbsentUse absent;
     std::vector<al::VarDecl> withRec = object_.variables;
     if (SourceTable(object_, objects_).starts_with("absent::")) {
       al::VarDecl rec;
@@ -1890,7 +1890,7 @@ private:
     for (const al::PageControl *control : sourceControls_.fields) {
       if (!IsUserControl(*control)) { continue; }
       const std::string sourceType = PartSource(*control);
-      if (!sourceType.empty()) { absent[Identifier(sourceType)]; }
+      if (!sourceType.empty()) { NoteAbsentType(absent, "ControlAddIn", sourceType); }
     }
     return PageHeader{
         .text = WithRuntimeIncludes(out_, PageKind(object_)), .dotnet = dotnet, .absent = absent};

@@ -240,8 +240,17 @@ successful fallback is invented. Emitter and dependency collection share one sig
 Unavailable array members also compile for direct, nested and multidimensional indices,
 including a bracket string literal in an index call and an implicit Validate field.
 The compiled runner proves a side-effecting index runs once before the named refusal;
-removing the matrix-only declaration must fail compilation. Case-normalized unavailable
-type identity remains a separate generator gap, not covered by these member checks.
+removing the matrix-only declaration must fail compilation.
+Unavailable AL type identities encode kind and case-normalized raw name bytes, not a
+scrubbed C++ identifier. Their declarations merge member uses across case aliases;
+diagnostics retain the deterministic original AL spelling. Compiled scalar/array var
+calls prove one identity across codeunits, while spaces, dots and object kinds retain
+distinct overloads. Splitting a case alias or removing its merged member must fail
+compilation. Default copy assignment on an unavailable AL object refuses, so merging
+case aliases cannot turn a formerly refused transfer into success; restoring a C++
+default assignment must fail execution. .NET aliases retain their existing separate
+binding rules. This does not qualify missing-symbol namespace/using resolution,
+Unicode case folding, AL storage or unavailable-type by-value conversion semantics.
 Unavailable scalar fields compile compound assignments and both Clear forms, then
 refuse with their original member identity before subsequent AL effects. Removing all
 six operations must fail the compiled runner. RefusedGate retains Decimal operands,

@@ -75,7 +75,7 @@ void UnavailableRecordFieldsCompileAndRefuse() {
       unit.UnavailableFields(operation, counter);
     } catch (const agiru::Error &error) { message = error.what(); }
     CHECK_TRUE("implicit unavailable fields compile but their operation refuses explicitly",
-               message.contains("UnavailableRow." + std::string(kMethods[operation])));
+               message.contains("Unavailable Row." + std::string(kMethods[operation])));
     CHECK_TRUE("unavailable operations never reach subsequent AL effects", counter == 41);
   }
 }
@@ -93,7 +93,7 @@ void UnavailableIndexedFieldsCompileAndRefuse() {
       unit.UnavailableIndexedFields(operation, counter);
     } catch (const agiru::Error &error) { message = error.what(); }
     CHECK_TRUE("indexed unavailable members compile and refuse with their own identity",
-               message.contains("IndexedRow." + std::string(kMembers[operation])));
+               message.contains("Indexed Row." + std::string(kMembers[operation])));
     CHECK_TRUE("the index executes once and refusal precedes subsequent AL effects",
                counter == (operation == kIndexWithSideEffect ? 42 : 41));
   }
@@ -109,7 +109,7 @@ void UnavailableFieldOperationsCompileAndRefuse() {
       unit.UnavailableFieldOperations(operation, counter);
     } catch (const agiru::Error &error) { message = error.what(); }
     CHECK_TRUE("compound assignments and both Clear forms retain the missing field identity",
-               message.contains("ArithmeticRow.Amount"));
+               message.contains("Arithmetic Row.Amount"));
     CHECK_TRUE("unavailable field operations refuse before later AL effects", counter == 41);
   }
 }
@@ -140,7 +140,7 @@ void FieldNumbersRetainTheirIntegerContract() {
       unit.UnavailableFieldNumber(operation, counter);
     } catch (const agiru::Error &error) { message = error.what(); }
     CHECK_TRUE("unavailable FieldNo remains Integer-shaped with its original refusal identity",
-               message.contains("NumberRow.FieldNo"));
+               message.contains("Number Row.FieldNo"));
     CHECK_TRUE("FieldNo refusal precedes overload invocation and subsequent AL effects",
                counter == 41);
   }
@@ -173,6 +173,27 @@ void UnavailablePartsRefuseWithoutDefaultAnswers() {
              unit.UnavailablePartInUntakenBranch() == kValue);
 }
 
+void CaseAliasesShareReferenceIdentity() {
+  constexpr agiru::Integer kOperationCount = 4;
+  constexpr std::array<std::string_view, kOperationCount> kMembers{
+      "CalleeOnly", "CalleeOnly", "CallerOnly", "="};
+  constexpr agiru::Integer kFirstReadOrAssignment = 2;
+  agiru::System::Fixture::NativeFixture_Codeunit unit;
+  for (agiru::Integer operation = 0; operation < kOperationCount; ++operation) {
+    agiru::Integer counter = kValue;
+    std::string message;
+    try {
+      unit.UnavailableCaseIdentity(operation, counter);
+    } catch (const agiru::Error &error) { message = error.what(); }
+    CHECK_TRUE("case aliases merge members and refuse with their original AL name",
+               message.contains("CASE ROW.") && message.contains(kMembers[operation]));
+    CHECK_TRUE("scalar and array aliases preserve var binding before the actual refusal",
+               counter == (operation >= kFirstReadOrAssignment ? 41 : 42));
+  }
+  CHECK_TRUE("raw name punctuation and kind retain independent overload identities",
+             unit.DistinctUnavailableTypes() == kValue);
+}
+
 }
 
 int main() {
@@ -184,5 +205,6 @@ int main() {
     UnavailableNamedPagesCompileAndRefuse();
     FieldNumbersRetainTheirIntegerContract();
     UnavailablePartsRefuseWithoutDefaultAnswers();
+    CaseAliasesShareReferenceIdentity();
   });
 }

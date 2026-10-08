@@ -511,14 +511,17 @@ const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
 std::string InterfaceType(const al::VarDecl &declared, const Objects &objects) {
   const auto found = objects.interfaces.find(LowerKey(declared.subtype));
   return "::agiru::Implementation<" +
-         (found != objects.interfaces.end() ? found->second.identifier
-                                            : "absent::" + Identifier(declared.subtype)) +
+         (found != objects.interfaces.end()
+              ? found->second.identifier
+              : "absent::" + AbsentIdentifier("Interface", declared.subtype)) +
          ">";
 }
 
 std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
   const TableRef *ref = Reach(declared, objects);
-  if (ref == nullptr) { return "absent::" + Identifier(declared.subtype); }
+  if (ref == nullptr) {
+    return "absent::" + AbsentIdentifier(TypeName(declared.type), declared.subtype);
+  }
   return declared.temporary ? "Temporary<" + ref->identifier + ">" : ref->identifier;
 }
 
@@ -587,7 +590,7 @@ std::string Parameterised(const al::VarDecl &declared, const Objects &objects, c
     return Generic(type, declared.arguments, objects);
   }
 
-  if (NamesAbsentType(declared)) { return "absent::" + Identifier(declared.type); }
+  if (NamesAbsentType(declared)) { return "absent::" + AbsentIdentifier("Type", declared.type); }
   if (type == "Code" || type == "Text") {
     return Unhidden(type + "<" + std::to_string(declared.length) + ">");
   }
@@ -1063,7 +1066,16 @@ std::size_t MemberAfterReceiver(std::span<const al::Token> tokens, std::size_t r
   return at + 1 < tokens.size() && tokens[at].text == "." ? at + 1 : tokens.size();
 }
 
-void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, DotNetUse &use) {
+std::set<std::string> &MembersOf(std::set<std::string> &members) {
+  return members;
+}
+
+std::set<std::string> &MembersOf(AbsentDefinition &definition) {
+  return definition.members;
+}
+
+template <typename Uses>
+void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, Uses &use) {
   for (std::size_t i = 0; i + 2 < procedure.tokens.size(); ++i) {
     if (procedure.tokens[i].kind != al::TokenKind::Identifier &&
         procedure.tokens[i].kind != al::TokenKind::QuotedIdentifier) {
@@ -1077,34 +1089,33 @@ void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, D
     }
     const auto found = named.find(LowerKey(procedure.tokens[i].text));
     if (found == named.end()) { continue; }
-    use[found->second].insert(Identifier(procedure.tokens[member].text));
-    GatherFieldArguments(procedure.tokens, member, use[found->second]);
+    auto &members = MembersOf(use.at(found->second));
+    members.insert(Identifier(procedure.tokens[member].text));
+    GatherFieldArguments(procedure.tokens, member, members);
   }
 }
 
 void NoteAbsent(const al::VarDecl &declared,
                 const Objects &objects,
                 DotNetNames &named,
-                DotNetUse &use) {
+                AbsentUse &use) {
   for (const al::VarDecl &argument : declared.arguments) {
     NoteAbsent(argument, objects, named, use);
   }
   if (NamesAbsentType(declared)) {
-    const std::string bare = Identifier(declared.type);
+    const std::string bare = NoteAbsentType(use, "Type", declared.type);
     named.insert_or_assign(LowerKey(declared.name), bare);
-    use.try_emplace(bare);
     return;
   }
   if (!NamesAnObject(declared) || Reach(declared, objects) != nullptr) { return; }
-  const std::string subtype = Identifier(declared.subtype);
+  const std::string subtype = NoteAbsentType(use, TypeName(declared.type), declared.subtype);
   named.insert_or_assign(LowerKey(declared.name), subtype);
-  use.try_emplace(subtype);
 }
 
 void GatherDotNet(const al::CodeunitObject &unit,
                   const Objects &objects,
                   DotNetUse &use,
-                  DotNetUse &absent) {
+                  AbsentUse &absent) {
   DotNetNames named;
   DotNetNames missing;
   for (const al::VarDecl &declared : unit.variables) {
@@ -1517,13 +1528,13 @@ public:
     if (kind == "queries") { index = &objects_.queries; }
     if (kind == "enums") {
       const auto known = objects_.enums.find(LowerKey(std::string(name)));
-      return known == objects_.enums.end() ? "absent::" + Identifier(name)
+      return known == objects_.enums.end() ? "absent::" + AbsentIdentifier("Enum", name)
                                            : known->second.identifier;
     }
     if (index == nullptr) { return "::agiru::" + Identifier(name); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
-    return "absent::" + Identifier(name);
+    return "absent::" + AbsentIdentifier(kind, name);
   }
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
@@ -2129,11 +2140,19 @@ std::string DeclaredType(const al::VarDecl &declared, const Objects &objects) {
   return TypeOf(declared, objects);
 }
 
+std::string NoteAbsentType(AbsentUse &use, std::string_view kind, std::string_view name) {
+  const std::string key = AbsentIdentifier(kind, name);
+  auto [found, inserted] =
+      use.try_emplace(key, AbsentDefinition{.name = std::string(name), .members = {}});
+  if (!inserted && name < found->second.name) { found->second.name = name; }
+  return key;
+}
+
 void GatherAbsentIn(const std::vector<al::VarDecl> &variables,
                     const std::vector<al::ProcedureDecl> &procedures,
                     const Objects &objects,
                     DotNetUse &dotnet,
-                    DotNetUse &absent) {
+                    AbsentUse &absent) {
   al::CodeunitObject unit;
   unit.variables = variables;
   unit.procedures = procedures;
@@ -2551,7 +2570,7 @@ InterfaceOutput WriteInterface(const al::InterfaceObject &object,
            (procedure.hasBody ? ");\n" : ") = 0;\n");
   }
   out += "};\n\n} // namespace " + space + "\n";
-  DotNetUse missing;
+  AbsentUse missing;
   DotNetUse dotnet;
   GatherAbsentIn({}, object.procedures, objects, dotnet, missing);
   return InterfaceOutput{.text = WithRuntimeIncludes(out, ObjectKind::Interface),
@@ -2681,7 +2700,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
          "Codeunit;\n";
   out += "};\n";
   DotNetUse dotnet;
-  DotNetUse absent;
+  AbsentUse absent;
   GatherDotNet(unit, objects, dotnet, absent);
   return CodeunitHeader{.text = WithRuntimeIncludes(out, ObjectKind::Codeunit),
                         .unresolvedTables = Unresolved(unit, objects),

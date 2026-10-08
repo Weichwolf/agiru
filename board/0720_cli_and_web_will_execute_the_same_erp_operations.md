@@ -4,9 +4,9 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: repair generic mixed-case unavailable Record reference identity and missing
-selected extension fields, then repeat the original Customer workflow; never patch apps
-or guess declarations.
+Next: qualify the repaired unavailable Record identity in the original production group,
+repair missing selected extension fields, then repeat the original Customer workflow;
+never patch apps or guess declarations.
 ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
 The previous keep-going build exposed mixed-case unavailable record references, indexed
 fields and unselected TestPage parts/extension fields. The original TestPage groups
@@ -198,7 +198,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `make gate GATE=RefusedGate JOBS=2`: 11 checks, zero red. Ordinary Integer Clear remains
   implemented. `make lint JOBS=2` checks 53 affected compiled units with zero failures;
   format passes and the suppression baseline remains 12. Whole absent-record Clear and
-  same-type refusal assignment remain gaps.
+  same-type Refused member assignment remain gaps.
   References: developer `devenv-al-operators.md` and
   `methods-auto/system/system-clear-joker-method.md` at the revision above; BCApps
   `main` `src/Layers/W1/Tests/TestLibraries/LibraryCRMIntegration.Codeunit.al` at the
@@ -249,6 +249,27 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   correctness. A real add-in transport must preserve that contract.
   Durable tests: `test/gate/{GenCodeunit,PageDispatcher}Gate.cpp` and
   `test/transpiler/native-codeunits/{source/PartHost.Page.al,source/NativeFixture.Codeunit.al,Runner.cpp}`.
+
+- Unavailable AL type identity: `Names.cpp` encodes the case-folded raw name and object
+  kind, preserving spaces, punctuation and distinct kinds instead of using a sanitized
+  C++ display name as identity. `CodeunitWriter.cpp` merges members across equivalent
+  spellings; `Main.cpp` emits deterministic original-name diagnostics. Scalar and indexed
+  `var Record` calls now share their type. Whole-object copy assignment refuses before
+  later AL effects; it must not silently succeed after case aliases are merged. .NET
+  aliases remain separate. Namespace/using resolution, Unicode case folding, absent
+  storage and inherited by-value conversions remain unqualified.
+  `make native-codeunits JOBS=2` with the verified System package: generator 78,
+  executable 107, source-bound 8 and original Base64 61 checks, zero red. All existing
+  controls plus default-copy assignment, unrelated `var` type and missing merged-member
+  mutations reject. GenNamesGate has 39 checks, GenPageGate 58 and GenInterfaceGate 35,
+  zero red. Changed-code lint covers 31 of 344 units with zero failures; format passes
+  and suppression baseline stays 12. Original group 526 and full linking are pending.
+  References at the pinned revisions above: developer `devenv-al-variables.md` and
+  `devenv-namespaces-structure.md`; BCApps `main`
+  `src/Layers/W1/Tests/{ERM/CopyPriceDataTest,TestLibraries/LibraryCRMIntegration}.Codeunit.al`.
+  Predecessors 779/850/810 warn against normalized-name collisions, miss-only guesses
+  and counting source matches as emitter proof. Durable fixtures:
+  `test/transpiler/native-codeunits/{source/AbsentPeer.Codeunit.al,source/NativeFixture.Codeunit.al,Runner.cpp}`.
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.

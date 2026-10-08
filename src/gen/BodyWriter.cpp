@@ -1898,12 +1898,12 @@ public:
     if (kind == "queries") { index = &objects_.queries; }
     if (kind == "enums") {
       const std::string named = NamedEnum(objects_, name);
-      return named.empty() ? "absent::" + Identifier(name) : named;
+      return named.empty() ? "absent::" + AbsentIdentifier("Enum", name) : named;
     }
     if (index == nullptr) { return "::agiru::" + RuntimeSpelling(Identifier(name)); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
-    return "absent::" + Identifier(name);
+    return "absent::" + AbsentIdentifier(kind, name);
   }
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
@@ -2326,12 +2326,12 @@ public:
     if (kind == "queries") { index = &objects_.queries; }
     if (kind == "enums") {
       const std::string named = NamedEnum(objects_, name);
-      return named.empty() ? "absent::" + Identifier(name) : named;
+      return named.empty() ? "absent::" + AbsentIdentifier("Enum", name) : named;
     }
     if (index == nullptr) { return "::agiru::" + RuntimeSpelling(Identifier(name)); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
-    return "absent::" + Identifier(name);
+    return "absent::" + AbsentIdentifier(kind, name);
   }
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {

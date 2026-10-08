@@ -1648,7 +1648,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
     out += "}\n";
   }
   DotNetUse dotnet;
-  DotNetUse absent;
+  AbsentUse absent;
   GatherAbsentIn(table.variables, bodies, objects, dotnet, absent);
   return TableHeader{.text = WithRuntimeIncludes(out, ObjectKind::Table),
                      .unresolvedEnums = Unresolved(table, enums),

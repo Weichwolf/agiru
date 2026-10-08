@@ -20,6 +20,38 @@
 
 namespace agiru::gen {
 
+std::string AbsentIdentifier(std::string_view kind, std::string_view alName) {
+  static constexpr std::array kKinds{
+      std::pair{std::string_view{"tables"}, std::string_view{"record"}},
+      std::pair{std::string_view{"codeunits"}, std::string_view{"codeunit"}},
+      std::pair{std::string_view{"pages"}, std::string_view{"page"}},
+      std::pair{std::string_view{"reports"}, std::string_view{"report"}},
+      std::pair{std::string_view{"xmlports"}, std::string_view{"xmlport"}},
+      std::pair{std::string_view{"queries"}, std::string_view{"query"}},
+      std::pair{std::string_view{"enums"}, std::string_view{"enum"}},
+      std::pair{std::string_view{"interfaces"}, std::string_view{"interface"}},
+  };
+  std::string tag = LowerKey(std::string(kind));
+  for (const auto &[plural, singular] : kKinds) {
+    if (tag == plural) {
+      tag = singular;
+      break;
+    }
+  }
+  std::string out = "Al_";
+  const auto append = [&](std::string_view part) {
+    constexpr std::string_view kHex = "0123456789abcdef";
+    for (const unsigned char byte : LowerKey(std::string(part))) {
+      out += kHex[byte / kHex.size()];
+      out += kHex[byte % kHex.size()];
+    }
+  };
+  append(tag);
+  out += '_';
+  append(alName);
+  return out;
+}
+
 namespace {
 
 char Lower(char c) {
