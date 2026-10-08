@@ -114,6 +114,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   The resumed `make slice-check all JOBS=6` completes at `d31bb87`: 14,225 slice sources,
   exit zero, 1,526 seconds; 1,902 unlinked procedures remain diagnostic stand-ins.
   The later source-insertion state repair still requires rebuilding generated consumers.
+  Its fresh native HTTP regression matrix retains all 154 cases and all 18 compiled
+  refusal controls, zero red, with unchanged input hashes; focused navigation has 239
+  checks and 25 execution controls. Original workflow acceptance is still pending.
   Generation/slice linking is not complete AL execution.
 - Remaining: original Customer creation/reopen, computed control values, variable input
   validation/retry, automatic AL CurrPage.Close, dynamic Editable, progress/report callbacks,

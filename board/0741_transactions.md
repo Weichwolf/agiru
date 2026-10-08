@@ -2,7 +2,7 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: finish the native HTTP regression matrix, rebuild production generated consumers
+Next: rebuild production generated consumers
 and execute Customer New/template/save/reopen under 0720;
 qualify disabled native callbacks, shutdown rollback, progress execution and the
 remaining optimistic-write/isolation contracts. The rebuilt original Customer opens
@@ -65,6 +65,10 @@ refusal reject. The 19 added checks cover source insertion during OnNewRecord,
 OnAfterGetCurrRecord/Copy and OnValidate, ordinary field persistence, duplicate prevention,
 pending identity/key mismatches, rollback and temporary rows. DelayedInsert regressions
 remain green. The changed runner passes targeted clang-tidy without suppressions.
+`make page-host-test JOBS=2` retains all 154 native HTTP cases, limits 40/7/80 and
+both TryFunction policies, zero red; all 18 compiled defects reject at named assertions
+and source/scalar input hashes remain unchanged. This is authored generated-page
+regression proof, not original Customer workflow acceptance.
 Sources: `test/runtime/page-navigation/{Created.Page.al,Runner.cpp}` and its Bash harness.
 References at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
 `methods-auto/page/page-saverecord-method.md`, `methods-auto/record/record-copy-method.md`,
