@@ -3,9 +3,9 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: qualify the source-insertion state repair in 0720/0741, then reproduce the
-captured template → customer → edit → reopen sequence through external CMD/MCP and
-sample the agiru browser; expand the remaining master-data cases.
+Next: expand customer invalid/duplicate/lookup/dimension cases and the remaining
+setup/master-data workflows; vendor/item creation follows the accepted original
+template → customer → edit → independent reopen regression.
 
 ## Processes and implementation
 
@@ -25,13 +25,16 @@ sample the agiru browser; expand the remaining master-data cases.
   List/Card/edit cases across external CMD/MCP and actual Chromium, independently
   checking the 40-row SQL window, exact Unicode saves, permissions and durable receipts.
   This does not replay the captured New/template sequence or accept this process family.
-- The expanded eleven-case run retains eight passes; original modal 1380 exposes all
+- The expanded eleven-case run passes 11/11, none skipped/cancelled; modal 1380 exposes all
   three templates. CMD/MCP/Chromium explicitly select the second template, create one
   customer through original AL, and independently verify creator plus five inherited
-  posting/payment/currency fields. Three cases fail because Address/Country/Credit Limit
-  stay only in the page buffer after Name saves. The generic new-record reconciliation
-  repair is gate-qualified in 0741; its production rebuild, independent reopen and ledger
-  acceptance remain pending. Choosing a template automatically is not an implementation.
+  posting/payment/currency fields. Name/Address/Country/Credit Limit persist, and a fresh
+  original List/Card independently reopens the exact typed values and zero balance.
+  SQL verifies no new customer ledger entries and unchanged counts/full-row fingerprints
+  across Customer/G/L/Item/Value ledgers. The generic state repair and production rebuild
+  are qualified in 0741. This accepts this Customer sequence on the stated native seed,
+  not the whole process family, visual BC parity or a matching-tenant financial A/B.
+  Choosing a template automatically is not an implementation.
 - Docs revision `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`, under
   `~/Git/dynamics365smb-docs/business-central/`: `setup.md`,
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,
@@ -44,7 +47,9 @@ sample the agiru browser; expand the remaining master-data cases.
   field values independently match, with displayed limit `1,234.56` and zero balance.
   Keep accepted machine values distinct from localized display text. Own customer
   remains for subsequent sales reference; unrelated customers/setup were unchanged.
-  No agiru replay, posting or independent SQL proof is accepted yet. Eight screenshots
+  The corresponding agiru Customer sequence now passes above; the international seed's
+  explicit CUSTOMER EU COMPANY differs from this CH reference's template. No matching-
+  tenant, posting or source-collation proof is claimed. Eight BC screenshots
   and state captures stay privately under `~/.local/share/agiru/bc-reference/2026-10-06/`.
 - Mark all own records/documents; record company/version/work date, inputs, chosen
   template, saved IDs and defaults. Never alter unrelated setup or send real email/payments.

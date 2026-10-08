@@ -2,14 +2,10 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: rebuild production generated consumers
-and execute Customer New/template/save/reopen under 0720;
-qualify disabled native callbacks, shutdown rollback, progress execution and the
-remaining optimistic-write/isolation contracts. The rebuilt original Customer opens
-the real template modal and inserts the explicitly selected template. Expanded workflow
-acceptance currently has eight passes and three persistence failures: Address, Country
-and Credit Limit stay only in the page buffer. The generic state repair below is gate-
-qualified; its production rebuild and original workflow acceptance remain pending.
+Next: qualify disabled native callbacks, shutdown rollback, progress execution and the
+remaining optimistic-write/isolation contracts. Original Customer New/template/save/
+independent reopen now passes all eleven HTTP cases across CMD/MCP/Chromium under 0720.
+This is one master-data workflow, not posting or complete transaction acceptance.
 Repeat counted AL execution after the verified SelectLatestVersion increment below;
 retain every startup refusal and test identity. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
@@ -69,6 +65,14 @@ remain green. The changed runner passes targeted clang-tidy without suppressions
 both TryFunction policies, zero red; all 18 compiled defects reject at named assertions
 and source/scalar input hashes remain unchanged. This is authored generated-page
 regression proof, not original Customer workflow acceptance.
+Production `make slice-check all B=/workspace/build/podman JOBS=6` passes after the
+repair: 14,225 slice sources, exit zero, 2,593 seconds; 1,902 unlinked procedures remain
+counted. `make erp-client-test JOBS=2` passes 11/11, no skipped/cancelled cases:
+the three real Customer creation/edit/reopen paths and all eight existing cases.
+Independent SQL retains complete row-content fingerprints and counts for the four
+ledger populations; seed, source Company and copied-binary identities remain unchanged.
+The owned clone and private credentials are removed. This does not qualify financial
+posting, source-BC collation, full-app compilation or source-counted AL execution.
 Sources: `test/runtime/page-navigation/{Created.Page.al,Runner.cpp}` and its Bash harness.
 References at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
 `methods-auto/page/page-saverecord-method.md`, `methods-auto/record/record-copy-method.md`,
@@ -92,8 +96,8 @@ root polling. Independent
 SQL verifies nested modal/question suspension, explicit cancellation/timeout rollback,
 no implicit modal commit, and durability of a prior explicit Commit after caller failure.
 Child-input receipts do not establish root durability. The production ABI rebuild
-at `d31bb87` passes slice-check/all (14,225 slice sources, 1,526 seconds); the new
-source-insertion repair still needs a rebuilt image and original workflow proof.
+at `d31bb87` passes slice-check/all (14,225 slice sources, 1,526 seconds); the later
+source-insertion repair and original Customer workflow are qualified above.
 No finance acceptance.
 
 Blocking Confirm/StrMenu now enforce trusted

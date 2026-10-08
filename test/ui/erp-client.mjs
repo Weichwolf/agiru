@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
 import { parsePage } from "../../build/client/profile.mjs";
 import { ServerConfigs } from "./server-config.mjs";
-import { assertBrowserPage, browserSet, launchBrowser, openBrowserPage } from "./browser-client.mjs";
+import { assertBrowserPage, browserAction, browserSet, launchBrowser, openBrowserPage } from "./browser-client.mjs";
 
 const execute = promisify(execFile);
 const container = process.env.AGIRU_DEV_CONTAINER ?? "agiru-dev";
@@ -38,8 +38,16 @@ async function sql(statement) {
 }
 async function customer(number) {
   return JSON.parse(await sql(`SELECT json_build_object('name',"Name",'search',"Search Name",
-    'modifier',"SystemModifiedBy"::text,'version',"timestamp"::text)
+    'modifier',"SystemModifiedBy"::text,'version',"timestamp"::text,
+    'creator',"SystemCreatedBy"::text,'address',"Address",'country',"Country/Region Code",
+    'credit',"Credit Limit (LCY)"::text)
     FROM "Customer" WHERE "No."=${quoted(number)}`));
+}
+async function ledgerSnapshot() {
+  const tables = ["Cust. Ledger Entry", "G/L Entry", "Item Ledger Entry", "Value Entry"];
+  return sql(`SELECT ${tables.map(name => `(SELECT count(*)::text || ':' ||
+    COALESCE(md5(string_agg(md5(to_jsonb(entry)::text), '' ORDER BY "Entry No.")), 'empty')
+    FROM "${name}" entry)`).join(",")}`);
 }
 async function cmd(name, value, denied = false) {
   return execute(process.execPath, ["build/client/cmd.mjs", "--json", name,
@@ -58,6 +66,49 @@ async function mcp(name, args, denied = false) {
   await client.connect(transport);
   try { return await client.callTool({ name: `agiru_${name}`, arguments: args }); }
   finally { await client.close(); }
+}
+
+async function workflowDriver(adapter, initial) {
+  const web = adapter === "Web" ? await openBrowserPage(browser, origin, path(initial), first.authorization) : undefined;
+  if (web) await assertBrowserPage(web.page, initial.page);
+  return {
+    async action(current, identity, text) {
+      const request = operation(current, identity, text);
+      if (adapter === "CMD") return JSON.parse((await cmd("execute", request)).stdout);
+      if (adapter === "MCP") {
+        const reply = await mcp("execute", request);
+        assert.ok(!reply.isError, JSON.stringify(reply.structuredContent));
+        return reply.structuredContent;
+      }
+      return text === undefined ? browserAction(web.page, origin, current.page, identity)
+        : browserSet(web.page, origin, current.page, identity, text);
+    },
+    async screenshot(name) {
+      if (web) await web.page.screenshot({ path: `${proof}/${name}.png`, fullPage: true });
+    },
+    async close() { await web?.page.close(); },
+  };
+}
+
+async function reopenCustomer(adapter, number) {
+  let list = JSON.parse((await cmd("read", target)).stdout);
+  const driver = await workflowDriver(adapter, list);
+  const blocks = Math.ceil(Number(await sql('SELECT count(*) FROM "Customer"')) / 40) + 1;
+  try {
+    for (let block = 0; block < blocks; ++block) {
+      assert.equal(list.page.window.limit, "40");
+      const row = list.page.rows.find(row => row.controls.find(control => control.identity === "No.")?.scalar?.value === number);
+      if (row) {
+        list = await driver.action(list, row.select.control);
+        const card = await driver.action(list, "$agiru.card");
+        await driver.screenshot(`customer-${adapter.toLowerCase()}-reopened`);
+        return card;
+      }
+      if (!list.page.window.more) break;
+      list = await driver.action(list, "$agiru.next");
+    }
+    assert.fail(`independent Customer List did not expose newly created ${number}`);
+  } finally { await driver.close(); }
 }
 
 let server, closed, pid, first, denied, client, list, card, saved, selected, original, browser;
@@ -269,3 +320,75 @@ test("original Customer New exposes the explicit template selection before creat
       "no automatic template choice or customer insertion before the explicit answer");
   }
 });
+
+for (const adapter of ["CMD", "MCP", "Web"]) {
+  test(`${adapter} creates an original Customer from an explicitly selected template, edits and independently reopens it`,
+    { timeout: 120000 }, async () => {
+      const population = Number(await sql('SELECT count(*) FROM "Customer"'));
+      const ledgers = await ledgerSnapshot();
+      const fresh = JSON.parse((await cmd("read", target)).stdout);
+      const driver = await workflowDriver(adapter, fresh);
+      let created;
+      const steps = [];
+      const inputs = { Name: `AGIRU ${adapter} CUSTOMER Ω 雪`, Address: "AGIRU Testweg 6",
+        "Country/Region Code": "CH", "Credit Limit (LCY)": "1234.56" };
+      try {
+        let modal = await driver.action(fresh, "$agiru.new");
+        assert.equal(modal.page.page, "1380");
+        assert.equal(modal.page.interaction.state, "modal");
+        assert.equal(modal.page.window.limit, "40");
+        assert.equal(await sql('SELECT count(*) FROM "Customer"'), String(population));
+        assert.equal(modal.page.rows.length, 3, "unchanged seed must retain all three template choices");
+        const templateRow = modal.page.rows[1];
+        const templateCode = templateRow.controls.find(control => control.identity === "Code")?.scalar?.value;
+        assert.ok(templateCode);
+        assert.equal(templateRow.selected, false, "explicitly select a non-default template");
+        modal = await driver.action(modal, templateRow.select.control);
+        assert.equal(field(modal, "Code"), templateCode);
+        assert.equal(await sql('SELECT count(*) FROM "Customer"'), String(population));
+        created = await driver.action(modal, "$agiru.modal_ok");
+        assert.equal(created.page.page, "21", "resume the original Customer Card, not a replacement mask");
+        assert.equal(created.page.interaction, undefined);
+        const number = field(created, "No.");
+        assert.ok(number, "original AL numbering must assign a new customer key");
+        assert.equal(await sql('SELECT count(*) FROM "Customer"'), String(population + 1));
+        assert.equal((await customer(number)).creator, "00000000-0000-0000-0000-000000000001");
+        const inherited = ["Gen. Bus. Posting Group", "VAT Bus. Posting Group", "Customer Posting Group",
+          "Payment Method Code", "Currency Code"];
+        for (const name of inherited) {
+          assert.equal(await sql(`SELECT "${name}" FROM "Customer" WHERE "No."=${quoted(number)}`),
+            await sql(`SELECT "${name}" FROM "Customer Templ." WHERE "Code"=${quoted(templateCode)}`),
+            `original AL must transfer ${name} from the explicitly selected template`);
+        }
+        for (const [name, value] of Object.entries(inputs)) {
+          created = await driver.action(created, name, value);
+          steps.push({ control: name, input: value, page: created.page, stored: await customer(number) });
+          await writeFile(`${proof}/customer-${adapter.toLowerCase()}-steps.json`, JSON.stringify({
+            template: templateCode, number, steps }));
+          assert.equal(field(created, name), value);
+        }
+        const stored = await customer(number);
+        assert.equal(stored.name, inputs.Name);
+        assert.equal(stored.address, inputs.Address);
+        assert.equal(stored.country, inputs["Country/Region Code"]);
+        assert.equal(await sql(`SELECT "Credit Limit (LCY)"=${quoted(inputs["Credit Limit (LCY)"])}::numeric
+          FROM "Customer" WHERE "No."=${quoted(number)}`), "t");
+        assert.equal(stored.modifier, "00000000-0000-0000-0000-000000000001");
+        assert.equal(await sql(`SELECT count(*) FROM "Cust. Ledger Entry" WHERE "Customer No."=${quoted(number)}`), "0");
+        assert.equal(await ledgerSnapshot(), ledgers,
+          "master-data entry must not insert, delete or change any of the four ledger populations");
+        await driver.screenshot(`customer-${adapter.toLowerCase()}-created`);
+        await writeFile(`${proof}/customer-${adapter.toLowerCase()}-created.json`, JSON.stringify({
+          template: templateCode, number, inputs, stored, page: created.page, ledgers }));
+      } finally { await driver.close(); }
+      const reopened = await reopenCustomer(adapter, field(created, "No."));
+      assert.notEqual(reopened.page.handle, created.page.handle, "reopen through an independent original list/card instance");
+      assert.equal(field(reopened, "No."), field(created, "No."));
+      for (const [name, value] of Object.entries(inputs)) {
+        if (name !== "Credit Limit (LCY)") assert.equal(field(reopened, name), value);
+      }
+      assert.equal(field(reopened, "Credit Limit (LCY)"), (await customer(field(created, "No."))).credit,
+        "fresh exact Decimal transport must retain the declared SQL storage scale, not binary floating point");
+      assert.equal(field(reopened, "Balance (LCY)"), "0");
+    });
+}

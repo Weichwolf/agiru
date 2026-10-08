@@ -4,10 +4,10 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: rebuild production generated consumers after the source-insertion state repair
-in 0741, then qualify original Customer template (1380) → create → edit → independent
-reopen for 0727. The expanded workflow run has eight passes and three stored-field
-failures before this repair. Never substitute a default template, UT handler or client rule.
+Next: expand setup/master-data workflows under 0727, retaining the accepted original
+Customer template (1380) → create → edit → independent reopen regression. Fix invalid
+variable-input success and qualify the remaining client/runtime contracts below.
+Never substitute a default template, UT handler or client rule.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -61,8 +61,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 - Sources: `include/runtime/{Page,PageSession,PageInstance,UiHost}.h`,
   `src/rt/{PageInstance,UiHost}.cpp`, `test/runtime/page-navigation/{Modal.Page.al,Runner.cpp}`
   and its Bash harness. This is a generated-factory/trusted-host gate, not HTTP parity.
-  The native host now uses the transport below; original Customer opens its modal and
-  inserts the chosen template, but ordinary-field persistence/reopen remains unaccepted.
+  The native host now uses the transport below; original Customer opens its modal,
+  inserts the chosen template and passes ordinary-field persistence/independent reopen.
   Non-modal query-close behaviour remains unqualified.
 - Developer `methods-auto/page/page-{runmodal-,getrecord,lookupmode}-method.md` and
   `triggers-auto/page/devenv-onqueryclosepage-page-trigger.md` at
@@ -113,12 +113,13 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   22 bound/211 unbound; all 35 codeunits are selected but 67 methods remain unbound.
   The resumed `make slice-check all JOBS=6` completes at `d31bb87`: 14,225 slice sources,
   exit zero, 1,526 seconds; 1,902 unlinked procedures remain diagnostic stand-ins.
-  The later source-insertion state repair still requires rebuilding generated consumers.
+  The later source-insertion repair also passes production slice-check/all: exit zero,
+  14,225 sources, 2,593 seconds; the same 1,902 unlinked gaps remain counted.
   Its fresh native HTTP regression matrix retains all 154 cases and all 18 compiled
   refusal controls, zero red, with unchanged input hashes; focused navigation has 239
-  checks and 25 execution controls. Original workflow acceptance is still pending.
+  checks and 25 execution controls. Original Customer workflow proof is recorded below.
   Generation/slice linking is not complete AL execution.
-- Remaining: original Customer creation/reopen, computed control values, variable input
+- Remaining: wider master-data workflows, computed control values, variable input
   validation/retry, automatic AL CurrPage.Close, dynamic Editable, progress/report callbacks,
   modal error-string quotas and expired-receipt cleanup. This is not source-BC collation,
   full generated-tree/UT execution, financial posting or production-scale acceptance.
@@ -415,15 +416,17 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   recorded in `e67438a`/0741; it predates native questions and linked-card creation.
   These gates/fixtures do not execute the source-counted AL UT.
 
-- Original Customer regression after the production modal rebuild: `make erp-client-test
-  JOBS=2`, eleven cases, **eight pass/three failures**, none skipped/cancelled. Original
-  New/template display and all seven existing cases pass. CMD/MCP/Chromium each explicitly
+- Original Customer regression after the source-insertion repair: `make erp-client-test
+  JOBS=2`, **eleven pass/zero failures**, none skipped/cancelled. Original New/template
+  display and all seven existing cases remain green. CMD/MCP/Chromium each explicitly
   select the second template, receive original Card 21 and create one numbered customer;
-  SQL confirms creator and five inherited posting/payment/currency fields. Name persists,
-  but Address/Country/Credit Limit only change the buffer; per-field independent SQL retains
-  the previous rowversion. Independent reopen/ledger assertions remain unexecuted after
-  these failures. The generic state repair and its focused proof belong to 0741; rebuild
-  the production image before claiming workflow acceptance.
+  SQL confirms creator and five inherited posting/payment/currency fields. Name, Address,
+  Country and Credit Limit persist and match an independent original List/Card reopen.
+  Decimal storage scale remains exact. SQL counts and complete row-content fingerprints
+  prove no insert/delete/update in Customer/G/L/Item/Value ledgers; the new customer has
+  no ledger entries and zero displayed balance. All eight earlier cases remain present.
+  The generic state repair and its focused proof belong to 0741. Earlier 8/11 failures
+  are recoverable at `ac896f4`; no failing identity was removed.
   `test/ui/erp-client.mjs` follows the existing asynchronous opening call without
   reopening; `browser-client.mjs` recognizes typed server errors and compares their
   exact text/outcome. Real NativePermissions denial is `Permission/refused` before
@@ -438,8 +441,11 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   `make web-test JOBS=2` passes fourteen Chromium cases, the actual Caddy asset case
   and all three compiled refusal controls; PageHtml retains 164 checks, zero red.
 - Seed `agiru_client_seed_20261007b` and source revisions are unchanged; SQL_ASCII/C
-  is not source-BC collation or complete Unicode qualification. New/template selection,
+  is not source-BC collation or complete Unicode qualification. Wider template cases,
   lookups, posting, full business families and source-counted AL acceptance remain due.
+  Browser samples preserve the actual created/reopened values, but the current long
+  flattened control/action presentation is not BC visual/layout parity. Unsupported
+  controls remain visible; dynamic layout/visibility, FactBoxes and complete UI remain gaps.
   Owned test clone, copied binaries and credentials are removed after verification.
   Earlier Customer failures are recoverable from `ba3190a`; none were filtered out.
   References: developer `methods-auto/system/system-guiallowed-method.md` at
