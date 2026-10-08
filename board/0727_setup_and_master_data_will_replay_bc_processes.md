@@ -20,6 +20,10 @@ external CMD/MCP and sample the agiru browser; expand the remaining master-data 
 
 ## Evidence and acceptance
 
+- Prerequisite regression: `make erp-client-test JOBS=2` passes 7/7 original Customer
+  List/Card/edit cases across external CMD/MCP and actual Chromium, independently
+  checking the 40-row SQL window, exact Unicode saves, permissions and durable receipts.
+  This does not replay the captured New/template sequence or accept this process family.
 - Docs revision `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`, under
   `~/Git/dynamics365smb-docs/business-central/`: `setup.md`,
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,

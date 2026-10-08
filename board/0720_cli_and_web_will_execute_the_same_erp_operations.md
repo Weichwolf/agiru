@@ -4,10 +4,9 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: integrate the session-owned native UI bridge from 0741 with real HTTP dialog
-admission/suspension and typed error responses; rerun original Customer
-List → Card → Validate → Save using external CMD/MCP and representative htmx browser checks. Preserve the generic generated-page
-HTTP/SQL contract below; do not replace permission enforcement with permissive stubs.
+Next: extend the verified original Customer List → Card → Validate → Save contract
+to New/template selection and lookups for 0727. Qualify progress/modal execution
+through the shared native UI endpoint; preserve generic HTTP/SQL authorization.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -265,52 +264,26 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   XMLport fixture compile failure; the focused repair and pending rerun are owned by 0741.
   these gates/fixtures do not execute the source-counted AL UT or qualify actual browsers.
 
-- Original Customer client regression: `make erp-client-test JOBS=2`,
-  rebuilt callback-policy native source `b8d83b2` with client `2f6f2e2`:
-  seven cases, six pass/one failure,
-  zero skipped/cancelled. `make slice-check all B=/workspace/build/podman JOBS=6`
-  rebuilt production factories for the expanded PageInstance/SessionOptions APIs: 14,225
-  diagnostic slice sources, zero missing, native build exit 0 in 2,901 seconds; not full-app or UT
-  acceptance. The 40-row Customer window independently matches SQL primary-key order
-  and every No./Name value, preserves exact Code/Text types and one selected row,
-  and agrees across external CMD/MCP and actual Chromium. The seed/source revision
-  and SQL_ASCII/collation limitations below remain unchanged.
-  Actual Chromium/htmx denies the unassigned user and edits the original Customer Name;
-  external CMD and real MCP make earlier edits on the same row. Independent SQL verifies
-  exact Unicode names, authenticated modifier, increased rowversion, unchanged row
-  population, durable receipts and no idle leases. `test/ui/browser-client.mjs` compares
-  actual rendered controls/typed values/command identities with the agent model; its
-  native-HTML browser regression and three compiled controls remain green. The complete
-  native image rebuild exits zero (14,225 slice sources, 1,902 explicit unlinked procedures).
-  Remaining case: Customer Card's No. is absent. Original `CustomerCard.Page.al`
-  OnOpenPage runs OnOpenBackground because HTTP still installs no native UI host;
-  NoFieldVisible remains false instead of running DocumentNoVisibility. The verified
-  seed's CUST series has Manual Nos.=true, so the interactive path should show No.
-  Preserve the failing case; never force GuiAllowed/visibility or bypass original AL.
-  Developer `properties/devenv-visible-property.md` at the revision below distinguishes
-  dynamic visibility from permissions. This is diagnostic existing-customer editing,
-  not interactive page/ERP acceptance, New/template selection or a completed business family.
-
-  Historical pre-bridge failure evidence:
-  `test/ui/erp-client.mjs` and the existing CRONUS fixture pipeline: seven cases,
-  one pass/six failures, zero skipped/cancelled. Caddy/native service starts and drains
-  cleanly; unassigned users are refused over HTTP/CMD/MCP without Customer/context SQL
-  effects. Authorized Customer List returns HTTP 500; all five dependent Card/edit/receipt
-  cases explicitly retain their unexecuted status as failures. A temporary C++ throw probe
-  locates `CustomerList.OnOpenPage → OfficeHostProvider.OnIsAvailable → GuiAllowed`.
-  The measured image's `GuiAllowed` accepted only installed test handlers; the new bridge
-  above still needs a production HTTP endpoint. Earlier isolated company-login
-  subscribers also encounter retained native-method refusals. Production sessions must
-  expose real UI capability, with false for background execution and true only for a
-  working host; do not insert always-true/always-false stubs, automatic dialog answers,
-  UT-handler impersonation or object-specific bypasses. Native AL errors outside the
-  PageHost whitelist currently become a generic transport `HttpHandlerFailure`; exact
-  client error/message parity remains open. Binary copies/hashes are existing-artifact
-  diagnostics, not actual browser acceptance. The rerun after the successful current
-  14,225-source native integration build retains one pass/six failures; stale binaries
-  do not explain the Customer opening failure.
-  Owned clone, binaries and private credentials are removed on failure. This regression
-  covers existing-customer edits, not New/template selection, posting or full sales acceptance.
+- Original Customer regression: `make erp-client-test JOBS=2`, native question/message
+  endpoint `ba3190a` plus opening-admission repair: **7/7 pass**, none skipped/cancelled.
+  `test/ui/erp-client.mjs` follows the existing asynchronous opening call without
+  reopening; `browser-client.mjs` recognizes typed server errors and compares their
+  exact text/outcome. Real NativePermissions denial is `Permission/refused` before
+  retaining a context or executing AL; CMD exits 2, MCP and Chromium agree, SQL unchanged.
+- The original 40-row Customer List matches independent SQL primary-key order and
+  every Code/Text value. External CMD/MCP and actual Chromium retain identical state.
+  Card OnOpenPage now exposes the exact No. through the real session UI host, not
+  forced GuiAllowed/visibility or object-specific runtime code. CMD/MCP/htmx each save
+  Unicode Name values; SQL verifies modifier, increased version, all 68 customers,
+  durable command receipts and released idle connections. Native build and targeted
+  PageCommandHost clang-tidy pass; 1,902 diagnostic-slice unlinked gaps remain.
+  `make web-test JOBS=2` passes fourteen Chromium cases, the actual Caddy asset case
+  and all three compiled refusal controls; PageHtml retains 164 checks, zero red.
+- Seed `agiru_client_seed_20261007b` and source revisions are unchanged; SQL_ASCII/C
+  is not source-BC collation or complete Unicode qualification. New/template selection,
+  lookups, posting, full business families and source-counted AL acceptance remain due.
+  Owned test clone, copied binaries and credentials are removed after verification.
+  Earlier Customer failures are recoverable from `ba3190a`; none were filtered out.
   References: developer `methods-auto/system/system-guiallowed-method.md` at
   `f928288ee840334be73142e5fc0202c0e19b246d`; BCApps
   `Layers/W1/BaseApp/{Sales/Customer/CustomerList.Page,CRM/Outlook/OfficeHostProvider.Codeunit,

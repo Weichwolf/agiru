@@ -118,11 +118,16 @@ test("original Customer List denies the unassigned user over web, CMD and MCP wi
   try { await cmd("read", target, true); } catch (caught) { error = caught; }
   assert.ok(error, "actual shell CMD must refuse an unassigned user");
   assert.equal(error.code, 2);
+  const failure = JSON.parse(error.stderr);
+  assert.equal(failure.error, "Permission");
+  assert.equal(failure.outcome, "refused");
   const reply = await mcp("read", { path: target }, true);
   assert.equal(reply.isError, true);
-  assert.deepEqual(reply.structuredContent, JSON.parse(error.stderr));
+  assert.deepEqual(reply.structuredContent, failure);
   const web = await openBrowserPage(browser, origin, target, denied.authorization);
   assert.equal(web.response.status(), 403);
+  assert.equal(await web.page.locator("#status").textContent(),
+    `Server error ${failure.error}: ${failure.message} outcome=${failure.outcome}`);
   assert.equal(await web.page.locator("#workspace [data-control]").count(), 0);
   await web.page.screenshot({ path: `${proof}/customer-denied.png`, fullPage: true });
   await web.page.close();
@@ -135,7 +140,16 @@ test("original Customer List opens over Caddy and retains identical web/CMD/MCP 
   const html = await response.text();
   await writeFile(`${proof}/customer-list.html`, html);
   assert.equal(response.status, 200, html);
-  list = { page: parsePage(html), status: response.status };
+  const initial = { page: parsePage(html), status: response.status };
+  list = initial.page.interaction?.state === "working"
+    ? await client.read(`/calls/${initial.page.interaction.call}`) : initial;
+  if (initial.page.interaction) {
+    const completed = await fetch(origin + path(list), { headers: first });
+    assert.equal(completed.status, 200);
+    const finalHtml = await completed.text();
+    assert.deepEqual(parsePage(finalHtml), list.page);
+    await writeFile(`${proof}/customer-list.html`, finalHtml);
+  }
   assert.equal(list.page.page, "22");
   assert.equal(list.page.profile, "2");
   assert.equal(list.page.view, "list");
@@ -178,7 +192,7 @@ test("CMD discovers and opens the original Customer Card with the exact selected
   assert.equal(await sql('SELECT "Manual Nos." FROM "No. Series" WHERE "Code" IN ' +
     '(SELECT "Customer Nos." FROM "Sales & Receivables Setup")'), "t", "seed requires the interactive No. field");
   assert.equal(field(card, "No."), selected,
-    "Customer Card interactive OnOpenPage remains unqualified: native HTTP has no UI host");
+    "Customer Card interactive OnOpenPage must expose the exact SQL key");
   assert.equal(field(card, "Name"), original.name);
   assert.deepEqual(await client.read(path(card)), card);
 });

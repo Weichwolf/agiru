@@ -678,13 +678,16 @@ struct PageCommandHost::Impl {
     const auto page = PageId{static_cast<std::int32_t>(number)};
     const auto *entry = FindPage(page);
     if (entry == nullptr) { Refuse("PageHostMissing"); }
-    {
+    try {
       Session admission(user, options.session);
       admission.CompanyName(options.company);
       admission.TablePermissions(tableAuthority);
       SessionCommand command(admission, connection);
       authorize(*entry->page, Opening(Mode(*entry->page, Get(values, "mode"))), {});
       command.Keep();
+    } catch (const Error &error) {
+      throw CommandFailure(
+          {.message = error.what(), .code = error.Code(), .command = {}, .outcome = "refused"});
     }
     auto context = Retain(user);
     auto call = std::make_shared<Call>();

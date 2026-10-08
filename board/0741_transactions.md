@@ -2,10 +2,10 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: rerun original Customer with the real question/message endpoint under 0720;
-qualify disabled native callbacks, shutdown rollback, progress/modal execution and
-the remaining optimistic-write/isolation contracts. The latest Customer measurement
-precedes this endpoint and retains its interactive Card lifecycle failure.
+Next: qualify disabled native callbacks, shutdown rollback, progress/modal execution
+and the remaining optimistic-write/isolation contracts. Original Customer now passes
+7/7 HTTP/CMD/MCP/Chromium cases under 0720, including interactive Card No., exact
+SQL-backed edits and pre-AL Permission/refused admission; New/template remains due.
 Repeat counted AL execution after the verified SelectLatestVersion increment below;
 retain every startup refusal and test identity. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;

@@ -11,7 +11,7 @@ export function launchBrowser() {
 }
 
 async function settled(page) {
-  await page.waitForFunction(() => /^(Ready|Explicit answer required|[0-9]+ unsupported|Page request refused|Write outcome uncertain)/
+  await page.waitForFunction(() => /^(Ready|Explicit answer required|[0-9]+ unsupported|Page request refused|Write outcome uncertain|Server error)/
     .test(document.querySelector("#status").textContent));
   await page.waitForFunction(() => !document.querySelector(".htmx-request"));
 }
