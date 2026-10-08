@@ -180,10 +180,13 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   105 dispatcher and 15 source checks, zero red; all 29 execution controls and one
   compile refusal reject. The deliberately removed unbound-integer guard crashes its
   mutant; production checks do not crash. Native integration remains pending.
-  Affected lint covers 144 handwritten consumers; it exposes the existing Load_
-  cognitive complexity in three PageSession consumers. Generator/collector checks are
-  clean; the fixture's operation-count finding is fixed and its focused lint is zero.
-  Simplify Load_ and rerun its consumers; do not raise the complexity threshold.
+  The 144-consumer lint run exposed Load_ complexity in three PageSession consumers
+  and a fixture operation-count finding. Both are repaired: Load_ now separates the
+  source-record guard from Load_Record_Window_ without changing its SQL/trigger order.
+  All three compiled header consumers and the fixture pass focused lint; format and
+  changed-code checks pass, suppression baseline stays 12. Navigation retains all
+  390 regular checks, 29 execution controls and one compile refusal. This is affected
+  consumer qualification, not a new FULL=1 claim over all 344 handwritten units.
   References: developer `methods-auto/page/page-{run,runmodal}-integer-table-integer-method.md`
   at the revision above; BCApps `main` `src/Layers/W1/BaseApp/GlobalAdminMessage.Page.al`
   and `src/System Application/App/Azure AD User Management/src/User sync/AzureADUserUpdateWizard.Page.al`

@@ -1546,54 +1546,61 @@ private:
       static_cast<void>(opening);
       throw Error("The page has no source record.", "PageWindowProvider");
     } else {
-      auto &page = Base::Page_();
-      auto &rec = page.Rec;
-      using Source = std::remove_cvref_t<decltype(rec)>;
-      Source anchor;
-      static_cast<typename Source::Platform_Half &>(anchor).Copy(rec);
-      if (position == RecordWindowPosition::After || position == RecordWindowPosition::Before) {
-        window_->Load(position == RecordWindowPosition::After ? window_->Size() - 1 : 0, &anchor);
-      }
-      auto loaded = ReadRecordWindow(&anchor, TableTraits<Source>::kTable, position, limit);
-      if (loaded.Size() == 0 && opening && page.OpenedEditable()) {
-        throw Error("Empty editable list windows are not qualified.", "PageWindowNewRow");
-      }
-      if (loaded.Size() == 0 &&
-          (position == RecordWindowPosition::After || position == RecordWindowPosition::Before)) {
-        receiver.Current(selected_, *this);
-        return {0, loaded.RowsRead(), false};
-      }
-      const RecordId previous = window_.has_value() ? selected_ : RecordId{};
-      RecordId selected;
-      Source selectedValues;
-      detail::HeldImage selectedImage;
-      for (std::size_t i = 0; i < loaded.Size(); ++i) {
-        loaded.Load(i, &rec);
-        const RecordId identity = rec.RecordId();
-        static_cast<void>(static_cast<typename Source::Platform_Half &>(rec).Read(true));
-        page.LandedOnRecord();
-        detail::AfterReadPageRecord(page);
-        receiver.Row(identity, *this);
-        if (i == 0 || identity == previous) {
-          selected = identity;
-          selectedValues = rec;
-          selectedImage.SetFrom(reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image);
-        }
-      }
-      if (loaded.Size() != 0) {
-        rec = selectedValues;
-        reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image.SetFrom(selectedImage);
-      } else {
-        rec = Source{};
-        reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().positioned = false;
-      }
-      if (opening || selected != previous) { detail::AfterCurrentPageRecord(page); }
-      receiver.Current(selected, *this);
-      const PageWindowState result{loaded.Size(), loaded.RowsRead(), loaded.HasMore()};
-      window_ = std::move(loaded);
-      selected_ = selected;
-      return result;
+      return Load_Record_Window_(position, limit, receiver, opening);
     }
+  }
+
+  PageWindowState Load_Record_Window_(RecordWindowPosition position,
+                                      std::size_t limit,
+                                      PageWindowReceiver &receiver,
+                                      bool opening) {
+    auto &page = Base::Page_();
+    auto &rec = page.Rec;
+    using Source = std::remove_cvref_t<decltype(rec)>;
+    Source anchor;
+    static_cast<typename Source::Platform_Half &>(anchor).Copy(rec);
+    if (position == RecordWindowPosition::After || position == RecordWindowPosition::Before) {
+      window_->Load(position == RecordWindowPosition::After ? window_->Size() - 1 : 0, &anchor);
+    }
+    auto loaded = ReadRecordWindow(&anchor, TableTraits<Source>::kTable, position, limit);
+    if (loaded.Size() == 0 && opening && page.OpenedEditable()) {
+      throw Error("Empty editable list windows are not qualified.", "PageWindowNewRow");
+    }
+    if (loaded.Size() == 0 &&
+        (position == RecordWindowPosition::After || position == RecordWindowPosition::Before)) {
+      receiver.Current(selected_, *this);
+      return {0, loaded.RowsRead(), false};
+    }
+    const RecordId previous = window_.has_value() ? selected_ : RecordId{};
+    RecordId selected;
+    Source selectedValues;
+    detail::HeldImage selectedImage;
+    for (std::size_t i = 0; i < loaded.Size(); ++i) {
+      loaded.Load(i, &rec);
+      const RecordId identity = rec.RecordId();
+      static_cast<void>(static_cast<typename Source::Platform_Half &>(rec).Read(true));
+      page.LandedOnRecord();
+      detail::AfterReadPageRecord(page);
+      receiver.Row(identity, *this);
+      if (i == 0 || identity == previous) {
+        selected = identity;
+        selectedValues = rec;
+        selectedImage.SetFrom(reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image);
+      }
+    }
+    if (loaded.Size() != 0) {
+      rec = selectedValues;
+      reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image.SetFrom(selectedImage);
+    } else {
+      rec = Source{};
+      reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().positioned = false;
+    }
+    if (opening || selected != previous) { detail::AfterCurrentPageRecord(page); }
+    receiver.Current(selected, *this);
+    const PageWindowState result{loaded.Size(), loaded.RowsRead(), loaded.HasMore()};
+    window_ = std::move(loaded);
+    selected_ = selected;
+    return result;
   }
 
   std::optional<RecordWindow> window_;
