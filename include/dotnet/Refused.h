@@ -300,6 +300,34 @@ public:
     Throw();
   }
 
+  /// \brief Refuses AL compound assignment without changing the unavailable member.
+  /// \tparam T The right operand's type.
+  /// \param value The already evaluated right operand.
+  /// \return Never.
+  /// \throws Error always, preserving this member's identity.
+  template <typename T> [[noreturn]] Refused &operator+=(const T &value) {
+    static_cast<void>(value);
+    Throw();
+  }
+
+  /// \copydoc operator+=
+  template <typename T> [[noreturn]] Refused &operator-=(const T &value) {
+    static_cast<void>(value);
+    Throw();
+  }
+
+  /// \copydoc operator+=
+  template <typename T> [[noreturn]] Refused &operator*=(const T &value) {
+    static_cast<void>(value);
+    Throw();
+  }
+
+  /// \copydoc operator+=
+  template <typename T> [[noreturn]] Refused &operator/=(const T &value) {
+    static_cast<void>(value);
+    Throw();
+  }
+
   /// \brief Refuses to stand on either side of `a + b`.
   /// \tparam T The other operand's type.
   /// \param left  The left operand.

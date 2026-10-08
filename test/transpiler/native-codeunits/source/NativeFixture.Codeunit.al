@@ -105,6 +105,22 @@ codeunit 50311 NativeFixture
         exit(1);
     end;
 
+    procedure UnavailableFieldOperations(Operation: Integer; var Counter: Integer)
+    var
+        Row: Record "Arithmetic Row";
+    begin
+        Counter := 41;
+        case Operation of
+            0: Row.Amount += 3;
+            1: Row.Amount -= 3;
+            2: Row.Amount *= 3;
+            3: Row.Amount /= 3;
+            4: Clear(Row.Amount);
+            5: System.Clear(Row.Amount);
+        end;
+        Counter := 99;
+    end;
+
     procedure UnavailablePage(Operation: Integer; var Counter: Integer)
     var
         Row: Record "Available Row" temporary;

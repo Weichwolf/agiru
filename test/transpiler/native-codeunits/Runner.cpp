@@ -99,6 +99,21 @@ void UnavailableIndexedFieldsCompileAndRefuse() {
   }
 }
 
+void UnavailableFieldOperationsCompileAndRefuse() {
+  constexpr agiru::Integer kOperationCount = 6;
+  agiru::System::Fixture::NativeFixture_Codeunit unit;
+  for (agiru::Integer operation = 0; operation < kOperationCount; ++operation) {
+    agiru::Integer counter = kValue;
+    std::string message;
+    try {
+      unit.UnavailableFieldOperations(operation, counter);
+    } catch (const agiru::Error &error) { message = error.what(); }
+    CHECK_TRUE("compound assignments and both Clear forms retain the missing field identity",
+               message.contains("ArithmeticRow.Amount"));
+    CHECK_TRUE("unavailable field operations refuse before later AL effects", counter == 41);
+  }
+}
+
 void UnavailableNamedPagesCompileAndRefuse() {
   constexpr agiru::Integer kOperationCount = 6;
   agiru::System::Fixture::NativeFixture_Codeunit unit;
@@ -122,6 +137,7 @@ int main() {
     NativeMethodsRefuseBeforeEffects();
     UnavailableRecordFieldsCompileAndRefuse();
     UnavailableIndexedFieldsCompileAndRefuse();
+    UnavailableFieldOperationsCompileAndRefuse();
     UnavailableNamedPagesCompileAndRefuse();
   });
 }

@@ -11,6 +11,7 @@ links=(--rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 sha256sum src/gen/{BodyWriter,CodeunitWriter,RuntimeSurface,NativeSource,NativeMethods,Refused}.{cpp,h} src/tc/Main.cpp \
   include/runtime/{NativeBase64,Error}.h src/net/NativeBase64.cpp \
+  include/BuiltinsWritten.h include/dotnet/Refused.h \
   "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" > "$proof/inputs.sha256"
 find "$input" -type f -exec sha256sum {} + >> "$proof/inputs.sha256"
@@ -76,6 +77,24 @@ if link_generated "$proof/missing-indexed-field" "$proof/runner.o" "$proof/missi
 fi
 rg -q "no member named 'MatrixOnly'" "$proof/missing-indexed-field-control.log"
 rm -r -- "$proof/missing-indexed-field"
+
+cp -a "$input" "$proof/missing-field-operations"
+awk '
+  /: (Row.Amount [+*\/-]=|Clear\(Row.Amount\)|System.Clear\(Row.Amount\))/ {
+    sub(/:.*/, ": Counter := 41;"); removed++
+  }
+  { print }
+  END { if (removed != 6) exit 2 }
+' "$input/source/NativeFixture.Codeunit.al" > "$proof/missing-field-operations/source/NativeFixture.Codeunit.al"
+generate "$proof/missing-field-operations" "$proof/missing-field-operations/generated" 1
+link_generated "$proof/missing-field-operations/generated" "$proof/runner.o" "$proof/missing-field-operations/runner"
+if "$proof/missing-field-operations/runner" > "$proof/missing-field-operations-control.log" 2>&1; then
+  printf 'native-codeunits: successful unavailable field operations escaped execution control\n' >&2
+  exit 1
+fi
+rg -q 'compound assignments and both Clear forms retain the missing field identity' "$proof/missing-field-operations-control.log"
+rg -q 'unavailable field operations refuse before later AL effects' "$proof/missing-field-operations-control.log"
+rm -f "$proof/missing-field-operations/runner"
 
 cp -a "$input" "$proof/missing-page-boundary"
 awk '

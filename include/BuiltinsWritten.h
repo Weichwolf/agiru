@@ -1491,6 +1491,8 @@ template <typename T> void Clear(T &Variable) {
     ::agiru::detail::RuntimeClear(&Variable, ::agiru::TableTraits<T>::kTable);
   } else if constexpr (detail::IsAlArray<T>) {
     for (::agiru::Integer at = 1; at <= Variable.Length(); ++at) { Clear(Variable[at]); }
+  } else if constexpr (requires { typename T::IsAlRefusal; }) {
+    static_cast<void>(static_cast<bool>(Variable));
   } else {
     Variable = T{};
   }

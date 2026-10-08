@@ -242,6 +242,11 @@ including a bracket string literal in an index call and an implicit Validate fie
 The compiled runner proves a side-effecting index runs once before the named refusal;
 removing the matrix-only declaration must fail compilation. Case-normalized unavailable
 type identity remains a separate generator gap, not covered by these member checks.
+Unavailable scalar fields compile compound assignments and both Clear forms, then
+refuse with their original member identity before subsequent AL effects. Removing all
+six operations must fail the compiled runner. RefusedGate retains Decimal operands,
+unknown-option Clear and an ordinary Integer Clear control. Whole absent-record Clear
+and same-type refusal assignment are separate gaps, not qualified by these checks.
 Unselected named Page.Run/RunModal calls compile through the numbered runtime API,
 including optional records, field numbers, Action results and case-insensitive names.
 They throw with the original AL identity before subsequent effects, not through an

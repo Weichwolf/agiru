@@ -60,9 +60,11 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   75 identity, 49 command, 48 value and 84 generator checks, zero red. Thirteen identity/
   command/credential/provider and six value defects reject. A same-user peer has a distinct
   SHA-256 verifier without changing AL UserSecurityId; legacy unbound contexts are
-  invalidated without deleting command evidence. `make page-host-test JOBS=2` passes
-  170/170 regular cases (38 fixture, 44 native for each of limits 40/7/80), without skips
-  or cancellations; all 22 compiled defects reject and input hashes remain unchanged.
+  invalidated without deleting command evidence. The earlier pre-cookie
+  `make page-host-test JOBS=2` run passed 170/170 regular cases (38 fixture, 44 native
+  for each of limits 40/7/80), without skips or cancellations; all 22 compiled defects
+  rejected and input hashes remained unchanged. The current cookie-enabled matrix is
+  red at the retained timeout below; this historical run is not current acceptance.
   Independent SQL proves same-user read/write/replay/poll/question/modal/receipt denial
   without additional effects. Eight affected C++ consumers pass targeted clang-tidy.
 - Local contracts at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
@@ -190,6 +192,23 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   BCApps `main` `src/Layers/W1/Tests/ERM/CopyPriceDataTest.Codeunit.al`, lines 2072/2074,
   at `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`; predecessor 1389 distinguishes
   array element access/extent from collection mutation. Durable fixtures:
+  `test/transpiler/native-codeunits/{source/NativeFixture.Codeunit.al,Runner.cpp}`.
+
+- Unavailable scalar operations: `dotnet::Refused` implements explicit refusal for
+  +=, -=, *= and /=; `Clear` rejects marked unavailable members/options instead of
+  replacing them with a successful default. Six ordinary AL cases retain member
+  identity and stop before later effects; removing the operations fails both assertions.
+  `make native-codeunits gate GATE=RefusedGate JOBS=2` with the verified System package:
+  generator 65, executable refusals 73, source-bound 8, original Base64 61 and Refused
+  11 checks, zero red; existing negative controls reject. Ordinary Integer Clear remains
+  implemented. `make lint JOBS=2` checks 53 affected compiled units with zero failures;
+  format passes and the suppression baseline remains 12. Whole absent-record Clear and
+  same-type refusal assignment remain gaps.
+  References: developer `devenv-al-operators.md` and
+  `methods-auto/system/system-clear-joker-method.md` at the revision above; BCApps
+  `main` `src/Layers/W1/Tests/TestLibraries/LibraryCRMIntegration.Codeunit.al` at the
+  revision above. Predecessor 1389 requires Clear to preserve array extent rather than
+  invent a collection reset. Durable tests: `test/gate/RefusedGate.cpp` and
   `test/transpiler/native-codeunits/{source/NativeFixture.Codeunit.al,Runner.cpp}`.
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported

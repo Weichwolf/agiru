@@ -2,7 +2,11 @@
 #include "dotnet/Type.h"
 #include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
+#include "type/Decimal.h"
+#include "type/Integer.h"
+#include "type/Option.h"
 
+#include "BuiltinsWritten.h"
 #include "Check.h"
 
 #include <string_view>
@@ -56,11 +60,44 @@ void ImmutableDescriptorsStillRefuseByName() {
   CHECK_TRUE("the immutable generic descriptor preserves its refusal identity", genericRefused);
 }
 
+template <typename Call> void MemberOperationRefuses(Call call) {
+  bool refused = false;
+  try {
+    call();
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()).contains("Fixture.Amount");
+  }
+  CHECK_TRUE("unavailable scalar operations retain the original member identity", refused);
+}
+
+void CompoundAssignmentsAndClearRefuseByName() {
+  agiru::dotnet::Refused amount{{.type = "Fixture", .member = "Amount"}};
+  const auto value = agiru::Decimal::FromInvariantString("1.23");
+  MemberOperationRefuses([&] { amount += value; });
+  MemberOperationRefuses([&] { amount -= value; });
+  MemberOperationRefuses([&] { amount *= value; });
+  MemberOperationRefuses([&] { amount /= value; });
+  MemberOperationRefuses([&] { agiru::Clear(amount); });
+
+  auto option = agiru::RefusedOption("Fixture.Status::Absent");
+  bool optionRefused = false;
+  try {
+    agiru::Clear(option);
+  } catch (const agiru::Error &error) {
+    optionRefused = std::string_view(error.what()).contains("Fixture.Status::Absent");
+  }
+  CHECK_TRUE("Clear cannot replace an unknown option with a successful default", optionRefused);
+  agiru::Integer scalar = 1;
+  agiru::Clear(scalar);
+  CHECK_TRUE("ordinary scalar Clear remains implemented", scalar == 0);
+}
+
 }
 
 int main() {
   return gate::Run("Refused", [] {
     RefusedChainsNameTheMember();
     ImmutableDescriptorsStillRefuseByName();
+    CompoundAssignmentsAndClearRefuseByName();
   });
 }
