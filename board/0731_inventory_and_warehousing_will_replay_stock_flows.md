@@ -11,6 +11,8 @@ Next: marked item → purchase receipt → movement/transfer → pick/shipment �
   reservations/availability, serial/lot/package tracing, bins and replenishment.
 - Basic and directed receipts/put-away/movements/picks/shipments; undo/correction,
   FEFO, partial quantities, cost adjustment and inventory-to-G/L reconciliation.
+- 0742 owns quality inspections, lot restrictions and dispositions over these stock
+  contracts; do not omit the separate Quality Management app or duplicate its business rules.
 - Reuse AL planning/warehouse posting and typed key/filter/query primitives;
   bound scan/pivot/output blocks, never materialize the entire ledger client-side.
 

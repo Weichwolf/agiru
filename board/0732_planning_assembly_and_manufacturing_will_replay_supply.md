@@ -11,6 +11,8 @@ Next: marked BOM and demand → planning worksheet → supply order → consumpt
   assembly-to-stock/to-order, production BOM/routing/capacity/calendars.
 - Planned/firm/released/finished production, material/capacity journals, scrap,
   subcontracting, reservations and costing. Premium licensing is not an agiru restriction.
+- 0742 owns quality inspections triggered by production/assembly output; expose the
+  qualified output/tracking contract to that family without making this WI depend on it.
 - Use existing generated AL algorithms; generic runtime semantics own fixes.
   Preserve deterministic ordering, exact units/quantities/costs and concurrent posting boundaries.
 
