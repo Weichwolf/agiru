@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { parsePage } from "../../build/client/profile.mjs";
+import { parsePage, parseFailure } from "../../build/client/profile.mjs";
 
 const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
 const { chromium } = require("playwright-core");
@@ -63,13 +63,14 @@ export async function assertBrowserPage(page, model) {
       handle: article.dataset.handle, revision: article.dataset.revision,
       caption: article.querySelector(":scope > h1").textContent,
       controls,
-      ...(article.dataset.agiruProfile === "3" ? { interaction: { state: article.dataset.state,
+      ...(["3", "4"].includes(article.dataset.agiruProfile) ? { interaction: { state: article.dataset.state,
         call: article.dataset.call, originCommand: article.dataset.originCommand,
-        ...(article.dataset.dialog ? { dialog: article.dataset.dialog, defaultChoice: article.dataset.default,
+        ...(article.dataset.poll ? { poll: { path: article.dataset.poll, state: article.dataset.pollState } } : {}),
+        ...(article.dataset.state === "modal" ? { dialog: article.dataset.dialog } : article.dataset.dialog ? { dialog: article.dataset.dialog, defaultChoice: article.dataset.default,
           prompt: article.querySelector('[data-prompt]').textContent } : {}) } } : {}),
       ...([...article.querySelectorAll('[data-message]')].length ? { messages:
         [...article.querySelectorAll('[data-message]')].map(node => ({ handle: node.dataset.message, text: node.textContent })) } : {}),
-      ...(article.dataset.agiruProfile === "2" ? { rows, window: { limit: article.dataset.limit,
+      ...(article.dataset.view === "list" ? { rows, window: { limit: article.dataset.limit,
         more: article.dataset.more === "true", direction: article.dataset.direction } } : {}),
       unsupported: article.querySelector(":scope > output[data-unsupported-count]").dataset.unsupportedCount,
     };
@@ -90,7 +91,8 @@ export async function assertBrowserPage(page, model) {
 
 export async function browserAction(page, origin, model, identity) {
   const escaped = await page.evaluate(value => CSS.escape(value), identity);
-  const endpoint = model.interaction?.dialog ? "/answers" : "/commands";
+  const endpoint = model.interaction?.state === "modal" ? `/modal-commands/${model.interaction.dialog}` :
+    model.interaction?.dialog ? "/answers" : "/commands";
   const received = page.waitForResponse(response => response.url() === `${origin}${endpoint}` &&
     response.request().method() === "POST");
   await page.locator(`[data-control="${escaped}"] button`).click();
@@ -99,7 +101,7 @@ export async function browserAction(page, origin, model, identity) {
   await page.waitForFunction(previous => {
     const article = document.querySelector("#workspace article");
     return article?.dataset.revision !== previous.revision ||
-      (article?.dataset.agiruProfile === "3" && article.dataset.dialog !== previous.interaction?.dialog);
+      (article?.dataset.state !== previous.interaction?.state || article?.dataset.dialog !== previous.interaction?.dialog);
   }, model);
   await settled(page);
   const result = { page: parsePage(await response.text()), status: response.status() };
@@ -110,7 +112,8 @@ export async function browserAction(page, origin, model, identity) {
 export async function browserSet(page, origin, model, identity, text) {
   const escaped = await page.evaluate(value => CSS.escape(value), identity);
   const control = page.locator(`[data-control="${escaped}"]`);
-  const received = page.waitForResponse(response => response.url() === `${origin}/commands` &&
+  const endpoint = model.interaction?.state === "modal" ? `/modal-commands/${model.interaction.dialog}` : "/commands";
+  const received = page.waitForResponse(response => response.url() === `${origin}${endpoint}` &&
     response.request().method() === "POST");
   await control.locator("input[name=text]").fill(text);
   await control.locator("button").click();
@@ -127,7 +130,24 @@ export async function browserSet(page, origin, model, identity, text) {
 export async function finishedResponse(page, origin, response) {
   if (response.status() !== 200) return response;
   const interaction = parsePage(await response.text()).interaction;
-  if (!interaction || interaction.state !== "working") return response;
-  return page.waitForResponse(async next => next.url() === `${origin}/calls/${interaction.call}` &&
-    (next.status() !== 200 || parsePage(await next.text()).interaction?.state !== "working"));
+  if (!interaction || (interaction.state !== "working" && interaction.poll?.state !== "failed")) return response;
+  const next = await page.waitForResponse(reply => reply.url() === origin +
+    (interaction.poll?.path ?? `/calls/${interaction.call}`));
+  return finishedResponse(page, origin, next);
+}
+
+export async function browserFailure(page, origin, model, identity) {
+  const escaped = await page.evaluate(value => CSS.escape(value), identity);
+  const endpoint = `/modal-commands/${model.interaction.dialog}`;
+  const received = page.waitForResponse(response => response.url() === origin + endpoint &&
+    response.request().method() === "POST");
+  await page.locator(`[data-control="${escaped}"] button`).click();
+  const response = await finishedResponse(page, origin, await received);
+  assert.equal(response.status(), 500);
+  const failure = parseFailure(await response.text());
+  await page.waitForFunction(expected => document.querySelector("#status")?.textContent.includes(expected),
+    failure.message);
+  await page.waitForFunction(previous => document.querySelector("#workspace article")?.dataset.revision !== previous,
+    model.revision);
+  return { error: failure.code, message: failure.message, outcome: failure.outcome, command: failure.command };
 }

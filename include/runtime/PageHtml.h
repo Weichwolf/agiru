@@ -23,6 +23,14 @@ struct PageHtmlAction {
   bool enabled = true;         ///< Discovery state; the receiver must recheck authorization/state.
 };
 
+/// \brief Copied modal transport identity over an unchanged typed page/list presentation.
+/// The host owns these opaque tokens; no AL object address or implicit close action is exposed.
+struct PageHtmlModal {
+  std::string_view call;          ///< Waiting root AL call, used for read-only polling.
+  std::string_view originCommand; ///< Root command; empty for an initial page opening.
+  std::string_view handle;        ///< Active modal nonce, also bound into the command path.
+};
+
 /// \brief Server-owned command envelope, not authorization or a session implementation.
 /// Handles/revisions/IDs must be checked by the HTTP command receiver. Commands are
 /// emitted as forms so browsers and agents discover the same operation contract.
@@ -34,6 +42,7 @@ struct PageHtmlContext {
   std::string_view csrf{};          ///< Server-issued CSRF token; never an implicit confirmation.
   std::string_view commandPath = "/commands"; ///< Same-origin root-relative ASCII endpoint.
   std::span<const PageHtmlAction> actions{};  ///< Borrowed, authorized lifecycle discovery.
+  const PageHtmlModal *modal = nullptr; ///< Optional borrowed modal identity for this rendering.
 };
 
 /// \brief Explicit version-one transport budgets, not BC control-count guarantees.

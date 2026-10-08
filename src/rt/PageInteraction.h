@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "runtime/HttpServer.h"
+#include "runtime/PageCommandHost.h"
 #include "runtime/PageHostOptions.h"
 #include "runtime/SecureToken.h"
 #include "runtime/UiHost.h"
@@ -21,6 +22,8 @@ class Connection;
 }
 
 namespace agiru::detail {
+
+struct PageModal;
 
 struct PageQuestion {
   std::string handle = GenerateSecureToken();
@@ -51,6 +54,7 @@ struct PageCall {
   std::string control;
   std::chrono::steady_clock::time_point deadline;
   std::shared_ptr<PageQuestion> question;
+  std::shared_ptr<PageModal> modal;
   std::vector<PageMessage> messages;
   std::size_t messageBytes = 0;
   std::size_t questions = 0;
@@ -62,7 +66,8 @@ struct PageCall {
 
 void InstallPageDialogs(const Connection &connection);
 std::unique_ptr<UiHost> MakePageUiHost(const std::shared_ptr<PageCall> &call,
-                                       const PageHostOptions &options);
+                                       const PageHostOptions &options,
+                                       const PageHostAuthorization &authorization);
 std::string RenderPageInteraction(const PageCall &call);
 std::string AppendPageMessages(const PageCall &call, std::string html);
 void AcceptPageAnswer(const Connection &connection,

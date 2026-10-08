@@ -48,7 +48,7 @@ for control in rounded-scalars disabled-command stale-revision double-post block
     control == "opening-replay" && /if \(!retained\)/ {
       sub(/!retained/, "false"); changed++
     }
-    control == "error-identity" && /if \(command && failure.command !== expected\)/ {
+    control == "error-identity" && /if \(command && failure.command !== expected/ {
       sub(/command && failure.command !== expected/, "false"); changed++
     }
     { print }

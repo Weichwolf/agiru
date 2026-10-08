@@ -2,8 +2,7 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: wire the qualified borrowed-page core into native modal HTTP execution for
-Customer New/template under 0720;
+Next: rebuild production generated consumers and execute Customer New/template under 0720;
 qualify disabled native callbacks, shutdown rollback, progress execution and the
 remaining optimistic-write/isolation contracts. Original Customer retains seven
 passing list/card/edit/permission/receipt cases and one new, unsuppressed modal failure.
@@ -52,12 +51,19 @@ do not defer client construction until all transaction acceptance is complete.
 
 ## Sources and regression ownership
 
-Borrowed modal lifecycle is qualified in 0720: 219 generated navigation, 105 dispatcher
-and 15 source checks pass; twenty execution defects and one compile defect reject.
-The caller's original AL page/filters survive; false/error close attempts can retry;
-disabled callbacks refuse before opening. Native modal HTTP suspension, authority,
-SQL receipts and nested transaction behaviour remain unimplemented. This increment
-does not turn the known original Customer template failure into acceptance.
+Borrowed modal lifecycle and native transport are qualified in 0720: 220 generated
+navigation, 105 dispatcher and 15 source checks pass; 21 execution defects and one
+compile defect reject. The caller's original AL page/filters survive; false/error close
+attempts can retry; disabled callbacks refuse before opening. Actual HTTP proof has
+154 cases, zero red, across limits 40/7/80 and both TryFunction policies after the
+delayed-error repair. Eighteen compiled defect controls reject at named assertions;
+`make page-host-test JOBS=2` exits zero with verified input hashes. Failed close inputs preserve
+their own receipt identity after the HTTP worker returns, never masquerade as successful
+root polling. Independent
+SQL verifies nested modal/question suspension, explicit cancellation/timeout rollback,
+no implicit modal commit, and durability of a prior explicit Commit after caller failure.
+Child-input receipts do not establish root durability. Original Customer template
+execution still requires the generated production ABI rebuild; no finance acceptance.
 
 Blocking Confirm/StrMenu now enforce trusted
 `transactions.allow_session_call_suspend_when_write_transaction_started`, default true,
@@ -80,7 +86,8 @@ BCApps `Finance/GeneralLedger/Posting/GenJnlPost.Codeunit.al` calls Confirm Mana
 before posting. Predecessor `openerp/runtime/ui_host.py` has no corresponding policy;
 its implicit headless answers and session-per-thread transport are not adopted.
 HTTP Confirm/StrMenu suspension and deferred messages now use a real session-owned
-endpoint; modal/report/request-page callbacks and live progress remain gaps.
+endpoint; native page modals now use the same retained AL worker/SQL lease. Report and
+request-page callbacks, automatic modal CurrPage.Close and live progress remain gaps.
 Production generated consumers have been rebuilt after the expanded SessionOptions
 value ABI: `make slice-check all B=/workspace/build/podman JOBS=6` exits zero,
 14,225 slice sources, 2,901 seconds. The 1,902 unlinked AL procedures remain gaps;

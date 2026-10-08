@@ -91,7 +91,9 @@ export class AgentClient {
       if (!response.ok) {
         const failure = parseFailure(html);
         const expected = failure.outcome === "refused" ? command : originCommand ?? command;
-        if (command && failure.command !== expected) throw new ClientError("ResponseRefused", "Error command identity does not match the submitted command");
+        if (command && failure.command !== expected && !(path.startsWith("/modal-commands/") && failure.command === command)) {
+          throw new ClientError("ResponseRefused", "Error command identity does not match the submitted command");
+        }
         throw new ServerError(failure.code, failure.message, failure.outcome, failure.command || undefined);
       }
       const page = parsePage(html);
@@ -111,7 +113,8 @@ export class AgentClient {
     }
   }
 
-  async #follow(result: Result, deadline: number, command?: string, handle = result.page.handle): Promise<Result> {
+  async #follow(result: Result, deadline: number, command?: string, handle = result.page.handle,
+                resolveFailure = false): Promise<Result> {
     const call = result.page.interaction?.call;
     for (;;) {
       const interaction = result.page.interaction;
@@ -119,12 +122,15 @@ export class AgentClient {
           interaction.originCommand !== (command ?? "")))) {
         throw new ClientError(command ? "WriteUncertain" : "ResponseRefused", "Operation identity changed while polling", command);
       }
-      if (!interaction || interaction.state !== "working") return result;
+      if (!interaction || (interaction.state !== "working" &&
+          !(resolveFailure && interaction.poll?.state === "failed"))) return result;
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new ClientError(command ? "WriteUncertain" : "OperationPending",
         `AL operation is still pending; read /calls/${call} to reconcile without replaying it`, command);
       await new Promise(resolve => setTimeout(resolve, Math.min(50, remaining)));
-      result = await this.#request(`/calls/${call}`, undefined, command, Math.max(1, deadline - Date.now()));
+      const poll = interaction.poll?.path ?? `/calls/${call}`;
+      const input = interaction.poll ? poll.split("/").at(-1) : command;
+      result = await this.#request(poll, undefined, input, Math.max(1, deadline - Date.now()), command);
     }
   }
 
@@ -155,7 +161,7 @@ export class AgentClient {
     const submit = async (): Promise<Result> => {
       return this.#request(envelope.path, envelope.fields, requested.command, this.#timeout, originCommand);
     };
-    return this.#follow(await submit(), deadline, originCommand, requested.page);
+    return this.#follow(await submit(), deadline, originCommand, requested.page, true);
   }
 }
 

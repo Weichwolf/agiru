@@ -17,19 +17,20 @@ cleanup() {
 }
 trap cleanup EXIT
 sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/runtime/PageCore.h \
-  src/rt/PageCore.cpp src/rt/PageValue.cpp include/runtime/PageValue.h \
+  src/rt/PageCore.cpp src/rt/PageValue.cpp include/runtime/{PageValue,PageVariableValue}.h \
   src/rt/PageHtml.cpp src/rt/HtmlText.{h,cpp} include/runtime/PageHtml.h \
   src/rt/PageListHtml.h \
   src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
   include/runtime/PageWindow.h include/runtime/RecordWindow.h src/rt/RecordWindow.cpp \
   include/runtime/Table.h \
-  include/runtime/Page.h src/gen/BodyWriter.cpp \
+  include/runtime/Page.h src/gen/{BodyWriter,PageWriter,RuntimeSurface}.cpp \
   include/runtime/PageSession.h include/runtime/test/TestPage.h \
   include/runtime/Session.h include/runtime/SessionCommand.h src/rt/Session.cpp \
   src/rt/SessionCommand.cpp src/rt/Cursor.cpp src/rt/Transaction.cpp \
   include/runtime/TablePermissions.h src/rt/TablePermissions.cpp src/rt/{Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/PageCommandHost.h src/rt/PageCommandHost.cpp test/ui/page-host/Runner.cpp \
   src/rt/PageInteraction.{h,cpp} include/runtime/UiHost.h src/rt/UiHost.cpp \
+  src/rt/PageModal.{h,cpp} \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
   include/runtime/NativeService.h src/rt/{NativeService,NativeServiceConfig}.cpp deploy/dev/agiru.json \
   src/cli/{Main,Services}.cpp src/cli/Services.h \
@@ -223,11 +224,11 @@ for object in "${objects[@]}"; do
     modal_objects+=("$object")
   fi
 done
-for control in modal-copy modal-veto modal-action modal-callback-policy; do
+for control in modal-copy modal-veto modal-action modal-callback-policy modal-values; do
   cp include/runtime/Page.h "$proof/mutant/include/runtime/Page.h"
   cp include/runtime/PageSession.h "$proof/mutant/include/runtime/PageSession.h"
   case "$control" in
-    modal-copy|modal-action) header=PageSession.h ;;
+    modal-copy|modal-action|modal-values) header=PageSession.h ;;
     modal-veto|modal-callback-policy) header=Page.h ;;
   esac
   awk -v control="$control" '
@@ -242,6 +243,9 @@ for control in modal-copy modal-veto modal-action modal-callback-policy; do
     }
     control == "modal-callback-policy" && /if \(modal\) \{ RequireUiCallback\(\); \}/ {
       sub(/RequireUiCallback\(\);/, "static_cast<void>(modal);"); changed++
+    }
+    control == "modal-values" && /row != nullptr && row->value != nullptr/ {
+      sub(/row->value != nullptr/, "false"); changed++
     }
     { print }
     END { if (changed != (control == "modal-callback-policy" ? 2 : 1)) exit 2 }
@@ -258,6 +262,7 @@ for control in modal-copy modal-veto modal-action modal-callback-policy; do
     modal-veto) rg -q 'an error on a later query-close leaves the modal open' "$proof/$control-execution.log" ;;
     modal-action) rg -q 'a card cancellation is not consent' "$proof/$control-execution.log" ;;
     modal-callback-policy) rg -q 'disabled modal callbacks refuse before native opening' "$proof/$control-execution.log" ;;
+    modal-values) rg -q 'Control has no exact typed value binding' "$proof/$control-execution.log" ;;
   esac
   rm -- "$proof/$control" "$proof/mutant-modal.o"
 done
@@ -283,4 +288,4 @@ fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; twenty execution controls and one control-name compile refusal reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; twenty-one execution controls and one control-name compile refusal reject; %s\n' "$proof"

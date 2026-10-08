@@ -33,6 +33,12 @@ bool Token(std::string_view value) {
 }
 
 void CheckContext(const PageHtmlContext &context) {
+  if (context.modal != nullptr &&
+      (!Token(context.modal->call) || !Token(context.modal->handle) ||
+       (!context.modal->originCommand.empty() && !Token(context.modal->originCommand)) ||
+       context.commandPath != "/modal-commands/" + std::string(context.modal->handle))) {
+    throw Error("Invalid modal HTML identity", "PageHtmlContext");
+  }
   if (!Token(context.pageHandle) || !Token(context.commandPrefix) || context.csrf.empty() ||
       context.revision.empty() || context.commandPath.empty() || context.commandPath[0] != '/' ||
       context.commandPath.starts_with("//")) {
@@ -312,8 +318,15 @@ PageHtmlResult Render(const PageDef &declaration,
   CheckContext(context);
   Writer out(limits, context);
   PageDispatcher dispatcher(declaration, page, authorization);
-  out.Raw(view == nullptr ? R"(<article data-agiru-profile="1" data-view="current-row")"
-                          : R"(<article data-agiru-profile="2" data-view="list")");
+  out.Raw("<article");
+  out.Attribute("data-agiru-profile", context.modal != nullptr ? "4" : view == nullptr ? "1" : "2");
+  out.Attribute("data-view", view == nullptr ? "current-row" : "list");
+  if (context.modal != nullptr) {
+    out.Attribute("data-state", "modal");
+    out.Attribute("data-call", context.modal->call);
+    out.Attribute("data-origin-command", context.modal->originCommand);
+    out.Attribute("data-dialog", context.modal->handle);
+  }
   if (view != nullptr) {
     out.Attribute("data-limit", std::to_string(view->limit));
     out.Attribute("data-more", view->state.more ? "true" : "false");

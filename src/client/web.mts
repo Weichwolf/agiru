@@ -16,6 +16,9 @@ const secret = document.querySelector<HTMLInputElement>("#credential")!;
 let authorization = "";
 let current: Page | undefined;
 let retained: Readonly<{ page: Page; html: string }> | undefined;
+let retainedModal: Readonly<{ page: Page; html: string }> | undefined;
+let resolving = false;
+let failureNotice = "";
 let active = false;
 let pollDeadline = 0;
 const candidates = new WeakMap<XMLHttpRequest, Page>();
@@ -51,6 +54,7 @@ document.addEventListener("htmx:configRequest", event => {
     if (request.verb === "get") {
       if (request.elt !== root) throw new Error();
       if (request.path.startsWith("/calls/") && request.path !== `/calls/${current?.interaction?.call}`) throw new Error();
+      if (request.path.startsWith("/modal-commands/") && request.path !== current?.interaction?.poll?.path) throw new Error();
       return;
     }
     if (request.verb !== "post" || !current || !(request.elt instanceof HTMLFormElement)) throw new Error();
@@ -72,6 +76,10 @@ document.addEventListener("htmx:configRequest", event => {
 document.addEventListener("htmx:beforeRequest", event => {
   if (active) { event.preventDefault(); return; }
   active = true;
+  if ((event as CustomEvent<Response>).detail.requestConfig.verb === "post") {
+    resolving = true;
+    failureNotice = "";
+  }
   status.textContent = "Working…";
 });
 
@@ -86,27 +94,43 @@ document.addEventListener("htmx:beforeOnLoad", event => {
       const failure = parseFailure(xhr.responseText);
       const command = response.requestConfig.verb === "post" ?
         (response.requestConfig.path === "/answers" && failure.outcome !== "refused" ? current?.interaction?.originCommand : response.requestConfig.parameters.command) :
+        response.requestConfig.path.startsWith("/modal-commands/") ? response.requestConfig.path.split("/").at(-1) :
         response.requestConfig.path.startsWith("/calls/") ? current?.interaction?.originCommand : undefined;
-      if (command && failure.command !== command) throw new Error();
+      if (command && failure.command !== command &&
+          !(response.requestConfig.path.startsWith("/modal-commands/") && failure.command === current?.interaction?.originCommand)) throw new Error();
       event.preventDefault();
-      if (failure.outcome === "failed" && current?.interaction && retained?.page.handle === current.handle) {
+      if (failure.outcome === "failed" && current?.interaction && retained?.page.handle === current.handle &&
+          failure.command === current.interaction.originCommand) {
         root.innerHTML = retained.html;
         htmx.process(root);
         current = retained.page;
+      } else if (failure.outcome === "failed" && current?.interaction && retainedModal?.page.handle === current.handle) {
+        root.innerHTML = retainedModal.html;
+        htmx.process(root);
+        current = retainedModal.page;
+        const handle = current.handle;
+        setTimeout(() => {
+          void htmx.ajax("get", `/?handle=${handle}`, { source: root, target: root, swap: "innerHTML" })
+            .catch(() => notice());
+        }, 50);
       }
-      status.textContent = `Server error ${failure.code}: ${failure.message} outcome=${failure.outcome}` +
+      resolving = false;
+      failureNotice = `Server error ${failure.code}: ${failure.message} outcome=${failure.outcome}` +
         (failure.command ? ` command=${failure.command}` : "") +
         (failure.outcome === "failed" ? "; prior explicit commits may persist." : "");
+      status.textContent = failureNotice;
       return;
     }
     const page = parsePage(xhr.responseText);
     const interaction = page.interaction;
-    if (response.requestConfig.path.startsWith("/calls/") &&
+    if ((response.requestConfig.path.startsWith("/calls/") ||
+         (response.requestConfig.verb === "get" && response.requestConfig.path.startsWith("/modal-commands/"))) &&
         (page.handle !== current?.handle || (interaction &&
           (interaction.call !== current?.interaction?.call || interaction.originCommand !== current?.interaction?.originCommand)))) throw new Error();
     if (response.requestConfig.verb === "post" && interaction &&
         (page.handle !== current?.handle || interaction.originCommand !==
-          (response.requestConfig.path === "/answers" ? current?.interaction?.originCommand : response.requestConfig.parameters.command))) throw new Error();
+          (response.requestConfig.path === "/answers" || response.requestConfig.path.startsWith("/modal-commands/")
+            ? current?.interaction?.originCommand : response.requestConfig.parameters.command))) throw new Error();
     candidates.set(xhr, page);
   } catch {
     event.preventDefault();
@@ -121,10 +145,11 @@ document.addEventListener("htmx:afterSwap", event => {
   if (accepted.interaction?.call !== current?.interaction?.call) pollDeadline = Date.now() + 15000;
   current = accepted;
   if (!current.interaction) retained = Object.freeze({ page: current, html: response.xhr.responseText });
+  if (current.interaction?.state === "modal") retainedModal = Object.freeze({ page: current, html: response.xhr.responseText });
   const url = new URL(location.href);
   url.search = new URLSearchParams({ handle: current.handle }).toString();
   history.replaceState(null, "", url);
-  if (current.interaction?.state === "working") {
+  if (current.interaction?.state === "working" || (resolving && current.interaction?.poll?.state === "failed")) {
     status.textContent = "Working…";
     setTimeout(() => {
       if (current !== accepted) return;
@@ -132,11 +157,15 @@ document.addEventListener("htmx:afterSwap", event => {
         status.textContent = `AL operation pending; read /calls/${accepted.interaction!.call} before retrying.`;
         return;
       }
-      void htmx.ajax("get", `/calls/${accepted.interaction!.call}`, { source: root, target: root, swap: "innerHTML" })
+      void htmx.ajax("get", accepted.interaction!.poll?.path ?? `/calls/${accepted.interaction!.call}`, { source: root, target: root, swap: "innerHTML" })
         .catch(() => notice());
     }, 50);
-  } else if (current.interaction) status.textContent = "Explicit answer required.";
-  else status.textContent = current.unsupported ? `${current.unsupported} unsupported controls remain visible.` : "Ready";
+  } else {
+    resolving = false;
+    status.textContent = current.interaction?.poll?.state === "failed" && failureNotice ? failureNotice :
+      current.interaction ? "Explicit answer required." :
+      current.unsupported ? `${current.unsupported} unsupported controls remain visible.` : "Ready";
+  }
 });
 
 for (const name of ["htmx:sendError", "htmx:timeout", "htmx:responseError", "htmx:onLoadError"]) {

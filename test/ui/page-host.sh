@@ -5,10 +5,13 @@ proof=$(mktemp -d /tmp/agiru-page-host.XXXXXX)
 gate_database=${AGIRU_PAGE_GATE_DATABASE:-agiru_gate}
 [[ "$gate_database" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]
 git rev-parse HEAD > "$proof/head.txt"
+sha256sum include/runtime/{Page,PageValue,PageVariableValue}.h src/rt/PageValue.cpp \
+  src/gen/{PageWriter,RuntimeSurface}.cpp > "$proof/scalar-inputs.sha256"
 sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSession,SessionCommand}.h \
   src/rt/{PageCommandHost,PageHtml,PageInstance,SessionCommand,HtmlText}.cpp src/rt/HtmlText.h \
   src/rt/PageListHtml.h include/runtime/{PageWindow,RecordWindow}.h src/rt/RecordWindow.cpp \
   src/rt/PageInteraction.{h,cpp} include/runtime/UiHost.h src/rt/UiHost.cpp \
+  src/rt/PageModal.{h,cpp} \
   include/runtime/TablePermissions.h src/rt/{TablePermissions,Session,Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/NativePermissions.h src/rt/{NativePermissions,NativePermissionSnapshot}.cpp \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
@@ -25,7 +28,6 @@ native=$(make --no-print-directory dev-exec COMMAND='mktemp -d /tmp/agiru-native
 [[ "$native" =~ ^/tmp/agiru-native-page-host\.[A-Za-z0-9]+$ ]]
 cleanup() {
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/host $native/agiru $native/auth.json $native/auth.json.second $native/owner.cpp $native/owner.so $native/revision.cpp $native/revision.so $native/replay.cpp $native/replay.so $native/policy.cpp $native/policy.so $native/duplicates.cpp $native/duplicates.so" || :
-  make --no-print-directory dev-exec COMMAND="rmdir -- $native" || :
   for file in "$proof/auth.json" "$proof/auth.json.second"; do
     if [[ -f "$file" ]]; then unlink "$file"; fi
   done
@@ -33,10 +35,11 @@ cleanup() {
     if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
     make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
   done
-  for control in dialog-default dialog-commit dialog-replay; do
+  for control in dialog-default dialog-commit dialog-replay modal-poll-receipt modal-commit modal-replay modal-cancel modal-message-replay; do
     make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
     if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
   done
+  make --no-print-directory dev-exec COMMAND="rmdir -- $native" || :
 }
 trap cleanup EXIT
 make dev-exec COMMAND='make gate GATE=NativeServiceConfigGate JOBS=2 B=/workspace/build/podman' \
@@ -86,7 +89,9 @@ mutation='
   control == "failure-receipt" && /AND outcome = \x27started\x27/ {
     sub(/AND outcome = \x27started\x27/, "AND outcome = \x27started\x27 AND false"); changed++
   }
-  control == "blocking-al" && /call->ready.wait_for\(lock, options.responseWait,/ {
+  /ServerHttpResponse Await\(/ { awaiting = 1 }
+  /^  }$/ { awaiting = 0 }
+  control == "blocking-al" && awaiting && /call->ready.wait_for\(lock, options.responseWait,/ {
     sub(/options.responseWait/, "std::chrono::seconds(1)"); changed++
   }
   control == "creation-mode" && /card->Open\(mode\);/ {
@@ -98,18 +103,30 @@ mutation='
   { print }
   END { if (changed != (control == "list-limit" || control == "owner" ? 2 : 1)) exit 2 }
 '
+prerequisites='native generated list retains|native list rows retain exact|external agent navigates list|actual shell CMD validates/saves|identical completed command replays|actual MCP saves the same|returning to the retained list rereads'
 for control in owner revision replay policy list-limit failure-receipt blocking-al creation-mode creation-policy; do
   podman exec --user 1000:1001 "${AGIRU_DEV_CONTAINER:-agiru-dev}" \
     awk -v control="$control" "$mutation" /workspace/src/rt/PageCommandHost.cpp > "$proof/$control.cpp"
   podman cp "$proof/$control.cpp" "${AGIRU_DEV_CONTAINER:-agiru-dev}:$native/$control.cpp"
-  make --no-print-directory dev-exec COMMAND="clang++-19 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Isrc/rt -fPIC -shared $native/$control.cpp --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 -L/workspace/build/podman -Wl,-rpath,/workspace/build/podman -lagiru_rt -lagiru_net -lagiru_db -o $native/$control.so" \
+  make --no-print-directory dev-exec COMMAND="clang++-19 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Isrc/rt -include runtime/Error.h -fPIC -shared $native/$control.cpp --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 -L/workspace/build/podman -Wl,-rpath,/workspace/build/podman -lagiru_rt -lagiru_net -lagiru_db -o $native/$control.so" \
     > "$proof/$control.compile.log" 2>&1
   status=0
   application=0
   if [[ "$control" = policy || "$control" = list-limit ]]; then application=1; fi
+  case "$control" in
+    owner) claim='foreign identities' ;;
+    revision) claim='PostgreSQL owns revision' ;;
+    replay) claim='identical completed command replays' ;;
+    policy) claim='startup configuration selects TryFunction write policy' ;;
+    list-limit) claim='shared HTTP list windows obey the trusted bound' ;;
+    failure-receipt) claim='a noncommitted AL action rolls back' ;;
+    blocking-al) claim='a pending native write keeps one HTTP worker available' ;;
+    creation-mode) claim='linked card New runs AL initialization' ;;
+    creation-policy) claim='linked card InsertAllowed false' ;;
+  esac
   AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" \
     AGIRU_PAGE_HOST_APPLICATION="$application" AGIRU_TRY_WRITE_DISABLED=1 AGIRU_LIST_ROWS=7 \
-    AGIRU_PAGE_HOST_PRELOAD="$native/$control.so" node --test test/ui/page-host.mjs \
+    AGIRU_PAGE_HOST_PRELOAD="$native/$control.so" node --test --test-name-pattern="^($prerequisites|$claim)" test/ui/page-host.mjs \
     > "$proof/$control.log" 2>&1 || status=$?
   [[ "$status" = 1 ]]
   case "$control" in
@@ -127,7 +144,45 @@ for control in owner revision replay policy list-limit failure-receipt blocking-
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
   unlink "$proof/$control.cpp"
 done
-for control in dialog-default dialog-commit dialog-replay; do
+for control in modal-commit modal-replay modal-cancel modal-message-replay; do
+  case "$control" in
+    modal-commit) pattern='CMD MCP and Chromium explicitly select' ;;
+    modal-replay|modal-cancel) pattern='modal SQL ownership revisions CSRF replay and permissions' ;;
+    modal-message-replay) pattern='CMD MCP and Chromium edit exact original modal variables' ;;
+  esac
+  podman exec --user agiru "${AGIRU_DEV_CONTAINER:-agiru-dev}" awk -v control="$control" '
+    control == "modal-commit" && /void PublishSnapshot\(\) \{/ {
+      print; print "    agiru::Commit();"; changed++; next
+    }
+    control == "modal-replay" && /replay.Value\(0, 0\) != input.digest/ {
+      sub(/replay.Value\(0, 0\) != input.digest/, "false"); changed++
+    }
+    control == "modal-cancel" && /return page_.CloseModal\(control ==/ {
+      sub(/control == "\$agiru.modal_ok" \? Action::OK : Action::Cancel/, "Action::OK"); changed++
+    }
+    control == "modal-message-replay" && /^[[:space:]]+receiptHtml,$/ {
+      sub(/receiptHtml/, "html"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' /workspace/src/rt/PageModal.cpp > "$proof/$control.cpp"
+  podman cp "$proof/$control.cpp" "${AGIRU_DEV_CONTAINER:-agiru-dev}:$native/$control.cpp"
+  make --no-print-directory dev-exec COMMAND="clang++-19 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Isrc/rt -include runtime/Error.h -fPIC -shared $native/$control.cpp --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 -L/workspace/build/podman -Wl,-rpath,/workspace/build/podman -lagiru_rt -lagiru_net -lagiru_db -o $native/$control.so" \
+    > "$proof/$control.compile.log" 2>&1
+  status=0
+  AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" AGIRU_PAGE_HOST_PRELOAD="$native/$control.so" \
+    node --test --test-name-pattern="$pattern" test/ui/page-host.mjs > "$proof/$control.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  case "$control" in
+    modal-commit) rg -q '^not ok .*CMD MCP and Chromium explicitly select' "$proof/$control.log" ;;
+    modal-replay|modal-cancel) rg -q '^not ok .*modal SQL ownership revisions CSRF replay and permissions' "$proof/$control.log" ;;
+    modal-message-replay) rg -q '^not ok .*CMD MCP and Chromium edit exact original modal variables' "$proof/$control.log" ;;
+  esac
+  for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
+  make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
+  unlink "$proof/$control.cpp"
+done
+for control in dialog-default dialog-commit dialog-replay modal-poll-receipt; do
   podman exec --user agiru "${AGIRU_DEV_CONTAINER:-agiru-dev}" awk -v control="$control" '
     control == "dialog-default" && /call->question = held;/ {
       $0 = $0 " held->answer = held->defaultChoice;"; changed++
@@ -138,6 +193,9 @@ for control in dialog-default dialog-commit dialog-replay; do
     control == "dialog-replay" && /replay.Value\(0, 0\) != std::to_string\(choice\)/ {
       sub(/replay.Value\(0, 0\) != std::to_string\(choice\)/, "false"); changed++
     }
+    control == "modal-poll-receipt" && /const auto poll = ModalPollAttributes\(call\);/ {
+      sub(/ModalPollAttributes\(call\)/, "(static_cast<void>(ModalPollAttributes(call)), std::string{})"); changed++
+    }
     { print }
     END { if (changed != 1) exit 2 }
   ' /workspace/src/rt/PageInteraction.cpp > "$proof/$control.cpp"
@@ -145,12 +203,18 @@ for control in dialog-default dialog-commit dialog-replay; do
   make --no-print-directory dev-exec COMMAND="clang++-19 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Isrc/rt -include runtime/Error.h -fPIC -shared $native/$control.cpp --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 -L/workspace/build/podman -Wl,-rpath,/workspace/build/podman -lagiru_rt -lagiru_net -lagiru_db -o $native/$control.so" \
     > "$proof/$control.compile.log" 2>&1
   status=0
+  case "$control" in
+    dialog-default|dialog-commit) pattern='^native questions preserve the AL transaction' ;;
+    dialog-replay) pattern='^nested native questions reject replaced answers' ;;
+    modal-poll-receipt) pattern='^query-close veto' ;;
+  esac
   AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" AGIRU_PAGE_HOST_PRELOAD="$native/$control.so" \
-    node --test test/ui/page-host.mjs > "$proof/$control.log" 2>&1 || status=$?
+    node --test --test-name-pattern="$pattern" test/ui/page-host.mjs > "$proof/$control.log" 2>&1 || status=$?
   [[ "$status" = 1 ]]
   case "$control" in
     dialog-default|dialog-commit) rg -q '^not ok .*native questions preserve the AL transaction' "$proof/$control.log" ;;
     dialog-replay) rg -q '^not ok .*nested native questions reject replaced answers' "$proof/$control.log" ;;
+    modal-poll-receipt) rg -q '^not ok .*query-close veto' "$proof/$control.log" ;;
   esac
   for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
@@ -173,5 +237,5 @@ make --no-print-directory dev-exec COMMAND="env LD_PRELOAD=$native/duplicates.so
 rg -q 'FAIL.*duplicate configuration keys refuse' "$proof/duplicates.log"
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/duplicates.cpp $native/duplicates.so"
 unlink "$proof/duplicates.cpp"
-sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'page-host: generated-page SQL effects, asynchronous AL calls, explicit questions/messages, linked-card creation and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; thirteen compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt/blocking-AL/default-answer/implicit-commit/changed-answer/creation-mode/creation-policy defects rejected; not full ERP acceptance; %s\n' "$proof"
+sha256sum --check "$proof/inputs.sha256" "$proof/scalar-inputs.sha256" > "$proof/integrity.log"
+printf 'page-host: generated-page SQL effects, asynchronous AL calls, explicit questions/messages/modals, linked-card creation and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; eighteen compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt/blocking-AL/default-answer/implicit-commit/changed-answer/creation-mode/creation-policy/modal-commit/modal-replay/modal-cancel/modal-message-replay/modal-poll-receipt defects rejected; not full ERP acceptance; %s\n' "$proof"

@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
 import { commandEnvelope, parseFailure, parsePage } from "../../build/client/profile.mjs";
 import { ServerConfigs } from "./server-config.mjs";
-import { launchBrowser, openBrowserPage, assertBrowserPage, browserAction, browserSet, finishedResponse } from "./browser-client.mjs";
+import { launchBrowser, openBrowserPage, assertBrowserPage, browserAction, browserSet, browserFailure, finishedResponse } from "./browser-client.mjs";
 import { renderAscii } from "../../build/client/ascii.mjs";
 
 const execute = promisify(execFile);
@@ -51,7 +51,7 @@ const dsn = `postgresql://agiru:agiru@127.0.0.1:5432/${database}`;
 if (nativeApplication) {
   serverConfig = await configurations.write({ database: dsn, company: "Fixture + Company", origin,
     http: { workers: 1 },
-    pages: { list_rows: rowLimit, dialog_timeout_seconds: 5 },
+    pages: { list_rows: rowLimit, dialog_timeout_seconds: 5, response_wait_ms: 1 },
     transactions: { disable_write_inside_try_functions: disableTryWrites } });
   application = spawn("podman", ["exec", "--user", "1000:1001", container,
     "env", ...(process.env.AGIRU_PAGE_HOST_PRELOAD ? [`LD_PRELOAD=${process.env.AGIRU_PAGE_HOST_PRELOAD}`] : []),
@@ -98,19 +98,74 @@ async function post(result, name, text, headers = first, complete = true) {
   const body = new URLSearchParams(envelope.fields).toString();
   let response = await fetch(origin + envelope.path, { method: "POST",
     headers: { ...headers, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body });
+  const resultResponse = await finish(response, headers, complete);
+  return { ...resultResponse, body };
+}
+
+async function finish(response, headers = first, complete = true) {
   let html = await response.text();
   const deadline = Date.now() + 15000;
   while (complete && response.status === 200) {
     const interaction = parsePage(html).interaction;
-    if (interaction?.state !== "working") break;
+    if (interaction?.state !== "working" && interaction?.poll?.state !== "failed") break;
     assert.ok(Date.now() < deadline, "native call must finish without repeating the POST");
     await new Promise(resolve => setTimeout(resolve, 50));
-    response = await fetch(origin + `/calls/${interaction.call}`, { headers, signal: AbortSignal.timeout(15000) });
+    response = await fetch(origin + (interaction.poll?.path ?? `/calls/${interaction.call}`), { headers, signal: AbortSignal.timeout(15000) });
     html = await response.text();
   }
-  return { response, body, html };
+  return { response, html };
 }
 const opened = await client.read("/?page=50341&company=Fixture%20%2B%20Company");
+
+async function modalAdapter(name, fresh) {
+  let browser, web, mcp;
+  const env = { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` };
+  if (name === "Web") {
+    browser = await launchBrowser();
+    web = await openBrowserPage(browser, origin, path(fresh), first.authorization);
+    await assertBrowserPage(web.page, fresh.page);
+  } else if (name === "MCP") {
+    const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
+    const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"));
+    const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"));
+    mcp = new Client({ name: "agiru-modal-parity", version: "1" });
+    await mcp.connect(new StdioClientTransport({ command: process.execPath, args: ["build/client/mcp.mjs"], env }));
+  }
+  return {
+    async failure(current, identity) {
+      if (web) return browserFailure(web.page, origin, current.page, identity);
+      const { enabled: _enabled, ...command } = operation(current, identity);
+      const input = { path: path(current), ...command };
+      if (mcp) {
+        const result = await mcp.callTool({ name: "agiru_execute", arguments: input });
+        assert.equal(result.isError, true);
+        return result.structuredContent;
+      }
+      try {
+        await execute(process.execPath, ["build/client/cmd.mjs", "--json", "execute", JSON.stringify(input)], { env });
+        assert.fail("CMD must report the delayed modal error");
+      } catch (error) {
+        assert.equal(error.code, 2);
+        return JSON.parse(error.stderr);
+      }
+    },
+    async action(current, identity, text) {
+      if (web) return text === undefined ? browserAction(web.page, origin, current.page, identity)
+        : browserSet(web.page, origin, current.page, identity, text);
+      const { enabled: _enabled, ...command } = operation(current, identity);
+      const input = { path: path(current), ...command, ...(text === undefined ? {} : { text }) };
+      if (mcp) {
+        const result = await mcp.callTool({ name: "agiru_execute", arguments: input });
+        assert.notEqual(result.isError, true, JSON.stringify(result.structuredContent));
+        assert.ok(result.content.some(item => item.type === "text" && item.text.includes("unsupported=")));
+        return result.structuredContent;
+      }
+      return JSON.parse((await execute(process.execPath, ["build/client/cmd.mjs", "--json", "execute", JSON.stringify(input)], { env })).stdout);
+    },
+    async screenshot(name) { if (web) await web.page.screenshot({ path: `${proof}/${name}.png`, fullPage: true }); },
+    async close() { await mcp?.close(); await browser?.close(); },
+  };
+}
 
 test("native generated list retains its row and handle across request-local connections", async () => {
   assert.equal(opened.page.page, "50341");
@@ -150,7 +205,9 @@ test("external agent navigates list to exact selected card through the common li
   assert.equal(field(card, "ID"), "2");
   assert.equal(field(card, "Value"), "22");
   assert.equal(card.page.handle, opened.page.handle);
-  assert.equal(card.page.unsupported, 6, "computed variable bindings remain counted gaps");
+  assert.equal(card.page.unsupported, 0, "declared variable bindings have exact scalar transport");
+  assert.equal(field(card, "LoadedValue"), "22");
+  assert.equal(field(card, "OpeningMode"), "true");
 });
 
 test("actual shell CMD validates/saves a generated AL field and independent SQL attributes its exact value", async () => {
@@ -176,12 +233,12 @@ test("identical completed command replays durably; altered payload and stale rev
   const before = await sql('SELECT count(*) FROM ui_writes');
   const send = body => fetch(origin + "/commands", { method: "POST",
     headers: { ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body });
-  const duplicate = await send(originalPost);
-  assert.equal(duplicate.status, 200);
-  assert.deepEqual(parsePage(await duplicate.text()), saved.page);
+  const duplicate = await finish(await send(originalPost));
+  assert.equal(duplicate.response.status, 200);
+  assert.deepEqual(parsePage(duplicate.html), saved.page);
   const changed = new URLSearchParams(originalPost);
   changed.set("text", "99");
-  assert.equal((await send(changed.toString())).status, 409);
+  assert.equal((await finish(await send(changed.toString()))).response.status, 409);
   const old = await post(card, "$agiru.save");
   assert.equal(old.response.status, 409);
   assert.equal(await sql('SELECT count(*) FROM ui_writes'), before);
@@ -229,8 +286,8 @@ test("foreign identities, company names, unsupported URLs and forged form author
   const envelope = commandEnvelope(saved.page, operation(saved, "Value"), "66");
   const body = new URLSearchParams(envelope.fields);
   body.set("csrf", "forged");
-  assert.equal((await fetch(origin + "/commands", { method: "POST", headers: {
-    ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body })).status, 403);
+  assert.equal((await finish(await fetch(origin + "/commands", { method: "POST", headers: {
+    ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body }))).response.status, 403);
   assert.equal((await fetch(origin + "/commands", { method: "POST", headers: {
     ...first, Origin: "https://foreign.example", "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(envelope.fields) })).status, 400);
@@ -377,7 +434,7 @@ if (nativeApplication) {
     await operator("client-init");
     assert.equal(await sql('SELECT count(*) FROM "User"'), "2");
     assert.equal(await sql('SELECT count(*) FROM "Access Control"'), "2");
-    assert.equal(await sql('SELECT count(*) FROM "Tenant Permission"'), "9");
+    assert.equal(await sql('SELECT count(*) FROM "Tenant Permission"'), "10");
   });
 
   test("operator credential issuance authenticates an existing account without granting writes", async () => {
@@ -802,8 +859,9 @@ test("linked card New runs AL initialization and saves exactly one new row acros
       const replay = await fetch(origin + create.path, { method: "POST", headers: {
         ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams(create.fields) });
-      assert.equal(replay.status, 200);
-      assert.deepEqual(parsePage(await replay.text()), created.page, "New replay must not reopen AL");
+      const replayed = await finish(replay);
+      assert.equal(replayed.response.status, 200);
+      assert.deepEqual(parsePage(replayed.html), created.page, "New replay must not reopen AL");
       created = await invoke(created, "ID", id);
       created = await invoke(created, "Value", "62");
       created = await invoke(created, "$agiru.save");
@@ -837,9 +895,251 @@ test("linked card InsertAllowed false refuses New and direct Create before AL in
   body.set("control", "$agiru.new");
   const denied = await fetch(origin + forged.path, { method: "POST", headers: {
     ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body });
-  assert.equal(denied.status, 400);
-  assert.equal(parseFailure(await denied.text()).code, "PageHostUnsupported");
+  const refusal = await finish(denied);
+  assert.equal(refusal.response.status, 400);
+  assert.equal(parseFailure(refusal.html).code, "PageHostUnsupported");
   await assert.rejects(client.read("/?page=50343&mode=Create"), error =>
     error.code === "PageHostUnsupported" && error.outcome === "refused");
   assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), population);
+});
+
+test("CMD MCP and Chromium explicitly select the original filtered modal and resume the same AL transaction", { timeout: 60000 }, async () => {
+  for (const adapter of ["CMD", "MCP", "Web"]) {
+    await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1; UPDATE "Navigation Row" SET "Value"=22 WHERE "ID"=2');
+    const fresh = await client.read("/?page=50347&mode=Edit");
+    const driver = await modalAdapter(adapter, fresh);
+    const root = operation(fresh, "ModalPick");
+    const writes = BigInt(await sql('SELECT count(*) FROM ui_writes'));
+    try {
+      let modal = await driver.action(fresh, "ModalPick");
+      assert.equal(modal.page.profile, "4");
+      assert.equal(modal.page.page, "50341");
+      assert.equal(modal.page.handle, fresh.page.handle);
+      assert.equal(modal.page.interaction.state, "modal");
+      assert.equal(modal.page.interaction.originCommand, root.command);
+      assert.equal(modal.page.window.limit, String(nativeApplication ? rowLimit : 40));
+      assert.deepEqual(modal.page.rows.map(row => row.controls.find(cell => cell.identity === "ID").scalar.value), ["2"]);
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "11", "modal suspension must not commit the pending write");
+      assert.equal(BigInt(await sql('SELECT count(*) FROM ui_writes')), writes);
+      assert.deepEqual(await client.read(path(modal)), modal);
+      assert.match(renderAscii(modal.page), /modal=.*explicit close required/);
+      const row = modal.page.rows[0].select.control;
+      const before = await client.read(path(modal));
+      modal = await driver.action(modal, row);
+      assert.equal(modal.page.revision, "1");
+      assert.equal(modal.page.interaction.dialog, before.page.interaction.dialog);
+      const replay = await post(before, row);
+      assert.equal(replay.response.status, 200);
+      assert.deepEqual(parsePage(replay.html), modal.page);
+      assert.equal(await sql(`SELECT revision FROM agiru_client.page_modals WHERE handle='${modal.page.interaction.dialog}'`), "1");
+      await driver.screenshot("native-filtered-modal");
+      const final = await driver.action(modal, "$agiru.modal_ok");
+      assert.equal(final.page.page, "50347");
+      assert.equal(final.page.interaction, undefined);
+      assert.equal(field(final, "Value"), "22", "GetRecord must expose the selected original AL object");
+      assert.deepEqual(final.page.messages.map(item => item.text), ["Selected row 2."]);
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "22");
+      assert.equal(BigInt(await sql('SELECT count(*) FROM ui_writes')), writes + 2n);
+      assert.equal(await sql(`SELECT active FROM agiru_client.page_modals WHERE handle='${modal.page.interaction.dialog}'`), "f");
+      assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands WHERE command_id='${root.command}'`), "complete");
+      assert.deepEqual(await client.read(path(final)), final);
+    } finally { await driver.close(); }
+  }
+});
+
+test("CMD MCP and Chromium edit exact original modal variables without independently committing the caller", async () => {
+  for (const adapter of ["CMD", "MCP", "Web"]) {
+    await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
+    const fresh = await client.read("/?page=50347&mode=Edit");
+    const driver = await modalAdapter(adapter, fresh);
+    try {
+      let modal = await driver.action(fresh, "ModalNested");
+      modal = await driver.action(modal, "OwnerMarker", "123");
+      modal = await driver.action(modal, "ExactAmount", "1.23456789012345678901");
+      assert.equal(field(modal, "OwnerMarker"), "123");
+      assert.equal(field(modal, "ExactAmount"), "1.23456789012345678901");
+      const before = await client.read(path(modal));
+      modal = await driver.action(modal, "Notify");
+      assert.deepEqual(modal.page.messages.map(message => message.text), ['Modal <script> Grün']);
+      const replay = await post(before, "Notify");
+      assert.equal(replay.response.status, 200);
+      assert.deepEqual(parsePage(replay.html), modal.page, "modal receipts must retain exact message identities and data");
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "11");
+      const final = await driver.action(modal, "$agiru.modal_ok");
+      assert.equal(field(final, "Value"), "123");
+      assert.deepEqual(final.page.messages, modal.page.messages);
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "123");
+    } finally { await driver.close(); }
+  }
+});
+
+test("modal SQL ownership revisions CSRF replay and permissions fence every input without releasing the caller", async () => {
+  await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const opened = await client.execute(path(fresh), operation(fresh, "ModalPick"));
+  const choice = operation(opened, "$agiru.modal_ok");
+  const envelope = commandEnvelope(opened.page, choice);
+  const send = (changes = {}, headers = first, endpoint = envelope.path) => fetch(origin + endpoint, {
+    method: "POST", headers: { ...headers, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...envelope.fields, ...changes }) });
+  assert.equal((await send({}, second)).status, 410);
+  assert.equal((await send({ csrf: "foreign" })).status, 403);
+  assert.equal((await send({ revision: "999" })).status, 409);
+  assert.equal((await send({}, first, "/modal-commands/not-the-modal")).status, 409);
+  const parent = await post(fresh, "ModalPick", undefined, first, false);
+  assert.equal(parent.response.status, 409, "the parent cannot accept input while its modal is active");
+  if (nativeApplication) {
+    await sql(`UPDATE "Tenant Permission" SET "Execute Permission"=0 WHERE "Role ID"='EDITOR' AND "Object Type"=8 AND "Object ID"=50341`);
+    try { assert.equal((await send()).status, 403); }
+    finally { await sql(`UPDATE "Tenant Permission" SET "Execute Permission"=1 WHERE "Role ID"='EDITOR' AND "Object Type"=8 AND "Object ID"=50341`); }
+  }
+  assert.equal(await sql(`SELECT count(*) FROM agiru_client.page_modal_commands WHERE modal_handle='${opened.page.interaction.dialog}'`), "0");
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "11");
+  const selected = await client.execute(path(opened), operation(opened, opened.page.rows[0].select.control));
+  const original = commandEnvelope(opened.page, operation(opened, opened.page.rows[0].select.control));
+  const changed = await fetch(origin + original.path, { method: "POST", headers: {
+    ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...original.fields, control: "$agiru.modal_cancel" }) });
+  assert.equal(changed.status, 409, "an identical ID cannot be repurposed as cancellation");
+  const cancelled = await post(selected, "$agiru.modal_cancel");
+  assert.equal(cancelled.response.status, 500);
+  assert.equal(parseFailure(cancelled.html).message, "explicit modal decline");
+  assert.equal(parseFailure(cancelled.html).outcome, "failed");
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "11", "declined parent errors roll back earlier writes");
+});
+
+test("nested modal pages and questions preserve the original AL variables and expose only the active child", { timeout: 30000 }, async () => {
+  await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const driver = await modalAdapter("Web", fresh);
+  try {
+    const parent = await driver.action(fresh, "ModalNested");
+    assert.equal(parent.page.page, "50352");
+    assert.equal(parent.page.unsupported, 1, "Action has no declared scalar transport and remains a counted gap");
+    assert.equal(field(parent, "OwnerMarker"), "42");
+    assert.equal(field(parent, "ExactAmount"), "1.2300");
+    assert.equal(field(parent, "ExactInteger"), "9223372036854775807");
+    assert.equal(field(parent, "OriginalText"), 'Grüezi <script> & "quoted"');
+    assert.equal(field(parent, "ArrayValue"), "7");
+    assert.deepEqual(parent.page.controls.find(control => control.identity === "Choice").scalar,
+      { type: "Option", value: "1", domain: "page/50352/control/Choice", member: "After", undefined: false, closing: false });
+    const child = await driver.action(parent, "PickChild");
+    assert.equal(child.page.page, "50341");
+    assert.notEqual(child.page.interaction.dialog, parent.page.interaction.dialog);
+    const blocked = await post(parent, "$agiru.modal_ok", undefined, first, false);
+    assert.equal(blocked.response.status, 409);
+    let resumed = await driver.action(child, "$agiru.modal_ok");
+    assert.equal(resumed.page.interaction.dialog, parent.page.interaction.dialog);
+    assert.equal(field(resumed, "OwnerMarker"), "52");
+    const question = await driver.action(resumed, "Ask");
+    assert.equal(question.page.interaction.state, "confirm");
+    assert.equal(question.page.interaction.defaultChoice, "0");
+    assert.equal((await post(resumed, "$agiru.modal_cancel", undefined, first, false)).response.status, 409);
+    resumed = await driver.action(question, question.page.controls[1].identity);
+    assert.equal(resumed.page.interaction.dialog, parent.page.interaction.dialog);
+    assert.equal(field(resumed, "OwnerMarker"), "62");
+    const final = await driver.action(resumed, "$agiru.modal_ok");
+    assert.equal(field(final, "Value"), "62");
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "62");
+  } finally { await driver.close(); }
+});
+
+async function withDelayedModalClose(run) {
+  await sql(`CREATE FUNCTION ui_close_delay() RETURNS trigger LANGUAGE plpgsql AS $body$
+    BEGIN IF NEW."ID"=2 THEN PERFORM pg_sleep(0.3); END IF; RETURN NEW; END $body$;
+    CREATE TRIGGER ui_close_delay BEFORE UPDATE ON "Navigation Row"
+    FOR EACH ROW EXECUTE FUNCTION ui_close_delay()`);
+  try { await run(); }
+  finally { await sql('DROP TRIGGER ui_close_delay ON "Navigation Row"; DROP FUNCTION ui_close_delay()'); }
+}
+
+test("query-close veto and AL errors keep the modal open and require a new explicit close attempt", async () => withDelayedModalClose(async () => {
+  await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  let modal = await client.execute(path(fresh), operation(fresh, "ModalCloseRetry"));
+  const identity = modal.page.interaction.dialog;
+  for (const [attempt, message] of [[1, "the page refused to close (OnQueryClosePage)"], [2, "Fixture close error"]]) {
+    const pending = await post(modal, "$agiru.modal_ok", undefined, first, false);
+    assert.equal(pending.response.status, 200, "the delayed close must release the HTTP worker before AL finishes");
+    const interaction = parsePage(pending.html).interaction;
+    assert.equal(interaction.state, "working");
+    assert.deepEqual(interaction.poll, { path: `/modal-commands/${identity}/${operation(modal, "$agiru.modal_ok").command}`, state: "pending" });
+    const foreign = await fetch(origin + interaction.poll.path, { headers: second });
+    assert.equal(foreign.status, 410, "a receipt address does not grant its foreign caller authority");
+    const failure = await finish({ status: pending.response.status, text: async () => pending.html });
+    assert.equal(failure.response.status, 500);
+    const error = parseFailure(failure.html);
+    assert.equal(error.message, message);
+    assert.equal(error.command, operation(modal, "$agiru.modal_ok").command);
+    assert.equal(error.outcome, "failed");
+    const replay = await post(modal, "$agiru.modal_ok");
+    assert.equal(replay.response.status, failure.response.status);
+    assert.equal(replay.html, failure.html, "failed close replays its receipt without another AL attempt");
+    modal = await client.read(path(modal));
+    assert.equal(modal.page.interaction.dialog, identity);
+    assert.equal(field(modal, "CloseAttempts"), String(attempt));
+    assert.equal(field(modal, "ClosedCount"), "0");
+    assert.equal(modal.page.interaction.poll.state, "failed");
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "11");
+  }
+  const final = await client.execute(path(modal), operation(modal, "$agiru.modal_ok"));
+  assert.equal(field(final, "Value"), "1");
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "1");
+}));
+
+test("CMD MCP and Chromium retain delayed modal errors and allow an explicit retry without committing the caller", { timeout: 30000 }, async () => withDelayedModalClose(async () => {
+  for (const adapter of ["CMD", "MCP", "Web"]) {
+    await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
+    const fresh = await client.read("/?page=50347&mode=Edit");
+    const driver = await modalAdapter(adapter, fresh);
+    try {
+      let modal = await driver.action(fresh, "ModalCloseRetry");
+      for (const [attempt, message] of [[1, "the page refused to close (OnQueryClosePage)"], [2, "Fixture close error"]]) {
+        const command = operation(modal, "$agiru.modal_ok").command;
+        const failure = await driver.failure(modal, "$agiru.modal_ok");
+        assert.equal(failure.message, message);
+        assert.equal(failure.command, command);
+        assert.equal(failure.outcome, "failed");
+        modal = await client.read(path(modal));
+        assert.equal(field(modal, "CloseAttempts"), String(attempt));
+        assert.equal(field(modal, "ClosedCount"), "0");
+        assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "11");
+      }
+      const final = await driver.action(modal, "$agiru.modal_ok");
+      assert.equal(field(final, "Value"), "1");
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "1");
+    } finally { await driver.close(); }
+  }
+}));
+
+test("a later caller error rolls back modal writes but never undoes an earlier explicit Commit", async () => {
+  for (const [action, stored, message] of [["ModalFail", "11", "failure after modal"],
+    ["ModalCommitFail", "21", "failure after committed modal"]]) {
+    await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
+    const fresh = await client.read("/?page=50347&mode=Edit");
+    const root = operation(fresh, action);
+    const modal = await client.execute(path(fresh), root);
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), stored);
+    await assert.rejects(client.execute(path(modal), operation(modal, "$agiru.modal_ok")), error =>
+      error.message === message && error.command === root.command && error.outcome === "failed");
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), stored);
+    assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands WHERE command_id='${root.command}'`), "failed");
+    assert.equal(await sql(`SELECT active FROM agiru_client.page_modals WHERE handle='${modal.page.interaction.dialog}'`), "f");
+  }
+});
+
+test("an unanswered native modal times out without choosing a row or committing caller writes", { timeout: 15000 }, async () => {
+  await sql('UPDATE "Navigation Row" SET "Value"=11 WHERE "ID"=1');
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const modal = await client.execute(path(fresh), operation(fresh, "ModalPick"));
+  const deadline = Date.now() + 10000;
+  let response;
+  do {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    response = await fetch(origin + `/calls/${modal.page.interaction.call}`, { headers: first });
+    if (response.status !== 200) break;
+  } while (Date.now() < deadline);
+  assert.equal(response.status, 500);
+  assert.equal(parseFailure(await response.text()).code, "UiDialogCancelled");
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "11");
 });

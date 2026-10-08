@@ -26,6 +26,7 @@
 #include "HtmlText.h"
 #include "PageInteraction.h"
 #include "PageListHtml.h"
+#include "PageModal.h"
 
 #include <algorithm>
 #include <array>
@@ -328,7 +329,7 @@ unsigned Status(std::string_view code) {
   if (code == "PageHostMissing") { return kNotFound; }
   if (code == "PageHostGone") { return kGone; }
   if (code == "PageHostBusy" || code == "PageHostRevision" || code == "PageHostReceipt" ||
-      code == "PageHostDialogStale") {
+      code == "PageHostDialogStale" || code == "PageHostModalStale" || code == "PageHostReplay") {
     return kConflict;
   }
   if (code == "PageHostCapacity") { return kUnavailable; }
@@ -361,7 +362,8 @@ FailureResponse(const Error &error, unsigned status, const CommandOutcome &resul
 }
 
 std::string RequestCommand(const ServerHttpRequest &request) {
-  if (request.method != "POST" || (request.target != "/commands" && request.target != "/answers")) {
+  if (request.method != "POST" || (request.target != "/commands" && request.target != "/answers" &&
+                                   !request.target.starts_with("/modal-commands/"))) {
     return {};
   }
   try {
@@ -390,6 +392,7 @@ void ValidatePageHostOptions(const PageHostOptions &options) {
 
 void InstallPageCommandHost(const Connection &connection) {
   detail::InstallPageDialogs(connection);
+  detail::InstallPageModals(connection);
   connection.Run(R"(CREATE TABLE IF NOT EXISTS agiru_client.page_contexts (
     handle text PRIMARY KEY,
     user_security_id uuid NOT NULL REFERENCES "User"("User Security ID") ON DELETE CASCADE,
@@ -440,10 +443,24 @@ struct PageCommandHost::Impl {
 
   std::string Working(const Call &call) const { return detail::RenderPageInteraction(call); }
 
-  ServerHttpResponse Await(const std::shared_ptr<Call> &call) const {
+  void ModalReadAuthority(Connection &connection, const Call &call, PageId page) const {
+    Session authority(call.user, options.session);
+    authority.CompanyName(options.company);
+    authority.TablePermissions(tableAuthority);
+    SessionCommand command(authority, connection);
+    const auto *entry = FindPage(page);
+    if (entry == nullptr) { Refuse("PageHostGone"); }
+    authorize(*entry->page, PageHostOperation::Read, {});
+    AuthorizeSnapshot(*entry->page, entry->page->layout);
+    AuthorizeSnapshot(*entry->page, entry->page->actions);
+    command.Keep();
+  }
+
+  ServerHttpResponse Await(Connection &connection, const std::shared_ptr<Call> &call) const {
     std::unique_lock lock(call->mutex);
     call->ready.wait_for(lock, options.responseWait, [&] {
-      return call->finished || (call->question && !call->question->answer);
+      return call->finished || (call->question && !call->question->answer) ||
+             (call->modal && !call->modal->busy);
     });
     if (call->finished) {
       if (call->error) {
@@ -462,6 +479,7 @@ struct PageCommandHost::Impl {
       if (!result) { Refuse("PageHostReceipt"); }
       return std::move(*result);
     }
+    if (call->modal) { ModalReadAuthority(connection, *call, call->modal->page); }
     return {.body = Working(*call),
             .headers = {{.name = "Content-Location", .value = "/?handle=" + call->pageHandle}}};
   }
@@ -542,7 +560,7 @@ struct PageCommandHost::Impl {
     command.Keep();
   }
 
-  ServerHttpResponse Poll(Connection &connection, const Guid &user, std::string_view handle) {
+  std::shared_ptr<Call> FindCall(std::string_view handle) {
     if (!Token(handle)) { Refuse("PageHostInput"); }
     std::shared_ptr<Call> call;
     {
@@ -552,8 +570,13 @@ struct PageCommandHost::Impl {
       call = found->second.lock();
       if (!call) { Refuse("PageHostGone"); }
     }
+    return call;
+  }
+
+  ServerHttpResponse Poll(Connection &connection, const Guid &user, std::string_view handle) {
+    const auto call = FindCall(handle);
     CallOwnership(connection, *call, user);
-    return Await(call);
+    return Await(connection, call);
   }
 
   std::shared_ptr<Context> Retain(const Guid &user) {
@@ -656,7 +679,7 @@ struct PageCommandHost::Impl {
     const auto number = Number(Get(values, "page"));
     const std::lock_guard lock(context->mutex);
     try {
-      InstallUiHost(context->session, detail::MakePageUiHost(call, options));
+      InstallUiHost(context->session, detail::MakePageUiHost(call, options, authorize));
       SessionCommand command(context->session, connection);
       context->page = MakeInstalledPage(PageId{static_cast<std::int32_t>(number)});
       const auto mode = Mode(context->page->Declaration(), Get(values, "mode"));
@@ -747,7 +770,7 @@ struct PageCommandHost::Impl {
       contexts.erase(context->handle);
       throw;
     }
-    return Await(call);
+    return Await(connection, call);
   }
 
   ServerHttpResponse Read(Connection &connection, const Guid &user, const Parameters &values) {
@@ -760,6 +783,9 @@ struct PageCommandHost::Impl {
         const std::lock_guard state(context->call->mutex);
         if (!context->call->finished) {
           CallOwnership(connection, *context->call, user);
+          if (context->call->modal) {
+            ModalReadAuthority(connection, *context->call, context->call->modal->page);
+          }
           return {
               .body = Working(*context->call),
               .headers = {{.name = "Content-Location", .value = "/?handle=" + context->handle}}};
@@ -1044,7 +1070,7 @@ struct PageCommandHost::Impl {
         "VALUES ($1,$2,$3,'started')",
         started);
     try {
-      InstallUiHost(context->session, detail::MakePageUiHost(call, options));
+      InstallUiHost(context->session, detail::MakePageUiHost(call, options, authorize));
       SessionCommand command(context->session, connection);
       Ownership(connection, *context, user);
       Execute(*context, values);
@@ -1146,7 +1172,7 @@ struct PageCommandHost::Impl {
         throw;
       }
     }
-    return Await(call);
+    return Await(connection, call);
   }
 
   ServerHttpResponse
@@ -1175,15 +1201,171 @@ struct PageCommandHost::Impl {
     if (Get(values, "csrf") != call->csrf) { Refuse("PageHostPermission"); }
     {
       const std::lock_guard lock(call->mutex);
+      if (call->modal) { ModalReadAuthority(connection, *call, call->modal->page); }
       detail::AcceptPageAnswer(connection, *call, Get(values, "command"), Get(values, "control"));
     }
-    return Await(call);
+    return Await(connection, call);
+  }
+
+  void ModalInputAuthority(Connection &connection,
+                           const Call &call,
+                           const detail::PageModal &modal,
+                           const detail::PageModalInput &input) const {
+    Session authority(call.user, options.session);
+    authority.CompanyName(options.company);
+    authority.TablePermissions(tableAuthority);
+    SessionCommand command(authority, connection);
+    const auto *entry = FindPage(modal.page);
+    if (entry == nullptr) { Refuse("PageHostGone"); }
+    auto operation = PageHostOperation::Control;
+    if (input.operation == "action" && input.control.starts_with("$agiru.")) {
+      operation = input.control == "$agiru.modal_ok" || input.control == "$agiru.modal_cancel"
+                      ? PageHostOperation::Close
+                  : input.control == "$agiru.save" ? PageHostOperation::Save
+                                                   : PageHostOperation::Move;
+    }
+    authorize(*entry->page, PageHostOperation::Read, {});
+    authorize(*entry->page,
+              operation,
+              {.operation = input.operation == "set" ? PageControlOperation::Set
+                                                     : PageControlOperation::Action,
+               .control = input.control,
+               .text = input.text});
+    command.Keep();
+  }
+
+  ServerHttpResponse ModalResult(Connection &connection,
+                                 const std::shared_ptr<Call> &call,
+                                 std::shared_ptr<detail::PageModalInput> input) const {
+    if (!input) { return Await(connection, call); }
+    {
+      std::unique_lock lock(call->mutex);
+      call->ready.wait_for(
+          lock, options.responseWait, [&] { return input->finished || call->finished; });
+      if (call->finished && call->error) {
+        lock.unlock();
+        return Await(connection, call);
+      }
+      if (!input->finished) {
+        input = detail::ReadPageModalInput(connection, *call, input->modal, input->command);
+      }
+      if (input->finished) {
+        if (input->error) {
+          try {
+            std::rethrow_exception(input->error);
+          } catch (const Error &error) {
+            throw CommandFailure({.message = error.what(),
+                                  .code = error.Code(),
+                                  .command = input->command,
+                                  .outcome = "failed"});
+          }
+        }
+        const auto response = input->response;
+        if (response) {
+          ModalReadAuthority(connection, *call, input->page);
+          return *response;
+        }
+      }
+    }
+    return Await(connection, call);
+  }
+
+  ServerHttpResponse ModalPoll(Connection &connection, const Guid &user, std::string_view target) {
+    const auto split = target.find('/');
+    if (split == std::string_view::npos || !Token(target.substr(0, split)) ||
+        !Token(target.substr(split + 1))) {
+      Refuse("PageHostInput");
+    }
+    const auto modal = target.substr(0, split);
+    const auto command = target.substr(split + 1);
+    const std::array<std::optional<std::string>, 3> binds{
+        std::string(modal), user.ToStorageText(), host};
+    const auto rows = connection.Execute(
+        "SELECT call_handle FROM agiru_client.page_modals WHERE handle=$1 "
+        "AND user_security_id=$2::uuid AND host_id=$3 AND expires_at>clock_timestamp()",
+        binds);
+    const auto identity = rows.Rows() == 1 ? rows.Value(0, 0) : std::nullopt;
+    if (!identity) { Refuse("PageHostGone"); }
+    const auto call = FindCall(*identity);
+    CallOwnership(connection, *call, user);
+    const auto input = detail::ReadPageModalInput(connection, *call, modal, command);
+    ModalReadAuthority(connection, *call, input->page);
+    return ModalResult(connection, call, input);
+  }
+
+  ServerHttpResponse
+  ModalCommand(Connection &connection, const Guid &user, const ServerHttpRequest &request) {
+    if (request.Header("Content-Type") != "application/x-www-form-urlencoded" ||
+        request.Header("Origin") != options.origin) {
+      Refuse("PageHostInput");
+    }
+    const auto handle =
+        std::string_view(request.target).substr(std::string_view("/modal-commands/").size());
+    if (!Token(handle)) { Refuse("PageHostInput"); }
+    const auto values = Parse(request.body, true);
+    constexpr std::array<std::string_view, 7> names{
+        "page", "revision", "command", "csrf", "operation", "control", "text"};
+    Known(values, names);
+    const auto operation = Get(values, "operation");
+    if (!Token(Get(values, "command")) || Get(values, "control").empty() ||
+        (operation != "set" && operation != "action") ||
+        (operation == "set") != values.contains("text") ||
+        values.size() != names.size() - (operation == "set" ? 0 : 1)) {
+      Refuse("PageHostInput");
+    }
+    auto context = Find(Get(values, "page"));
+    std::shared_ptr<Call> call;
+    {
+      const std::lock_guard lock(context->callMutex);
+      call = context->call;
+    }
+    if (!call) { Refuse("PageHostGone"); }
+    CallOwnership(connection, *call, user, true);
+    if (Get(values, "csrf") != call->csrf) { Refuse("PageHostPermission"); }
+    std::shared_ptr<detail::PageModalInput> input;
+    {
+      const std::lock_guard lock(call->mutex);
+      detail::PageModalInput candidate{.command = std::string(Get(values, "command")),
+                                       .operation = std::string(operation),
+                                       .control = std::string(Get(values, "control")),
+                                       .text = std::string(Get(values, "text")),
+                                       .digest = SecureTokenDigest(request.body)};
+      const std::array<std::optional<std::string>, 4> identity{
+          std::string(handle), call->handle, user.ToStorageText(), host};
+      const auto rows = connection.Execute(
+          "SELECT page_id FROM agiru_client.page_modals WHERE handle=$1 AND call_handle=$2 "
+          "AND user_security_id=$3::uuid AND host_id=$4 AND expires_at>clock_timestamp()",
+          identity);
+      const auto page = rows.Rows() == 1 ? rows.Value(0, 0) : std::nullopt;
+      if (!page || Number(*page) > std::numeric_limits<std::int32_t>::max()) {
+        Refuse("PageHostModalStale");
+      }
+      const detail::PageModal modal{.page = PageId{static_cast<std::int32_t>(Number(*page))}};
+      try {
+        ModalInputAuthority(connection, *call, modal, candidate);
+      } catch (const Error &error) {
+        if (error.Code() != "Permission" && error.Code() != "PageHostPermission") { throw; }
+        throw CommandFailure({.message = error.what(),
+                              .code = error.Code(),
+                              .command = candidate.command,
+                              .outcome = "refused"});
+      }
+      input = detail::AcceptPageModal(
+          connection, *call, handle, Get(values, "revision"), std::move(candidate), options);
+    }
+    return ModalResult(connection, call, input);
   }
 
   ServerHttpResponse Handle(const ServerHttpRequest &request) {
     Connection connection(options.database);
     const auto user = LookupClientCredential(connection, request.Header("Authorization"));
     if (!user) { Refuse("PageHostAuthentication"); }
+    if (request.method == "GET" && request.target.starts_with("/modal-commands/")) {
+      return ModalPoll(
+          connection,
+          *user,
+          std::string_view(request.target).substr(std::string_view("/modal-commands/").size()));
+    }
     if (request.method == "GET" && request.target.starts_with(kCallPrefix)) {
       return Poll(connection, *user, std::string_view(request.target).substr(kCallPrefix.size()));
     }
@@ -1197,6 +1379,9 @@ struct PageCommandHost::Impl {
     }
     if (request.method == "POST" && request.target == "/answers") {
       return Answer(connection, *user, request);
+    }
+    if (request.method == "POST" && request.target.starts_with("/modal-commands/")) {
+      return ModalCommand(connection, *user, request);
     }
     return {.status = kMethodNotAllowed,
             .body = "<p>Unsupported page endpoint or method</p>",

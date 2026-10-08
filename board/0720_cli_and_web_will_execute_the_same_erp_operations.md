@@ -4,10 +4,10 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: implement native Page.RunModal suspension for the original Customer template
-list (1380), including explicit selection/cancel and GetRecord writeback for 0727.
-Preserve the AL page variable, caller stack/transaction and generic HTTP/SQL authority;
-never substitute a default template, UT handler or client-side business rule.
+Next: rebuild production generated consumers after the PageInstance/control ABI changes,
+then execute original Customer New/template (1380), explicit selection/cancel and GetRecord
+writeback for 0727. The native modal transport proof uses authored generated pages,
+not this business workflow. Never substitute a default template, UT handler or client rule.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -22,6 +22,10 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Unicode, temporal flags and declared Option/Enum members remain exact. Domains identify
   the object kind, ID and control; display text is not a type oracle. Unsupported storage
   refuses explicitly. Computed-expression transport remains unqualified.
+- Remaining input defect: `PageWriter.cpp::TriggerTable` discards the Boolean returned
+  by the variable setter's Evaluate call. Invalid variable input can therefore succeed
+  without changing its value. After the modal increment, require an explicit validation
+  failure and qualify retry/rollback through CMD/MCP/web; do not claim complete input parity.
 - Sources: `include/runtime/{PageVariableValue,PageValue,Page,PageSession}.h`,
   `src/rt/PageValue.cpp`, `src/gen/{PageWriter,RuntimeSurface}.cpp` and
   `test/gate/PageValueGate.cpp`. PageValue has 43 checks, zero red; affected scalar/generator
@@ -57,16 +61,63 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 - Sources: `include/runtime/{Page,PageSession,PageInstance,UiHost}.h`,
   `src/rt/{PageInstance,UiHost}.cpp`, `test/runtime/page-navigation/{Modal.Page.al,Runner.cpp}`
   and its Bash harness. This is a generated-factory/trusted-host gate, not HTTP parity.
-  The real native host still refuses `UiModalUnsupported`; original Customer New remains
-  unaccepted. Active-modal HTTP authority, receipts, nested dialogs, child-close order and
-  BC's modal-only query-close rule remain to qualify. Rebuild generated consumers after
-  the PageInstance virtual-interface change before rerunning original Customer.
+  The native host now uses the transport below; original Customer New remains unaccepted.
+  Rebuild generated consumers after the PageInstance/control virtual-interface changes
+  before rerunning original Customer. Non-modal query-close behaviour remains unqualified.
 - Developer `methods-auto/page/page-{runmodal-,getrecord,lookupmode}-method.md` and
   `triggers-auto/page/devenv-onqueryclosepage-page-trigger.md` at
   `f928288ee840334be73142e5fc0202c0e19b246d`.
   Predecessor findings: `openerp/board/1705_lookupmode-bestimmt-schliessaktion.md` and
   `1231_onqueryclosepage-wurde-nie-gefeuert-currpage-lookupmode-war.md`; no Python
   threading or implicit modal commits adopted.
+
+## Native modal transport
+
+- Profile 4 exposes only the active modal through explicit nonce, revision and command
+  identities. External CMD/MCP and htmx share the same generated controls, exact values,
+  bounded SQL windows and explicit OK/Cancel. No automatic selection or confirmation.
+- Original AL page storage, caller stack and SQL lease remain on the bounded AL worker.
+  HTTP workers consume immutable snapshots, never AL page pointers. PostgreSQL fences
+  ownership, changed-payload replay and receipts; each HTTP operation reauthorizes access.
+  Child receipts mean processed input, not a committed caller transaction.
+- Authored generated-page HTTP proof: 34 fixture-host cases and 40 actual `agiru serve`
+  cases for each of limits 40/7/80, including both TryFunction write policies: 154 pass,
+  zero red. Independent SQL covers explicit selection/GetRecord, original-variable edits,
+  nested modals/questions, query-close veto/error retries, cancellation/timeout and later
+  caller rollback without undoing an earlier explicit Commit. Message replay preserves
+  the exact original identities/text; Chromium samples use the same public Caddy endpoint.
+- Delayed close errors now retain their exact child-command receipt address through
+  working snapshots; authenticated GET polling reads the SQL receipt without executing AL.
+  CMD/MCP/web follow that receipt, retain the original error and require explicit retry.
+  Fresh reads retain the open modal and updated revision without replaying the failed input.
+  All eighteen compiled defect controls reject at named assertions; `make page-host-test
+  JOBS=2` exits zero and verifies input hashes. Normal matrices remain complete; each
+  mutant executes its affected case and required predecessors, not unrelated timeouts.
+  Close-trigger SQL delay uses fixture-only
+  PostgreSQL triggers; it does not depend on the unimplemented AL Sleep method.
+- `make client-test JOBS=2`: 44 cases and eight executable defects rejected;
+  `make web-test JOBS=2`: 14 browser cases, three defects and actual Caddy asset delivery.
+  Generated navigation 220, dispatcher 105 and source 15 checks pass; 21 execution
+  defects and one compile refusal reject. Native configuration has 242 checks, zero red.
+  Ten affected compiled C++ units pass targeted clang-tidy without suppressions.
+- Sources: `src/rt/PageModal.{h,cpp}`, `src/rt/{PageCommandHost,PageInteraction,PageHtml}.cpp`,
+  `include/runtime/PageHtml.h`, `src/client/{profile,http,ascii,web}.mts`,
+  `test/ui/{page-host.sh,page-host.mjs,browser-client.mjs}` and authored AL fixtures in
+  `test/runtime/page-navigation/`. Reproduce with `make page-host-test JOBS=2`.
+- Production regeneration uses an AL-file-hash-equal copy of BCApps
+  `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`, verified System symbols 29.0.54011.55407
+  (package `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`) and
+  host runtime 18.0. `make transpile` exits 1: 21 unresolved extension anchors,
+  5,683 refused properties and 625 untranslated in-scope object kinds remain counted.
+  Native declarations select 233/234 tables (one approved licensing exclusion), with
+  22 bound/211 unbound; all 35 codeunits are selected but 67 methods remain unbound.
+  `make slice-check all JOBS=6` stopped deliberately at 535/1,075 compiler steps to
+  repair the observed delayed modal-error transport loss. Keep incremental outputs and
+  rebuild after HTTP qualification; generation is not complete AL execution.
+- Remaining: original Customer creation/reopen, computed control values, variable input
+  validation/retry, automatic AL CurrPage.Close, dynamic Editable, progress/report callbacks,
+  modal error-string quotas and expired-receipt cleanup. This is not source-BC collation,
+  full generated-tree/UT execution, financial posting or production-scale acceptance.
 
 ## Native command diagnostics
 
@@ -230,6 +281,19 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   parity is unproven; `scripts/cronus_to_pg.py` already encounters mixed SQL Server
   column collations but the transfer does not qualify their preservation. Inspect
   `pg_database`, `pg_attribute`/`pg_collation` and original SQL Server column metadata.
+- Read-only source inventory on SQL Server 2022 CU26 (`16.0.4265.3`): CRONUS and original
+  Customer No./Name/Search Name use `Latin1_General_100_CS_AS`. All collated source columns:
+  that profile 15,032; `Latin1_General_100_CI_AS` 2; `Latin1_General_BIN` 37;
+  `Latin1_General_CI_AS_KS_WS` 16; `SQL_Latin1_General_CP1_CI_AS` 46;
+  `SQL_Latin1_General_CP437_CS_AS` 1. A single guessed database-default mapping is insufficient.
+  Source equality probes distinguish case/accents and `1`/`01`, but equate composed/
+  decomposed accents and trailing spaces; native C text equality does not equate the latter.
+  Source ordering for `01,1,10,2,a,A,e,é` differs from C. Preserve existing databases;
+  qualify a UTF-8 clone, comparison/uniqueness/filter profile and actual indexed continuation.
+  Reproduce source identity/counts with `SELECT name,collation_name FROM sys.databases
+  WHERE name=DB_NAME()` and `SELECT collation_name,count(*) FROM sys.columns WHERE
+  collation_name IS NOT NULL GROUP BY collation_name` in original CRONUS; inspect the
+  Customer entries through `sys.tables t JOIN sys.columns c ON c.object_id=t.object_id`.
 - The window gate explicitly creates UTF-8 storage and tests both C and an ICU
   `und-u-ks-level1` nondeterministic column collation, independently confirming case/
   accent equality. Text equality/ranges, wildcard Code filters, OR filter group -1,

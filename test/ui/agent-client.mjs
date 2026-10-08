@@ -26,6 +26,17 @@ let failureMode = "";
 let workingCommand = "", workingPolls = 0;
 let questionMode = false;
 const workingHtml = command => `<article data-agiru-profile="3" data-view="interaction" data-page="50400" data-handle="page_1" data-revision="9007199254740993" data-state="working" data-call="call_1" data-origin-command="${command}"><h1>Working</h1><output data-unsupported-count="0"></output></article>`;
+
+test("modal receipt metadata binds a same-origin input identity and refuses incomplete or foreign paths", () => {
+  const attributes = ' data-poll="/modal-commands/modal_1/input_1" data-poll-state="pending"';
+  const pending = workingHtml("root_1").replace('><h1>', attributes + '><h1>');
+  assert.deepEqual(parsePage(pending).interaction.poll, { path: "/modal-commands/modal_1/input_1", state: "pending" });
+  assert.ok(renderAscii(parsePage(pending)).includes("receipt=/modal-commands/modal_1/input_1 state=pending"));
+  for (const malformed of [pending.replace('/modal-commands/modal_1/input_1', 'https://foreign.invalid/receipt'),
+    pending.replace(' data-poll-state="pending"', ''), pending.replace('data-poll-state="pending"', 'data-poll-state="complete"')]) {
+    assert.throws(() => parsePage(malformed), error => error.code === "ProfileRefused");
+  }
+});
 const server = createServer(async (request, response) => {
   received.push({ method: request.method, path: request.url, headers: request.headers });
   if (request.url === "/redirect") { response.writeHead(302, { Location: "http://127.0.0.1:1/foreign" }); response.end(); return; }

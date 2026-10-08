@@ -2,14 +2,17 @@
 
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/PageCommandHost.h"
 #include "runtime/PageHostOptions.h"
 #include "runtime/PageHtml.h"
 #include "runtime/UiHost.h"
+#include "type/Action.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Variant.h"
 
 #include "HtmlText.h"
+#include "PageModal.h"
 
 #include <algorithm>
 #include <array>
@@ -114,8 +117,14 @@ void CloseQuestion(const PageHostOptions &options, const PageQuestion &question)
 
 class PageUiHost final : public UiHost {
 public:
-  PageUiHost(const std::shared_ptr<PageCall> &call, PageHostOptions options)
-      : call_(call), options_(std::move(options)) {}
+  PageUiHost(const std::shared_ptr<PageCall> &call,
+             PageHostOptions options,
+             PageHostAuthorization authorization)
+      : call_(call), options_(std::move(options)), authorization_(std::move(authorization)) {}
+
+  Action RunModal(PageInstance &page) override {
+    return RunPageModal(Active(), options_, authorization_, page);
+  }
 
   void QueueMessage(std::string_view text) override {
     auto call = Active();
@@ -221,7 +230,19 @@ private:
 
   std::weak_ptr<PageCall> call_;
   PageHostOptions options_;
+  PageHostAuthorization authorization_;
 };
+
+std::string ModalPollAttributes(const PageCall &call) {
+  for (auto modal = call.modal; modal; modal = modal->parent) {
+    const auto input = modal->input ? modal->input : modal->executing;
+    if (input && (!input->finished || input->error)) {
+      return " data-poll=\"/modal-commands/" + input->modal + "/" + input->command +
+             "\" data-poll-state=\"" + (input->finished ? "failed" : "pending") + "\"";
+    }
+  }
+  return {};
+}
 
 }
 
@@ -237,17 +258,29 @@ void InstallPageDialogs(const Connection &connection) {
 }
 
 std::unique_ptr<UiHost> MakePageUiHost(const std::shared_ptr<PageCall> &call,
-                                       const PageHostOptions &options) {
-  return std::make_unique<PageUiHost>(call, options);
+                                       const PageHostOptions &options,
+                                       const PageHostAuthorization &authorization) {
+  return std::make_unique<PageUiHost>(call, options, authorization);
 }
 
 std::string RenderPageInteraction(const PageCall &call) {
+  const auto poll = ModalPollAttributes(call);
   const auto question = call.question && !call.question->answer ? call.question : nullptr;
+  if (!question && call.modal && !call.modal->busy) {
+    auto html = call.modal->html;
+    const auto end = html.find('>');
+    if (end == std::string::npos || poll.size() > kBytes - std::min(html.size(), kBytes)) {
+      Refuse("UiTransportLimit");
+    }
+    html.insert(end, poll);
+    return AppendPageMessages(call, std::move(html));
+  }
   std::string html = R"(<article data-agiru-profile="3" data-view="interaction" data-page=")";
   html += std::to_string(call.page.Value());
   html += "\" data-handle=\"" + call.pageHandle + "\" data-revision=\"" + call.revision;
   html += "\" data-state=\"" + (question ? question->kind : "working");
   html += "\" data-call=\"" + call.handle + "\" data-origin-command=\"" + call.command + "\"";
+  html += poll;
   if (question) {
     html += " data-dialog=\"" + question->handle + "\" data-default=\"" +
             std::to_string(question->defaultChoice) + "\"";

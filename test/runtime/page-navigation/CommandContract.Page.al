@@ -123,6 +123,88 @@ page 50347 "Command Contract Card"
                         Message('unreachable oversized question');
                 end;
             }
+            action(ModalPick)
+            {
+                trigger OnAction()
+                var
+                    Lookup: Page "Navigation List";
+                    Selected: Record "Navigation Row";
+                begin
+                    Rec.Value += 10;
+                    Rec.Modify();
+                    Selected.SetRange(ID, 2);
+                    Lookup.SetTableView(Selected);
+                    Lookup.LookupMode(true);
+                    if Lookup.RunModal() <> Action::LookupOK then
+                        Error('explicit modal decline');
+                    Lookup.GetRecord(Selected);
+                    Rec.Value := Selected.Value;
+                    Rec.Modify();
+                    Message('Selected row %1.', Selected.ID);
+                end;
+            }
+            action(ModalNested)
+            {
+                trigger OnAction()
+                var
+                    Modal: Page "Navigation Modal";
+                begin
+                    Rec.Value += 10;
+                    Rec.Modify();
+                    Modal.SetMarker(41);
+                    Modal.LookupMode(true);
+                    if Modal.RunModal() <> Action::LookupOK then
+                        Error('explicit modal decline');
+                    Rec.Value := Modal.GetMarker();
+                    Rec.Modify();
+                end;
+            }
+            action(ModalCloseRetry)
+            {
+                trigger OnAction()
+                var
+                    Modal: Page "Navigation Modal";
+                begin
+                    Rec.Value += 10;
+                    Rec.Modify();
+                    Modal.SetMarker(41);
+                    Modal.RequireCloseRetries();
+                    Modal.LookupMode(true);
+                    if Modal.RunModal() <> Action::LookupOK then
+                        Error('explicit modal decline');
+                    Rec.Value := Modal.GetCloseCount();
+                    Rec.Modify();
+                end;
+            }
+            action(ModalFail)
+            {
+                trigger OnAction()
+                var
+                    Lookup: Page "Navigation List";
+                begin
+                    Rec.Value += 10;
+                    Rec.Modify();
+                    Lookup.LookupMode(true);
+                    Lookup.RunModal();
+                    Error('failure after modal');
+                end;
+            }
+            action(ModalCommitFail)
+            {
+                trigger OnAction()
+                var
+                    Lookup: Page "Navigation List";
+                begin
+                    Rec.Value += 10;
+                    Rec.Modify();
+                    Commit();
+                    Lookup.LookupMode(true);
+                    Lookup.RunModal();
+                    Rec.Value += 100;
+                    Rec.Modify();
+                    Error('failure after committed modal');
+                end;
+            }
         }
     }
 
