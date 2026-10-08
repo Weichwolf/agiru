@@ -9,19 +9,24 @@ trap 'find "$proof" -type f \( -name "*.o" -o -name "runner" -o -name "control" 
 printf 'xmlport-import: receipts %s\n' "$proof"
 sha256sum test/runtime/xmlport-import.sh test/runtime/xmlport-import/* \
   src/gen/{BodyWriter,PageWriter}.cpp "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
+  src/rt/XmlPort.cpp include/runtime/XmlPort.h \
   "$B/libagiru_db.so" "$B/libagiru_net.so" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
-for profile in default-false default-true omitted temporary; do
+for profile in default-false default-true omitted temporary schema-false schema-true; do
   case_root="$proof/$profile"
   mkdir -p "$case_root/source"
   cp test/runtime/xmlport-import/Fixture.Table.al "$case_root/source/Fixture.Table.al"
   cp test/transpiler/native-enums/source/app.json "$case_root/source/app.json"
   defaults=true
   temporary=false
-  if [ "$profile" = default-false ]; then defaults=false; fi
-  if [ "$profile" = temporary ]; then temporary=true; fi
+  if [ "$profile" = default-false ] || [ "$profile" = schema-false ]; then defaults=false; fi
+  if [ "$profile" = temporary ] || [[ "$profile" == schema-* ]]; then temporary=true; fi
   awk -v defaults="$defaults" -v temporary="$temporary" -v profile="$profile" '
+    /UseRequestPage = false;/ && profile ~ /^schema-/ {
+      print "    InlineSchema = " defaults ";";
+      print "    UseLax = " defaults ";";
+    }
     /DefaultFieldsValidation = false;/ {
       changed++;
       if (profile == "omitted") next;
@@ -58,7 +63,55 @@ for profile in default-false default-true omitted temporary; do
   "$CXX" "${flags[@]}" -c test/runtime/xmlport-import/Runner.cpp -o "$case_root/runner.o"
   "$CXX" "${flags[@]}" "$case_root/runner.o" "${objects[@]}" "$port" \
     "${links[@]}" -o "$case_root/runner"
-  "$case_root/runner" "$dsn" "$temporary" "$defaults" | tee "$case_root/execution.log"
+  "$case_root/runner" "$dsn" "$temporary" "$defaults" "$profile" | tee "$case_root/execution.log"
+  if [[ "$profile" == schema-* ]]; then
+    definition="$case_root/generated/fixture/fixture/xmlport/ImportValidationConsumer.def.cpp"
+    for control in missing-schema-flags ignored-schema-import ignored-inline-export; do
+      control_sources=("${objects[@]}" "$port")
+      if [ "$control" = missing-schema-flags ]; then
+        awk '
+          /\.useLax =/ { changed++; next }
+          { print }
+          END { if (changed != 1) exit 2 }
+        ' "$definition" > "$case_root/mutant.cpp"
+        control_sources=()
+        for object in "${objects[@]}"; do
+          if [ "$object" != "$case_root/ImportValidationConsumer.def.cpp.o" ]; then
+            control_sources+=("$object")
+          fi
+        done
+        control_sources+=("$port")
+        control_include="-I$(dirname "$definition")"
+      else
+        if [ "$control" = ignored-inline-export ] && [ "$profile" = schema-false ]; then continue; fi
+        awk -v control="$control" '
+          control == "ignored-schema-import" && /if \(def.useLax.has_value\(\)\)/ {
+            sub(/def.useLax.has_value\(\)/, "false"); changed++
+          }
+          control == "ignored-inline-export" && /def.format == XmlPortFormat::Xml && def.inlineSchema/ {
+            sub(/def.inlineSchema/, "false"); changed++
+          }
+          { print }
+          END { if (changed != 1) exit 2 }
+        ' src/rt/XmlPort.cpp > "$case_root/mutant.cpp"
+        control_include=-Isrc/rt
+      fi
+      "$CXX" "${flags[@]}" "$control_include" "$case_root/runner.o" \
+        "${control_sources[@]}" "$case_root/mutant.cpp" "${links[@]}" -o "$case_root/control"
+      status=0
+      "$case_root/control" "$dsn" "$temporary" "$defaults" "$profile" \
+        > "$case_root/$control.log" 2>&1 || status=$?
+      [ "$status" -eq 1 ]
+      case "$control" in
+        missing-schema-flags) expected='generated schema flags retain both explicit Boolean declarations' ;;
+        ignored-schema-import) expected='generated schema imports refuse before assigning fields' ;;
+        ignored-inline-export) expected='generated inline schema exports refuse before writing destination bytes' ;;
+      esac
+      rg -q "$expected" "$case_root/$control.log"
+      sha256sum "$case_root/mutant.cpp" "$case_root/control" >> "$proof/controls.sha256"
+      rm -- "$case_root/mutant.cpp" "$case_root/control"
+    done
+  fi
   mkdir -p "$B/fixture-commands"
   jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/xmlport-import/Runner.cpp" \
     --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
@@ -93,7 +146,7 @@ for profile in default-false default-true omitted temporary; do
     "$CXX" "${flags[@]}" "-I$(dirname "$port")" "$case_root/runner.o" "${objects[@]}" \
       "$case_root/mutant.cpp" "${links[@]}" -o "$case_root/control"
     status=0
-    "$case_root/control" "$dsn" "$temporary" "$defaults" \
+    "$case_root/control" "$dsn" "$temporary" "$defaults" "$profile" \
       > "$case_root/$control.log" 2>&1 || status=$?
     [ "$status" -eq 1 ]
     case "$control" in
@@ -124,4 +177,4 @@ for profile in default-false default-true omitted temporary; do
   fi
 done
 sha256sum --check "$proof/inputs.sha256" > "$proof/input-integrity.log"
-printf 'xmlport-import: generated field/attribute assignment, validation/defaults, temporary import and explicit Validate pass; five execution controls and aggregate-construction defect reject; %s\n' "$proof"
+printf 'xmlport-import: field/attribute assignment, validation/defaults, temporary import and explicit schema policies pass; ten execution controls and aggregate-construction defect reject; %s\n' "$proof"

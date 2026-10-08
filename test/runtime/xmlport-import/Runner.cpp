@@ -1,5 +1,6 @@
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
+#include "runtime/XmlPort.h"
 #include "type/Blob.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
@@ -15,6 +16,7 @@
 namespace {
 using Consumer = agiru::Fixture::ImportValidationConsumer_XmlPort;
 constexpr agiru::Integer kRejectedFixtureValue = 99;
+constexpr int kArgumentCount = 5;
 
 void Import(Consumer &consumer, std::string_view value) {
   agiru::Blob source;
@@ -93,14 +95,56 @@ void ErrorsAndExplicitValidation(bool temporary) {
     CHECK_TRUE("ordinary explicit Validate on a temporary record is not bypassed", explicitRefused);
   }
 }
+
+void ExplicitSchemaPolicies(bool inlineSchema) {
+  const auto &definition = agiru::XmlPortTraits<Consumer>::kPort;
+  CHECK_TRUE("generated schema flags retain both explicit Boolean declarations",
+             definition.inlineSchema == inlineSchema && definition.useLax.has_value() &&
+                 *definition.useLax == inlineSchema);
+  Consumer consumer{};
+  std::string error;
+  try {
+    Import(consumer, "10");
+  } catch (const agiru::Error &failure) { error = failure.what(); }
+  CHECK_TEXT("generated schema imports refuse before assigning fields or running insert triggers",
+             error,
+             std::string("XmlPort.Import: UseLax=") + (inlineSchema ? "true" : "false") +
+                 " requires XML schema validation");
+  CHECK_TRUE("refused schema imports leave assignment and insert counters untouched",
+             consumer.ValueObserved() == 0 && consumer.OtherObserved() == 0 &&
+                 consumer.InsertBoundaries() == 0);
+  agiru::Blob destination;
+  agiru::OutStream output;
+  destination.CreateOutStream(output, agiru::TextEncoding::UTF8);
+  error.clear();
+  try {
+    CHECK_TRUE("generated schema export succeeds when no inline XSD is requested",
+               consumer.Export(output));
+  } catch (const agiru::Error &failure) { error = failure.what(); }
+  CHECK_TEXT("generated inline schema exports refuse before writing destination bytes",
+             error,
+             inlineSchema ? "XmlPort.Export: InlineSchema=true requires XML schema generation"
+                          : "");
+  agiru::InStream input;
+  destination.CreateInStream(input, agiru::TextEncoding::UTF8);
+  const std::string written = agiru::detail::ReadWhole(input);
+  CHECK_TRUE("refused export is empty; accepted export contains its declared XML root",
+             inlineSchema ? written.empty() : written.find("<Root") != std::string::npos);
+}
 }
 
 int main(int argc, char **argv) {
   return gate::Run("Generated XMLport Import", [argc, argv] {
-    if (argc != 4) { throw std::runtime_error("expected gate DSN, temporary and default flags"); }
+    if (argc != kArgumentCount) {
+      throw std::runtime_error("expected gate DSN, temporary/default flags and profile");
+    }
     const agiru::Session session(argv[1]);
     const bool temporary = std::string_view(argv[2]) == "true";
     const bool defaults = std::string_view(argv[3]) == "true";
+    if (std::string_view(argv[4]).starts_with("schema-")) {
+      ExplicitSchemaPolicies(defaults);
+      return;
+    }
     ValuesAndOrder(temporary, defaults);
     ErrorsAndExplicitValidation(temporary);
   });

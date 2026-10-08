@@ -50,6 +50,19 @@ tests and agent business workflows on sealed disposable databases.
 
 ## Evidence and acceptance
 
+- XMLport schema flags are retained in `XmlPortDef`: `InlineSchema=false` exports omit
+  XSD; true XML exports and explicitly declared strict/lax XML imports refuse missing
+  schema generation/validation. Text formats are unaffected; omitted-mode XML imports
+  remain unqualified. `make xmlport-import JOBS=2` in the development container passes
+  GenXmlPort/XmlPort 34/170 and 101 generated execution checks; ten execution defects
+  and one construction defect reject. Nine property/attribute audit tests pass; all six
+  affected C++ units pass focused tidy. Sources: `include/runtime/XmlPort.h`,
+  `src/{gen/BodyWriter,rt/XmlPort,tc/Main}.cpp`, `test/runtime/xmlport-import/`,
+  `test/gate/{GenXmlPort,XmlPort}Gate.cpp`, `test/tooling/toolchain.py`.
+  Developer `properties/devenv-{inlineschema,uselax}-property.md` at `f928288ee840`;
+  BCApps `Layers/W1/Tests/TestRunner-Internal/CoverageResults{Detailed,Summary}.XmlPort.al`
+  at `d99152ee35f0`; predecessor `board/docaudit/03_properties.tsv` identifies incomplete
+  fixed-schema output/absent validation. This is not complete XMLport qualification.
 - Refreshed predecessor 1945/1948/1957 rejects priority-queue reordering and image
   GC freezing on end-to-end evidence. Do not import interpreter/GIL workarounds.
   Retain ANALYZE after seed restoration, immutable metadata/parameterized plans,

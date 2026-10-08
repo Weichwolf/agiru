@@ -637,6 +637,12 @@ constexpr std::string_view kLayoutObsoletionStatus =
     "pending (board:0063,0033)";
 
 constexpr std::array kPartlyTranslatedProperties{
+    std::pair{std::string_view{"page.inlineschema"},
+              std::string_view{"immutable XMLport flag; false exports omit XSD; true XML exports "
+                               "refuse pending schema generation (board:0721)"}},
+    std::pair{std::string_view{"page.uselax"},
+              std::string_view{"explicit XMLport mode retained; exports unaffected; XML imports "
+                               "refuse pending strict/lax validation (board:0721)"}},
     std::pair{std::string_view{"field.sqltimestamp"},
               std::string_view{
                   "stored BigInteger aliases share the SQL allocator/physical column; "

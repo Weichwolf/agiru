@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -85,6 +86,11 @@ struct XmlPortDef {
   ///        (`devenv-namespaces-property.md`: "the namespaces declarations are only supported in
   ///        the root element"); an element's `NamespacePrefix` is part of its XmlName.
   std::span<const XmlNamespaceDef> namespaces{};
+  /// \brief `InlineSchema`; false exports omit XSD, true explicitly refuses pending generation.
+  bool inlineSchema = false;
+  /// \brief Explicit `UseLax` declaration; either XML import mode refuses pending validation.
+  /// An omitted declaration retains the existing, separately unqualified import behaviour.
+  std::optional<bool> useLax{};
 };
 
 /// \brief `currXMLport.Break()` in flight: ends the current table element's loop.

@@ -131,12 +131,10 @@ std::string Collapsed(const std::string &text) {
 /// element is a record member and a text element a `Text` variable, an element's triggers stand
 /// on the enclosing table element's record as `Rec`, and the schema is walked out (`Export_`)
 /// and in (`Import_`) through the output and input cursors.
-void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
-  agiru::al::PageObject port = agiru::al::ParseXmlPort(kSource);
-  agiru::gen::PrepareXmlPort(port);
+void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk(const agiru::al::PageObject &port,
+                                                        const agiru::gen::Objects &objects) {
   CHECK_TRUE("the table element became a record variable",
              agiru::gen::DataItemVariable(port, "Some Line") != nullptr);
-  const agiru::gen::Objects objects = Tables();
   const agiru::gen::PageHeader header =
       agiru::gen::WritePage(port, "Inventory/Counting/ExportSomeLines.XmlPort.al", objects);
   CHECK_TRUE(
@@ -155,7 +153,10 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
              Has(header.text,
                  "static constexpr const XmlPortDef &kPort = "
                  "agiru::Inventory::Counting::kExportSomeLinesXmlPort;"));
+}
 
+void GeneratedSchemaWalkPreservesTriggersAndRecords(const agiru::al::PageObject &port,
+                                                    const agiru::gen::Objects &objects) {
   const std::string source = agiru::gen::WriteSource(
       port, "Inventory/Counting/ExportSomeLines.XmlPort.al", objects, nullptr);
   CHECK_TRUE("a field trigger stands on the table element's record",
@@ -248,8 +249,42 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
              Has(definitions, "RegisterXmlPort<ExportSomeLines_XmlPort> kInXmlPortCatalogue;"));
 }
 
+void SchemaPoliciesRetainExplicitValuesAndAbsence() {
+  const agiru::gen::Objects objects;
+  for (const std::string_view value : {"false", "true"}) {
+    const std::string source = "xmlport 50002 SchemaPolicy { Direction = Export; "
+                               "InlineSchema = " +
+                               std::string(value) + "; UseLax = " + std::string(value) +
+                               "; schema { textelement(Root) {} } }";
+    auto port = agiru::al::ParseXmlPort(source);
+    agiru::gen::PrepareXmlPort(port);
+    const std::string definitions =
+        agiru::gen::WriteDefinitions(port, "SchemaPolicy.XmlPort.al", objects, nullptr);
+    CHECK_TRUE("InlineSchema retains the declared Boolean value",
+               Has(definitions, ".inlineSchema = " + std::string(value) + ","));
+    CHECK_TRUE("UseLax retains the declared Boolean value",
+               Has(definitions, ".useLax = " + std::string(value) + ","));
+  }
+  auto port =
+      agiru::al::ParseXmlPort("xmlport 50002 SchemaPolicy { schema { textelement(Root) {} } }");
+  agiru::gen::PrepareXmlPort(port);
+  const std::string definitions =
+      agiru::gen::WriteDefinitions(port, "SchemaPolicy.XmlPort.al", objects, nullptr);
+  CHECK_TRUE("omitted InlineSchema does not request inline XSD",
+             Has(definitions, ".inlineSchema = false,"));
+  CHECK_TRUE("omitted UseLax does not claim implemented schema validation",
+             !Has(definitions, ".useLax ="));
+}
+
 }
 
 int main() {
-  return gate::Run("GenXmlPort", [] { TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk(); });
+  return gate::Run("GenXmlPort", [] {
+    agiru::al::PageObject port = agiru::al::ParseXmlPort(kSource);
+    agiru::gen::PrepareXmlPort(port);
+    const agiru::gen::Objects objects = Tables();
+    TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk(port, objects);
+    GeneratedSchemaWalkPreservesTriggersAndRecords(port, objects);
+    SchemaPoliciesRetainExplicitValuesAndAbsence();
+  });
 }

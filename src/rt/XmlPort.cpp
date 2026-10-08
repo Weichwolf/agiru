@@ -5,6 +5,7 @@
 #include "dotnet/XmlNode.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Report.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
@@ -106,6 +107,9 @@ void XmlPortOutput::Start(const XmlPortDef &def,
 }
 
 void XmlPortOutput::Start(const XmlPortDef &def, const detail::XmlPortSeparators &separators) {
+  if (def.format == XmlPortFormat::Xml && def.inlineSchema) {
+    throw Error("XmlPort.Export: InlineSchema=true requires XML schema generation");
+  }
   def_ = def;
   fieldSeparator_ = std::string(separators.field);
   recordSeparator_ = std::string(separators.record);
@@ -270,6 +274,10 @@ void XmlPortInput::Load(std::string_view bytes,
   if (textFormat_) {
     ParseLines(bytes, separators);
     return;
+  }
+  if (def.useLax.has_value()) {
+    throw Error(std::string("XmlPort.Import: UseLax=") + (*def.useLax ? "true" : "false") +
+                " requires XML schema validation");
   }
   ParseXml(bytes);
 }

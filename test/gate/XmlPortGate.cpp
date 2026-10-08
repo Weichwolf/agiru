@@ -251,6 +251,50 @@ void TheNamespacesAreDeclaredOnTheRoot() {
 
 /// `Xmlport.Export(Number, ...)` resolves through the catalogue; a number this build carries no
 /// xmlport for refuses with the number (board:0034).
+void SchemaPoliciesDoNotSilentlyBecomeSuccessfulNoOps() {
+  XmlPortOutput out;
+  for (const bool useLax : {false, true}) {
+    const XmlPortDef exportDef{
+        .format = XmlPortFormat::Xml, .inlineSchema = false, .useLax = useLax};
+    out.Start(exportDef, ",", "\r\n", "\"", "\r\n\r\n");
+    out.BeginGroup("Root");
+    out.Value("Value", "123", false, 0);
+    out.EndGroup("Root");
+    CHECK_TEXT(
+        "explicit UseLax does not affect exports without inline XSD",
+        out.Finish(),
+        R"(<?xml version="1.0" encoding="utf-8" standalone="yes"?><Root><Value>123</Value></Root>)");
+    XmlPortInput input;
+    std::string error;
+    try {
+      input.Load("<Root><Value>123</Value></Root>", exportDef, ",", "\r\n", "\"");
+    } catch (const agiru::Error &failure) { error = failure.what(); }
+    CHECK_TEXT("explicit UseLax imports refuse missing schema validation",
+               error,
+               std::string("XmlPort.Import: UseLax=") + (useLax ? "true" : "false") +
+                   " requires XML schema validation");
+  }
+  std::string error;
+  try {
+    out.Start(XmlPortDef{.inlineSchema = true}, ",", "\r\n", "\"", "\r\n\r\n");
+  } catch (const agiru::Error &failure) { error = failure.what(); }
+  CHECK_TEXT("InlineSchema=true refuses instead of omitting the requested XSD",
+             error,
+             "XmlPort.Export: InlineSchema=true requires XML schema generation");
+  const XmlPortDef textDef{
+      .format = XmlPortFormat::VariableText, .inlineSchema = true, .useLax = false};
+  XmlPortInput text;
+  text.Load("123\r\n", textDef, ",", "\r\n", "");
+  CHECK_TRUE("XML-only schema validation does not reject text imports", text.Enter("Row"));
+  CHECK_TRUE("text field remains available", text.Enter("Value"));
+  CHECK_TEXT("text field retains its value", text.Text(), "123");
+  out.Start(textDef, ",", "\r\n", "", "\r\n\r\n");
+  out.BeginRecord("Row");
+  out.Value("Value", "123", false, 0);
+  out.EndRecord("Row");
+  CHECK_TEXT("XML-only inline schema does not reject text exports", out.Finish(), "123\r\n");
+}
+
 void AnUnknownNumberRefusesByName() {
   CHECK_TRUE("no xmlport 999999",
              agiru::FindXmlPort(agiru::XmlPortId{kUnknownPortNumber}) == nullptr);
@@ -278,6 +322,7 @@ int main() {
     TheInputWalksTextAndXmlAlike();
     TextInputRetainsBoundaryFields();
     TheNamespacesAreDeclaredOnTheRoot();
+    SchemaPoliciesDoNotSilentlyBecomeSuccessfulNoOps();
     AnUnknownNumberRefusesByName();
   });
 }

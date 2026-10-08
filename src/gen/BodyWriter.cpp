@@ -4081,6 +4081,12 @@ std::string XmlPortDeclaration(const al::PageObject &page,
     out += "    .useDefaultNamespace = true,\n";
   }
   if (!namespaces.empty()) { out += "    .namespaces = k" + identifier + "Namespaces,\n"; }
+  out += "    .inlineSchema = " +
+         std::string(LowerKey(text("InlineSchema", "false")) == "true" ? "true" : "false") + ",\n";
+  if (const al::Property *useLax = al::Find(page.properties, "UseLax")) {
+    out +=
+        "    .useLax = " + std::string(LowerKey(useLax->text) == "true" ? "true" : "false") + ",\n";
+  }
   out += "};\n\n} // namespace " + space + "\n\n";
   return out;
 }

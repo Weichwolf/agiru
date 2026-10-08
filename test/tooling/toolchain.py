@@ -1421,6 +1421,23 @@ class TranspilerAttributeCensusGate(unittest.TestCase):
     def test_empty_population_is_zero(self):
         self.assert_census('procedure A() begin end;', (0, 0, 0, 0, 0))
 
+    def test_xmlport_schema_modes_are_retained_and_counted_as_partial(self):
+        for value in ('false', 'true'):
+            with self.subTest(value=value):
+                (self.root / 'source/SchemaPolicy.XmlPort.al').write_text(
+                    'namespace Microsoft.Fixture;\nxmlport 50141 SchemaPolicy { '
+                    f'Direction = Export; InlineSchema = {value}; UseLax = {value}; '
+                    'schema { textelement(Root) {} } }')
+                result = subprocess.run(
+                    [str(self.transpiler), str(self.root), str(self.root / 'apps.json'),
+                     str(self.root / 'generated')], text=True, capture_output=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                for property_name, member in (('inlineschema', 'inlineSchema'), ('uselax', 'useLax')):
+                    self.assertRegex(result.stdout, rf'partly\s+1 x page\.{property_name} --')
+                    definition = self.root / 'generated/fixture/fixture/xmlport/SchemaPolicy.def.cpp'
+                    self.assertIn(f'.{member} = {value},', definition.read_text())
+                self.assertNotIn('ABORT', result.stdout)
+
     def test_acknowledged_kind_counts_its_observed_declarations(self):
         self.assert_census('[Normal] procedure A() begin end;\n'
                            '[Normal] procedure B() begin end;', (0, 1, 2, 0, 0))
