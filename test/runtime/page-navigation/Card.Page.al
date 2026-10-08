@@ -22,6 +22,10 @@ page 50340 "Navigation Card"
     begin
         OpeningMode := CurrPage.Editable;
     end;
+    trigger OnNewRecord(BelowxRec: Boolean)
+    begin
+        Rec.Value := 314;
+    end;
     trigger OnAfterGetRecord()
     begin
         LoadedValue := Rec.Value;

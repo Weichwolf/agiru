@@ -246,3 +246,26 @@ test("Customer edits retain full row population and durable command receipts", a
   assert.ok(BigInt(await sql("SELECT count(*) FROM agiru_client.page_commands WHERE outcome='complete'")) >= 4n);
   assert.equal(await sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database()"), "1");
 });
+
+test("original Customer New exposes the explicit template selection before creating a customer", { timeout: 30000 }, async () => {
+  assert.equal(await sql('SELECT count(*) FROM "Customer Templ."'), "3",
+    "the unchanged reference seed requires an explicit choice, not a single-template shortcut");
+  assert.equal(await sql('SELECT "Default Nos." FROM "No. Series" WHERE "Code" IN ' +
+    '(SELECT "Customer Nos." FROM "Sales & Receivables Setup")'), "t");
+  const before = await sql('SELECT count(*) FROM "Customer"');
+  try {
+    const fresh = JSON.parse((await cmd("read", target)).stdout);
+    const selected = JSON.parse((await cmd("execute", operation(fresh, "$agiru.new"))).stdout);
+    assert.equal(selected.page.page, "1380", "the active modal must be the original template list");
+    const templates = JSON.parse(await sql(`SELECT json_agg(row_to_json(t)) FROM
+      (SELECT "Code" AS code,"Description" AS description FROM "Customer Templ." ORDER BY "Code" LIMIT 40) t`));
+    assert.deepEqual(selected.page.rows.map(row => ({
+      code: row.controls.find(control => control.identity === "Code")?.scalar?.value,
+      description: row.controls.find(control => control.identity === "Description")?.scalar?.value,
+    })), templates);
+    await writeFile(`${proof}/customer-template-selection.json`, JSON.stringify(selected));
+  } finally {
+    assert.equal(await sql('SELECT count(*) FROM "Customer"'), before,
+      "no automatic template choice or customer insertion before the explicit answer");
+  }
+});

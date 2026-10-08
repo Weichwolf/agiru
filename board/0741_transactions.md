@@ -2,10 +2,11 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: qualify disabled native callbacks, shutdown rollback, progress/modal execution
-and the remaining optimistic-write/isolation contracts. Original Customer now passes
-7/7 HTTP/CMD/MCP/Chromium cases under 0720, including interactive Card No., exact
-SQL-backed edits and pre-AL Permission/refused admission; New/template remains due.
+Next: implement native modal execution for Customer New/template under 0720;
+qualify disabled native callbacks, shutdown rollback, progress execution and the
+remaining optimistic-write/isolation contracts. Original Customer retains seven
+passing list/card/edit/permission/receipt cases and one new, unsuppressed modal failure.
+The New command's failed AL boundary retains all 68 customers in independent SQL.
 Repeat counted AL execution after the verified SelectLatestVersion increment below;
 retain every startup refusal and test identity. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;

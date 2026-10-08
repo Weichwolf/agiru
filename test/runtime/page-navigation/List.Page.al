@@ -4,6 +4,7 @@ page 50341 "Navigation List"
 {
     PageType = List;
     Editable = false;
+    InsertAllowed = false;
     SourceTable = "Navigation Row";
     CardPageId = "Navigation Card";
     layout

@@ -309,6 +309,19 @@ PageHostOperation Opening(PageOpenMode mode) {
   Refuse("PageHostInput");
 }
 
+bool Insertable(const PageDef &page) {
+  if (page.insertAllowed.empty()) { return true; }
+  const auto equal = [&](std::string_view literal) {
+    return std::ranges::equal(page.insertAllowed, literal, [](char left, char right) {
+      const char lower = left >= 'A' && left <= 'Z' ? static_cast<char>(left - 'A' + 'a') : left;
+      return lower == right;
+    });
+  };
+  if (equal("true")) { return true; }
+  if (equal("false")) { return false; }
+  Refuse("PageHostUnsupported");
+}
+
 unsigned Status(std::string_view code) {
   if (code == "PageHostAuthentication" || code == "SessionIdentity") { return kUnauthorized; }
   if (code == "PageHostPermission" || code == "Permission") { return kForbidden; }
@@ -594,6 +607,11 @@ struct PageCommandHost::Impl {
     }
     if (page.Declaration().cardPageId.Value() != 0) {
       actions.push_back({"$agiru.card", "Edit card"});
+      const auto *card = FindPage(page.Declaration().cardPageId);
+      if (card != nullptr && card->page->source == page.Declaration().source &&
+          Insertable(*card->page)) {
+        actions.push_back({"$agiru.new", "New"});
+      }
     }
     if (!context.parents.empty()) { actions.push_back({"$agiru.back", "Back"}); }
     Authorization authority(page.Declaration(), authorize);
@@ -683,7 +701,9 @@ struct PageCommandHost::Impl {
       admission.CompanyName(options.company);
       admission.TablePermissions(tableAuthority);
       SessionCommand command(admission, connection);
-      authorize(*entry->page, Opening(Mode(*entry->page, Get(values, "mode"))), {});
+      const auto mode = Mode(*entry->page, Get(values, "mode"));
+      authorize(*entry->page, Opening(mode), {});
+      if (mode == PageOpenMode::New && !Insertable(*entry->page)) { Refuse("PageHostUnsupported"); }
       command.Keep();
     } catch (const Error &error) {
       throw CommandFailure(
@@ -800,7 +820,7 @@ struct PageCommandHost::Impl {
     loader.Current(context.page->CurrentRecord(), context.page->Controls());
   }
 
-  void OpenCard(Context &context) const {
+  void OpenCard(Context &context, PageOpenMode mode) const {
     auto &page = *context.page;
     if (context.parents.size() >= options.navigationDepth) { Refuse("PageHostCapacity"); }
     const auto &source = page.Declaration();
@@ -808,11 +828,14 @@ struct PageCommandHost::Impl {
     authorize(source, PageHostOperation::Read, {});
     auto card = MakeInstalledPage(source.cardPageId);
     if (card->Declaration().source != source.source) { Refuse("PageHostUnsupported"); }
-    authorize(card->Declaration(), PageHostOperation::OpenEdit, {});
-    const RecordId record = page.CurrentRecord();
-    if (record.IsEmpty()) { Refuse("PageHostMissing"); }
-    card->Open(PageOpenMode::Edit);
-    if (!card->SelectRecord(record)) { Refuse("PageHostMissing"); }
+    authorize(card->Declaration(), Opening(mode), {});
+    if (mode == PageOpenMode::New && !Insertable(card->Declaration())) {
+      Refuse("PageHostUnsupported");
+    }
+    const RecordId record = mode == PageOpenMode::Edit ? page.CurrentRecord() : RecordId{};
+    if (mode == PageOpenMode::Edit && record.IsEmpty()) { Refuse("PageHostMissing"); }
+    card->Open(mode);
+    if (mode == PageOpenMode::Edit && !card->SelectRecord(record)) { Refuse("PageHostMissing"); }
     context.parents.push_back({.page = std::move(context.page), .list = std::move(context.list)});
     context.page = std::move(card);
     context.list.reset();
@@ -847,7 +870,11 @@ struct PageCommandHost::Impl {
       return;
     }
     if (control == "$agiru.card") {
-      OpenCard(context);
+      OpenCard(context, PageOpenMode::Edit);
+      return;
+    }
+    if (control == "$agiru.new") {
+      OpenCard(context, PageOpenMode::New);
       return;
     }
     if (control == "$agiru.back") {

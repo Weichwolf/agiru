@@ -377,7 +377,7 @@ if (nativeApplication) {
     await operator("client-init");
     assert.equal(await sql('SELECT count(*) FROM "User"'), "2");
     assert.equal(await sql('SELECT count(*) FROM "Access Control"'), "2");
-    assert.equal(await sql('SELECT count(*) FROM "Tenant Permission"'), "7");
+    assert.equal(await sql('SELECT count(*) FROM "Tenant Permission"'), "9");
   });
 
   test("operator credential issuance authenticates an existing account without granting writes", async () => {
@@ -752,4 +752,94 @@ test("native question HTML byte refusal rolls back before publishing an unreacha
     error.code === "PageHtmlLimit" && error.outcome === "failed" && error.command === selected.command);
   assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
   assert.equal(await sql(`SELECT count(*) FROM agiru_client.page_dialogs WHERE command_id='${selected.command}'`), "0");
+});
+
+test("linked card New runs AL initialization and saves exactly one new row across CMD MCP and htmx", async () => {
+  const population = await sql('SELECT count(*) FROM "Navigation Row"');
+  for (const [index, adapter] of ["CMD", "MCP", "web"].entries()) {
+    const id = String(1001 + index);
+    const browser = adapter === "web" ? await launchBrowser() : undefined;
+    let mcp, web;
+    try {
+      const fresh = await client.read("/?page=50341");
+      assert.equal(operation(fresh, "$agiru.new").enabled, true,
+        "linked Card InsertAllowed, not the noneditable List's false property, supplies New");
+      if (adapter === "web") {
+        web = await openBrowserPage(browser, origin, path(fresh), first.authorization);
+        await assertBrowserPage(web.page, fresh.page);
+      }
+      if (adapter === "MCP") {
+        const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
+        const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"));
+        const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"));
+        mcp = new Client({ name: "agiru-new-card-gate", version: "1" });
+        await mcp.connect(new StdioClientTransport({ command: process.execPath, args: ["build/client/mcp.mjs"],
+          env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } }));
+      }
+      const invoke = async (view, name, text) => {
+        if (adapter === "web") return text === undefined
+          ? browserAction(web.page, origin, view.page, name)
+          : browserSet(web.page, origin, view.page, name, text);
+        const { enabled: _enabled, ...selected } = operation(view, name);
+        const input = { path: path(view), ...selected, ...(text === undefined ? {} : { text }) };
+        if (adapter === "CMD") {
+          const reply = await execute(process.execPath, ["build/client/cmd.mjs", "--json", "execute", JSON.stringify(input)],
+            { env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } });
+          assert.equal(reply.stderr, "");
+          return JSON.parse(reply.stdout);
+        }
+        const reply = await mcp.callTool({ name: "agiru_execute", arguments: input });
+        assert.notEqual(reply.isError, true, JSON.stringify(reply.structuredContent));
+        return reply.structuredContent;
+      };
+      const create = commandEnvelope(fresh.page, operation(fresh, "$agiru.new"));
+      let created = await invoke(fresh, "$agiru.new");
+      assert.equal(created.page.page, "50340");
+      assert.equal(created.page.handle, fresh.page.handle);
+      assert.equal(field(created, "ID"), "0", "New must not select or copy an existing key");
+      assert.equal(field(created, "Value"), "314", "original OnNewRecord supplies initialization");
+      assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), population, "opening is not an insertion");
+      const replay = await fetch(origin + create.path, { method: "POST", headers: {
+        ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(create.fields) });
+      assert.equal(replay.status, 200);
+      assert.deepEqual(parsePage(await replay.text()), created.page, "New replay must not reopen AL");
+      created = await invoke(created, "ID", id);
+      created = await invoke(created, "Value", "62");
+      created = await invoke(created, "$agiru.save");
+      assert.equal(await sql(`SELECT "Value"::text || '|' || "SystemCreatedBy"::text
+        FROM "Navigation Row" WHERE "ID"=${id}`), "62|00000000-0000-0000-0000-000000000001");
+      assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), String(BigInt(population) + 1n));
+      assert.deepEqual(await client.read(path(created)), created);
+      const back = await invoke(created, "$agiru.back");
+      assert.equal(back.page.page, "50341");
+      assert.equal(field(back, "ID"), field(fresh, "ID"), "creation must not mutate the retained list's selected key");
+      if (adapter === "web") await assertBrowserPage(web.page, back.page);
+    } finally {
+      await web?.page.close();
+      await browser?.close();
+      await mcp?.close();
+      await sql(`DELETE FROM "Navigation Row" WHERE "ID"=${id}`);
+    }
+  }
+  const blank = await client.read("/?page=50341");
+  const created = await client.execute(path(blank), operation(blank, "$agiru.new"));
+  await client.execute(path(created), operation(created, "$agiru.back"));
+  assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), population, "unedited New must not insert a blank record");
+});
+
+test("linked card InsertAllowed false refuses New and direct Create before AL insertion", async () => {
+  const population = await sql('SELECT count(*) FROM "Navigation Row"');
+  const blocked = await client.read("/?page=50344");
+  assert.ok(!blocked.page.controls.some(control => control.identity === "$agiru.new"));
+  const forged = commandEnvelope(blocked.page, operation(blocked, "$agiru.card"));
+  const body = new URLSearchParams(forged.fields);
+  body.set("control", "$agiru.new");
+  const denied = await fetch(origin + forged.path, { method: "POST", headers: {
+    ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body });
+  assert.equal(denied.status, 400);
+  assert.equal(parseFailure(await denied.text()).code, "PageHostUnsupported");
+  await assert.rejects(client.read("/?page=50343&mode=Create"), error =>
+    error.code === "PageHostUnsupported" && error.outcome === "refused");
+  assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), population);
 });

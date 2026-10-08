@@ -4,9 +4,10 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: extend the verified original Customer List → Card → Validate → Save contract
-to New/template selection and lookups for 0727. Qualify progress/modal execution
-through the shared native UI endpoint; preserve generic HTTP/SQL authorization.
+Next: implement native Page.RunModal suspension for the original Customer template
+list (1380), including explicit selection/cancel and GetRecord writeback for 0727.
+Preserve the AL page variable, caller stack/transaction and generic HTTP/SQL authority;
+never substitute a default template, UT handler or client-side business rule.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -77,6 +78,35 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   retaining 1,902 diagnostic-slice unlinked gaps. Native configuration passes 232 checks.
   Targeted clang-tidy is clear for PageCommandHost, NativeServiceConfig, its gate and
   the generated HTTP fixture runner. Full AL execution and original Customer remain due.
+
+## Linked-card creation
+
+- `src/rt/PageCommandHost.cpp` advertises `$agiru.new` from the linked Card's
+  InsertAllowed, not the noneditable List's flag. It opens that installed Card in New
+  mode through the existing AL lifecycle; no selected key is copied. Unknown property
+  expressions refuse. False also refuses forged commands and direct Create admission.
+- `test/ui/page-host.mjs`: New, AL OnNewRecord initialization, exact saved SQL values,
+  authenticated creator, one-row population increase, identical command replay and
+  return to the retained list agree across external CMD/MCP/Chromium. Unedited New
+  does not insert. Existing private state and SQL transaction/receipt boundaries remain.
+- `make page-host-test JOBS=2`: 122 positive HTTP cases at 7/40/80 under both policies,
+  zero red; thirteen compiled defects rejected, including wrong creation mode and
+  ignored Card InsertAllowed. Navigation 183, PageSource 15, PageDispatcher 105 and
+  sixteen execution controls/one compile refusal remain green. Native build and two
+  affected C++ units pass clang-tidy. No production/generated header was widened.
+- Actual Customer acceptance now retains eight cases: seven existing cases pass;
+  New fails with `AlError: Unhandled UI: ModalPage Select Customer Templ. List`,
+  outcome failed and the exact original command identity. Independent SQL retains all
+  68 customers; the unchanged seed has three templates and Default Nos.=true.
+  Native modal execution, template creation, view/filter transfer, empty-list creation,
+  editable lists without CardPageId and post-creation list refresh remain unqualified.
+- References at developer `f928288ee840334be73142e5fc0202c0e19b246d`:
+  `properties/devenv-{cardpageid,insertallowed}-property.md`,
+  `triggers-auto/page/devenv-onnewrecord-page-trigger.md`,
+  `methods-auto/page/page-runmodal--method.md`. BCApps/user revisions below are unchanged.
+  Predecessor `openerp/test/openerp/runtime/test_client_list_new_opens_card.py` and
+  `test_client_untouched_new_line.py`, plus board 1730 comment 5, identify the linked-card,
+  explicit-template and untouched-row contracts; their implementation is not transplanted.
 
 ## Bounded lists and collation
 
@@ -254,18 +284,19 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   Defaults never answer; explicit UT adapters never fall back to production callbacks.
   Independent SQL proves no implicit Commit, rollback of unfinished question execution
   and durability of prior Commit. Nested/detached sessions and worker migration preserve
-  host ownership. No endpoint is yet installed by PageCommandHost: real HTTP suspension,
-  opening admission, modal pages, bounded delivery and automatic progress teardown remain
-  pending. No new production UI or ERP milestone is claimed. References above plus
+  host ownership. The native question/message endpoint and its current proof are
+  described above; modal pages and automatic progress teardown remain pending.
+  References above plus
   `methods-auto/dialog/dialog-{update,close}-method.md`; predecessor threading is not adopted.
   The earlier native `make test JOBS=2` rerun passed 181 cases, zero red, including
   257 tooling tests. Changed-code `make lint JOBS=2`: 28/330 units, zero findings,
-  unchanged suppression count. Current post-callback-policy manifest: 185 cases, one
-  XMLport fixture compile failure; the focused repair and pending rerun are owned by 0741.
-  these gates/fixtures do not execute the source-counted AL UT or qualify actual browsers.
+  unchanged suppression count. Frozen native baseline at `2809174`: 185 cases, zero red,
+  recorded in `e67438a`/0741; it predates native questions and linked-card creation.
+  These gates/fixtures do not execute the source-counted AL UT.
 
-- Original Customer regression: `make erp-client-test JOBS=2`, native question/message
-  endpoint `ba3190a` plus opening-admission repair: **7/7 pass**, none skipped/cancelled.
+- Original Customer regression: `make erp-client-test JOBS=2`, eight cases,
+  **seven pass/one failure**, none skipped/cancelled. New/template remains red above;
+  all seven existing list/card/edit/permission/receipt cases still pass.
   `test/ui/erp-client.mjs` follows the existing asynchronous opening call without
   reopening; `browser-client.mjs` recognizes typed server errors and compares their
   exact text/outcome. Real NativePermissions denial is `Permission/refused` before
