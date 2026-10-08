@@ -652,6 +652,41 @@ void UnselectedNamedPagesDoNotNeedInventedClasses() {
              !body.contains("absent::UnselectedPage{}") && !body.contains("::Run(0"));
 }
 
+void RecordFieldNumbersKeepThePlatformReturnType() {
+  const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
+    codeunit 50316 FieldNumberTypes {
+      procedure Read()
+      var
+        Row: Record "Number Row";
+        Rows: array[2] of Record "Number Row";
+        Peer: Codeunit "Number Peer";
+      begin
+        Consume(Row.FieldNo("Only Number Field"));
+        Consume(Rows[1].fIeLdNo("Only Number Field"));
+        Peer.FieldNo();
+      end;
+      local procedure Consume(Value: Integer)
+      begin
+      end;
+    })");
+  const auto header = agiru::gen::WriteCodeunit(unit, "FieldNumberTypes.Codeunit.al", Tables());
+  const auto body = agiru::gen::WriteCodeunitSource(unit, "FieldNumberTypes.Codeunit.al", Tables());
+  CHECK_TRUE("unavailable record FieldNo has the platform Integer return shape",
+             body.contains("static_cast<::agiru::Integer>(Row.FieldNo(Row.OnlyNumberField))"));
+  CHECK_TRUE(
+      "array record FieldNo retains case-insensitive platform typing",
+      body.contains(
+          "static_cast<::agiru::Integer>(At(Rows, 1).FieldNo(At(Rows, 1).OnlyNumberField))"));
+  CHECK_TRUE("a non-record member named FieldNo is not forced into the platform return type",
+             body.contains("Peer.FieldNo()") &&
+                 !body.contains("static_cast<::agiru::Integer>(Peer.FieldNo())"));
+  CHECK_TRUE("typed FieldNo still retains its missing field and method descriptors",
+             header.absent.at("NumberRow").contains("OnlyNumberField") &&
+                 header.absent.at("NumberRow").contains("FieldNo"));
+  CHECK_TRUE("Integer casts name their own runtime header",
+             body.contains("#include \"type/Integer.h\""));
+}
+
 } // namespace
 
 int main() {
@@ -675,5 +710,6 @@ int main() {
     NativeDeclarationsNeverBecomeSuccessfulEmptyMethods();
     ImplicitRecordFieldsMatchBodyLowering();
     UnselectedNamedPagesDoNotNeedInventedClasses();
+    RecordFieldNumbersKeepThePlatformReturnType();
   });
 }

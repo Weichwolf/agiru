@@ -159,12 +159,10 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `RecordFieldArguments` in `RuntimeSurface.{h,cpp}`, replacing drifting method lists.
   Collection retains bare/quoted fields for ModifyAll, LoadFields, range/filter queries,
   CopyFilter, FieldActive, Relation and AreFieldsLoaded; non-field values are not schema.
-  `make native-codeunits JOBS=2` with the verified System package: generator 57,
-  executable refusals 39, source-bound calls 8 and original Base64 bindings 61 checks,
-  zero red. Ten unavailable-record operations compile and throw before subsequent AL
+  The combined native-codeunit qualifier below covers these calls.
+  Ten unavailable-record operations compile and throw before subsequent AL
   effects; deleting Enabled from generated refusal declarations fails compilation.
   Native-attribute, source-ID, missing-definition and both Base64 controls still reject.
-  `make lint JOBS=2`: 13 affected units, zero findings, suppression baseline unchanged.
   This repairs dependency emission, not the excluded integration or core company-copy
   acceptance. Retain mixed cleanup code and its explicit refusals until qualified.
   References: developer `methods-auto/record/record-{modifyall,loadfields}-method.md`
@@ -183,10 +181,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   cover direct/nested/multidimensional reads, an index with a side effect and Validate's
   implicit field. Refusals retain member identity, evaluate the index once and stop
   before later effects; removing the matrix-only declaration fails compilation.
-  `make native-codeunits JOBS=2` with the verified System package: generator 65,
-  executable refusals 61, source-bound 8 and original Base64 61 checks, zero red;
-  existing negative controls still reject. Three affected C++ units pass clang-tidy,
-  format passes and the suppression baseline remains 12. Mixed-case unavailable type
+  The combined qualifier retains the existing negative controls. Mixed-case unavailable type
   identity and the other production build failures remain open; this is not ERP proof.
   References: developer `methods/devenv-array-methods.md` at `f928288ee840334be73142e5fc0202c0e19b246d`;
   BCApps `main` `src/Layers/W1/Tests/ERM/CopyPriceDataTest.Codeunit.al`, lines 2072/2074,
@@ -198,9 +193,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   +=, -=, *= and /=; `Clear` rejects marked unavailable members/options instead of
   replacing them with a successful default. Six ordinary AL cases retain member
   identity and stop before later effects; removing the operations fails both assertions.
-  `make native-codeunits gate GATE=RefusedGate JOBS=2` with the verified System package:
-  generator 65, executable refusals 73, source-bound 8, original Base64 61 and Refused
-  11 checks, zero red; existing negative controls reject. Ordinary Integer Clear remains
+  `make gate GATE=RefusedGate JOBS=2`: 11 checks, zero red. Ordinary Integer Clear remains
   implemented. `make lint JOBS=2` checks 53 affected compiled units with zero failures;
   format passes and the suppression baseline remains 12. Whole absent-record Clear and
   same-type refusal assignment remain gaps.
@@ -210,6 +203,22 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   revision above. Predecessor 1389 requires Clear to preserve array extent rather than
   invent a collection reset. Durable tests: `test/gate/RefusedGate.cpp` and
   `test/transpiler/native-codeunits/{source/NativeFixture.Codeunit.al,Runner.cpp}`.
+
+- FieldNo return shape: `BodyWriter.cpp` preserves the documented Integer result
+  before overload resolution, including unavailable Record and indexed receivers.
+  Four compiled refusal cases retain member identity and stop before later effects;
+  selected Record FieldNo reaches Integer, while a Codeunit FieldNo retains Text.
+  Removing the cast restores the Integer/JsonArray ambiguity and must fail compilation.
+  `make native-codeunits lint JOBS=2` with the verified System package: generator 70,
+  executable refusals 83, source-bound 8, original Base64 61 checks, zero red; all
+  existing negative controls reject. Three affected compiled units pass clang-tidy,
+  format passes and the suppression baseline remains 12. Side-effecting indexed method
+  receivers remain unqualified; constant-index typing is not a once-only evaluation proof.
+  References: developer `methods-auto/record/record-fieldno-method.md` at the revision
+  above; BCApps `main` `src/System Application/App/Retention Policy/src/Retention Policy
+  Allowed Tables/RetenPolAllowedTables.Codeunit.al` at the revision above. Predecessor
+  1094 distinguishes intrinsic AL names from similarly spelled fields/procedures.
+  Durable fixtures: `test/transpiler/native-codeunits/{source/*.al,Runner.cpp}`.
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.

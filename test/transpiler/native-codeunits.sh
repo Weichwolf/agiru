@@ -50,6 +50,21 @@ record_command native-codeunits "$input/Runner.cpp" \
 link_generated "$proof/generated" "$proof/runner.o" "$proof/runner"
 "$proof/runner" | tee "$proof/execution.log"
 
+cp -a "$proof/generated" "$proof/untyped-field-number"
+awk '
+  { changed += gsub(/static_cast<::agiru::Integer>\(Row.FieldNo\(Row.OnlyNumberField\)\)/,
+                    "Row.FieldNo(Row.OnlyNumberField)"); print }
+  END { if (changed != 2) exit 2 }
+' "$proof/generated/fixture/system/fixture/codeunit/NativeFixture.cpp" \
+  > "$proof/untyped-field-number/fixture/system/fixture/codeunit/NativeFixture.cpp"
+if link_generated "$proof/untyped-field-number" "$proof/runner.o" "$proof/untyped-field-number-runner" \
+  > "$proof/untyped-field-number-control.log" 2>&1; then
+  printf 'native-codeunits: untyped FieldNo escaped overload compilation control\n' >&2
+  exit 1
+fi
+rg -q "call to member function 'FieldNumberResult' is ambiguous" "$proof/untyped-field-number-control.log"
+rm -r -- "$proof/untyped-field-number"
+
 cp -a "$proof/generated" "$proof/missing-field"
 awk '
   /::agiru::dotnet::Refused Enabled\{/ { removed++; next }

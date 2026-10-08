@@ -247,6 +247,11 @@ refuse with their original member identity before subsequent AL effects. Removin
 six operations must fail the compiled runner. RefusedGate retains Decimal operands,
 unknown-option Clear and an ordinary Integer Clear control. Whole absent-record Clear
 and same-type refusal assignment are separate gaps, not qualified by these checks.
+Record FieldNo calls retain the platform Integer result shape before C++ overload
+resolution. Four unavailable-record/array cases refuse before later AL effects; a
+selected record reaches the Integer overload and a Codeunit FieldNo retains Text.
+Removing the result typing must fail compilation with an ambiguous Integer/JsonArray
+overload. Side-effecting indexed method receivers remain a separate qualification gap.
 Unselected named Page.Run/RunModal calls compile through the numbered runtime API,
 including optional records, field numbers, Action results and case-insensitive names.
 They throw with the original AL identity before subsequent effects, not through an

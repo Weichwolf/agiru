@@ -130,6 +130,27 @@ void UnavailableNamedPagesCompileAndRefuse() {
   }
 }
 
+void FieldNumbersRetainTheirIntegerContract() {
+  constexpr agiru::Integer kOperationCount = 4;
+  agiru::System::Fixture::NativeFixture_Codeunit unit;
+  for (agiru::Integer operation = 0; operation < kOperationCount; ++operation) {
+    agiru::Integer counter = kValue;
+    std::string message;
+    try {
+      unit.UnavailableFieldNumber(operation, counter);
+    } catch (const agiru::Error &error) { message = error.what(); }
+    CHECK_TRUE("unavailable FieldNo remains Integer-shaped with its original refusal identity",
+               message.contains("NumberRow.FieldNo"));
+    CHECK_TRUE("FieldNo refusal precedes overload invocation and subsequent AL effects",
+               counter == 41);
+  }
+  CHECK_TRUE("selected Record FieldNo reaches the Integer overload",
+             unit.AvailableFieldNumber() == 1);
+  CHECK_TEXT("a Codeunit method named FieldNo retains its declared Text result",
+             unit.OrdinaryFieldNumberName(),
+             "own-field-number");
+}
+
 }
 
 int main() {
@@ -139,5 +160,6 @@ int main() {
     UnavailableIndexedFieldsCompileAndRefuse();
     UnavailableFieldOperationsCompileAndRefuse();
     UnavailableNamedPagesCompileAndRefuse();
+    FieldNumbersRetainTheirIntegerContract();
   });
 }

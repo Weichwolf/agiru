@@ -137,4 +137,45 @@ codeunit 50311 NativeFixture
         end;
         Counter := 99;
     end;
+
+    procedure UnavailableFieldNumber(Operation: Integer; var Counter: Integer)
+    var
+        Row: Record "Number Row";
+        Rows: array[2] of Record "Number Row";
+        Grid: array[2,2] of Record "Number Row";
+        Value: Integer;
+    begin
+        Counter := 41;
+        case Operation of
+            0: Value := FieldNumberResult(Row.FieldNo("Only Number Field"));
+            1: Value := FieldNumberResult(Rows[1].FieldNo("Only Number Field"));
+            2: Value := FieldNumberResult(Grid[1,2].FieldNo("Only Number Field"));
+            3: Value := FieldNumberResult(Row.fIeLdNo(Row."Only Number Field"));
+        end;
+        Counter := 99;
+    end;
+
+    procedure AvailableFieldNumber(): Integer
+    var
+        Row: Record "Available Row" temporary;
+    begin
+        exit(FieldNumberResult(Row.FieldNo(ID)));
+    end;
+
+    procedure OrdinaryFieldNumberName(): Text
+    var
+        Peer: Codeunit "Number Peer";
+    begin
+        exit(Peer.FieldNo());
+    end;
+
+    local procedure FieldNumberResult(Value: Integer): Integer
+    begin
+        exit(Value);
+    end;
+
+    local procedure FieldNumberResult(Value: JsonArray): Integer
+    begin
+        exit(-1);
+    end;
 }

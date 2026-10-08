@@ -708,6 +708,18 @@ private:
            SameName(scope_.DeclaredType(callee.children[0].text), "Codeunit");
   }
 
+  [[nodiscard]] bool IsRecordFieldNumber(const al::Expr &callee) const {
+    if (IsRecordOperation(callee, "FieldNo")) { return true; }
+    if (!IsMemberCall(callee, "FieldNo") || callee.kind == al::ExprKind::Name) { return false; }
+    const al::Expr *receiver = &callee.children.front();
+    while (receiver->kind == al::ExprKind::Index && !receiver->children.empty()) {
+      receiver = &receiver->children.front();
+    }
+    return receiver->kind == al::ExprKind::Name &&
+           (scope_.IsRecord(receiver->text) ||
+            SameName(scope_.DeclaredType(receiver->text), "Record"));
+  }
+
   std::string RefusedControlCall(const al::Expr &callee) const {
     std::vector<std::string> names;
     const al::Expr *walk = &callee;
@@ -942,7 +954,8 @@ private:
         !scope_.Module().empty()) {
       out += ", " + scope_.Module();
     }
-    return out + ")";
+    out += ")";
+    return IsRecordFieldNumber(callee) ? "static_cast<::agiru::Integer>(" + out + ")" : out;
   }
 
   static std::string_view BareBuiltin(std::string_view name) {
