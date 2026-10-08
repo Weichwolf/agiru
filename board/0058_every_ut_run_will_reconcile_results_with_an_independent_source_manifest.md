@@ -56,10 +56,17 @@ business workflows are active in 0720; full G1 acceptance does not block their i
   Package/declaration qualifiers are not full-app linking or business execution.
 - BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17` retains byte-identical sources
   for all eighty configured UT codeunits / 2,314 methods versus `bb7111877f`.
-  `make transpile` has regenerated against this revision and the verified native
-  package; 215 unbound native tables, 67 native methods and 5,683 refused property
-  declarations keep translation nonzero. Generation is not successful full-tree
-  compilation or AL execution.
+  `make transpile` after `0b31295` retains 77 selected UT codeunits / 2,298 methods;
+  these are parser counts, not executed results. The verified native package has
+  22 bound / 211 unbound tables and 67 unbound methods; 122 refused properties and
+  21 unresolved extension anchors keep translation at exit one. All 306,303 property
+  declarations are classified; zero silent drops. Generation is not full-tree compilation.
+- Failed generation preserves old outputs. `test/slice` still compiles stale approved
+  exclusions, including `tests/core/codeunit/O365IntegrationRecordUT.cpp` from
+  `Layers/W1/Tests/Graph/O365IntegrationRecordUT.Codeunit.al`. Before the next integrated
+  build, apply canonical scope to slice/full-app inputs with explicit raw/selected/excluded
+  receipts. Preserve every raw slice identity and refuse unapproved missing inputs;
+  do not remove identities or treat a file-presence check as current selection proof.
 - Last aggregate tidy measurement: 388 unique diagnostics, ninety of 267 units
   analysed, all ninety failed. Subsequent shared-header repairs make focused
   PlatformSourceGate analysis pass; the aggregate was not rerun and remains unproven.
