@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { chmod } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
-import { commandEnvelope, parsePage } from "../../build/client/profile.mjs";
+import { commandEnvelope, parseFailure, parsePage } from "../../build/client/profile.mjs";
 import { ServerConfigs } from "./server-config.mjs";
 import { launchBrowser, openBrowserPage, assertBrowserPage, browserAction } from "./browser-client.mjs";
 import { renderAscii } from "../../build/client/ascii.mjs";
@@ -282,11 +282,70 @@ test("a noncommitted AL action rolls back; production Commit survives a later er
     assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1'), expected);
     assert.equal((await fetch(origin + path(fresh), { headers: first })).status, 410);
     const receipt = operation(fresh, name).command;
+    assert.deepEqual(parseFailure(failed.html), { code: "AlError", command: receipt, outcome: "failed",
+      message: name === "WriteAndFail" ? "rollback fixture error" : "durable fixture error" });
     assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands WHERE command_id = '${receipt}'`), "failed");
     assert.equal((await fetch(origin + "/commands", { method: "POST", headers: {
       ...first, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body: failed.body })).status, 410);
   }
   assert.equal(await sql('SELECT count(*) FROM ui_writes WHERE "value" = 111'), "1");
+});
+
+test("CMD/MCP/htmx preserve native AL diagnostics and failed receipts without implying rollback of prior commits", async () => {
+  for (const transport of ["CMD", "MCP", "web"]) {
+    await sql('UPDATE "Navigation Row" SET "Value" = 11 WHERE "ID" = 1');
+    const browser = transport === "web" ? await launchBrowser() : undefined;
+    let mcp;
+    try {
+      const fresh = await client.read("/?page=50347&mode=Edit");
+      const { enabled: _enabled, ...selected } = operation(fresh, "CommitAndFail");
+      const input = { path: path(fresh), ...selected };
+      let error;
+      if (transport === "CMD") {
+        try {
+          await execute(process.execPath, ["build/client/cmd.mjs", "execute", JSON.stringify(input)],
+            { env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } });
+          assert.fail("the failed command must not produce successful CMD output");
+        } catch (failure) {
+          assert.equal(failure.code, 2);
+          assert.equal(failure.stdout, "");
+          error = JSON.parse(failure.stderr);
+        }
+      } else if (transport === "MCP") {
+        const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
+        const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"));
+        const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"));
+        mcp = new Client({ name: "agiru-native-error-test", version: "1" });
+        await mcp.connect(new StdioClientTransport({ command: process.execPath,
+          args: ["build/client/mcp.mjs"], env: { AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } }));
+        const result = await mcp.callTool({ name: "agiru_execute", arguments: input });
+        assert.equal(result.isError, true);
+        error = result.structuredContent;
+        assert.deepEqual(JSON.parse(result.content[0].text), error);
+      } else {
+        const opened = await openBrowserPage(browser, origin, input.path, first.authorization);
+        const page = opened.page;
+        await assertBrowserPage(page, fresh.page);
+        const received = page.waitForResponse(response => response.url() === `${origin}/commands` && response.request().method() === "POST");
+        await page.locator('[data-control="CommitAndFail"] button').click();
+        const response = await received;
+        assert.equal(response.status(), 500);
+        const failure = parseFailure(await response.text());
+        error = { error: failure.code, message: failure.message, command: failure.command, outcome: failure.outcome };
+        await page.waitForFunction(() => document.querySelector("#status").textContent.startsWith("Server error"));
+        assert.equal(await page.locator("#status").textContent(),
+          `Server error AlError: durable fixture error outcome=failed command=${input.command}; prior explicit commits may persist.`);
+        await assertBrowserPage(page, fresh.page);
+      }
+      assert.deepEqual(error, { error: "AlError", message: "durable fixture error", command: input.command, outcome: "failed" });
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1'), "111");
+      assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands WHERE command_id = '${input.command}'`), "failed");
+    } finally {
+      await mcp?.close();
+      await browser?.close();
+      await sql('UPDATE "Navigation Row" SET "Value" = 111 WHERE "ID" = 1');
+    }
+  }
 });
 
 if (nativeApplication) {

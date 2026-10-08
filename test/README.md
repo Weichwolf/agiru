@@ -286,10 +286,11 @@ list window or complete page lifecycle. View navigation remains open (0720).
 `make client` builds the external Node 20+ TypeScript client from its locked
 dependencies. `make client-test` runs on the host: C++ `PageHtmlGate --html` produces
 the actual fragment in `agiru-dev`; a clearly labelled Node HTTP fixture checks
-lossless values, shell CMD and real MCP stdio calls over one agent library. Seven
+lossless values, shell CMD and real MCP stdio calls over one agent library. Eight
 executable mutants must expose rounded scalars, disabled-command execution,
 stale revisions, duplicate POSTs, blocking authentication-file opens and unsafe MCP
-read-only/idempotent hints, plus accidental page reopening during command preflight.
+read-only/idempotent hints, accidental page reopening during command preflight and
+acceptance of a failure belonging to another command.
 Execute must use the matching retained `/?handle=<page>` path and refuse an opening,
 foreign, duplicate or mismatched path before any HTTP request.
 Discovery must disclose that page opening can write from
@@ -299,7 +300,7 @@ This is not a Node ERP server or proof of
 production authentication, SQL effects, actual htmx browser behaviour or complete
 page/ERP parity. `AGIRU_PAGE_HTML_GATE` can select an explicitly built host producer.
 Fixtures and disposable mutant modules use `/tmp`; Node stays outside the ERP container.
-`make web-test` builds local htmx/static browser assets and executes ten real Chromium
+`make web-test` builds local htmx/static browser assets and executes eleven real Chromium
 cases against the same native `PageHtmlGate` fragment and agent profile/envelope.
 Three compiled bundles must fail named response-effect, hidden-envelope and concurrent
 POST cases. One additional actual Caddy case qualifies static assets/licenses, document
@@ -307,6 +308,20 @@ versus HX routing and security headers, with private certificate/config state an
 shutdown. Screenshots, source/binary hashes and logs remain current receipts under
 `/tmp`; mutant bundles are removed even on failure. This is not a Node ERP server,
 native HTTP/SQL/browser workflow acceptance, complete lists, dialogs or production login.
+
+Native page errors use the bounded `data-agiru-error="1"` HTML envelope: unchanged
+error text/code, explicit command identity and `refused`, `failed` or `unknown` outcome.
+`failed` requires durable page invalidation and a failed SQL command receipt; it never
+promises to undo an earlier explicit Commit. `refused` describes this submission, not
+historical effects of the same command. Empty AL classification becomes transport-only
+`AlError`; AL error state is unchanged. CMD/MCP share strict decoding; htmx displays
+untrusted text without replacing the retained page. Malformed, mismatched, disconnected
+or unqualified write responses remain uncertain; no outcome authorizes automatic retries.
+`ui/page-host.mjs` independently checks rollback, durable Commit, failed receipts and
+actual external CMD/MCP/Chromium error parity. A compiled lost-receipt defect must fail.
+`AGIRU_PAGE_GATE_DATABASE` selects a separate existing disposable gate database for its
+generated navigation regressions; HTTP fixtures still create/drop their own databases.
+Full ErrorInfo/actionable-error dialogs and live Confirm/StrMenu suspension remain gaps.
 `tooling/header-dependencies.sh` checks the native server's narrow options-only headers;
 forcing HTTP or retained page execution into `NativeService.h` must fail. Configuration
 and execution share the same option types, not copied defaults or validation rules.

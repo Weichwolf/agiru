@@ -1,6 +1,6 @@
 import { configuredClient } from "./http.mjs";
 import { operate, present } from "./command.mjs";
-import { ClientError, errorResult } from "./errors.mjs";
+import { ClientError, ServerError, errorResult } from "./errors.mjs";
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -25,5 +25,6 @@ async function main(): Promise<void> {
 
 main().catch(error => {
   process.stderr.write(JSON.stringify(errorResult(error)) + "\n");
-  process.exitCode = error instanceof ClientError && error.code === "WriteUncertain" ? 3 : 2;
+  process.exitCode = (error instanceof ClientError && error.code === "WriteUncertain") ||
+    (error instanceof ServerError && error.outcome === "unknown") ? 3 : 2;
 });

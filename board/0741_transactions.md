@@ -80,7 +80,25 @@ failure, all other cases pass, including 257 tooling tests. The fixture now call
 resolve the generated binding rather than guessing its name. Focused `make xmlport-import
 JOBS=2`: four profiles, 90 checks, five execution defects and the constructor defect rejected;
 GenXmlPort 28 and XmlPort 161 checks, zero red. Runner clang-tidy has zero findings.
-Full manifest rerun remains due; no runtime or generator semantics were changed.
+The frozen rerun at `375a80e` retains 185 cases but has 62 red: its cold CMake build
+ignored the explicitly supplied gate DSN/source roots and compiled the default
+localhost:5433 connection and absent local AL path. PostgreSQL in the development
+container is on 5432. XMLport import now passes all four profiles in that run.
+Correct frozen configuration and rerun; this is not a green manifest or an AL UT result.
+
+Native command failures now require affected-row proof for durable page invalidation
+and the failed SQL receipt before returning `failed`. Cleanup uncertainty returns
+`unknown`; prior explicit Commit remains durable. `PageCommandHost.cpp` and shared
+`src/client/{profile,http,errors,cmd,mcp,web}.mts` preserve exact diagnostics/command IDs
+over HTTP instead of treating every server-side AL failure as WriteUncertain.
+`test/ui/page-host.mjs` independently checks rollback, Commit, receipts and external
+CMD/MCP/Chromium error parity; `page-host.sh` adds a compiled missing-receipt control.
+`make page-host-test`: 82 native HTTP cases, limits 40/7/80 and both TryFunction
+policies, seven compiled defects rejected; generated navigation 183, PageSource 15,
+PageDispatcher 105 and sixteen execution controls/one compile refusal pass.
+38 client cases/eight executable defects and eleven browser cases/three compiled
+defects pass; targeted PageCommandHost clang-tidy has zero findings. Full ErrorInfo,
+live question suspension, financial posting and complete AL acceptance remain open.
 
 `make refresh-records JOBS=2`: 149 C++ checks, 80 generator checks and six compiled
 defects rejected. `runtime/RecordRefresh.h` owns both official overloads;

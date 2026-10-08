@@ -15,6 +15,27 @@ sandbox reference execution and agiru replication. Their agiru prerequisites are
 specific working client contracts, not this WI's full acceptance; no dependency cycle.
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
+## Native command diagnostics
+
+- `src/rt/PageCommandHost.cpp` emits bounded error HTML with exact AL text/classification,
+  command identity and explicit outcome. `failed` requires durable page invalidation and
+  a failed PostgreSQL receipt; prior explicit Commit is not undone. Cleanup/transport
+  uncertainty stays `unknown`; refusal describes only the current submission.
+- `src/client/{profile,http,errors,cmd,mcp,web}.mts` share strict error decoding.
+  CMD/MCP retain structured diagnostics; htmx uses text, keeps the existing page and
+  never retries. A mismatched command or malformed response remains WriteUncertain.
+  The empty-code fallback `AlError` is transport classification, not changed AL state.
+- `make client-test`: 38 cases, eight executable defects rejected; `make web-test`:
+  eleven Chromium cases, three compiled defects and the actual Caddy asset case pass.
+  `make lint-one UNIT=src/rt/PageCommandHost.cpp JOBS=2`: zero findings. Native rollback,
+  durable Commit and external CMD/MCP/browser error parity are exercised by
+  `test/ui/page-host.mjs`; `make page-host-test` passes 82 native HTTP cases at limits
+  40/7/80 under both TryFunction policies and rejects seven compiled defects,
+  including a lost failed receipt. Generated navigation retains 183 checks,
+  PageSource 15, PageDispatcher 105 and all sixteen execution defects/one compile refusal.
+- Full ErrorInfo/actionable-error dialogs, Confirm/StrMenu HTTP suspension and modal
+  execution remain required; this contract is not working business-workflow acceptance.
+
 ## Bounded lists and collation
 
 - SQL kernel implemented: `include/runtime/RecordWindow.h`, `src/rt/RecordWindow.cpp`

@@ -17,13 +17,13 @@ AGIRU_CLIENT_HTML="$proof/page.html" node --test test/ui/agent-client.mjs > "$pr
   exit 1
 }
 cat "$proof/client.log"
-for control in rounded-scalars disabled-command stale-revision double-post blocking-auth unsafe-read-hints opening-replay; do
+for control in rounded-scalars disabled-command stale-revision double-post blocking-auth unsafe-read-hints opening-replay error-identity; do
   mutant="$proof/$control"
   mkdir "$mutant"
   cp build/client/*.mjs "$mutant/"
   ln -s "$(realpath src/client/node_modules)" "$mutant/node_modules"
   source=profile
-  case "$control" in stale-revision|double-post|blocking-auth|opening-replay) source=http;; esac
+  case "$control" in stale-revision|double-post|blocking-auth|opening-replay|error-identity) source=http;; esac
   if [[ "$control" = unsafe-read-hints ]]; then source=mcp; fi
   awk -v control="$control" '
     control == "rounded-scalars" && /value: attr\(node, "data-value"\)/ {
@@ -48,6 +48,9 @@ for control in rounded-scalars disabled-command stale-revision double-post block
     control == "opening-replay" && /if \(!retained\)/ {
       sub(/!retained/, "false"); changed++
     }
+    control == "error-identity" && /if \(command && failure.command !== command\)/ {
+      sub(/command && failure.command !== command/, "false"); changed++
+    }
     { print }
     END { if (changed != 1) exit 2 }
   ' "build/client/$source.mjs" > "$mutant/$source.mjs"
@@ -66,10 +69,13 @@ for control in rounded-scalars disabled-command stale-revision double-post block
   if [[ "$control" = opening-replay ]]; then
     rg -q '^not ok .*execute refuses opening or mismatched paths before any HTTP request' "$proof/$control.log"
   fi
+  if [[ "$control" = error-identity ]]; then
+    rg -q '^not ok .*typed server errors retain exact diagnostics' "$proof/$control.log"
+  fi
   rm -- "$mutant/"*.mjs "$mutant/node_modules"
   rmdir "$mutant"
 done
 sha256sum --check --status "$proof/inputs.sha256"
-printf 'agent-client: seven executable value/disabled/revision/duplicate-write/blocking-auth/read-hint/opening-replay mutants rejected\n'
+printf 'agent-client: eight executable value/disabled/revision/duplicate-write/blocking-auth/read-hint/opening-replay/error-identity mutants rejected\n'
 printf 'agent-client: semantic HTML/CMD/MCP transport fixture; no ERP SQL/browser parity claim\n'
 printf 'agent-client: %s\n' "$proof"

@@ -55,10 +55,39 @@ constexpr unsigned kMethodNotAllowed = 405;
 constexpr unsigned kConflict = 409;
 constexpr unsigned kGone = 410;
 constexpr unsigned kUnavailable = 503;
+constexpr unsigned kInternalError = 500;
 constexpr std::size_t kMaximumParameters = 8;
 constexpr auto kMaximumContextLifetime = std::chrono::hours(24);
 constexpr std::string_view kActionPrefix = "$agiru.";
 using Parameters = std::map<std::string, std::string, std::less<>>;
+
+struct Diagnostic {
+  std::string_view message;
+  std::string_view code;
+  std::string_view command;
+  std::string_view outcome;
+};
+
+struct CommandOutcome {
+  std::string_view command;
+  std::string_view outcome;
+};
+
+class CommandFailure final : public Error {
+public:
+  explicit CommandFailure(const Diagnostic &diagnostic)
+      : Error(diagnostic.message, diagnostic.code),
+        command_(diagnostic.command),
+        outcome_(diagnostic.outcome) {}
+
+  std::string_view Command() const { return command_; }
+
+  std::string_view Outcome() const { return outcome_; }
+
+private:
+  std::string command_;
+  std::string outcome_;
+};
 
 [[noreturn]] void Refuse(std::string_view code) {
   throw Error("Page host refused this operation", std::string(code));
@@ -222,12 +251,38 @@ unsigned Status(std::string_view code) {
   return kBadRequest;
 }
 
-std::string DiagnosticHtml(std::string_view message) {
-  std::string html = "<p>";
-  constexpr std::size_t kClosingBytes = 4;
-  detail::AppendHtmlText(html, message, PageHtmlLimits::kDefaultBytes - kClosingBytes);
-  html += "</p>";
+std::string DiagnosticHtml(const Diagnostic &diagnostic) {
+  std::string html = R"(<article data-agiru-error="1" data-code=")";
+  constexpr std::size_t kClosingBytes = 14;
+  constexpr auto kBytes = PageHtmlLimits::kDefaultBytes - kClosingBytes;
+  detail::AppendHtmlText(html, diagnostic.code.empty() ? "AlError" : diagnostic.code, kBytes);
+  html += "\" data-command=\"";
+  detail::AppendHtmlText(html, diagnostic.command, kBytes);
+  html += "\" data-outcome=\"";
+  detail::AppendHtmlText(html, diagnostic.outcome, kBytes);
+  html += "\"><h1>Request failed</h1><p>";
+  detail::AppendHtmlText(html, diagnostic.message, kBytes);
+  html += "</p></article>";
   return html;
+}
+
+ServerHttpResponse
+FailureResponse(const Error &error, unsigned status, const CommandOutcome &result) {
+  return {.status = status,
+          .body = DiagnosticHtml({.message = error.what(),
+                                  .code = error.Code(),
+                                  .command = result.command,
+                                  .outcome = result.outcome}),
+          .headers = {}};
+}
+
+std::string RequestCommand(const ServerHttpRequest &request) {
+  if (request.method != "POST" || request.target != "/commands") { return {}; }
+  try {
+    const auto values = Parse(request.body, true);
+    const auto command = Get(values, "command");
+    return Token(command) ? std::string(command) : std::string{};
+  } catch (const Error &) { return {}; }
 }
 
 }
@@ -621,12 +676,20 @@ struct PageCommandHost::Impl {
     context.invalid = true;
     const Connection cleanup(options.database);
     const std::array<std::optional<std::string>, 1> handle{context.handle};
-    cleanup.Run("UPDATE agiru_client.page_contexts SET invalidated = true WHERE handle = $1",
-                handle);
+    if (cleanup
+            .Execute("UPDATE agiru_client.page_contexts SET invalidated = true WHERE handle = $1",
+                     handle)
+            .Affected() != 1) {
+      Refuse("PageHostCleanup");
+    }
     const std::array<std::optional<std::string>, 2> binds{context.handle, std::string(commandId)};
-    cleanup.Run("UPDATE agiru_client.page_commands SET outcome = 'failed',html = NULL "
-                "WHERE handle = $1 AND command_id = $2 AND outcome = 'started'",
-                binds);
+    if (cleanup
+            .Execute("UPDATE agiru_client.page_commands SET outcome = 'failed',html = NULL "
+                     "WHERE handle = $1 AND command_id = $2 AND outcome = 'started'",
+                     binds)
+            .Affected() != 1) {
+      Refuse("PageHostCleanup");
+    }
   }
 
   ServerHttpResponse
@@ -700,14 +763,30 @@ struct PageCommandHost::Impl {
     } catch (const std::exception &execution) {
       try {
         Invalidate(*context, commandId);
-      } catch (const std::exception &cleanup) {
-        throw Error(std::string(execution.what()) + "; page cleanup failed: " + cleanup.what(),
-                    "PageHostCleanup");
+      } catch (...) {
+        throw CommandFailure({.message = "Page cleanup failed; command outcome is unknown",
+                              .code = "PageHostCleanup",
+                              .command = commandId,
+                              .outcome = "unknown"});
       }
-      throw;
+      const auto *al = dynamic_cast<const Error *>(&execution);
+      throw CommandFailure({.message = al == nullptr ? "Server execution failed" : al->what(),
+                            .code = al == nullptr ? "ServerFailure" : al->Code(),
+                            .command = commandId,
+                            .outcome = "failed"});
     } catch (...) {
-      Invalidate(*context, commandId);
-      throw;
+      try {
+        Invalidate(*context, commandId);
+      } catch (...) {
+        throw CommandFailure({.message = "Page cleanup failed; command outcome is unknown",
+                              .code = "PageHostCleanup",
+                              .command = commandId,
+                              .outcome = "unknown"});
+      }
+      throw CommandFailure({.message = "Server execution failed",
+                            .code = "ServerFailure",
+                            .command = commandId,
+                            .outcome = "failed"});
     }
   }
 
@@ -747,21 +826,31 @@ PageCommandHost::~PageCommandHost() = default;
 ServerHttpResponse PageCommandHost::Handle(const ServerHttpRequest &request) {
   try {
     return impl_->Handle(request);
+  } catch (const CommandFailure &error) {
+    const auto status =
+        (error.Code().starts_with("PageHost") && error.Code() != "PageHostCleanup") ||
+                error.Code() == "Permission" || error.Code() == "PageValidation" ||
+                error.Code() == "PageCommand"
+            ? Status(error.Code())
+            : kInternalError;
+    return FailureResponse(error, status, {.command = error.Command(), .outcome = error.Outcome()});
   } catch (const SessionError &) {
     return {.status = kUnauthorized,
-            .body = "<p>Authentication required</p>",
+            .body = DiagnosticHtml({.message = "Authentication required",
+                                    .code = "SessionIdentity",
+                                    .command = {},
+                                    .outcome = "unknown"}),
             .headers = {{.name = "WWW-Authenticate", .value = "Bearer realm=\"agiru\""}}};
   } catch (const Error &error) {
-    if (error.Code() == "PageHostCleanup" ||
-        (!error.Code().starts_with("PageHost") && error.Code() != "SessionIdentity" &&
-         error.Code() != "PageValidation" && error.Code() != "PageCommand" &&
-         error.Code() != "Permission")) {
-      throw;
-    }
-    ServerHttpResponse response{.status = error.Code() == "Permission" ? kForbidden
-                                                                       : Status(error.Code()),
-                                .body = DiagnosticHtml(error.what()),
-                                .headers = {}};
+    const bool refusal = error.Code().starts_with("PageHost") && error.Code() != "PageHostCleanup";
+    const auto status = refusal || error.Code() == "Permission" ||
+                                error.Code() == "SessionIdentity" ||
+                                error.Code() == "PageValidation" || error.Code() == "PageCommand"
+                            ? Status(error.Code())
+                            : kInternalError;
+    const auto command = RequestCommand(request);
+    auto response = FailureResponse(
+        error, status, {.command = command, .outcome = refusal ? "refused" : "unknown"});
     if (response.status == kUnauthorized) {
       response.headers.push_back({.name = "WWW-Authenticate", .value = "Bearer realm=\"agiru\""});
     }

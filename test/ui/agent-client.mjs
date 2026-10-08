@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 const modules = process.env.AGIRU_CLIENT_MODULES ? pathToFileURL(process.env.AGIRU_CLIENT_MODULES + "/") : new URL("../../build/client/", import.meta.url);
-const { parsePage, commandEnvelope, limits } = await import(new URL("profile.mjs", modules));
+const { parsePage, parseFailure, commandEnvelope, limits } = await import(new URL("profile.mjs", modules));
 const { renderAscii, quote } = await import(new URL("ascii.mjs", modules));
 const { AgentClient, readAuth } = await import(new URL("http.mjs", modules));
 const { operate } = await import(new URL("command.mjs", modules));
@@ -19,6 +19,9 @@ const html = await readFile(process.env.AGIRU_CLIENT_HTML, "utf8");
 const page = parsePage(html);
 const received = [];
 let posts = 0;
+const failureHtml = (command = "cmd_1_7", outcome = "failed") =>
+  `<article data-agiru-error="1" data-code="UiWriteTransaction" data-command="${command}" data-outcome="${outcome}"><h1>Request failed</h1><p>Grüezi &lt;script&gt; 東京 &amp; blocked.</p></article>`;
+let failureMode = "";
 const server = createServer(async (request, response) => {
   received.push({ method: request.method, path: request.url, headers: request.headers });
   if (request.url === "/redirect") { response.writeHead(302, { Location: "http://127.0.0.1:1/foreign" }); response.end(); return; }
@@ -29,6 +32,12 @@ const server = createServer(async (request, response) => {
     for await (const chunk of request) body += chunk;
     received.at(-1).body = Object.fromEntries(new URLSearchParams(body));
     if (request.url === "/disconnect") { request.socket.destroy(); return; }
+    if (failureMode) {
+      response.writeHead(500, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(failureMode === "malformed" ? "<p>unqualified failure</p>" :
+        failureHtml(failureMode === "mismatched" ? "other_command" : "cmd_1_7", failureMode === "unknown" ? "unknown" : "failed"));
+      return;
+    }
   }
   response.setHeader("Content-Type", "text/html; charset=utf-8");
   if (request.url === "/wrong-type") response.setHeader("Content-Type", "application/json");
@@ -227,6 +236,36 @@ test("uncertain write disconnect is never retried; command receipt identity reta
   assert.equal(shell.code, 3); assert.equal(shell.stdout, "");
   assert.equal(JSON.parse(shell.stderr).command, "cmd_1_7");
   assert.equal(posts, before + 2);
+});
+
+test("typed server errors retain exact diagnostics and explicit outcomes; malformed or foreign command outcomes remain uncertain", async () => {
+  const decoded = { code: "UiWriteTransaction", message: "Grüezi <script> 東京 & blocked.", command: "cmd_1_7", outcome: "failed" };
+  assert.deepEqual(parseFailure(failureHtml()), decoded);
+  for (const invalid of [failureHtml().replace('data-outcome="failed"', 'data-outcome="complete"'),
+    failureHtml().replace('data-command="cmd_1_7"', 'data-command=""'), failureHtml() + failureHtml(),
+    failureHtml().replace("</p>", "<script>sideEffect()</script></p>"),
+    failureHtml().replace('data-code="UiWriteTransaction"', 'data-code="UiWriteTransaction" data-code="other"')]) {
+    assert.throws(() => parseFailure(invalid), error => error.code === "ProfileRefused");
+  }
+  const before = posts;
+  try {
+    for (const mode of ["failed", "unknown", "malformed", "mismatched"]) {
+      failureMode = mode;
+      await assert.rejects(operate(client, "execute", request("Post", "action")), error =>
+        mode === "failed" || mode === "unknown"
+          ? error.code === decoded.code && error.message === decoded.message && error.command === decoded.command && error.outcome === mode
+          : error.code === "WriteUncertain" && error.command === decoded.command);
+      const shell = await cmd(["execute", JSON.stringify(request("Post", "action"))]);
+      assert.equal(shell.code, mode === "failed" ? 2 : 3);
+      assert.equal(shell.stdout, "");
+      const value = JSON.parse(shell.stderr);
+      assert.equal(value.command, decoded.command);
+      if (mode === "failed" || mode === "unknown") assert.deepEqual(value,
+        { error: decoded.code, message: decoded.message, command: decoded.command, outcome: mode });
+      else assert.equal(value.error, "WriteUncertain");
+    }
+    assert.equal(posts, before + 8, "never retry any failed or uncertain submission automatically");
+  } finally { failureMode = ""; }
 });
 
 test("MCP real stdio initialize/discover/read/set/action matches CMD and form effects", async () => {

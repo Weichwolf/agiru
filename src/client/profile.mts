@@ -25,6 +25,33 @@ const token = /^[A-Za-z0-9_-]{1,128}$/;
 const digits = /^[0-9]+$/;
 const scalarNames = ["Text", "Code", "Integer", "BigInteger", "Decimal", "Boolean", "Option", "Enum",
   "Date", "Time", "DateTime", "Duration", "Guid", "DateFormula", "RecordId"];
+
+export type Failure = Readonly<{ code: string; command: string; outcome: "refused" | "failed" | "unknown"; message: string }>;
+
+export function parseFailure(html: string): Failure {
+  check(new TextEncoder().encode(html).byteLength <= limits.bytes && html.isWellFormed() &&
+    !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(html), "Invalid error HTML text");
+  const fragment = parseFragment(html, { sourceCodeLocationInfo: true, onParseError: error => {
+    if (error.code === "control-character-reference" && html.slice(error.startOffset - 5, error.startOffset) === "&#13;") return;
+    if (error.code === "control-character-in-input-stream" && /^[\u0080-\u009f]$/u.test(html[error.startOffset]!)) return;
+    if (error.code === "noncharacter-in-input-stream") return;
+    throw new ClientError("ProfileRefused", "Malformed error HTML");
+  } });
+  const roots = children(fragment);
+  check(roots.length === 1 && roots[0]!.tagName === "article", "Expected one error article");
+  const root = roots[0]!;
+  const expected = ["data-agiru-error", "data-code", "data-command", "data-outcome"];
+  check(root.attrs.length === expected.length && root.attrs.every(item => expected.includes(item.name)) &&
+    attr(root, "data-agiru-error") === "1" && root.sourceCodeLocation?.endTag, "Invalid error envelope");
+  const items = children(root);
+  check(items.length === 2 && items[0]!.tagName === "h1" && items[1]!.tagName === "p" &&
+    items.every(item => item.attrs.length === 0 && item.sourceCodeLocation?.endTag), "Invalid error contents");
+  check(text(items[0]!) === "Request failed", "Invalid error heading");
+  const code = attr(root, "data-code"), command = attr(root, "data-command"), outcome = attr(root, "data-outcome");
+  check(code.length > 0 && code.length <= 128 && (!command || token.test(command)) &&
+    ["refused", "failed", "unknown"].includes(outcome) && (outcome !== "failed" || command), "Invalid error identity or outcome");
+  return Object.freeze({ code, command, outcome: outcome as Failure["outcome"], message: text(items[1]!) });
+}
 const responseEffects = ["hx-redirect", "hx-location", "hx-refresh", "hx-trigger", "hx-trigger-after-settle",
   "hx-trigger-after-swap", "hx-retarget", "hx-reswap", "hx-reselect", "hx-push-url", "hx-replace-url"];
 

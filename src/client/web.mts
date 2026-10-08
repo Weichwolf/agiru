@@ -1,5 +1,5 @@
 import htmx from "htmx.org";
-import { checkResponseProfile, commandEnvelope, parsePage, type Page } from "./profile.mjs";
+import { checkResponseProfile, commandEnvelope, parseFailure, parsePage, type Page } from "./profile.mjs";
 
 type Request = {
   verb: string; path: string; elt: HTMLElement; headers: Record<string, string>;
@@ -76,9 +76,18 @@ document.addEventListener("htmx:beforeOnLoad", event => {
   const response = (event as CustomEvent<Response>).detail;
   try {
     const xhr = response.xhr;
-    if (xhr.status < 200 || xhr.status >= 300 ||
+    if (xhr.status < 200 ||
         xhr.responseURL !== new URL(response.requestConfig.path, location.origin).href) throw new Error();
     checkResponseProfile(xhr.getResponseHeader("Content-Type") ?? "", header => xhr.getResponseHeader(header) !== null);
+    if (xhr.status >= 300) {
+      const failure = parseFailure(xhr.responseText);
+      if (response.requestConfig.verb === "post" && failure.command !== response.requestConfig.parameters.command) throw new Error();
+      event.preventDefault();
+      status.textContent = `Server error ${failure.code}: ${failure.message} outcome=${failure.outcome}` +
+        (failure.command ? ` command=${failure.command}` : "") +
+        (failure.outcome === "failed" ? "; prior explicit commits may persist." : "");
+      return;
+    }
     candidates.set(xhr, parsePage(xhr.responseText));
   } catch {
     event.preventDefault();

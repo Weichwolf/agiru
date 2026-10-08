@@ -109,6 +109,23 @@ test("real htmx field/action POST preserves the exact agent command envelope wit
   await page.close();
 });
 
+test("htmx presents qualified command errors as untrusted text and never replaces the retained page or retries", async () => {
+  const page = await open();
+  await ready(page);
+  const command = parsePage(original).controls.find(control => control.identity === "Post").operation.command;
+  const before = requests.length;
+  responseStatus = 500;
+  responseHtml = `<article data-agiru-error="1" data-code="UiWriteTransaction" data-command="${command}" data-outcome="failed"><h1>Request failed</h1><p>Grüezi &lt;script&gt; 東京 &amp; blocked.</p></article>`;
+  await control(page, "Post").locator("button").click();
+  await page.waitForFunction(() => document.querySelector("#status").textContent.startsWith("Server error"));
+  assert.equal(await page.locator("#status").textContent(),
+    `Server error UiWriteTransaction: Grüezi <script> 東京 & blocked. outcome=failed command=${command}; prior explicit commits may persist.`);
+  assert.equal(requests.length, before + 1);
+  await assertBrowserPage(page, parsePage(original));
+  assert.equal(await page.locator("#status script").count(), 0);
+  assert.equal(await page.evaluate(() => window.injected), undefined);
+});
+
 for (const [name, mutate] of [
   ["script", html => html.replace("</h1>", "<script>window.injected=true</script></h1>")],
   ["handler", html => html.replace('<button type="submit">Set', '<button type="submit" onclick="window.injected=true">Set')],

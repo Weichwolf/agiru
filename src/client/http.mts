@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
-import { ClientError } from "./errors.mjs";
-import { checkResponseProfile, commandEnvelope, limits, parsePage, type Page } from "./profile.mjs";
+import { ClientError, ServerError } from "./errors.mjs";
+import { checkResponseProfile, commandEnvelope, limits, parseFailure, parsePage, type Page } from "./profile.mjs";
 
 export type Command = Readonly<{
   page: string; revision: string; command: string; control: string; operation: "set" | "action"; text?: string;
@@ -87,14 +87,19 @@ export class AgentClient {
         chunks.push(next.value);
       }
       const html = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, size));
+      if (!response.ok) {
+        const failure = parseFailure(html);
+        if (command && failure.command !== command) throw new ClientError("ResponseRefused", "Error command identity does not match the submitted command");
+        throw new ServerError(failure.code, failure.message, failure.outcome, failure.command || undefined);
+      }
       const page = parsePage(html);
-      if (!response.ok) throw new ClientError("HttpRefused", `HTTP ${response.status}; no successful command outcome established`);
       const result = Object.freeze({ page, status: response.status });
       if (Buffer.byteLength(JSON.stringify(result)) > 4194304) {
         throw new ClientError("ResponseLimit", "Structured output byte budget exceeded");
       }
       return result;
     } catch (error) {
+      if (error instanceof ServerError) throw error;
       if (command) throw new ClientError("WriteUncertain", "Write outcome is uncertain; reconcile the command receipt before retrying", command);
       if (error instanceof ClientError) throw error;
       throw new ClientError("TransportFailure", "HTTP read failed or returned invalid UTF-8");

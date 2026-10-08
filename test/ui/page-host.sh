@@ -2,6 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 proof=$(mktemp -d /tmp/agiru-page-host.XXXXXX)
+gate_database=${AGIRU_PAGE_GATE_DATABASE:-agiru_gate}
+[[ "$gate_database" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]
 git rev-parse HEAD > "$proof/head.txt"
 sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSession,SessionCommand}.h \
   src/rt/{PageCommandHost,PageHtml,PageInstance,SessionCommand,HtmlText}.cpp src/rt/HtmlText.h \
@@ -26,7 +28,7 @@ cleanup() {
   for file in "$proof/auth.json" "$proof/auth.json.second"; do
     if [[ -f "$file" ]]; then unlink "$file"; fi
   done
-  for control in owner revision replay policy duplicates list-limit; do
+  for control in owner revision replay policy duplicates list-limit failure-receipt; do
     if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
     make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
   done
@@ -35,7 +37,7 @@ trap cleanup EXIT
 make dev-exec COMMAND='make gate GATE=NativeServiceConfigGate JOBS=2 B=/workspace/build/podman' \
   > "$proof/config-gate.log" 2>&1 || { cat "$proof/config-gate.log"; exit 1; }
 cat "$proof/config-gate.log"
-make dev-exec COMMAND="env AGIRU_TEST_DSN=postgresql://agiru:agiru@127.0.0.1:5432/agiru_gate AGIRU_PAGE_HOST_BUILD=$native make page-navigation JOBS=2 B=/workspace/build/podman" \
+make dev-exec COMMAND="env AGIRU_TEST_DSN=postgresql://agiru:agiru@127.0.0.1:5432/$gate_database AGIRU_PAGE_HOST_BUILD=$native make page-navigation JOBS=2 B=/workspace/build/podman" \
   > "$proof/native.log" 2>&1 || { cat "$proof/native.log"; exit 1; }
 cat "$proof/native.log"
 AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" node --test test/ui/page-host.mjs \
@@ -76,10 +78,13 @@ mutation='
   control == "list-limit" && /options.listRows, loader/ {
     sub(/options.listRows, loader/, "PageHostOptions::kDefaultListRows, loader"); changed++
   }
+  control == "failure-receipt" && /AND outcome = \x27started\x27/ {
+    sub(/AND outcome = \x27started\x27/, "AND outcome = \x27started\x27 AND false"); changed++
+  }
   { print }
   END { if (changed != (control == "list-limit" ? 2 : 1)) exit 2 }
 '
-for control in owner revision replay policy list-limit; do
+for control in owner revision replay policy list-limit failure-receipt; do
   podman exec --user 1000:1001 "${AGIRU_DEV_CONTAINER:-agiru-dev}" \
     awk -v control="$control" "$mutation" /workspace/src/rt/PageCommandHost.cpp > "$proof/$control.cpp"
   podman cp "$proof/$control.cpp" "${AGIRU_DEV_CONTAINER:-agiru-dev}:$native/$control.cpp"
@@ -99,6 +104,7 @@ for control in owner revision replay policy list-limit; do
     replay) rg -q '^not ok .*identical completed command replays' "$proof/$control.log" ;;
     policy) rg -q '^not ok .*startup configuration selects TryFunction write policy' "$proof/$control.log" ;;
     list-limit) rg -q '^not ok .*shared HTTP list windows obey the trusted bound' "$proof/$control.log" ;;
+    failure-receipt) rg -q '^not ok .*a noncommitted AL action rolls back' "$proof/$control.log" ;;
   esac
   for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
@@ -122,4 +128,4 @@ rg -q 'FAIL.*duplicate configuration keys refuse' "$proof/duplicates.log"
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/duplicates.cpp $native/duplicates.so"
 unlink "$proof/duplicates.cpp"
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'page-host: generated-page SQL effects over Caddy/C++, external CMD/MCP and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; six compiled ownership/revision/replay/policy/duplicate/list-bound defects rejected; not full ERP/browser acceptance; %s\n' "$proof"
+printf 'page-host: generated-page SQL effects and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; seven compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt defects rejected; not full ERP acceptance; %s\n' "$proof"
