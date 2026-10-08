@@ -90,9 +90,15 @@ including reused builds. Explicit database/source roots override the selected ca
 inherited B/Make overrides cannot redirect the lane. SnapshotGate passes 21 checks,
 including exact quoted/dollar values, source refusal, private storage, changed configuration
 and configure failure. `make verify-check`: 29 checks, zero red; the complete tooling
-suite passes 261 tests. The corrected frozen `make test JOBS=2` rerun is active;
-its actual CMake cache now selects PostgreSQL 5432, the verified AL source and the
-diagnostic slice independently of live B. Complete manifest/AL UT acceptance remains open.
+suite passes 261 tests. The corrected frozen `make test JOBS=2` rerun passes all
+185 manifest cases, zero red, in 2,042 seconds including configuration/build.
+Its cache selects PostgreSQL 5432, the verified AL source and the diagnostic slice
+independently of live B. Frozen source SHA-256
+`0325ab8c0e296014c5507ad454911f6a81b4df52033c47096a8871a1530e650e`
+and system-symbol/configuration hashes remain unchanged; the input includes the
+configuration repair committed as `1a07829`, not subsequent asynchronous client work.
+This closes the local manifest failure, not source-counted AL UT, complete-app,
+interactive client or financial posting acceptance.
 
 Native command failures now require affected-row proof for durable page invalidation
 and the failed SQL receipt before returning `failed`. Cleanup uncertainty returns
