@@ -17,13 +17,14 @@ AGIRU_CLIENT_HTML="$proof/page.html" node --test test/ui/agent-client.mjs > "$pr
   exit 1
 }
 cat "$proof/client.log"
-for control in rounded-scalars disabled-command stale-revision double-post blocking-auth; do
+for control in rounded-scalars disabled-command stale-revision double-post blocking-auth unsafe-read-hints; do
   mutant="$proof/$control"
   mkdir "$mutant"
   cp build/client/*.mjs "$mutant/"
   ln -s "$(realpath src/client/node_modules)" "$mutant/node_modules"
   source=profile
   case "$control" in stale-revision|double-post|blocking-auth) source=http;; esac
+  if [[ "$control" = unsafe-read-hints ]]; then source=mcp; fi
   awk -v control="$control" '
     control == "rounded-scalars" && /value: attr\(node, "data-value"\)/ {
       sub(/value: attr\(node, "data-value"\)/, "value: String(Number(attr(node, \"data-value\")))"); changed++
@@ -40,6 +41,10 @@ for control in rounded-scalars disabled-command stale-revision double-post block
     control == "blocking-auth" && /constants\.O_NONBLOCK/ {
       sub(/ \| constants\.O_NONBLOCK/, ""); changed++
     }
+    control == "unsafe-read-hints" && /annotations: \{ readOnlyHint: false, destructiveHint: true, idempotentHint: false \}/ {
+      sub(/readOnlyHint: false, destructiveHint: true, idempotentHint: false/,
+        "readOnlyHint: name === \"read\", destructiveHint: name === \"execute\", idempotentHint: name === \"read\""); changed++
+    }
     { print }
     END { if (changed != 1) exit 2 }
   ' "build/client/$source.mjs" > "$mutant/$source.mjs"
@@ -52,10 +57,13 @@ for control in rounded-scalars disabled-command stale-revision double-post block
   if [[ "$control" = blocking-auth ]]; then
     rg -q '^not ok .*private auth files reject FIFOs without waiting for a writer' "$proof/$control.log"
   fi
+  if [[ "$control" = unsafe-read-hints ]]; then
+    rg -q '^not ok .*MCP real stdio initialize/discover/read/set/action' "$proof/$control.log"
+  fi
   rm -- "$mutant/"*.mjs "$mutant/node_modules"
   rmdir "$mutant"
 done
 sha256sum --check --status "$proof/inputs.sha256"
-printf 'agent-client: five executable value/disabled/revision/duplicate-write/blocking-auth mutants rejected\n'
+printf 'agent-client: six executable value/disabled/revision/duplicate-write/blocking-auth/read-hint mutants rejected\n'
 printf 'agent-client: semantic HTML/CMD/MCP transport fixture; no ERP SQL/browser parity claim\n'
 printf 'agent-client: %s\n' "$proof"

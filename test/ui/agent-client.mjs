@@ -225,6 +225,10 @@ test("MCP real stdio initialize/discover/read/set/action matches CMD and form ef
   try {
     await mcp.connect(transport);
     const tools = await mcp.listTools();
+    for (const tool of tools.tools) {
+      assert.deepEqual(tool.annotations, { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+        `${tool.name}: page opens can write in AL triggers; do not advertise safe automatic retries`);
+    }
     assert.deepEqual(tools.tools.map(tool => tool.name), ["agiru_read", "agiru_execute"]);
     const result = await mcp.callTool({ name: "agiru_read", arguments: { path: "/?page=50400" } });
     assert.deepEqual(result.structuredContent, { status: 200, page });

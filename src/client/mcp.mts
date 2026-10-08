@@ -10,10 +10,10 @@ async function main(): Promise<void> {
   const server = new McpServer({ name: "agiru-agent", version: "0.1.0" }, { maxToolInputElements: 64 });
   for (const [name, inputSchema] of [["read", readSchema], ["execute", executeSchema]] as const) {
     server.registerTool(`agiru_${name}`, {
-      description: name === "read" ? "Read the shared semantic HTML page; discover exact values and explicit commands" :
+      description: name === "read" ? "Open or read the shared semantic HTML page; opening runs AL triggers and may write; discover exact values and explicit commands" :
         "Submit one advertised command with explicit page handle, revision and command ID; never retries uncertain writes",
       inputSchema,
-      annotations: { readOnlyHint: name === "read", destructiveHint: name === "execute", idempotentHint: name === "read" },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     }, async (argumentsValue: unknown) => {
       try {
         const value = present(await operate(client, name, argumentsValue));

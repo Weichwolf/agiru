@@ -19,6 +19,8 @@ node build/client/mcp.mjs
 - MCP stdio: `agiru_read` and `agiru_execute`, shared schemas/library. Structured
   results and compact text; stdout is protocol-only. Input is bounded to 1 MiB,
   strictly UTF-8, with no automatic dialog answers.
+  Neither tool promises read-only or idempotent execution: opening a page runs AL
+  triggers, which may write. The name `read` is not permission to retry page opens.
 - Commands require copied handles/revisions/command IDs and exact AL identities.
   Set takes explicit display text; C++ must parse/validate it. Action takes no text.
   Client fences supplement, never replace, server authorization and receipt checks.
