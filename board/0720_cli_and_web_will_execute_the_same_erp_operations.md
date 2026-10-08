@@ -164,13 +164,19 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   browser-document negotiation at `/` requires applying the updated container config.
   `make web-test JOBS=2`: ten Chromium/native-HTML cases and one actual Caddy
   document/asset/header/routing case pass; three compiled defective bundles fail named
-  controls. `make client-test JOBS=2`: 36 cases, six defects rejected. MCP discovery
+  controls. `make client-test JOBS=2`: 37 cases, seven defects rejected. MCP discovery
   marks both operations as potentially destructive and non-idempotent: opening runs
   AL triggers that can write; the name `read` does not authorize automatic retries.
   `src/client/mcp.mts` and `test/ui/agent-client.{mjs,sh}` prove actual stdio hints
   and reject a compiled read-only/idempotent-hint defect. Reference:
   `triggers-auto/page/devenv-onopenpage-page-trigger.md` at the developer revision
-  above and `src/rt/PageCommandHost.cpp::Open`. Opening receipt recovery remains pending.
+  above and `src/rt/PageCommandHost.cpp::Open`. Agent preflight in
+  `src/client/http.mts` requires the matching retained `/?handle=<page>` route;
+  CMD/MCP refuse opening, mismatched, duplicate and foreign paths before any HTTP call.
+  The opening-replay mutant must fail that named test. Updated
+  `test/ui/http-server.mjs` command paths retain twelve passing Caddy/native HTTP/SQL
+  transport cases using unchanged prebuilt producers; not original ERP workflow proof.
+  Opening receipt recovery remains pending.
   Producer
   `PageHtmlGate`: 164 checks. These fixtures are separate from actual ERP HTTP/SQL
   parity. Current-row fragments are not forty-row lists;

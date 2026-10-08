@@ -113,6 +113,10 @@ export class AgentClient {
       (requested.text !== undefined && (!requested.text.isWellFormed() || Buffer.byteLength(requested.text) > limits.bytes))) {
       throw new ClientError("CommandRefused", "Invalid explicit command context");
     }
+    const location = this.#url(path);
+    const retained = location.pathname === "/" && location.searchParams.size === 1 &&
+      location.searchParams.get("handle") === requested.page;
+    if (!retained) throw new ClientError("CommandRefused", "Execute requires the retained /?handle=<page> path; never reopen a page to submit a command");
     const current = await this.read(path);
     if (current.page.handle !== requested.page || current.page.revision !== requested.revision) {
       throw new ClientError("StalePage", "Page handle or revision changed; read and choose a new command explicitly");

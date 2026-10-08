@@ -37,8 +37,8 @@ const server = createServer(async (request, response) => {
   if (request.url === "/invalid-utf8") { response.end(Buffer.from([0xc0, 0xaf])); return; }
   if (request.url === "/big") { response.end("x".repeat(limits.bytes + 1)); return; }
   if (request.url === "/large") { response.end(html.replace("HTML &lt;fixture&gt;", "x".repeat(270000))); return; }
-  if (request.url === "/uncertain" || request.url === "/disconnect") {
-    response.end(html.replaceAll('action="/commands"', 'action="/disconnect"').replaceAll('hx-post="/commands"', 'hx-post="/disconnect"'));
+  if (request.url === "/?handle=page_uncertain" || request.url === "/disconnect") {
+    response.end(html.replaceAll('page_1', 'page_uncertain').replaceAll('action="/commands"', 'action="/disconnect"').replaceAll('hx-post="/commands"', 'hx-post="/disconnect"'));
   } else response.end(html);
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -53,7 +53,7 @@ function change(before, afterValue) {
 function refuses(value) { assert.throws(() => parsePage(value), error => error.code === "ProfileRefused"); }
 function request(control, operation, text) {
   const item = page.controls.find(value => value.identity === control);
-  return { path: "/?page=50400&company=CRONUS%20CH", page: page.handle, revision: page.revision,
+  return { path: `/?handle=${page.handle}`, page: page.handle, revision: page.revision,
     command: item.operation.command, control, operation, ...(text === undefined ? {} : { text }) };
 }
 function cmd(args) {
@@ -195,6 +195,20 @@ test("stale/disabled/unknown actions and invalid schemas never POST", async () =
   assert.equal(posts, before);
 });
 
+test("execute refuses opening or mismatched paths before any HTTP request", async () => {
+  const before = received.length;
+  for (const path of ["/?page=50400", "/?page=50400&company=CRONUS%20CH", "/",
+    "/?handle=other", "/?handle=page_1&handle=page_1", "/?handle=page_1&page=50400",
+    "/other?handle=page_1", "/?handle=page_1#fragment", "//foreign/?handle=page_1"]) {
+    await assert.rejects(operate(client, "execute", { ...request("Post", "action"), path }),
+      error => ["CommandRefused", "PathRefused"].includes(error.code));
+  }
+  const shell = await cmd(["execute", JSON.stringify({ ...request("Post", "action"), path: "/?page=50400" })]);
+  assert.equal(shell.code, 2);
+  assert.equal(JSON.parse(shell.stderr).error, "CommandRefused");
+  assert.equal(received.length, before, "do not run OnOpenPage while checking an existing command");
+});
+
 test("HTTP refuses redirects, foreign paths, malformed UTF-8, status and body/type budgets", async () => {
   for (const path of ["/redirect", "/hx-redirect", "/wrong-type", "/invalid-utf8", "/big", "/refused",
     "//foreign/", "https://foreign/", "/\\foreign", "/#fragment"]) await assert.rejects(client.read(path));
@@ -206,10 +220,10 @@ test("HTTP refuses redirects, foreign paths, malformed UTF-8, status and body/ty
 
 test("uncertain write disconnect is never retried; command receipt identity retained", async () => {
   const before = posts;
-  await assert.rejects(operate(client, "execute", { ...request("Post", "action"), path: "/uncertain" }),
+  await assert.rejects(operate(client, "execute", { ...request("Post", "action"), path: "/?handle=page_uncertain", page: "page_uncertain" }),
     error => error.code === "WriteUncertain" && error.command === "cmd_1_7");
   assert.equal(posts, before + 1);
-  const shell = await cmd(["execute", JSON.stringify({ ...request("Post", "action"), path: "/uncertain" })]);
+  const shell = await cmd(["execute", JSON.stringify({ ...request("Post", "action"), path: "/?handle=page_uncertain", page: "page_uncertain" })]);
   assert.equal(shell.code, 3); assert.equal(shell.stdout, "");
   assert.equal(JSON.parse(shell.stderr).command, "cmd_1_7");
   assert.equal(posts, before + 2);
@@ -248,7 +262,11 @@ test("MCP real stdio initialize/discover/read/set/action matches CMD and form ef
     assert.equal(invalid.isError, true); assert.equal(posts, before + 2);
     const disabled = await mcp.callTool({ name: "agiru_execute", arguments: request("Disabled", "action") });
     assert.equal(disabled.isError, true); assert.equal(disabled.structuredContent.error, "CommandDisabled");
-    const uncertain = await mcp.callTool({ name: "agiru_execute", arguments: { ...request("Post", "action"), path: "/uncertain" } });
+    const beforeOpen = received.length;
+    const reopened = await mcp.callTool({ name: "agiru_execute", arguments: { ...request("Post", "action"), path: "/?page=50400" } });
+    assert.equal(reopened.isError, true); assert.equal(reopened.structuredContent.error, "CommandRefused");
+    assert.equal(received.length, beforeOpen);
+    const uncertain = await mcp.callTool({ name: "agiru_execute", arguments: { ...request("Post", "action"), path: "/?handle=page_uncertain", page: "page_uncertain" } });
     assert.equal(uncertain.isError, true); assert.equal(uncertain.structuredContent.error, "WriteUncertain");
     assert.equal(posts, before + 3); assert.equal(diagnostic, "");
   } finally { await mcp.close(); }

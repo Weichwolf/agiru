@@ -10,7 +10,7 @@ business workflows remain incomplete.
 export AGIRU_ORIGIN=http://127.0.0.1:8080
 node build/client/cmd.mjs read '/?company=CRONUS%20CH&page=21'
 node build/client/cmd.mjs --json read '/?company=CRONUS%20CH&page=21'
-node build/client/cmd.mjs execute '{"path":"/?page=21","page":"<advertised-handle>","revision":"<advertised-revision>","command":"<advertised-command>","control":"<AL-control-name>","operation":"set","text":"<explicit-display-text>"}'
+node build/client/cmd.mjs execute '{"path":"/?handle=<advertised-handle>","page":"<advertised-handle>","revision":"<advertised-revision>","command":"<advertised-command>","control":"<AL-control-name>","operation":"set","text":"<explicit-display-text>"}'
 node build/client/mcp.mjs
 ```
 
@@ -22,6 +22,8 @@ node build/client/mcp.mjs
   Neither tool promises read-only or idempotent execution: opening a page runs AL
   triggers, which may write. The name `read` is not permission to retry page opens.
 - Commands require copied handles/revisions/command IDs and exact AL identities.
+  Execute accepts only the retained `/?handle=<page>` path, never the initial
+  opening URL: its preflight must not rerun company/page initialization or writes.
   Set takes explicit display text; C++ must parse/validate it. Action takes no text.
   Client fences supplement, never replace, server authorization and receipt checks.
 - Profile 1 supports one current row, ordered groups/fields/actions/labels and

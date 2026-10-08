@@ -55,7 +55,7 @@ async function sql(expression) {
   return result.stdout.trim();
 }
 function command(operation, control, text) {
-  return { path: "/?page=50400&company=CRONUS%20CH", page: page.handle, revision: page.revision,
+  return { path: `/?handle=${page.handle}`, page: page.handle, revision: page.revision,
     command: page.controls.find(item => item.identity === control).operation.command,
     control, operation, ...(text === undefined ? {} : { text }) };
 }
