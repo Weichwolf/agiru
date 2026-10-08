@@ -38,9 +38,13 @@ This is a storage gate, not live HTTPS cookies, browser login or SaaS acceptance
 front door; nine compiled transport/retention/configuration defects must reject.
 `make browser-https-test` exercises real Caddy TLS, private libmicrohttpd and PostgreSQL
 in one disposable container with an external protocol client and independent SQL probes.
-The private CA is explicitly trusted, never bypassed; cookies, metadata/origin denials,
-rotation, logout and source expiry are checked. Neither target proves actual Chromium
-cookie adoption, cookie-mode ERP effects, stolen-token device binding or full SaaS security.
+Actual Chromium exercises the htmx cookie client; external CMD/MCP retain the same
+exact generated-list values. Independent SQL checks Validate/Save/replay, passive
+bootstrap, tab isolation, logout and expiry during an unanswered AL question.
+Malformed grants must refuse without bearer fallback or AL execution. The private CA
+is explicitly trusted in an isolated profile after an actual browser rejection, never
+bypassed. Protocol probes retain metadata/origin denials, rotation and source expiry.
+Neither target proves stolen-token device binding, full business workflows or SaaS security.
 
 `make session-identity JOBS=2` also checks session-owned ApplicationArea and random sequences through
 nested, reused, migrated and concurrent workers. Six compiled ownership/seed/bound/clock
@@ -345,7 +349,7 @@ This is not a Node ERP server or proof of
 production authentication, SQL effects, actual htmx browser behaviour or complete
 page/ERP parity. `AGIRU_PAGE_HTML_GATE` can select an explicitly built host producer.
 Fixtures and disposable mutant modules use `/tmp`; Node stays outside the ERP container.
-`make web-test` builds local htmx/static browser assets and executes eleven real Chromium
+`make web-test` builds local htmx/static browser assets and executes fourteen real Chromium
 cases against the same native `PageHtmlGate` fragment and agent profile/envelope.
 Three compiled bundles must fail named response-effect, hidden-envelope and concurrent
 POST cases. One additional actual Caddy case qualifies static assets/licenses, document

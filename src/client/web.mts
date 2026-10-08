@@ -1,4 +1,5 @@
 import htmx from "htmx.org";
+import { BrowserSession } from "./browser-session.mjs";
 import { checkResponseProfile, commandEnvelope, parseFailure, parsePage, type Page } from "./profile.mjs";
 
 type Request = {
@@ -13,7 +14,8 @@ const root = document.querySelector<HTMLElement>("#workspace")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const login = document.querySelector<HTMLFormElement>("#connection")!;
 const secret = document.querySelector<HTMLInputElement>("#credential")!;
-let authorization = "";
+const logout = document.querySelector<HTMLButtonElement>("#logout")!;
+const session = new BrowserSession();
 let current: Page | undefined;
 let retained: Readonly<{ page: Page; html: string }> | undefined;
 let retainedModal: Readonly<{ page: Page; html: string }> | undefined;
@@ -22,6 +24,7 @@ let failureNotice = "";
 let active = false;
 let pollDeadline = 0;
 const candidates = new WeakMap<XMLHttpRequest, Page>();
+const uncertainCommands = new WeakMap<XMLHttpRequest, string>();
 
 htmx.config.allowEval = false;
 htmx.config.allowScriptTags = false;
@@ -38,7 +41,8 @@ function path(value: string): string {
 }
 
 function notice(response?: Response): void {
-  const command = response?.requestConfig.parameters.command || current?.interaction?.originCommand;
+  const command = (response && uncertainCommands.get(response.xhr)) ||
+    response?.requestConfig.parameters.command || current?.interaction?.originCommand;
   status.textContent = response?.requestConfig.verb === "post" || command
     ? `Write outcome uncertain; reconcile command ${command ?? "(unknown)"} before retrying.`
     : "Page request refused; no successful outcome established.";
@@ -48,8 +52,7 @@ document.addEventListener("htmx:configRequest", event => {
   const request = (event as CustomEvent<Request>).detail;
   try {
     request.path = path(request.path);
-    if (!authorization) throw new Error();
-    request.headers.Authorization = authorization;
+    Object.assign(request.headers, session.headers());
     request.headers.Accept = "text/html";
     if (request.verb === "get") {
       if (request.elt !== root) throw new Error();
@@ -90,6 +93,15 @@ document.addEventListener("htmx:beforeOnLoad", event => {
     if (xhr.status < 200 ||
         xhr.responseURL !== new URL(response.requestConfig.path, location.origin).href) throw new Error();
     checkResponseProfile(xhr.getResponseHeader("Content-Type") ?? "", header => xhr.getResponseHeader(header) !== null);
+    if (xhr.status === 401) {
+      event.preventDefault();
+      const command = current?.interaction?.originCommand || response.requestConfig.parameters.command;
+      if (command) uncertainCommands.set(xhr, command);
+      session.clear();
+      resetClient();
+      notice(response);
+      return;
+    }
     if (xhr.status >= 300) {
       const failure = parseFailure(xhr.responseText);
       const command = response.requestConfig.verb === "post" ?
@@ -176,25 +188,69 @@ for (const name of ["htmx:sendError", "htmx:timeout", "htmx:responseError", "htm
 }
 document.addEventListener("htmx:afterRequest", () => { active = false; });
 
-login.addEventListener("submit", event => {
+function resetClient(): void {
+  current = undefined;
+  retained = undefined;
+  retainedModal = undefined;
+  resolving = false;
+  failureNotice = "";
+  root.replaceChildren();
+  login.hidden = false;
+  secret.value = "";
+  secret.required = !session.ready;
+  secret.closest("label")!.hidden = session.ready;
+  logout.hidden = !session.ready;
+}
+
+login.addEventListener("submit", async event => {
   event.preventDefault();
   if (active) return;
-  if (location.protocol !== "https:" && !["127.0.0.1", "localhost", "[::1]"].includes(location.hostname)) {
-    status.textContent = "Use HTTPS or a loopback development origin.";
-    return;
-  }
-  if (!/^ag1_[a-f0-9]{64}$/.test(secret.value)) {
-    status.textContent = "A valid privately issued development credential is required.";
-    return;
-  }
-  authorization = `Bearer ${secret.value}`;
-  secret.value = "";
-  login.hidden = true;
+  let destination: string;
   try {
     const target = document.querySelector<HTMLInputElement>("#target")!.value;
-    void htmx.ajax("get", path(target), { source: root, target: root, swap: "innerHTML" }).catch(() => notice());
-  } catch { status.textContent = "Only same-origin root-relative page paths are allowed."; }
+    destination = path(target);
+  } catch { status.textContent = "Only same-origin root-relative page paths are allowed."; return; }
+  active = true;
+  try {
+    if (!session.ready) {
+      const credential = secret.value;
+      secret.value = "";
+      await session.connect(credential);
+    }
+    login.hidden = true;
+    logout.hidden = false;
+    active = false;
+    await htmx.ajax("get", destination, { source: root, target: root, swap: "innerHTML" });
+  } catch {
+    active = false;
+    status.textContent = "Connection refused or uncertain; reload to reconcile before retrying.";
+  }
+});
+
+logout.addEventListener("click", async () => {
+  if (active) return;
+  active = true;
+  const pending = current?.interaction?.originCommand;
+  let signedOut = false;
+  try { await session.logout(); signedOut = true; }
+  catch { signedOut = false; }
+  finally {
+    active = false;
+    resetClient();
+    status.textContent = signedOut ? "Signed out; unsaved pages were not saved." :
+      "Logout uncertain; reload to reconcile before retrying.";
+    if (pending) status.textContent += ` Reconcile command ${pending}; logout does not establish its outcome.`;
+  }
 });
 
 const target = document.querySelector<HTMLInputElement>("#target")!;
 target.value = location.search ? `/${location.search}` : "/?page=22";
+if (session.cookies) {
+  active = true;
+  secret.disabled = true;
+  void session.bootstrap().then(ready => {
+    resetClient();
+    status.textContent = ready ? "Browser session ready; choose a page and Open." : "Development credential required.";
+  }).catch(() => { status.textContent = "Session bootstrap refused; no page opened."; })
+    .finally(() => { active = false; secret.disabled = false; });
+}

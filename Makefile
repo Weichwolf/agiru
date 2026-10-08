@@ -32,7 +32,7 @@ browser-auth: comments db ## qualify native browser authentication protocol and 
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_BrowserHttpGate gate_NativeServiceConfigGate
 	@B="$(B)" bash "$(SELF)/test/ui/browser-auth.sh"
 
-browser-https-test: ## qualify actual Caddy HTTPS cookie transport against a disposable SQL probe
+browser-https-test: web ## qualify Caddy HTTPS cookies and actual browser/CMD/MCP page operations
 	@bash "$(SELF)/test/ui/browser-https.sh"
 
 browser-sessions: comments db ## qualify SQL browser-session expiry, rotation, source and admission fences

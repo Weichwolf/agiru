@@ -59,7 +59,13 @@ installed packages retain their own notices/licenses. None are ERP-server depend
 `make web` bundles htmx 2.0.11 (0BSD) and the same profile/parser/envelope into
 `build/web/`; `make dev-web` publishes those static files to the owned Caddy container.
 Open `/assets/index.html` with the privately issued development token. It stays in
-tab memory, never URL/storage; production sign-in remains pending. Updated Caddy
+tab memory only on loopback HTTP. HTTPS exchanges it once for an HttpOnly
+`__Host-agiru` cookie; subsequent page calls use session-bound CSRF, not a retained
+bearer. Passive bootstrap opens no AL page and does not renew idle expiry.
+Sign out revokes the browser identity; expired/revoked sessions clear the workspace
+and preserve pending command IDs for reconciliation, never automatically retry writes.
+Tabs share authentication, not AL page state. Neither cookies nor bearer tokens
+prevent replay after theft; production password sign-in remains pending. Updated Caddy
 configuration serves the same entry at `/?page=...&company=...` for browser navigation;
 HX requests keep the native fragment route. Applying that configuration needs a
 container restart/rebuild; publishing assets alone does not change the running proxy.
@@ -71,3 +77,11 @@ test-only); fourteen native-HTML fixture cases, one actual Caddy asset/routing c
 three defective compiled bundles,
 not production SQL/dialog/ERP acceptance. esbuild 0.28.2 (MIT) is build-only.
 The bundle ships dependency licenses; the native server does not use Node.js.
+
+`make browser-https-test` qualifies the actual cookie-mode htmx client, external
+CMD/MCP list values and independent SQL effects through Debian Caddy and the native
+server/PostgreSQL in one disposable container. Chromium first rejects the private CA,
+then explicitly trusts it in an isolated test profile; certificate checks are never
+disabled. It covers cookie flags, tab isolation, Validate/Save/replay, logout, malformed
+session grants and expiry during an unanswered AL dialog. This is generated-page
+transport qualification, not complete business-process or SaaS-security acceptance.

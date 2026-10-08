@@ -4,8 +4,9 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: adopt the HTTPS cookie/CSRF protocol in the actual htmx client and prove
-cookie-mode page/activity/replay parity in Chromium, then expand setup/master-data
+Next: repair the generated ExchangeSync.Enabled dependency blocking the native app
+build in its generator/runtime primitive; never patch apps or guess missing fields.
+Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
 production variable setters and qualify original invalid-input/lookup/dimension cases.
@@ -46,9 +47,10 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Preserve atomic SQL effects under denial, timeout, disconnect and exhaustion.
 - Current code inspection: `ClientCredentials.cpp` checks bearer expiry/revocation;
   `PageCommandHost.cpp` binds ownership to credential/user/company/host and checks write CSRF/Origin.
-  `HttpServer.cpp` emits no-store; Caddy declares CSP. Browser uses an in-memory bearer
-  (`src/client/web.mts`), not an HttpOnly cookie. The native cookie protocol below is
-  separate from actual browser adoption and full SaaS isolation, which remain unqualified.
+  `HttpServer.cpp` emits no-store; Caddy declares CSP. The actual HTTPS htmx client
+  exchanges its development source credential once, retaining only CSRF in memory;
+  loopback HTTP uses a separate tab-memory bearer adapter. Full SaaS isolation and
+  password sign-in remain unqualified.
 - Credential identity gates: 36 checks, zero red; `make session-identity` retains
   75 identity, 49 command, 48 value and 84 generator checks, zero red. Thirteen identity/
   command/credential/provider and six value defects reject. A same-user peer has a distinct
@@ -85,8 +87,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   requests remain independent. Trusted `browser_sessions` settings are complete in
   `deploy/dev/agiru.json`; activation on HTTP refuses. Development defaults stay disabled.
   Same-origin bootstrap is passive; rotation/logout commit before issuing/deleting cookies.
-  Fresh operations request idle renewal; cookie-mode AL activity/replay qualification
-  and active-stack revocation/cancellation remain due.
+  Fresh operations request idle renewal; actual cookie-mode SQL tests prove passive
+  bootstrap and command replay do not renew it. Active-stack revocation/cancellation
+  remains unqualified; expiry denies answers and unanswered AL follows its own timeout.
   `make browser-auth JOBS=2`: 37 protocol/front-door and 280 configuration checks,
   zero red; nine compiled CSRF/metadata/proxy/origin/cookie/retention/HTTPS-policy
   defects reject. Eleven affected compiled C++ units pass targeted clang-tidy.
@@ -94,17 +97,33 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   36 credential, 48 value and 84 generator checks, zero red; their negative controls
   still reject. Container runs explicitly select the container-local gate DSN.
 - `make browser-https-test` uses the official Debian Caddy, private libmicrohttpd and
-  PostgreSQL together in a disposable container, with an external Node protocol client.
+  PostgreSQL together in a disposable container, with external Node and Chromium clients.
   All nine TLS/cookie/CSRF/rotation/logout/source-expiry cases pass without disabling
   certificate verification; an untrusted CA is rejected. Forged forwarding headers are
-  replaced and denials leave independent SQL probe effects unchanged. This is a SQL
-  protocol probe, not actual Chromium cookie adoption or ERP workflow acceptance.
-  Durable sources: `test/ui/browser-https.{sh,mjs}`, `test/gate/BrowserHttpGate.cpp`,
-  `deploy/dev/Caddyfile`; no WI dependency on disposable receipts.
+  replaced and denials leave independent SQL probe effects unchanged. Eight actual
+  Chromium cases prove cookie adoption/no retained bearer, exact CMD/MCP list values,
+  Validate/Save/GET-followed replay SQL effects, independent tab state, durable logout,
+  malformed-grant refusal without bearer fallback, and expiry while AL still awaits
+  an explicit answer. The original command ID survives client reset; no automatic
+  answer/retry or additional SQL write occurs. This is generated-page transport proof,
+  not full business workflows or SaaS acceptance. Fixture Runner passes targeted
+  clang-tidy with zero failures.
+  Existing regressions: `make web-test` passes 14 Chromium cases and one Caddy case;
+  three defective bundles reject. `make client-test` passes 44 CMD/MCP cases and
+  the 164-check native HTML producer; eight executable client defects reject.
+  Durable sources: `src/client/{browser-session,web}.mts`,
+  `test/ui/{browser-https.sh,browser-https.mjs,browser-page-https.mjs,trusted-chromium.sh}`,
+  `test/gate/BrowserHttpGate.cpp`, `deploy/dev/Caddyfile`.
+  Chromium first refuses the certificate, then imports its CA into a private NSS
+  profile mounted only in the test process namespace. Personal trust remains unchanged;
+  [Chromium Linux certificate management](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/cert_management.md)
+  consulted 2026-10-08. No certificate bypass or disposable-receipt WI dependency.
 - Predecessor `~/Git/openerp/board/1775_a_session_per_tab.md`: do not equate a shared
   browser authentication cookie with AL page state. Retain explicit independent page
   contexts; reject global session managers, URL credentials and unbounded tab sessions.
-  Two actual browser tabs still need qualification. Never claim stolen-cookie device binding.
+  Two actual tabs now prove passive shared authentication with independent page handles
+  and AL variables; logout invalidates the other tab's next operation without SQL effects.
+  Never claim stolen-cookie device binding.
 - Current `make page-host-test JOBS=2` attempt: generated navigation 270, dispatcher
   105 and source 15 checks pass with their 29 execution controls/one compile refusal.
   The external fixture passes 38/38; production-shaped native configuration passes

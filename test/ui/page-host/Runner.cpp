@@ -1,6 +1,7 @@
 #include "meta/PageDef.h"
 #include "platform/Company.h"
 #include "platform/User.h"
+#include "runtime/BrowserSession.h"
 #include "runtime/ClientCredentials.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
@@ -135,6 +136,7 @@ void Seed(const std::string &dsn, const std::string &authPath) {
   connection.Run(R"(CREATE TRIGGER ui_write_audit AFTER UPDATE ON "Navigation Row"
                     FOR EACH ROW EXECUTE FUNCTION ui_write_audit())");
   agiru::InstallClientCredentials(connection);
+  agiru::InstallBrowserSessions(connection);
   LegacyContextMigration(connection);
   gate::PrivateAuthFile(
       authPath,

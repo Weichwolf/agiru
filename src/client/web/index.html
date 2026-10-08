@@ -13,9 +13,11 @@
     <label>Page path <input id="target" type="text" required></label>
     <label>Development credential <input id="credential" type="password" autocomplete="off" required></label>
     <button type="submit">Open</button>
-    <p>Use a privately issued development token. It remains only in this tab's memory.
+    <p>Use a privately issued development token. HTTPS exchanges it for a protected cookie;
+      loopback HTTP retains it only in this tab's memory.
       Production sign-in is not implemented by this development entry.</p>
   </form>
+  <button id="logout" type="button" hidden>Sign out</button>
   <p id="status" role="status" aria-live="polite">Not connected</p>
   <main id="workspace"></main>
 </body>
