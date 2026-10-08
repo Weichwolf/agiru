@@ -5,6 +5,7 @@
 #include "Format.h"
 #include "Parser.h"
 #include "Refused.h"
+#include "RuntimeSurface.h"
 
 #include <array>
 #include <cstddef>
@@ -551,6 +552,49 @@ void NativeDeclarationsNeverBecomeSuccessfulEmptyMethods() {
   CHECK_TRUE("ordinary AL procedures retain their implementation", source.contains("return 7;"));
 }
 
+void ImplicitRecordFieldsMatchBodyLowering() {
+  const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
+    codeunit 50312 FieldArguments {
+      procedure Update()
+      var Row: Record "Unavailable Row"; Value: Boolean;
+      begin
+        Row.ModifyAll(Enabled, Value);
+        Row.LoadFields("Quoted Field", Enabled);
+        Row.GetRangeMin("Quoted Field");
+        Row.GetRangeMax("Quoted Field");
+        Row.GetFilter("Quoted Field");
+        Row.GetAscending("Quoted Field");
+        Row.CopyFilter("Quoted Field", Enabled);
+        Row.FieldActive(Enabled);
+        Row.Relation(Enabled);
+        Row.AreFieldsLoaded("Quoted Field", Enabled);
+      end;
+    })");
+  const auto header = agiru::gen::WriteCodeunit(unit, "FieldArguments.Codeunit.al", Tables());
+  const auto &members = header.absent.at("UnavailableRow");
+  CHECK_TRUE("ModifyAll's implicit field remains an explicit unavailable member",
+             members.contains("Enabled"));
+  CHECK_TRUE("variadic and quoted field arguments remain explicit unavailable members",
+             members.contains("QuotedField"));
+  CHECK_TRUE("ModifyAll's value is not invented as a record field", !members.contains("Value"));
+  CHECK_TRUE("ordinary local arguments are not invented as unavailable object types",
+             header.absent.size() == 1);
+  const auto body = agiru::gen::WriteCodeunitSource(unit, "FieldArguments.Codeunit.al", Tables());
+  CHECK_TRUE("the emitter names the exact refusal members recorded by the collector",
+             body.contains("Row.ModifyAll(Row.Enabled, Value)") &&
+                 body.contains("Row.LoadFields(Row.QuotedField, Row.Enabled)"));
+  CHECK_TRUE("field argument signatures use AL case-insensitive method lookup",
+             agiru::gen::RecordFieldArguments("mOdIfYaLl") == 1);
+  CHECK_TRUE("record values and similarly named methods are not field arguments",
+             agiru::gen::RecordFieldArguments("Modify") == 0 &&
+                 agiru::gen::RecordFieldArguments("ModifyAllExtra") == 0);
+  CHECK_TRUE("multi-field methods retain their variadic field signature",
+             agiru::gen::RecordFieldArguments("LoadFields") ==
+                     agiru::gen::kAllRecordFieldArguments &&
+                 agiru::gen::RecordFieldArguments("AreFieldsLoaded") ==
+                     agiru::gen::kAllRecordFieldArguments);
+}
+
 } // namespace
 
 int main() {
@@ -571,5 +615,6 @@ int main() {
     ACodeunitIncludesEveryObjectItNames();
     ANativeFieldCannotCaptureARecordMethod();
     NativeDeclarationsNeverBecomeSuccessfulEmptyMethods();
+    ImplicitRecordFieldsMatchBodyLowering();
   });
 }

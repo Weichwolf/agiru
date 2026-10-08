@@ -4,8 +4,10 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: repair the generated ExchangeSync.Enabled dependency blocking the native app
-build in its generator/runtime primitive; never patch apps or guess missing fields.
+Next: regenerate the production tree with the qualified implicit-field dependency repair,
+rebuild the native app and repeat the original Customer workflow; never patch apps or
+guess missing fields. The last production build still stops at ExchangeSync.Enabled;
+the new production rebuild remains pending, not proved by fixture compilation.
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
@@ -139,6 +141,29 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `test/gate/ClientCredentialsGate.cpp`, `test/ui/{page-host,http-server,web-client}.*`.
 
 ## Refreshed client contracts (2026-10-08)
+
+- Implicit field arguments: `BodyWriter.cpp` and `CodeunitWriter.cpp` now share
+  `RecordFieldArguments` in `RuntimeSurface.{h,cpp}`, replacing drifting method lists.
+  Collection retains bare/quoted fields for ModifyAll, LoadFields, range/filter queries,
+  CopyFilter, FieldActive, Relation and AreFieldsLoaded; non-field values are not schema.
+  `make native-codeunits JOBS=2` with the verified System package: generator 57,
+  executable refusals 39, source-bound calls 8 and original Base64 bindings 61 checks,
+  zero red. Ten unavailable-record operations compile and throw before subsequent AL
+  effects; deleting Enabled from generated refusal declarations fails compilation.
+  Native-attribute, source-ID, missing-definition and both Base64 controls still reject.
+  `make lint JOBS=2`: 13 affected units, zero findings, suppression baseline unchanged.
+  This repairs dependency emission, not the excluded integration or core company-copy
+  acceptance. Retain mixed cleanup code and its explicit refusals until qualified.
+  References: developer `methods-auto/record/record-{modifyall,loadfields}-method.md`
+  at `f928288ee840334be73142e5fc0202c0e19b246d`; BCApps `main`
+  `src/Layers/W1/BaseApp/EnvironmentCleanupSubs.Codeunit.al` at
+  `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`, SHA-256
+  `a8af594ed0941128459ba06699d9d5cb15b0f0c7666b90d9c562328a9df510c2`,
+  equal to the production source copy. User intent: `business-central/about-new-company.md`.
+  Predecessor 1173 retains the cost of successful fallbacks instead of named refusals.
+  Verified System manifest is 29.0.55365.0/runtime 18.0; artifact directory
+  29.0.54011.55407 is not that manifest version. Package SHA-256 remains
+  `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`.
 
 - P0, before sales/purchase replay: each row owns its OnAfterGetRecord-derived
   variables, arrays and totals; rendering a pending input row must not reset them.

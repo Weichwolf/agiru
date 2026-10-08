@@ -516,37 +516,6 @@ std::string InterfaceType(const al::VarDecl &declared, const Objects &objects) {
          ">";
 }
 
-constexpr std::size_t kEveryArgument = static_cast<std::size_t>(-1);
-
-std::size_t FieldArguments(std::string_view method) {
-  static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
-      {"SetRange", 1},
-      {"SetFilter", 1},
-      {"FindFirstField", 1},
-      {"FindNextField", 1},
-      {"FindPreviousField", 1},
-      {"TestField", 1},
-      {"FieldError", 1},
-      {"FieldCaption", 1},
-      {"ColumnCaption", 1},
-      {"ColumnName", 1},
-      {"FieldName", 1},
-      {"FieldNo", 1},
-      {"Validate", 1},
-      {"SetAscending", 1},
-      {"CalcFields", kEveryArgument},
-      {"CalcSums", kEveryArgument},
-      {"SetAutoCalcFields", kEveryArgument},
-      {"SetCurrentKey", kEveryArgument},
-      {"SetLoadFields", kEveryArgument},
-      {"AddLoadFields", kEveryArgument},
-  };
-  for (const auto &[name, count] : kTakers) {
-    if (LowerKey(std::string(name)) == LowerKey(std::string(method))) { return count; }
-  }
-  return 0;
-}
-
 std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
   const TableRef *ref = Reach(declared, objects);
   if (ref == nullptr) { return "absent::" + Identifier(declared.subtype); }
@@ -1049,7 +1018,7 @@ void NoteDotNet(const al::VarDecl &declared, DotNetNames &named, DotNetUse &use)
 void GatherFieldArguments(const std::vector<al::Token> &tokens,
                           std::size_t method,
                           std::set<std::string> &into) {
-  const std::size_t count = FieldArguments(tokens[method].text);
+  const std::size_t count = RecordFieldArguments(tokens[method].text);
   if (count == 0) { return; }
   std::size_t at = method + 1;
   if (at >= tokens.size() || tokens[at].text != "(") { return; }
@@ -1065,7 +1034,7 @@ void GatherFieldArguments(const std::vector<al::Token> &tokens,
     }
     if (depth != 0) { continue; }
     if (token.text == ",") {
-      if (count != kEveryArgument) { return; }
+      if (count != kAllRecordFieldArguments) { return; }
       first = true;
       continue;
     }

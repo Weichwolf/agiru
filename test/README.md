@@ -233,6 +233,10 @@ the source-bound fixture uses production `--system-symbols` loading, indexes bar
 qualified and numeric identities, links cross-codeunit AL calls and checks registry
 metadata and original module ownership. Wrong source IDs and missing definitions
 must fail compilation/linking. Unbound Native calls remain named refusals.
+Ordinary AL calls on an unavailable Record compile implicit/quoted field arguments
+for ten methods and refuse with the original member identity before subsequent effects.
+Removing the implicit field declaration must fail compilation; no table schema or
+successful fallback is invented. Emitter and dependency collection share one signature table.
 An explicit verified `AGIRU_SYSTEM_SYMBOLS` compiles all nine original Base64
 overloads: five text-input bindings execute; four InStream overloads retain named
 refusals. Wrong-encoding and terminated-output controls must fail. The text-output

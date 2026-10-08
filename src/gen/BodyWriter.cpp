@@ -495,47 +495,6 @@ private:
     return SameName(declared, "FieldRef") || SameName(declared, "KeyRef");
   }
 
-  static std::size_t FieldArguments(std::string_view method) {
-    static constexpr auto kAll = static_cast<std::size_t>(-1);
-    static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
-        {"SetRange", 1},
-        {"SetFilter", 1},
-        {"FindFirstField", 1},
-        {"FindNextField", 1},
-        {"FindPreviousField", 1},
-        {"TestField", 1},
-        {"FieldError", 1},
-        {"FieldCaption", 1},
-        {"ColumnCaption", 1},
-        {"ColumnName", 1},
-        {"FieldName", 1},
-        {"FieldNo", 1},
-        {"Validate", 1},
-        {"SetAscending", 1},
-        {"CalcFields", kAll},
-        {"CalcSums", kAll},
-        {"SetAutoCalcFields", kAll},
-        {"SetCurrentKey", kAll},
-        {"SetLoadFields", kAll},
-        {"AddLoadFields", kAll},
-        {"LoadFields", kAll},
-        {"GetRangeMin", 1},
-        {"GetRangeMax", 1},
-        {"GetFilter", 1},
-        {"GetAscending", 1},
-        {"CopyFilter", kAll},
-        {"FieldActive", 1},
-        {"ModifyAll", 1},
-        {"Relation", 1},
-        {"SetAutoCalcFields", kAll},
-        {"AreFieldsLoaded", kAll},
-    };
-    for (const auto &[name, count] : kTakers) {
-      if (SameName(name, method)) { return count; }
-    }
-    return 0;
-  }
-
   std::string Raise(const al::Expr &expression) {
     std::string message = expression.children.size() > 2 ? "StrSubstNo(" : "";
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
@@ -804,7 +763,7 @@ private:
     CallArguments out;
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[1].kind == al::ExprKind::Name) {
-      out.fields = FieldArguments(callee.children[1].text);
+      out.fields = RecordFieldArguments(callee.children[1].text);
       if (out.fields != 0 && callee.children.front().kind == al::ExprKind::Name &&
           TakesValues(scope_.DeclaredType(callee.children.front().text))) {
         out.fields = 0;
@@ -894,7 +853,7 @@ private:
   std::string FieldArgument(const al::Expr &argument, std::size_t i, const CallArguments &context) {
     const al::Expr *holder = context.holder;
     const bool isField = !context.receiver.empty() &&
-                         (context.fields == static_cast<std::size_t>(-1) || i <= context.fields);
+                         (context.fields == kAllRecordFieldArguments || i <= context.fields);
     if (isField && holder != nullptr && holder->kind == al::ExprKind::Index &&
         !holder->children.empty() && holder->children.front().kind == al::ExprKind::Name &&
         argument.kind == al::ExprKind::Name &&

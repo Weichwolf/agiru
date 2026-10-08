@@ -58,4 +58,25 @@ codeunit 50311 NativeFixture
     begin
         exit(7);
     end;
+
+    procedure UnavailableFields(Operation: Integer; var Counter: Integer)
+    var
+        Row: Record "Unavailable Row";
+        Value: Boolean;
+    begin
+        Counter := 41;
+        case Operation of
+            0: Row.ModifyAll(Enabled, Value);
+            1: Row.LoadFields("Quoted Field", Enabled);
+            2: Row.GetRangeMin("Quoted Field");
+            3: Row.GetRangeMax("Quoted Field");
+            4: Row.GetFilter("Quoted Field");
+            5: Row.GetAscending("Quoted Field");
+            6: Row.CopyFilter("Quoted Field", Enabled);
+            7: Row.FieldActive(Enabled);
+            8: Row.Relation(Enabled);
+            9: Row.AreFieldsLoaded("Quoted Field", Enabled);
+        end;
+        Counter := 99;
+    end;
 }

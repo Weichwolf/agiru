@@ -9,7 +9,7 @@ printf 'native-codeunits: receipts %s\n' "$proof"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate)
 links=(--rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
-sha256sum src/gen/{CodeunitWriter,NativeSource,NativeMethods,Refused}.{cpp,h} src/tc/Main.cpp \
+sha256sum src/gen/{BodyWriter,CodeunitWriter,RuntimeSurface,NativeSource,NativeMethods,Refused}.{cpp,h} src/tc/Main.cpp \
   include/runtime/NativeBase64.h src/net/NativeBase64.cpp \
   "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" > "$proof/inputs.sha256"
@@ -41,11 +41,27 @@ record_command() {
 
 generate "$input" "$proof/generated" 1
 rg -q '^refused +7 ' "$proof/generated.log"
-"$CXX" "${flags[@]}" "-I$proof/generated/fixture" -c "$input/Runner.cpp" -o "$proof/runner.o"
+"$CXX" "${flags[@]}" "-I$proof/generated/fixture" "-I$proof/generated/absent" \
+  -c "$input/Runner.cpp" -o "$proof/runner.o"
 record_command native-codeunits "$input/Runner.cpp" \
-  "$CXX" "${flags[@]}" "-I$proof/generated/fixture" -c "$input/Runner.cpp" -o "$proof/runner.o"
+  "$CXX" "${flags[@]}" "-I$proof/generated/fixture" "-I$proof/generated/absent" \
+  -c "$input/Runner.cpp" -o "$proof/runner.o"
 link_generated "$proof/generated" "$proof/runner.o" "$proof/runner"
 "$proof/runner" | tee "$proof/execution.log"
+
+cp -a "$proof/generated" "$proof/missing-field"
+awk '
+  /::agiru::dotnet::Refused Enabled\{/ { removed++; next }
+  { print }
+  END { if (removed != 1) exit 2 }
+' "$proof/generated/absent/absent/Types.h" > "$proof/missing-field/absent/absent/Types.h"
+if link_generated "$proof/missing-field" "$proof/runner.o" "$proof/missing-field-runner" \
+  > "$proof/missing-field-control.log" 2>&1; then
+  printf 'native-codeunits: missing implicit field escaped compilation control\n' >&2
+  exit 1
+fi
+rg -q "no member named 'Enabled'" "$proof/missing-field-control.log"
+rm -r -- "$proof/missing-field"
 
 cp -a "$input" "$proof/non-native"
 sed -i '/\[Native\]/d; /\[nAtIvE\]/d' "$proof/non-native/source/NativeFixture.Codeunit.al"

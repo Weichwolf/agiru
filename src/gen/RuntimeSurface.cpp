@@ -22,6 +22,54 @@
 
 namespace agiru::gen {
 
+std::size_t RecordFieldArguments(std::string_view method) {
+  static constexpr std::array<std::pair<std::string_view, std::size_t>, 30> kFields{{
+      {"SetRange", 1},
+      {"SetFilter", 1},
+      {"FindFirstField", 1},
+      {"FindNextField", 1},
+      {"FindPreviousField", 1},
+      {"TestField", 1},
+      {"FieldError", 1},
+      {"FieldCaption", 1},
+      {"ColumnCaption", 1},
+      {"ColumnName", 1},
+      {"FieldName", 1},
+      {"FieldNo", 1},
+      {"Validate", 1},
+      {"SetAscending", 1},
+      {"CalcFields", kAllRecordFieldArguments},
+      {"CalcSums", kAllRecordFieldArguments},
+      {"SetAutoCalcFields", kAllRecordFieldArguments},
+      {"SetCurrentKey", kAllRecordFieldArguments},
+      {"SetLoadFields", kAllRecordFieldArguments},
+      {"AddLoadFields", kAllRecordFieldArguments},
+      {"LoadFields", kAllRecordFieldArguments},
+      {"GetRangeMin", 1},
+      {"GetRangeMax", 1},
+      {"GetFilter", 1},
+      {"GetAscending", 1},
+      {"CopyFilter", kAllRecordFieldArguments},
+      {"FieldActive", 1},
+      {"ModifyAll", 1},
+      {"Relation", 1},
+      {"AreFieldsLoaded", kAllRecordFieldArguments},
+  }};
+  for (const auto &[name, count] : kFields) {
+    if (method.size() != name.size()) { continue; }
+    bool same = true;
+    for (std::size_t i = 0; i < name.size(); ++i) {
+      if (std::tolower(static_cast<unsigned char>(name[i])) !=
+          std::tolower(static_cast<unsigned char>(method[i]))) {
+        same = false;
+        break;
+      }
+    }
+    if (same) { return count; }
+  }
+  return 0;
+}
+
 namespace {
 
 std::string TextOf(const std::filesystem::path &file) {

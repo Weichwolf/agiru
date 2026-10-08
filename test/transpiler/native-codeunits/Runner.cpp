@@ -7,6 +7,7 @@
 #include "Check.h"
 #include "system/fixture/codeunit/NativeFixture.h"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -54,8 +55,36 @@ void NativeMethodsRefuseBeforeEffects() {
   CHECK_TRUE("ordinary AL code remains executable", unit.Ordinary() == kValue);
 }
 
+void UnavailableRecordFieldsCompileAndRefuse() {
+  agiru::System::Fixture::NativeFixture_Codeunit unit;
+  constexpr std::array<std::string_view, 10> kMethods{"ModifyAll",
+                                                      "LoadFields",
+                                                      "GetRangeMin",
+                                                      "GetRangeMax",
+                                                      "GetFilter",
+                                                      "GetAscending",
+                                                      "CopyFilter",
+                                                      "FieldActive",
+                                                      "Relation",
+                                                      "AreFieldsLoaded"};
+  for (agiru::Integer operation = 0; operation < static_cast<agiru::Integer>(kMethods.size());
+       ++operation) {
+    agiru::Integer counter = kValue;
+    std::string message;
+    try {
+      unit.UnavailableFields(operation, counter);
+    } catch (const agiru::Error &error) { message = error.what(); }
+    CHECK_TRUE("implicit unavailable fields compile but their operation refuses explicitly",
+               message.contains("UnavailableRow." + std::string(kMethods[operation])));
+    CHECK_TRUE("unavailable operations never reach subsequent AL effects", counter == 41);
+  }
+}
+
 }
 
 int main() {
-  return gate::Run("Generated Native Codeunit Refusals", NativeMethodsRefuseBeforeEffects);
+  return gate::Run("Generated Native Codeunit Refusals", [] {
+    NativeMethodsRefuseBeforeEffects();
+    UnavailableRecordFieldsCompileAndRefuse();
+  });
 }

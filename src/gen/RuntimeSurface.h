@@ -2,6 +2,7 @@
 
 #include "ObjectKind.h"
 
+#include <cstddef>
 #include <map>
 #include <set>
 #include <string>
@@ -26,6 +27,10 @@ inline constexpr std::string_view kRuntimeIncludeMarker = "// @door\n";
 [[nodiscard]] const std::map<std::string, std::string> &PlatformMembers(std::string_view table);
 
 [[nodiscard]] bool RuntimeCallable(std::string_view name);
+
+inline constexpr std::size_t kAllRecordFieldArguments = static_cast<std::size_t>(-1);
+
+[[nodiscard]] std::size_t RecordFieldArguments(std::string_view method);
 
 [[nodiscard]] bool DeclaredByBase(std::string_view header, std::string_view name);
 
