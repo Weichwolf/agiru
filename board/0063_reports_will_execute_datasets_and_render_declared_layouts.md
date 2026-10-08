@@ -2,7 +2,8 @@
 
 Status: queued | Priority: P1
 Depends on: 0013/0044's declared metadata and record/filter/aggregate contracts.
-G1: finish dataset/native successor faults required by UT. After G1: layout engine.
+Finish dataset/native successor faults required by UT; request/layout work follows
+concrete client/report prerequisites, not a fully green G1 milestone.
 Client request presentation uses 0720's dispatcher; no dependency on complete G3.
 Next: qualify installed native layouts/dataset rows, then bind one request-page model.
 
@@ -37,6 +38,23 @@ Next: qualify installed native layouts/dataset rows, then bind one request-page 
    Prove the shared Cairo/shaping build in WASM; don't impose demo constraints on Linux.
 
 ## Acceptance and references
+
+- Refreshed predecessor 1958/1971/1983/1985: the request page is a live retained report
+  instance, not a form applied only at OK. Immediate validation refreshes dependent
+  options; collision-free control IDs, read-only/visible predicates, TableRelation,
+  lookup/assist/drilldown and exact Option/Enum identity/caption are required.
+  Option edits and dataitem filters are distinct operations; unknown controls refuse.
+  ProcessingOnly exposes OK/Cancel, not Print/Preview. Exercise SaveValues and
+  OnQueryClosePage outcomes separately, with CMD/MCP/web and independent SQL.
+- Predecessor 1986's nine refused RDLC layouts identify needed generic features:
+  column-group tablix (AccountSchedule/Portrait), String.Format, Rnd, PageNumber
+  expressions and charts (CustomerTop10List/BOM/timeline). Inventory and qualify them
+  in the C++ typed-layout/Cairo path; no XSL-FO/FOP or raw dataset-table PDF fallback.
+  Genuine financial column groups precede optional visual polish; charts remain required.
+- Sources: `~/Git/openerp/test/openerp/runtime/test_{client_request_page_live,
+  request_page_control_keys,request_page_close_query,client_processing_only_report,
+  rdlc_layout}.py`, `openerp/web/client/request_page.py`, `scripts/transpiler/rdlc_gen.py`.
+  Their renderer startup/warm-up measurements are not native performance evidence.
 
 - Ordinal dataset text: `src/rt/Report.cpp::ReportDataset::Add` selects display
   Format 0 only for held Option/Enum values; other scalars retain XML Format 9.

@@ -18,6 +18,13 @@ Next: marked BOM and demand → planning worksheet → supply order → consumpt
 
 ## Evidence and acceptance
 
+- Refreshed predecessor 1987/1989: replay forecast/MPS/MRP request initialization
+  with Combined MPS/MRP disabled; do not assume SaveValues supplied a prior test's MPS.
+  `<90M>` is ninety months, not ninety days. Qualify routing send-ahead quantities,
+  concurrent capacities and wait-time DateTime arithmetic across midnight/outside
+  working hours against original `SCM Plan-Req. Wksht` and `SCM Capacity Requirements`
+  methods. Keep these hypotheses separate from demonstrated agiru faults.
+
 - Docs `bf5ffffa9b026`, `business-central/production-planning.md`,
   `production-manage-manufacturing.md`, `assembly-assemble-items.md` and their linked tasks.
 - Reference/replay unexecuted. Independently reconcile demand/supply order linkage,

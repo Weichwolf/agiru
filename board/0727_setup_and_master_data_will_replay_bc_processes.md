@@ -21,6 +21,20 @@ template → customer → edit → independent reopen regression.
 
 ## Evidence and acceptance
 
+- Refreshed predecessor 1966/2000: qualify country composition from BCApps
+  `.config/views_config.json` and original GDL build scripts: W1 → DACH → CH,
+  higher-layer replacement, excluded-view paths and placeholder handling. Pin selected
+  owners/body hashes and country tests; apply agiru adaptations only after composition
+  with explicit conflicts. Never silently overwrite localized posting or install
+  successful licensing/service stubs. 0058 owns scope, 0073 binding and 0721 deployment.
+- Predecessor 2002 retains a RapidStart defect after field-name collision repair:
+  ImportPackageXML → ApplyPackage inserts keys but loses Decimal data. Add the original
+  DuplicatedXMLFields workflow with independent field-number/RecordRef/SQL checks;
+  generic Init/Insert/Modify/alias ownership is the repair, not an object-specific patch.
+  Source: `~/Git/openerp/scripts/transpiler/layer_view.py`,
+  `scripts/analysis/patch_target_overlap.py`, `test/openerp/runtime/test_layer_view.py`;
+  BC `ERM RS Package Operations::ImportPackageWithDuplicatedXMLFields`.
+
 - Prerequisite regression: `make erp-client-test JOBS=2` passes 7/7 original Customer
   List/Card/edit cases across external CMD/MCP and actual Chromium, independently
   checking the 40-row SQL window, exact Unicode saves, permissions and durable receipts.

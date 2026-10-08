@@ -50,6 +50,27 @@ tests and agent business workflows on sealed disposable databases.
 
 ## Evidence and acceptance
 
+- Refreshed predecessor 1945/1948/1957 rejects priority-queue reordering and image
+  GC freezing on end-to-end evidence. Do not import interpreter/GIL workarounds.
+  Retain ANALYZE after seed restoration, immutable metadata/parameterized plans,
+  bounded reusable workers and before/after SQL/RSS/latency measurements. Warm-up
+  must not execute business triggers/writes or hide cold-start costs.
+- P2 after G2: authenticated `/admin` operational contracts for environment inventory,
+  explicit backup/download, restore/copy into a NEW database, capacity, session
+  cancellation and operation receipts. Use bounded jobs and private deployment
+  credentials; preserve demo/master data, refuse path/database ambiguity, prove restore.
+  PITR requires qualified WAL archival, not a pg_dump claim. Source:
+  `~/Git/openerp/openerp/web/admin/{auth,backups,store,insights}.py` (1964/1965).
+- Generic AL telemetry stays required despite the reference's namespace omission:
+  bounded batches, environment/session dimensions, redaction, PostgreSQL retention
+  and visible delivery failures; use a separate transaction, never Commit ERP work.
+  Do not import process-global mutable registries/mailboxes or per-database endless
+  runners (1970/1979). Multi-session tests must see no identity/policy/data leakage.
+- Existing app/version migration work also owns safe extension installation:
+  validate paths, size, publisher/app/runtime/ABI/dependencies; versioned immutable
+  native packages, schema/data migration, session drain and rollback evidence.
+  Reference 1999's Python ZIP import is not native loading or a security proof.
+
 - No matched BC benchmark, 2 TB / 10,000-user or complete aarch64 qualification exists.
   Existing `make native-report-layouts` proves declaration/link/package controls
   (562+562 checks, sixteen assets), not installed/selected layouts, rendering,

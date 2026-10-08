@@ -15,6 +15,42 @@ sandbox reference execution and agiru replication. Their agiru prerequisites are
 specific working client contracts, not this WI's full acceptance; no dependency cycle.
 BC capture can proceed while client construction is underway. Keep one WI in progress.
 
+## Refreshed client contracts (2026-10-08)
+
+- P0, before sales/purchase replay: each row owns its OnAfterGetRecord-derived
+  variables, arrays and totals; rendering a pending input row must not reset them.
+  Reposition after posting from AL's current key/view, and initialize a new line only
+  when appropriate. Empty temporary editable lists and dynamically editable parts
+  are input surfaces too. Qualify original journals, Apply Entries and document totals.
+- P0: preserve declared identities, not normalized-name precedence. Distinguish
+  LocationCode from "Location Code" and AmountToApply from "Amount to Apply";
+  reject forged hidden/noneditable controls. Honor only SubPageLink and SourceTableView,
+  never guessed host Document Type. 0073 owns binding, 0044 owns record/filter semantics.
+  Sales/purchase entry must address the visible FilteredTypeField when the original
+  Type control is hidden; a default Item value must not mask a dropped agent input.
+- P1: modal pages retain actions and editable lookup rows; explicit OK chooses a row.
+  CurrPage.Close terminates through the declared lifecycle. Scope exit/navigation and
+  explicit Close need separate BC qualification; never copy the reference's
+  unconditional OnQueryClosePage bypass or default dialog answers.
+- P1: request options validate immediately, re-read dependent values and expose
+  lookup/assist/drilldown; reject an option name used as a dataitem filter (0063).
+  Lists without CardPageId use the enabled Return-shortcut action to open a record;
+  related read-only values expose authorized Brick/DropDown previews and card links.
+- P1: load visible Role Center/FactBox parts on demand with shared explicit operations
+  for agents; collapsed panes do no work. Suggestions use declared relation branches,
+  server filters and bounded windows; do not sort or invent values on the client.
+- Browser samples: row-key-qualified DOM IDs; discard stale morph listeners;
+  preserve cursor/QuickEntry/Tab/arrow/F2/Escape behavior and invalid entered text.
+  Keep presentation errors separate from AL TestPage diagnostic framing without
+  losing error codes, command receipts or rollback. Agent parity is semantic, not TTY.
+- Sources in refreshed `~/Git/openerp/`: `openerp/web/client/{page_model,protocol,request_page}.py`,
+  `openerp/web/static/bc.js`, `test/openerp/runtime/test_client_{journal_after_posting,
+  row_globals_after_validate,part_link_only,modal_page_actions,lines_become_editable}.py`,
+  `scripts/analysis/client_feature_audit.py`, predecessor 1915–1930/1938/1940/1946/
+  1954/1956/1958/1962/1971/1982–1985. Inventory source-declared capabilities against
+  the shared model, then execute original CMD/MCP/web/SQL cases; static flags alone
+  are not proof. These are queued agiru contracts, not imported pass claims.
+
 ## Typed variable bindings
 
 - Generated control getters read the original declared scalar storage through

@@ -27,6 +27,24 @@ compile and execute the four accepted overload counterexamples.
 
 ## Useful implementation details and acceptance
 
+- Refreshed predecessor 1916/1917/1971/1972/1988: allocate collision-free names
+  per declaration owner and retain original AL identity everywhere: fields/keys/
+  CalcFormula/TableRelation/RecordRef, page/request controls, arrays and table globals.
+  Do not globally rename seed columns or choose a record field over a page variable.
+  Item Journal Line's UnitCost versus "Unit Cost" changes posting costs; percentage
+  versus amount collisions change costing. Qualify original callers and SQL values.
+- Resolve namespace-qualified TableRelation through declared symbols and owner/type,
+  not dotted-path guesses. The same binding supplies validation and client lookups.
+- Value-context cases from 1992/1994/1995: TestPage GoToKey/GoToRecord and record
+  Find/Get failures raise when discarded, return false when consumed; cover unqualified
+  own-table calls, implicit report dataitems and TestPart receivers. DotNet Char Unicode
+  category methods must validate original Customer/Vendor/Contact phone fields, not
+  produce a nil value. Unsupported signatures refuse; no unknown-member catch-all.
+- Sources: `~/Git/openerp/test/openerp/runtime/test_{colliding_field_names,
+  table_global_beside_field,request_page_control_keys,namespaced_table_relation,
+  bare_find_in_own_code,testpage_goto_raises,dotnet_char}.py`. Port contracts into
+  existing C++ generator gates and AL fixtures; verify local developer guarantees first.
+
 - `src/gen/BodyWriter.cpp` captures each `for` end expression once as an owned value,
   after start evaluation, for ascending/descending and Boolean loops. Fresh lower-case
   C++ temporaries cannot collide with AL's capitalized identifiers; actual declared

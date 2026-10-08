@@ -50,6 +50,22 @@ do not defer client construction until all transaction acceptance is complete.
 
 ## Sources and regression ownership
 
+Refreshed predecessor 1959/1963 exposed failed posting with orphan shipment/invoice
+headers and no ledger entries: Boolean Codeunit.Run must roll back its exact boundary.
+Its later real-row tests cover Commit-then-error, but its claim that pending caller
+writes need no refusal conflicts with the local Codeunit.Run guarantee; retain agiru's
+production refusal. Do not transplant its TryFunction/savepoint policy.
+Predecessor 1944 separates leaving a key control from validation to release number-series
+locks before a question; qualify actual BC request/Commit boundaries before changing
+agiru, never commit merely because a dialog is displayed. Test concurrent source-AL
+document creation with NOWAIT and independent SQL, plus failure after the earlier Commit.
+Predecessor 1980: a local manually bound subscriber must unbind at its declaring scope's
+exit, including error/return; callee parameters must not unbind caller-owned instances.
+Reproduce receive then failing invoice in the same session: the new Error Message
+Handler must activate, publish its context and leave no partial posting. Use C++ RAII,
+not generated Python finally wrappers. Sources in `~/Git/openerp/test/openerp/runtime/`:
+`test_{codeunit_run_transactions,client_key_control_insert_commits,local_binding_scope}.py`.
+
 `PageSession.h` now reconciles source-AL insertion with both pending-new markers.
 Native storage probes both primary key and immutable SystemId with bounded `SELECT 1`,
 without replacing the live buffer, image, filters or rowversion. Temporary storage uses

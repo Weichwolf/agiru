@@ -64,6 +64,26 @@ seed prevents causal A/B proof; full G1 remains open (0058).
 
 ## Useful implementation details
 
+- Refreshed predecessor 1922/1931/1991/1993: CalcFormula predicates on the same
+  target field must retain AL order and blank FIELD(FILTER(...)) behavior; a dict
+  overwrite or guessed primary-key fallback can silently total the entire ledger.
+  Qualify My Account, multi-key Job Task and G/L Totaling with original AL and
+  independent SQL before batching. Exist uses a bounded existence probe, not Count.
+- P1 after correct filters: serve page cells from the already-calculated row buffer;
+  batch eligible FlowFields over bounded windows, retaining OnAfterGetRecord changes.
+  Keep reusable parameterized statement shapes, not record/session values, globally.
+  Never reuse observations across writes, savepoint rollback, Commit, permission or
+  company changes; SelectLatestVersion and isolation contracts still apply.
+- Keep native bounded bidirectional cursor work: predecessor 1926/1927/1993 falls
+  back to full materialization on reverse/NULL-key paths. Do not import that fallback,
+  per-row RecordRef navigation or a client Python sort. 0720/0741 qualify source
+  collation: deterministic ICU level-2 does not establish case-insensitive equality
+  and does not match the measured CS_AS seed automatically.
+- References: `~/Git/openerp/test/openerp/runtime/test_{flowfield_same_field_conditions,
+  flowfield_exist_probes_one_row,list_flowfields_batched,read_cache,relative_navigation_window,
+  select_latest_version,table_connections}.py`; connection registration/defaults require
+  real session-owned providers or explicit refusal, never successful no-ops (1977).
+
 - XMLport import validation diagnosis: BC29 NCL SHA256 `277e35cbdfb8`,
   NavXmlPortImporter `<AssignFieldValueAsync>d__25::MoveNext`, assigns through
   SourceFieldTableNode, fires OnAfterAssignField, then branches past ValidateAsync
