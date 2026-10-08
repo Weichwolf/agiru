@@ -61,12 +61,30 @@ business workflows are active in 0720; full G1 acceptance does not block their i
   22 bound / 211 unbound tables and 67 unbound methods; 122 refused properties and
   21 unresolved extension anchors keep translation at exit one. All 306,303 property
   declarations are classified; zero silent drops. Generation is not full-tree compilation.
-- Failed generation preserves old outputs. `test/slice` still compiles stale approved
-  exclusions, including `tests/core/codeunit/O365IntegrationRecordUT.cpp` from
-  `Layers/W1/Tests/Graph/O365IntegrationRecordUT.Codeunit.al`. Before the next integrated
-  build, apply canonical scope to slice/full-app inputs with explicit raw/selected/excluded
-  receipts. Preserve every raw slice identity and refuse unapproved missing inputs;
-  do not remove identities or treat a file-presence check as current selection proof.
+- Build-input selection now uses `scripts/build_sources.py` and
+  `cmake/GeneratedSources.cmake` for slice, full apps and native libraries. The generator
+  publishes current CPP identities and policy/app-root snapshots even on refusal; the
+  transpile wrapper retains original AL identities across successful sweeps. Required
+  missing, unverified or stale inputs refuse; handwritten gates/transpiler remain buildable.
+  Source selection is not a successful generation or full-app compilation claim.
+  `make slice-check`: 14,225 raw / 13,537 selected / 99 approved product exclusions /
+  589 selection omissions, zero missing/errors; every raw slice identity remains unchanged.
+  All configured apps plus platform: 14,655 raw / 13,938 selected / 107 product exclusions /
+  610 omissions, zero errors. Native declarations follow bounded product rules, not the
+  configured BCApps namespace reachability filter, matching `gen/NativeSource.cpp`.
+  Original UTF-8 BOMs previously bypassed namespace selection in eleven slice CPPs;
+  `tc/Main.cpp` now handles the BOM. Examples: BCApps `d99152ee35f0` paths
+  `Layers/W1/BaseApp/{CRM/Outlook/ContactSyncQueueDialog.Page.al,System/Telemetry/TelemetryManagement.Codeunit.al}`.
+  Actual-generator refusal and compiled CMake controls cover BOM bypass, stale/missing
+  required inputs, exact exclusions, removed origins, separate omissions and native domain
+  selection. Reproduce with `make verify-check VERIFY_CHECKS=BuildSourcesGate`;
+  `ProductSourceGate` and `NativeSourceCompilerGate` cover actual generated manifests.
+  Current regeneration still refuses 122 properties, 67 native methods and 21 anchors;
+  77 UT codeunits / 2,298 methods remain parser inventory, not execution.
+  Full tooling run: `make verify-check VERIFY_CHECKS=` passes 279 tests with the explicit
+  container gate DSN and pinned source/docs. `make tc` and full-app CMake configuration
+  pass; focused `lint-one UNIT=src/tc/Main.cpp` reports zero failures. These are not
+  current full native build, aggregate tidy or AL execution results.
 - Last aggregate tidy measurement: 388 unique diagnostics, ninety of 267 units
   analysed, all ninety failed. Subsequent shared-header repairs make focused
   PlatformSourceGate analysis pass; the aggregate was not rerun and remains unproven.

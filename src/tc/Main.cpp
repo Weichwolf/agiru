@@ -152,6 +152,7 @@ std::string DeclaredNamespace(const std::filesystem::path &path) {
   if (!file) { return {}; }
   std::string line;
   while (std::getline(file, line)) {
+    if (line.starts_with("\xEF\xBB\xBF")) { line.erase(0, 3); }
     const std::size_t at = line.find("namespace ");
     if (at == std::string::npos) { continue; }
     if (line.find_first_not_of(" \t") != at) { continue; }
@@ -3001,7 +3002,8 @@ std::size_t WriteNativeTables(Run &run,
     const auto relative = "native/table/" + std::to_string(table.id) + ".cpp";
     Keep(run,
          Output{.directory = run.output, .relative = relative},
-         agiru::gen::NativeTableDefinition(table, binding->second, objects));
+         "// Generated from " + native.paths.at(at) + ". Do not edit.\n\n" +
+             agiru::gen::NativeTableDefinition(table, binding->second, objects));
     ++count;
     ++run.written;
   }
@@ -3284,6 +3286,7 @@ public:
     allReports += nativeReports.objects.size();
     NoteUnresolvedLayouts(store, gathered);
     WriteReportAssets(job, gathered.reportAssets, kept);
+    WriteBuildInputs();
     return Finish(nativeOutput);
   }
 
@@ -3296,6 +3299,26 @@ private:
   Enums nativeEnums;
   Pages nativeReports;
   std::size_t nativeGaps = 0;
+
+  void WriteBuildInputs() {
+    if (job.output.empty()) { return; }
+    std::string sources;
+    for (const auto &path : kept) {
+      if (path.extension() != ".cpp") { continue; }
+      const auto relative = path.lexically_relative(job.output).generic_string();
+      if (relative.find_first_of("\r\n\t") != std::string::npos) {
+        throw std::runtime_error("generated build path contains a control separator");
+      }
+      sources += relative + '\n';
+    }
+    WriteFile({.directory = job.output, .relative = "generation-sources.txt"}, sources);
+    WriteFile({.directory = job.output, .relative = "generation-scope.json"},
+              Read(job.apps.parent_path() / "scope.json"));
+    WriteFile({.directory = job.output, .relative = "generation-apps.json"}, Read(job.apps));
+    kept.insert(job.output / "generation-sources.txt");
+    kept.insert(job.output / "generation-scope.json");
+    kept.insert(job.output / "generation-apps.json");
+  }
 
   void ReadInputs() {
     apps = agiru::gen::ReadApps(job.apps);

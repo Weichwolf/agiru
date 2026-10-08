@@ -342,6 +342,18 @@ def area_selected(area, policy):
         name.endswith(value.lower()) for value in policy.get('area_exclude_suffix', []))
 
 
+def selection_reason(namespace, area, test, policy, source_domain='bcapps'):
+    if source_domain == 'system-symbols':
+        return None
+    if source_domain != 'bcapps':
+        raise ValueError('unknown source domain')
+    if not namespace_selected(namespace, policy):
+        return 'selection-namespace'
+    if test and not area_selected(area, policy):
+        return 'selection-area'
+    return None
+
+
 def configured_apps(configuration):
     apps = configuration['apps']
     if not apps or len({app['name'] for app in apps}) != len(apps):
@@ -441,9 +453,9 @@ def inventory(root, configuration, policy, source_domain='bcapps'):
             row['objects'] = len(found)
             row['conditional_source'] = bool(re.search(r'^\s*#(?:if|elif)\b', text, re.M | re.I))
             for index, item in enumerate(found):
-                selected = bool(configured) and reason is None and (
-                    row['namespace_selected'] and (row['area_selected'] or
-                    not (item['kind'] == 'codeunit' and item['test_subtype'])))
+                omission = selection_reason(namespace, area,
+                    item['kind'] == 'codeunit' and item['test_subtype'], policy, source_domain)
+                selected = bool(configured) and reason is None and omission is None
                 item.update(source=source, declaration_index=index, app_root=app_root,
                             configured_apps=configured, namespace_selected=row['namespace_selected'],
                             product_exclusion_reason=reason, area=area,

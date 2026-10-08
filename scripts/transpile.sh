@@ -22,9 +22,19 @@ if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then
   arguments+=(--system-symbols "$package")
 fi
 jq -n --args '$ARGS.positional' -- "$B/agirutc" "${arguments[@]}" > "$proof/command.json"
+origin_arguments=(--root "$(dirname "$2")" --bc-source "$1" --generated "$3")
+if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then origin_arguments+=(--symbols "$package"); fi
+python3 scripts/build_sources.py record "${origin_arguments[@]}" --output "$proof/source-origins-before.json"
 status=0
 "$B/agirutc" "${arguments[@]}" > "$proof/translation.log" 2>&1 || status=$?
 cat "$proof/translation.log"
+origin_status=0
+python3 scripts/build_sources.py record "${origin_arguments[@]}" --previous "$proof/source-origins-before.json" \
+  > "$proof/source-origins.log" 2>&1 || origin_status=$?
+cat "$proof/source-origins.log"
+printf '%s\n' "$status" > "$proof/generator-status"
+printf '%s\n' "$origin_status" > "$proof/origin-status"
+if [ "$status" -eq 0 ] && [ "$origin_status" -ne 0 ]; then status=$origin_status; fi
 sha256sum --check --status "$proof/inputs.sha256"
 if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then
   python3 scripts/fetch_symbols.py --verify "$package" > "$proof/package-after.json"

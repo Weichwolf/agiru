@@ -233,7 +233,8 @@ option(AGIRU_BUILD_APPS "Build the transpiled apps under apps/" OFF)
 option(AGIRU_BUILD_SLICE "Build the generated slice in the CLI" ON)
 
 include(cmake/GeneratedLink.cmake)
-file(GLOB_RECURSE platform_sources CONFIGURE_DEPENDS "apps/platform/*.cpp")
+include(cmake/GeneratedSources.cmake)
+agiru_generated_app_sources(platform platform_sources)
 file(GLOB_RECURSE platform_headers CONFIGURE_DEPENDS "apps/platform/*.h")
 if(platform_sources OR platform_headers)
   if(NOT EXISTS "${CMAKE_SOURCE_DIR}/apps/platform/PlatformModule.h")
@@ -242,6 +243,7 @@ if(platform_sources OR platform_headers)
 endif()
 if(platform_sources)
   add_library(agiru_app_platform SHARED ${platform_sources})
+  add_dependencies(agiru_app_platform agiru_inputs_app_platform)
   target_include_directories(agiru_app_platform PRIVATE
     "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
     "${CMAKE_SOURCE_DIR}/apps/shared" "${CMAKE_SOURCE_DIR}/apps/platform")
@@ -277,17 +279,8 @@ if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/te
   # round was spent adding `ICPartner` twice (2026-09-07).
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/test/slice" "${CMAKE_SOURCE_DIR}/scripts/unity_groups.py")
-  execute_process(
-    COMMAND python3 "${CMAKE_SOURCE_DIR}/scripts/unity_groups.py"
-            "${CMAKE_SOURCE_DIR}/test/slice"
-    RESULT_VARIABLE slice_group_status
-    OUTPUT_VARIABLE slice_group_output
-    ERROR_VARIABLE slice_group_error
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT slice_group_status EQUAL 0)
-    message(FATAL_ERROR "${slice_group_error}")
-  endif()
-  string(REPLACE "\n" ";" slice_lines "${slice_group_output}")
+  agiru_generated_sources(slice slice_lines --slice "${CMAKE_SOURCE_DIR}/test/slice")
+  add_dependencies(agiru agiru_inputs_slice)
   set(slice_sources "")
   foreach(line IN LISTS slice_lines)
     if(NOT line MATCHES "^([^|]+)[|](.+)$")
@@ -304,6 +297,7 @@ if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/te
   endforeach()
   if(slice_sources)
     add_library(agiru_slice SHARED ${slice_sources})
+    add_dependencies(agiru_slice agiru_inputs_slice)
     target_include_directories(agiru_slice PRIVATE
       "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
       "${CMAKE_SOURCE_DIR}/apps/shared")
@@ -380,11 +374,13 @@ if(AGIRU_BUILD_APPS)
   math(EXPR app_last "${app_count} - 1")
   foreach(i RANGE ${app_last})
     string(JSON app GET "${apps_json}" apps ${i} name)
-    file(GLOB_RECURSE app_sources CONFIGURE_DEPENDS "apps/${app}/*.cpp")
+    agiru_generated_app_sources("${app}" app_sources)
+    add_dependencies(agiru agiru_inputs_app_${app})
     if(NOT app_sources)
       continue()
     endif()
     add_library(agiru_app_${app} SHARED ${app_sources})
+    add_dependencies(agiru_app_${app} agiru_inputs_app_${app})
     target_include_directories(agiru_app_${app} PRIVATE
       "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
       "${CMAKE_SOURCE_DIR}/apps/shared"

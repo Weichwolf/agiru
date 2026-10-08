@@ -6,10 +6,9 @@ Next: qualify disabled native callbacks, shutdown rollback, progress execution a
 remaining optimistic-write/isolation contracts. Original Customer New/template/save/
 independent reopen now passes all eleven HTTP cases across CMD/MCP/Chromium under 0720.
 This is one master-data workflow, not posting or complete transaction acceptance.
-First close 0058's stale generated build-input selection gap, rebuild the production
-page setters, then repeat original master-data HTTP and counted AL execution.
-Repeat counted AL execution after the verified SelectLatestVersion increment below;
-retain every startup refusal and test identity. Atomic
+0058's stale generated build-input selection is qualified; rebuild the production
+page setters, then repeat original master-data HTTP and counted AL execution,
+retaining every startup refusal and test identity. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
 do not defer client construction until all transaction acceptance is complete.
 

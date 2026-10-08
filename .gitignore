@@ -1,4 +1,8 @@
 apps/*/
+apps/generation-sources.txt
+apps/generation-scope.json
+apps/generation-apps.json
+apps/source-origins.json
 *.bak
 build/
 .cache/

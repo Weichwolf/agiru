@@ -163,6 +163,23 @@ class NativeSourceCompilerGate(unittest.TestCase):
         self.assertFalse((self.generated / 'platform/PlatformModule.h').exists())
         self.assertIn('no provider or business execution proof', result.stdout)
 
+    def test_bound_native_table_keeps_original_source_in_current_build_inputs(self):
+        self.native_table_manifest()
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        cpp = 'platform/native/table/2000000171.cpp'
+        self.assertEqual((self.generated / cpp).read_text().splitlines()[0],
+                         '// Generated from src/unusual-name.aL. Do not edit.')
+        self.assertIn(cpp, (self.generated / 'generation-sources.txt').read_text().splitlines())
+        recorded = subprocess.run([sys.executable, str(self.repository / 'scripts/build_sources.py'),
+            'record', '--root', str(self.root), '--generated', str(self.generated),
+            '--bc-source', str(self.root), '--symbols', str(self.package)],
+            capture_output=True, text=True, timeout=30)
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        origins = json.loads((self.generated / 'source-origins.json').read_text())['sources']
+        self.assertEqual(origins[cpp]['source'], 'system-symbols/src/unusual-name.aL')
+        self.assertFalse(origins[cpp]['source_missing'])
+
     def test_native_product_scope_retains_raw_identity_and_required_page(self):
         commercial = self.package / 'src/Commercial.Table.al'
         commercial.write_text('namespace System.Security.AccessControl; '
@@ -969,7 +986,8 @@ class SymbolsPackageGate(unittest.TestCase):
             compiler.write_text('#!/bin/sh\nprintf "compiler-started\\n"\nexit 7\n')
             compiler.chmod(0o755)
             apps = work / 'apps.json'
-            apps.write_text('{"apps":[]}')
+            apps.write_text('{"apps":[{"name":"fixture","source":"source"}]}')
+            (work / 'source').mkdir()
             (work / 'scope.json').write_text('{"include":["System"],"exclude":[]}')
             environment = dict(os.environ, B=str(build), AGIRU_SYSTEM_SYMBOLS=str(package))
             environment.pop('AGIRU_HOST_RUNTIME', None)
@@ -988,6 +1006,20 @@ class SymbolsPackageGate(unittest.TestCase):
             receipt = Path((build / 'transpile.latest').read_text().strip())
             invocation = json.loads((receipt / 'command.json').read_text())
             self.assertEqual(invocation[4:6], ['--host-runtime', '17.0'])
+            for status in (7, 0):
+                with self.subTest(generator_status=status):
+                    compiler.write_text('#!/bin/sh\nmkdir -p "$3/unknown"\n'
+                        'printf "// Generated from Broken.Codeunit.al. Do not edit.\\n" '
+                        '> "$3/unknown/Broken.cpp"\n' + f'exit {status}\n')
+                    result = subprocess.run(command, cwd=root, env=environment,
+                                            text=True, capture_output=True)
+                    self.assertEqual(result.returncode, status or 1, result.stdout + result.stderr)
+                    receipt = Path((build / 'transpile.latest').read_text().strip())
+                    self.assertEqual((receipt / 'generator-status').read_text().strip(), str(status))
+                    self.assertEqual((receipt / 'origin-status').read_text().strip(), '1')
+                    self.assertIn('no configured app owner', result.stderr + result.stdout)
+                    (work / 'generated/unknown/Broken.cpp').unlink()
+            compiler.write_text('#!/bin/sh\nprintf "compiler-started\\n"\nexit 7\n')
             (package / 'src/Virtual Tables/Fixture.Table.al').write_text('changed')
             result = subprocess.run(command, cwd=root, env=environment, text=True, capture_output=True)
             self.assertNotEqual(result.returncode, 0)
@@ -2517,6 +2549,39 @@ class ProductSourceGate(unittest.TestCase):
         self.assertIn('futureattribute', result.stdout.lower())
         self.assertTrue(list((self.root / 'generated').rglob('Retained.h')))
 
+    def test_failed_generation_publishes_current_inputs_without_stale_sources(self):
+        first = self.run_transpiler()
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        original = set((self.root / 'generated/generation-sources.txt').read_text().splitlines())
+        core = next(value for value in original if value.endswith('/CoreUT.cpp'))
+        (self.root / 'source/Core.Codeunit.al').write_text(
+            'namespace Microsoft.Fixture; codeunit 50143 "Core UT" { invalid syntax }')
+        failed = self.run_transpiler()
+        self.assertNotEqual(failed.returncode, 0)
+        current = set((self.root / 'generated/generation-sources.txt').read_text().splitlines())
+        self.assertNotIn(core, current)
+        self.assertTrue((self.root / 'generated' / core).is_file())
+        self.assertEqual((self.root / 'generated/generation-scope.json').read_bytes(),
+                         (self.root / 'scope.json').read_bytes())
+        self.assertEqual((self.root / 'generated/generation-apps.json').read_bytes(),
+                         (self.root / 'apps.json').read_bytes())
+
+    def test_utf8_bom_does_not_bypass_namespace_selection(self):
+        (self.root / 'scope.json').write_text(json.dumps(dict(self.policy,
+            exclude=['Microsoft.Fixture.Hidden'])))
+        (self.root / 'source/Hidden.Codeunit.al').write_text('\ufeffnamespace Microsoft.Fixture.Hidden;\n'
+            'codeunit 50149 Hidden { [FutureAttribute] procedure Refused() begin end; }')
+        result = self.run_transpiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(list((self.root / 'generated').rglob('Hidden.cpp')))
+        self.assertTrue(list((self.root / 'generated').rglob('CoreUT.cpp')))
+        control = dict(self.policy, exclude=[])
+        (self.root / 'scope.json').write_text(json.dumps(control))
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('futureattribute', result.stdout.lower())
+        self.assertTrue(list((self.root / 'generated').rglob('Hidden.cpp')))
+
     def test_module_rules_use_a_directory_boundary(self):
         (self.root / 'scope.json').write_text(json.dumps(
             dict(self.policy, product_exclude=['microsoft-cloud:source/'])))
@@ -2573,6 +2638,215 @@ class ProductSourceGate(unittest.TestCase):
                 result = self.run_transpiler()
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('scope.json:', result.stdout + result.stderr)
+
+
+class BuildSourcesGate(unittest.TestCase):
+    def setUp(self):
+        self.repository = SCRIPT.parents[2]
+        temporary = tempfile.TemporaryDirectory(prefix='agiru-build-sources-')
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.generated = self.root / 'apps'
+        (self.generated / 'module').mkdir(parents=True)
+        (self.root / 'source').mkdir()
+        self.script = self.repository / 'scripts/build_sources.py'
+        self.policy = {'include': ['Microsoft'], 'exclude': [],
+                       'product_exclude': ['microsoft-cloud:source/Cloud.Codeunit.al']}
+        (self.root / 'scope.json').write_text(json.dumps(self.policy))
+        (self.root / 'apps.json').write_text(json.dumps({
+            'apps': [{'name': 'module', 'source': 'source'}]}))
+        self.cpp = []
+        for name in ('Core', 'Cloud', 'Neighbor'):
+            self.add_source(name)
+        self.freeze_generation(['module/Core.cpp', 'module/Neighbor.cpp'])
+        self.slice = self.root / 'slice'
+        self.slice.write_text('\n'.join(self.cpp) + '\n')
+        self.receipt = self.root / 'receipt.json'
+        recorded = self.command('record', '--bc-source', str(self.root))
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+
+    def command(self, operation, *arguments):
+        return subprocess.run([sys.executable, str(self.script), operation,
+            '--root', str(self.root), *arguments], capture_output=True, text=True, timeout=30)
+
+    def add_source(self, name, namespace='Microsoft.Fixture', test=False, folder=''):
+        origin = Path('source') / folder / (name + '.Codeunit.al')
+        (self.root / origin).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / origin).write_text(f'namespace {namespace};\ncodeunit 50100 "{name}" {{ ' +
+                                       ('Subtype = Test; ' if test else '') + '}\n')
+        cpp = 'module/' + name + '.cpp'
+        (self.generated / cpp).write_text('// Generated from ' +
+            str(origin.relative_to('source')) + '. Do not edit.\n' +
+            ('#error excluded source entered compilation\n' if name == 'Cloud' else
+             f'int {name.lower()}() {{ return 0; }}\n'))
+        self.cpp.append(cpp)
+
+    def freeze_generation(self, sources=None):
+        (self.generated / 'generation-sources.txt').write_text('\n'.join(sources or self.cpp) + '\n')
+        for name in ('scope', 'apps'):
+            shutil.copyfile(self.root / (name + '.json'), self.generated / ('generation-' + name + '.json'))
+
+    def project(self, *arguments):
+        return self.command('project', '--slice', str(self.slice), '--receipt', str(self.receipt), *arguments)
+
+    def test_scope_filters_build_but_preserves_raw_identities_and_groups(self):
+        result = self.project()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = json.loads(self.receipt.read_text())
+        self.assertEqual((receipt['raw'], receipt['selected'], receipt['product_excluded']), (3, 2, 1))
+        self.assertEqual([row['cpp'] for row in receipt['sources']], self.cpp)
+        self.assertNotIn('Cloud.cpp', result.stdout)
+        groups = unity.group_sources(self.cpp)
+        self.assertEqual(result.stdout.splitlines(),
+                         [f'{value}|{groups[value]}' for value in self.cpp if 'Cloud' not in value])
+
+    def test_removed_approved_source_retains_identity_after_sweep(self):
+        (self.generated / 'module/Cloud.cpp').unlink()
+        recorded = self.command('record', '--bc-source', str(self.root))
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        result = self.project()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        cloud = json.loads(self.receipt.read_text())['sources'][1]
+        self.assertEqual((cloud['source'], cloud['reason'], cloud['present']),
+                         ('source/Cloud.Codeunit.al', 'microsoft-cloud', False))
+        app = self.command('project', '--app', 'module', '--receipt', str(self.receipt))
+        self.assertEqual(app.returncode, 0, app.stderr)
+        self.assertEqual(json.loads(self.receipt.read_text())['raw'], 3)
+
+    def test_missing_required_source_refuses_slice_and_full_app(self):
+        (self.generated / 'module/Core.cpp').unlink()
+        for population in (('--slice', str(self.slice)), ('--app', 'module')):
+            with self.subTest(population=population):
+                result = self.command('project', *population)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('missing module/Core.cpp', result.stderr)
+
+    def test_stale_required_cpp_cannot_replace_current_emission(self):
+        self.freeze_generation(['module/Neighbor.cpp'])
+        result = self.project()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('required source was not emitted', result.stderr)
+        self.assertEqual(json.loads(self.receipt.read_text())['selected'], 2)
+
+    def test_missing_manifest_changed_policy_and_roots_refuse(self):
+        for name in ('scope', 'apps'):
+            path = self.root / (name + '.json')
+            original = path.read_text()
+            path.write_text(original + '\n')
+            result = self.project()
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('generation policy/app roots differ', result.stderr)
+            path.write_text(original)
+        (self.generated / 'generation-sources.txt').unlink()
+        result = self.project()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('current generation manifest is missing', result.stderr)
+
+    def test_selection_omissions_are_gaps_not_product_exclusions(self):
+        self.policy['area_exclude'] = ['Graph']
+        (self.root / 'scope.json').write_text(json.dumps(self.policy))
+        self.add_source('GraphTest', test=True, folder='Graph')
+        self.add_source('GraphLibrary', folder='Graph')
+        self.add_source('Other', namespace='Other')
+        self.freeze_generation(['module/Core.cpp', 'module/Neighbor.cpp', 'module/GraphLibrary.cpp'])
+        self.slice.write_text('\n'.join(self.cpp) + '\n')
+        self.assertEqual(self.command('record', '--bc-source', str(self.root)).returncode, 0)
+        result = self.project()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = json.loads(self.receipt.read_text())
+        self.assertEqual((receipt['raw'], receipt['selected'], receipt['product_excluded'], receipt['omitted']),
+                         (6, 3, 1, 2))
+        self.assertIn('GraphLibrary.cpp', result.stdout)
+        self.assertEqual({row['reason'] for row in receipt['sources'] if row['decision'] == 'omitted'},
+                         {'selection-area', 'selection-namespace'})
+
+    def test_native_bindings_follow_product_scope_not_bcapps_namespace_selection(self):
+        package = self.root / 'package'
+        (package / 'src').mkdir(parents=True)
+        (self.generated / 'platform').mkdir()
+        for name in ('Native', 'Commercial'):
+            (package / 'src' / (name + '.Table.al')).write_text(
+                f'namespace System.Agents; table 2000000001 {name} {{}}\n')
+            (self.generated / 'platform' / (name + '.cpp')).write_text(
+                f'// Generated from src/{name}.Table.al. Do not edit.\n')
+        self.policy['product_exclude'].append('bc-licensing:system-symbols/src/Commercial.Table.al')
+        (self.root / 'scope.json').write_text(json.dumps(self.policy))
+        self.freeze_generation(['module/Core.cpp', 'module/Neighbor.cpp', 'platform/Native.cpp'])
+        result = self.command('record', '--bc-source', str(self.root), '--symbols', str(package))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.command('project', '--app', 'platform', '--receipt', str(self.receipt))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'platform/Native.cpp\n')
+        receipt = json.loads(self.receipt.read_text())
+        self.assertEqual((receipt['raw'], receipt['selected'], receipt['product_excluded'], receipt['omitted']),
+                         (2, 1, 1, 0))
+
+    def test_emitted_excluded_source_refuses_instead_of_hiding_generator_disagreement(self):
+        self.freeze_generation()
+        result = self.project()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('current generation emitted a product-excluded source', result.stderr)
+
+    def test_unknown_origin_duplicate_and_traversal_refuse(self):
+        for rows, error in ((['module/Unknown.cpp'], 'unverified original source'),
+                            (['module/Core.cpp'] * 2, 'duplicate source'),
+                            (['../outside.cpp'], 'invalid generated/source identity')):
+            with self.subTest(rows=rows):
+                self.slice.write_text('\n'.join(rows) + '\n')
+                result = self.project()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(error, result.stderr)
+
+    def test_cmake_builds_selected_sources_and_fences_slice_and_apps_without_disabling_gates(self):
+        (self.root / 'scripts').symlink_to(self.repository / 'scripts', target_is_directory=True)
+        (self.root / 'cmake').symlink_to(self.repository / 'cmake', target_is_directory=True)
+        (self.root / 'gate.cpp').write_text('int gate() { return 0; }\n')
+        (self.root / 'main.cpp').write_text('int core(); int neighbor(); int main() { return core()+neighbor(); }\n')
+        (self.root / 'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.28)
+project(BuildSourceSelection CXX)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+include(cmake/GeneratedSources.cmake)
+agiru_generated_sources(slice rows --slice "${CMAKE_SOURCE_DIR}/slice")
+set(sources)
+foreach(row IN LISTS rows)
+  string(REGEX REPLACE "[|].*$" "" source "${row}")
+  list(APPEND sources "${CMAKE_SOURCE_DIR}/apps/${source}")
+endforeach()
+set_source_files_properties(${sources} PROPERTIES GENERATED TRUE)
+add_library(slice STATIC ${sources})
+add_dependencies(slice agiru_inputs_slice)
+agiru_generated_app_sources(module app_sources)
+add_library(app STATIC ${app_sources})
+add_dependencies(app agiru_inputs_app_module)
+add_library(handwritten OBJECT gate.cpp)
+add_executable(client main.cpp)
+target_link_libraries(client PRIVATE slice)
+''')
+        build = self.root / 'build'
+        configured = subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-G', 'Ninja',
+                                     '-DCMAKE_CXX_COMPILER=clang++-19'], capture_output=True, text=True)
+        self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
+        def compile_target(target):
+            return subprocess.run(['cmake', '--build', str(build), '--target', target, '-j', '2'],
+                                  capture_output=True, text=True, timeout=30)
+        for target in ('client', 'app'):
+            result = compile_target(target)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(subprocess.run([str(build / 'client')]).returncode, 0)
+        self.freeze_generation(['module/Neighbor.cpp'])
+        for target in ('slice', 'app'):
+            result = compile_target(target)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('required source was not emitted', result.stdout + result.stderr)
+        (self.generated / 'module/Core.cpp').unlink()
+        self.freeze_generation(['module/Core.cpp', 'module/Neighbor.cpp'])
+        result = compile_target('handwritten')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = compile_target('slice')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('missing module/Core.cpp', result.stdout + result.stderr)
+
+
 
 
 class SourceInventoryGate(unittest.TestCase):
@@ -2841,9 +3115,9 @@ class SourceInventoryGate(unittest.TestCase):
             root = Path(folder)
             (root / 'src').mkdir()
             (root / 'src/Commercial.al').write_text('table 1 Commercial {}')
-            (root / 'src/User.al').write_text('table 2 User {}')
+            (root / 'src/User.al').write_text('namespace System.Agents; table 2 User {}')
             configuration = {'apps': [{'name': 'native', 'source': 'src'}]}
-            policy = {'include': ['System', 'Microsoft'], 'exclude': [],
+            policy = {'include': ['System', 'Microsoft'], 'exclude': ['System.Agents'],
                       'product_exclude': ['bc-licensing:system-symbols/src/Commercial.al']}
             native = scope_inventory.inventory(root, configuration, policy, 'system-symbols')
             regular = scope_inventory.inventory(root, configuration, policy)
@@ -2851,6 +3125,11 @@ class SourceInventoryGate(unittest.TestCase):
             self.assertEqual(regular['summary']['objects'], 2)
             self.assertEqual(native['summary']['product_excluded_objects'], 1)
             self.assertEqual(regular['summary']['product_excluded_objects'], 0)
+            self.assertEqual(native['summary']['selected_objects'], 1)
+            self.assertEqual(regular['summary']['selected_objects'], 1)
+            native_user = next(item for item in native['objects'] if item['name'] == 'User')
+            self.assertFalse(native_user['namespace_selected'])
+            self.assertTrue(native_user['selection_selected'])
             self.assertEqual(native['source_sha256'], regular['source_sha256'])
             self.assertFalse(native['errors'])
             self.assertFalse(regular['errors'])

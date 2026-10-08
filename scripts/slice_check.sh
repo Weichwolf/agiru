@@ -4,19 +4,12 @@ root=$(realpath "${1:-$(dirname "$0")/..}")
 B=${B:-$root/build}
 mkdir -p "$B"
 proof=$(mktemp -d /tmp/agiru-slice-check.XXXXXX)
-python3 "$root/scripts/unity_groups.py" "$root/test/slice" > "$proof/sources.tsv"
-count=0
-missing=0
-while IFS='|' read -r source group; do
-  count=$((count + 1))
-  if [ ! -f "$root/apps/$source" ]; then
-    printf 'slice-check: missing %s (%s)\n' "$source" "$group" >&2
-    missing=$((missing + 1))
-  fi
-done < "$proof/sources.tsv"
-printf 'slice-check: %s sources, %s missing; %s\n' "$count" "$missing" "$proof/sources.tsv"
-if [ "$count" -eq 0 ]; then
-  printf 'slice-check: empty source population\n' >&2
-  exit 2
+status=0
+python3 "$root/scripts/build_sources.py" project --root "$root" --slice "$root/test/slice" \
+  --receipt "$proof/population.json" > "$proof/sources.tsv" || status=$?
+if [ -f "$proof/population.json" ]; then
+  jq -r '"slice-check: \(.raw) raw, \(.selected) selected, \(.product_excluded) product-excluded, \(.omitted) omitted, \([.sources[] | select(.decision == "selected" and .present == false)] | length) missing"' \
+    "$proof/population.json"
 fi
-[ "$missing" -eq 0 ]
+printf 'slice-check: exit %s; %s\n' "$status" "$proof"
+exit "$status"

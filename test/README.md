@@ -107,6 +107,16 @@ proof of the current integration build, actual browser/htmx execution or full ER
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.
 `make verify-check` checks build tooling without rebuilding C++.
+`BuildSourcesGate` compiles the shared CMake source projection and tests stale/missing
+inputs, exact product exclusions and separately counted selection omissions. Raw slice
+identities and unity assignments stay unchanged. `make slice-check` requires the current
+generator source list, policy/app-root snapshots and original-source map; file presence
+alone is insufficient. The transpile wrapper preserves removed source identities, including
+after a successful sweep. Generated-library builds recheck the same contract; missing inputs
+do not prevent handwritten gates or the transpiler from building.
+Native platform declarations use bounded product exclusions; BCApps namespace/area
+reachability does not remove required system declarations. Native inventory retains both
+the namespace diagnostic and the independently selected identity.
 Frozen runs pin the selected build's database, source, app/slice and build-type settings,
 with explicit database/source overrides. Private configuration is hash-checked; `make
 configure CMAKE_ARGS=<declared-settings>` runs before targets, including reused builds.
