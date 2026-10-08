@@ -80,6 +80,25 @@ void UnavailableRecordFieldsCompileAndRefuse() {
   }
 }
 
+void UnavailableIndexedFieldsCompileAndRefuse() {
+  constexpr std::array<std::string_view, 5> kMembers{
+      "ArrayOnly", "NestedOnly", "MatrixOnly", "BracketOnly", "Validate"};
+  constexpr agiru::Integer kIndexWithSideEffect = 3;
+  agiru::System::Fixture::NativeFixture_Codeunit unit;
+  for (agiru::Integer operation = 0; operation < static_cast<agiru::Integer>(kMembers.size());
+       ++operation) {
+    agiru::Integer counter = kValue;
+    std::string message;
+    try {
+      unit.UnavailableIndexedFields(operation, counter);
+    } catch (const agiru::Error &error) { message = error.what(); }
+    CHECK_TRUE("indexed unavailable members compile and refuse with their own identity",
+               message.contains("IndexedRow." + std::string(kMembers[operation])));
+    CHECK_TRUE("the index executes once and refusal precedes subsequent AL effects",
+               counter == (operation == kIndexWithSideEffect ? 42 : 41));
+  }
+}
+
 void UnavailableNamedPagesCompileAndRefuse() {
   constexpr agiru::Integer kOperationCount = 6;
   agiru::System::Fixture::NativeFixture_Codeunit unit;
@@ -102,6 +121,7 @@ int main() {
   return gate::Run("Generated Native Codeunit Refusals", [] {
     NativeMethodsRefuseBeforeEffects();
     UnavailableRecordFieldsCompileAndRefuse();
+    UnavailableIndexedFieldsCompileAndRefuse();
     UnavailableNamedPagesCompileAndRefuse();
   });
 }

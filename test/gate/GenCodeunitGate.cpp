@@ -595,6 +595,42 @@ void ImplicitRecordFieldsMatchBodyLowering() {
                      agiru::gen::kAllRecordFieldArguments);
 }
 
+void IndexedUnavailableRecordMembersRemainExplicit() {
+  const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
+    codeunit 50315 IndexedFields {
+      procedure Read()
+      var
+        Rows: array[2] of Record "Indexed Row";
+        Grid: array[2,2] of Record "Indexed Row";
+        Slots: array[2] of Integer;
+        Value: Integer;
+      begin
+        Value := Rows[1]."Array Only";
+        Value := Rows[Slots[1]]."Nested Only";
+        Value := Grid[1,2]."Matrix Only";
+        Value := Rows[Index(']')]."Bracket Only";
+        Rows[1].Validate("Validated Only", Value);
+      end;
+      local procedure Index(Marker: Text): Integer
+      begin
+        exit(1);
+      end;
+    })");
+  const auto header = agiru::gen::WriteCodeunit(unit, "IndexedFields.Codeunit.al", Tables());
+  const auto &members = header.absent.at("IndexedRow");
+  CHECK_TRUE("array-only reads retain their unavailable record member",
+             members.contains("ArrayOnly"));
+  CHECK_TRUE("nested and multidimensional indices preserve their receiver's members",
+             members.contains("NestedOnly") && members.contains("MatrixOnly"));
+  CHECK_TRUE("a closing bracket in a string literal does not end the receiver index",
+             members.contains("BracketOnly"));
+  CHECK_TRUE("indexed methods retain both their call and implicit field argument",
+             members.contains("Validate") && members.contains("ValidatedOnly"));
+  CHECK_TRUE("array indices and ordinary arguments do not become record fields",
+             !members.contains("Index") && !members.contains("Slots") &&
+                 !members.contains("Value") && header.absent.size() == 1);
+}
+
 void UnselectedNamedPagesDoNotNeedInventedClasses() {
   const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
     codeunit 50314 MissingPage {
@@ -627,6 +663,7 @@ int main() {
     AnInlineOptionGetsAnEnumerationOfItsOwn();
     AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives();
     AFieldNamedOnAnArrayElementIsTheElementsField();
+    IndexedUnavailableRecordMembersRemainExplicit();
     AVariableNamedAfterItsTypeScopesThroughTheType();
     AFieldRefsTypeScopesThroughFieldType();
     AForeachOverADotNetCollectionFillsTheDeclaredVariable();

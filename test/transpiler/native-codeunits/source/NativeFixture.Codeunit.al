@@ -80,6 +80,31 @@ codeunit 50311 NativeFixture
         Counter := 99;
     end;
 
+    procedure UnavailableIndexedFields(Operation: Integer; var Counter: Integer)
+    var
+        Rows: array[2] of Record "Indexed Row";
+        Grid: array[2,2] of Record "Indexed Row";
+        Slots: array[2] of Integer;
+        Value: Integer;
+    begin
+        Slots[1] := 1;
+        Counter := 41;
+        case Operation of
+            0: Value := Rows[1]."Array Only";
+            1: Value := Rows[Slots[1]]."Nested Only";
+            2: Value := Grid[1,2]."Matrix Only";
+            3: Value := Rows[ChooseIndex(Counter, ']')]."Bracket Only";
+            4: Rows[1].Validate("Validated Only", Value);
+        end;
+        Counter := 99;
+    end;
+
+    local procedure ChooseIndex(var Counter: Integer; Marker: Text): Integer
+    begin
+        Counter += 1;
+        exit(1);
+    end;
+
     procedure UnavailablePage(Operation: Integer; var Counter: Integer)
     var
         Row: Record "Available Row" temporary;

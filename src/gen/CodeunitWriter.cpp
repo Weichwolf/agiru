@@ -1046,21 +1046,39 @@ void GatherFieldArguments(const std::vector<al::Token> &tokens,
   }
 }
 
+std::size_t MemberAfterReceiver(std::span<const al::Token> tokens, std::size_t receiver) {
+  std::size_t at = receiver + 1;
+  while (at < tokens.size() && tokens[at].kind == al::TokenKind::Punctuation &&
+         tokens[at].text == "[") {
+    std::size_t depth = 0;
+    do {
+      if (tokens[at].kind == al::TokenKind::Punctuation) {
+        if (tokens[at].text == "[") { ++depth; }
+        if (tokens[at].text == "]") { --depth; }
+      }
+      ++at;
+    } while (at < tokens.size() && depth != 0);
+    if (depth != 0) { return tokens.size(); }
+  }
+  return at + 1 < tokens.size() && tokens[at].text == "." ? at + 1 : tokens.size();
+}
+
 void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, DotNetUse &use) {
   for (std::size_t i = 0; i + 2 < procedure.tokens.size(); ++i) {
     if (procedure.tokens[i].kind != al::TokenKind::Identifier &&
         procedure.tokens[i].kind != al::TokenKind::QuotedIdentifier) {
       continue;
     }
-    if (procedure.tokens[i + 1].text != ".") { continue; }
-    if (procedure.tokens[i + 2].kind != al::TokenKind::Identifier &&
-        procedure.tokens[i + 2].kind != al::TokenKind::QuotedIdentifier) {
+    const std::size_t member = MemberAfterReceiver(procedure.tokens, i);
+    if (member == procedure.tokens.size()) { continue; }
+    if (procedure.tokens[member].kind != al::TokenKind::Identifier &&
+        procedure.tokens[member].kind != al::TokenKind::QuotedIdentifier) {
       continue;
     }
     const auto found = named.find(LowerKey(procedure.tokens[i].text));
     if (found == named.end()) { continue; }
-    use[found->second].insert(Identifier(procedure.tokens[i + 2].text));
-    GatherFieldArguments(procedure.tokens, i + 2, use[found->second]);
+    use[found->second].insert(Identifier(procedure.tokens[member].text));
+    GatherFieldArguments(procedure.tokens, member, use[found->second]);
   }
 }
 

@@ -176,10 +176,28 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   29.0.54011.55407 is not that manifest version. Package SHA-256 remains
   `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`.
 
+- Indexed unavailable members: `CodeunitWriter.cpp` now collects fields/methods after
+  balanced indices, ignoring brackets inside string literals. Five compiled AL cases
+  cover direct/nested/multidimensional reads, an index with a side effect and Validate's
+  implicit field. Refusals retain member identity, evaluate the index once and stop
+  before later effects; removing the matrix-only declaration fails compilation.
+  `make native-codeunits JOBS=2` with the verified System package: generator 65,
+  executable refusals 61, source-bound 8 and original Base64 61 checks, zero red;
+  existing negative controls still reject. Three affected C++ units pass clang-tidy,
+  format passes and the suppression baseline remains 12. Mixed-case unavailable type
+  identity and the other production build failures remain open; this is not ERP proof.
+  References: developer `methods/devenv-array-methods.md` at `f928288ee840334be73142e5fc0202c0e19b246d`;
+  BCApps `main` `src/Layers/W1/Tests/ERM/CopyPriceDataTest.Codeunit.al`, lines 2072/2074,
+  at `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`; predecessor 1389 distinguishes
+  array element access/extent from collection mutation. Durable fixtures:
+  `test/transpiler/native-codeunits/{source/NativeFixture.Codeunit.al,Runner.cpp}`.
+
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.
-  The 14,225-file slice check passes; the native build fails on the missing named-page
-  declaration in GlobalAdminMessage. These remain counted gaps, not green acceptance.
+  The 14,225-file slice check passes; the completed keep-going native build has six
+  failed unity groups (526/650/551/028/421/140), not a remaining GlobalAdminMessage
+  failure. The current field/part/type/overload repairs and bounded O365 exclusion
+  need production regeneration and linking; none is full native/ERP acceptance.
   Named Page.Run/RunModal now lower through the numbered runtime API, with an explicit
   kind/name refusal before dispatch instead of an invented absent class or object zero.
   Compiled fixtures cover optional records/field numbers, Action results and mixed-case

@@ -63,6 +63,20 @@ fi
 rg -q "no member named 'Enabled'" "$proof/missing-field-control.log"
 rm -r -- "$proof/missing-field"
 
+cp -a "$proof/generated" "$proof/missing-indexed-field"
+awk '
+  /::agiru::dotnet::Refused MatrixOnly\{/ { removed++; next }
+  { print }
+  END { if (removed != 1) exit 2 }
+' "$proof/generated/absent/absent/Types.h" > "$proof/missing-indexed-field/absent/absent/Types.h"
+if link_generated "$proof/missing-indexed-field" "$proof/runner.o" "$proof/missing-indexed-field-runner" \
+  > "$proof/missing-indexed-field-control.log" 2>&1; then
+  printf 'native-codeunits: missing indexed field escaped compilation control\n' >&2
+  exit 1
+fi
+rg -q "no member named 'MatrixOnly'" "$proof/missing-indexed-field-control.log"
+rm -r -- "$proof/missing-indexed-field"
+
 cp -a "$input" "$proof/missing-page-boundary"
 awk '
   /: (Choice := )?(Page|page)\.(Run|RunModal|rUn)\(/ {

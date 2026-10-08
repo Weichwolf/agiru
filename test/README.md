@@ -237,6 +237,11 @@ Ordinary AL calls on an unavailable Record compile implicit/quoted field argumen
 for ten methods and refuse with the original member identity before subsequent effects.
 Removing the implicit field declaration must fail compilation; no table schema or
 successful fallback is invented. Emitter and dependency collection share one signature table.
+Unavailable array members also compile for direct, nested and multidimensional indices,
+including a bracket string literal in an index call and an implicit Validate field.
+The compiled runner proves a side-effecting index runs once before the named refusal;
+removing the matrix-only declaration must fail compilation. Case-normalized unavailable
+type identity remains a separate generator gap, not covered by these member checks.
 Unselected named Page.Run/RunModal calls compile through the numbered runtime API,
 including optional records, field numbers, Action results and case-insensitive names.
 They throw with the original AL identity before subsequent effects, not through an
