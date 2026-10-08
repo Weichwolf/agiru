@@ -127,15 +127,14 @@ Production generated consumers have been rebuilt after the expanded SessionOptio
 value ABI: `make slice-check all B=/workspace/build/podman JOBS=6` exits zero,
 14,225 slice sources, 2,901 seconds. The 1,902 unlinked AL procedures remain gaps;
 this is not complete-app compilation, full AL execution or a working client dialog.
-Latest frozen native baseline: clean `280917453b8cc12549872a50c4a9b1bfcd8cb436`;
-`make verify-start B=/workspace/build/podman JOBS=2 VERIFY_TARGETS=test`:
-185 manifest cases, zero red, exit 0, 1,930 seconds including configuration/build.
-The run includes the bounded asynchronous executor, not later question/message work.
-Source, selected PostgreSQL-5432/AL/slice configuration and system symbols retain their
-SHA-256 before/after: respectively
-`5e68d7a21dbd3d5eca34ddccef7baa90413e10dcb40245625e4890c8d4be301b`,
-`681c0520e14721d4b0875729c614c0c39e1e65ed4ffbc31b8f991225d5db05c0`,
-`34c40f0dcc839eb4d244398715e11a801194bfcea69a21257c5de20a9833a955`.
+Latest native baseline: `9d5b0a99553c5b2a61e29254829aac47caa8bf03`;
+`make test B=/workspace/build/podman JOBS=2` in the development container:
+185 manifest cases, zero red, exit 0. This includes current modal transport,
+source-insertion reconciliation, bounded windows and transaction regressions.
+Select verified BC source, developer reference, original source notice, system symbols
+and the dedicated PostgreSQL-5432 gate database explicitly. Native compiler/test inputs
+remain unchanged; the separate new HTTP invalid-input regression was not consumed.
+The old frozen baseline and its hashes remain recoverable in `9d5b0a9`.
 `scripts/verify_snapshot.py` pins private selected-build settings and configures its
 own lane before targets, including reused builds; inherited B cannot redirect it.
 The earlier wrong-DSN/source configuration defect is repaired in `1a07829`;
