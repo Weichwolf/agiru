@@ -74,7 +74,13 @@ C++ and PostgreSQL with external CMD/MCP. Independent SQL checks typed values,
 modifier identity, write counts, command replay/revisions, rollback and durable AL Commit.
 Generated actions also attempt denied reads/inserts on a second table; HTTP must refuse
 without disclosing its values or changing either table.
-Three compiled ownership/revision/replay defects must fail named HTTP cases. The fixture
+AL calls use a separate bounded executor and shared profile-3 `working` status; clients
+poll the opaque call instead of repeating admission. Delayed field writes run with one
+HTTP worker and independent SQL observers; CMD/MCP/htmx must retain exact final values,
+one write effect, rollback/durable Commit and original failure identities. This does not
+qualify Confirm/StrMenu, cancellation, queue saturation or multi-user scale.
+Compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt and
+synchronous-execution defects must fail named cases. The fixture
 has real generated pages and SQL grants, not a full BC permission provider or browser
 acceptance. It reuses the page-navigation compilation pipeline and private auth-file helper.
 

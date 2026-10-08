@@ -16,6 +16,7 @@ function field(control: Control, command = ""): string {
 
 export function renderAscii(page: Page, budget = 262144): string {
   const lines = [`page ${page.page} ${quote(page.caption)} handle=${page.handle} rev=${page.revision} view=${page.view}`];
+  if (page.interaction) lines.push(`working call=${page.interaction.call} command=${page.interaction.originCommand || "(opening)"}`);
   for (const control of page.controls) {
     const key = quote(control.identity);
     if (control.kind === "group") continue;

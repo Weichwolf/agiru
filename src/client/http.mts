@@ -61,12 +61,12 @@ export class AgentClient {
     } catch { throw new ClientError("PathRefused", "Only same-origin root-relative paths are allowed"); }
   }
 
-  async #request(path: string, fields?: Readonly<Record<string, string>>, command?: string): Promise<Result> {
+  async #request(path: string, fields?: Readonly<Record<string, string>>, command?: string, timeout = this.#timeout): Promise<Result> {
     const url = this.#url(path);
     const body = fields ? new URLSearchParams(fields).toString() : undefined;
     if (body && Buffer.byteLength(body) > limits.bytes) throw new ClientError("RequestLimit", "Command byte budget exceeded");
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.#timeout);
+    const timer = setTimeout(() => controller.abort(), timeout);
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
       const response = await fetch(url, { method: body === undefined ? "GET" : "POST", redirect: "manual",
@@ -109,7 +109,28 @@ export class AgentClient {
     }
   }
 
-  read(path: string): Promise<Result> { return this.#request(path); }
+  async #follow(result: Result, deadline: number, command?: string, handle = result.page.handle): Promise<Result> {
+    const call = result.page.interaction?.call;
+    for (;;) {
+      const interaction = result.page.interaction;
+      if (result.page.handle !== handle || (interaction && (interaction.call !== call ||
+          interaction.originCommand !== (command ?? "")))) {
+        throw new ClientError(command ? "WriteUncertain" : "ResponseRefused", "Operation identity changed while polling", command);
+      }
+      if (!interaction) return result;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new ClientError(command ? "WriteUncertain" : "OperationPending",
+        `AL operation is still pending; read /calls/${call} to reconcile without replaying it`, command);
+      await new Promise(resolve => setTimeout(resolve, Math.min(50, remaining)));
+      result = await this.#request(`/calls/${call}`, undefined, command, Math.max(1, deadline - Date.now()));
+    }
+  }
+
+  async read(path: string): Promise<Result> {
+    const deadline = Date.now() + this.#timeout;
+    const result = await this.#request(path);
+    return this.#follow(result, deadline, result.page.interaction?.originCommand || undefined);
+  }
 
   async execute(path: string, requested: Command): Promise<Result> {
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(requested.page) || !/^[0-9]{1,128}$/.test(requested.revision) ||
@@ -127,7 +148,11 @@ export class AgentClient {
       throw new ClientError("StalePage", "Page handle or revision changed; read and choose a new command explicitly");
     }
     const envelope = commandEnvelope(current.page, { ...requested, enabled: true }, requested.text);
-    return this.#request(envelope.path, envelope.fields, requested.command);
+    const deadline = Date.now() + this.#timeout;
+    const submit = async (): Promise<Result> => {
+      return this.#request(envelope.path, envelope.fields, requested.command);
+    };
+    return this.#follow(await submit(), deadline, requested.command, requested.page);
   }
 }
 

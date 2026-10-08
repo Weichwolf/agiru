@@ -28,7 +28,7 @@ cleanup() {
   for file in "$proof/auth.json" "$proof/auth.json.second"; do
     if [[ -f "$file" ]]; then unlink "$file"; fi
   done
-  for control in owner revision replay policy duplicates list-limit failure-receipt; do
+  for control in owner revision replay policy duplicates list-limit failure-receipt blocking-al; do
     if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
     make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
   done
@@ -81,10 +81,13 @@ mutation='
   control == "failure-receipt" && /AND outcome = \x27started\x27/ {
     sub(/AND outcome = \x27started\x27/, "AND outcome = \x27started\x27 AND false"); changed++
   }
+  control == "blocking-al" && /call->ready.wait_for\(lock, options.responseWait,/ {
+    sub(/options.responseWait/, "std::chrono::seconds(1)"); changed++
+  }
   { print }
-  END { if (changed != (control == "list-limit" ? 2 : 1)) exit 2 }
+  END { if (changed != (control == "list-limit" || control == "owner" ? 2 : 1)) exit 2 }
 '
-for control in owner revision replay policy list-limit failure-receipt; do
+for control in owner revision replay policy list-limit failure-receipt blocking-al; do
   podman exec --user 1000:1001 "${AGIRU_DEV_CONTAINER:-agiru-dev}" \
     awk -v control="$control" "$mutation" /workspace/src/rt/PageCommandHost.cpp > "$proof/$control.cpp"
   podman cp "$proof/$control.cpp" "${AGIRU_DEV_CONTAINER:-agiru-dev}:$native/$control.cpp"
@@ -105,6 +108,7 @@ for control in owner revision replay policy list-limit failure-receipt; do
     policy) rg -q '^not ok .*startup configuration selects TryFunction write policy' "$proof/$control.log" ;;
     list-limit) rg -q '^not ok .*shared HTTP list windows obey the trusted bound' "$proof/$control.log" ;;
     failure-receipt) rg -q '^not ok .*a noncommitted AL action rolls back' "$proof/$control.log" ;;
+    blocking-al) rg -q '^not ok .*a pending native write keeps one HTTP worker available' "$proof/$control.log" ;;
   esac
   for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
@@ -128,4 +132,4 @@ rg -q 'FAIL.*duplicate configuration keys refuse' "$proof/duplicates.log"
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/duplicates.cpp $native/duplicates.so"
 unlink "$proof/duplicates.cpp"
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'page-host: generated-page SQL effects and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; seven compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt defects rejected; not full ERP acceptance; %s\n' "$proof"
+printf 'page-host: generated-page SQL effects, asynchronous AL calls and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; eight compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt/blocking-AL defects rejected; not full ERP acceptance; %s\n' "$proof"

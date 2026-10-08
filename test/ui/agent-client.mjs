@@ -22,16 +22,34 @@ let posts = 0;
 const failureHtml = (command = "cmd_1_7", outcome = "failed") =>
   `<article data-agiru-error="1" data-code="UiWriteTransaction" data-command="${command}" data-outcome="${outcome}"><h1>Request failed</h1><p>Grüezi &lt;script&gt; 東京 &amp; blocked.</p></article>`;
 let failureMode = "";
+let workingCommand = "", workingPolls = 0;
+const workingHtml = command => `<article data-agiru-profile="3" data-view="interaction" data-page="50400" data-handle="page_1" data-revision="9007199254740993" data-state="working" data-call="call_1" data-origin-command="${command}"><h1>Working</h1><output data-unsupported-count="0"></output></article>`;
 const server = createServer(async (request, response) => {
   received.push({ method: request.method, path: request.url, headers: request.headers });
   if (request.url === "/redirect") { response.writeHead(302, { Location: "http://127.0.0.1:1/foreign" }); response.end(); return; }
   if (request.url === "/timeout") return;
+  if (request.url === "/working-open") {
+    workingCommand = ""; workingPolls = 0;
+    response.setHeader("Content-Type", "text/html; charset=utf-8"); response.end(workingHtml("")); return;
+  }
+  if (request.url === "/calls/call_1") {
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    workingPolls++;
+    if (failureMode === "working-failure") {
+      response.statusCode = 500; response.end(failureHtml(workingCommand)); return;
+    }
+    response.end(failureMode === "working-forever" || workingPolls < 2 ? workingHtml(workingCommand) : html); return;
+  }
   if (request.method === "POST") {
     posts++;
     let body = "";
     for await (const chunk of request) body += chunk;
     received.at(-1).body = Object.fromEntries(new URLSearchParams(body));
     if (request.url === "/disconnect") { request.socket.destroy(); return; }
+    if (failureMode.startsWith("working")) {
+      workingCommand = received.at(-1).body.command; workingPolls = 0;
+      response.setHeader("Content-Type", "text/html; charset=utf-8"); response.end(workingHtml(workingCommand)); return;
+    }
     if (failureMode) {
       response.writeHead(500, { "Content-Type": "text/html; charset=utf-8" });
       response.end(failureMode === "malformed" ? "<p>unqualified failure</p>" :
@@ -76,6 +94,45 @@ function cmd(args) {
     child.on("close", code => resolve({ code, stdout, stderr }));
   });
 }
+
+test("working profile is bounded, non-executable and carries the original operation identity", () => {
+  const working = parsePage(workingHtml("cmd_1_7"));
+  assert.deepEqual(working.interaction, { state: "working", call: "call_1", originCommand: "cmd_1_7" });
+  assert.equal(working.controls.length, 0);
+  assert.ok(renderAscii(working).includes("working call=call_1 command=cmd_1_7"));
+  for (const invalid of [workingHtml("bad command"), workingHtml("").replace('data-state="working"', 'data-state="confirm"'),
+    workingHtml("").replace("<h1>Working</h1>", "<h1>Working</h1><p>hidden business data</p>"),
+    workingHtml("").replace('data-call="call_1"', 'data-call="//foreign"')]) refuses(invalid);
+  refuses(html.replace('data-agiru-profile="1"', 'data-agiru-profile="1" data-call="call_1"'));
+});
+
+test("opening and writes poll the same call without repeating AL admission", async () => {
+  const before = received.length;
+  assert.deepEqual(await client.read("/working-open"), { page, status: 200 });
+  assert.deepEqual(received.slice(before).map(item => item.path), ["/working-open", "/calls/call_1", "/calls/call_1"]);
+  failureMode = "working";
+  const previous = posts;
+  try {
+    const selected = request("Post", "action");
+    assert.deepEqual(await client.execute(selected.path, selected), { page, status: 200 });
+    assert.equal(posts - previous, 1);
+    assert.equal(workingPolls, 2);
+  } finally { failureMode = ""; }
+});
+
+test("failed and timed-out polls retain write identity and never repost", async () => {
+  const selected = request("Post", "action");
+  for (const mode of ["working-failure", "working-forever"]) {
+    failureMode = mode;
+    const previous = posts;
+    try {
+      await assert.rejects(new AgentClient(origin, {}, mode === "working-forever" ? 180 : 15000)
+        .execute(selected.path, selected), error => error.command === selected.command &&
+          error.code === (mode === "working-failure" ? "UiWriteTransaction" : "WriteUncertain"));
+      assert.equal(posts - previous, 1);
+    } finally { failureMode = ""; }
+  }
+});
 
 test("C++-rendered profile: exact scalars, order, entity decoding and counted gaps", () => {
   assert.equal(page.page, "50400");

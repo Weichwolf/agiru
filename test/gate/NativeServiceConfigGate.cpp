@@ -59,6 +59,9 @@ void Defaults() {
                  options.pages.commands == pages.commands &&
                  options.pages.receiptBytes == pages.receiptBytes &&
                  options.pages.listRows == pages.listRows &&
+                 options.pages.executionWorkers == pages.executionWorkers &&
+                 options.pages.executionQueue == pages.executionQueue &&
+                 options.pages.responseWait == pages.responseWait &&
                  options.pages.lifetime == pages.lifetime &&
                  options.pages.session.disableWriteInsideTryFunctions ==
                      pages.session.disableWriteInsideTryFunctions &&
@@ -74,7 +77,13 @@ void Defaults() {
   root["transactions"]["allow_session_call_suspend_when_write_transaction_started"] = Node(false);
   root["pages"]["receipt_bytes"] = Node::Number("9007199254740993");
   constexpr auto kConfiguredListRows = 7;
+  constexpr auto kConfiguredExecutionWorkers = 3;
+  constexpr auto kConfiguredExecutionQueue = 5;
+  constexpr auto kConfiguredResponseWaitMs = 7;
   root["pages"]["list_rows"] = Node(kConfiguredListRows);
+  root["pages"]["execution_workers"] = Node(kConfiguredExecutionWorkers);
+  root["pages"]["execution_queue"] = Node(kConfiguredExecutionQueue);
+  root["pages"]["response_wait_ms"] = Node(kConfiguredResponseWaitMs);
   root["company"] = Node(std::string("Original + Gesellschaft 東京"));
   const auto selected = agiru::ParseNativeServiceOptions(root.dump());
   CHECK_TRUE("trusted explicit worker and transaction policies are retained",
@@ -83,6 +92,11 @@ void Defaults() {
              !selected.pages.session.allowSessionCallSuspendWhenWriteTransactionStarted);
   CHECK_TRUE("trusted configuration changes the common list row bound",
              selected.pages.listRows == kConfiguredListRows);
+  CHECK_TRUE("AL execution admission and response wait are independent of HTTP workers",
+             selected.pages.executionWorkers == kConfiguredExecutionWorkers &&
+                 selected.pages.executionQueue == kConfiguredExecutionQueue &&
+                 selected.pages.responseWait ==
+                     std::chrono::milliseconds(kConfiguredResponseWaitMs));
   CHECK_TRUE("integer budgets never travel through binary floating point",
              selected.pages.receiptBytes == 9007199254740993ULL);
   root["company"] = Node(std::string("Changed"));
@@ -206,6 +220,13 @@ void DuplicatesAndNumbers() {
     CHECK_TRUE("server parser shares native transport resource validation", Refuses(root.dump()));
   }
   auto lifetime = original;
+  for (const auto &[field, value] :
+       {std::pair{"execution_workers", "257"}, {"response_wait_ms", "1001"}}) {
+    auto invalid = original;
+    invalid["pages"][field] = Node::Number(value);
+    CHECK_TRUE("AL workers and initial response wait have explicit ceilings",
+               Refuses(invalid.dump()));
+  }
   constexpr auto kOneDay = std::chrono::hours(24);
   lifetime["pages"]["lifetime_seconds"] =
       Node(std::chrono::duration_cast<std::chrono::seconds>(kOneDay).count() + 1);

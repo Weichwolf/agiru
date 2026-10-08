@@ -20,6 +20,9 @@
     "commands": 128,
     "receipt_bytes": 4194304,
     "list_rows": 40,
+    "execution_workers": 16,
+    "execution_queue": 32,
+    "response_wait_ms": 50,
     "lifetime_seconds": 3600
   },
   "transactions": {

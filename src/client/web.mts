@@ -16,6 +16,7 @@ const secret = document.querySelector<HTMLInputElement>("#credential")!;
 let authorization = "";
 let current: Page | undefined;
 let active = false;
+let pollDeadline = 0;
 const candidates = new WeakMap<XMLHttpRequest, Page>();
 
 htmx.config.allowEval = false;
@@ -33,8 +34,8 @@ function path(value: string): string {
 }
 
 function notice(response?: Response): void {
-  const command = response?.requestConfig.parameters.command;
-  status.textContent = response?.requestConfig.verb === "post"
+  const command = response?.requestConfig.parameters.command || current?.interaction?.originCommand;
+  status.textContent = response?.requestConfig.verb === "post" || command
     ? `Write outcome uncertain; reconcile command ${command ?? "(unknown)"} before retrying.`
     : "Page request refused; no successful outcome established.";
 }
@@ -48,6 +49,7 @@ document.addEventListener("htmx:configRequest", event => {
     request.headers.Accept = "text/html";
     if (request.verb === "get") {
       if (request.elt !== root) throw new Error();
+      if (request.path.startsWith("/calls/") && request.path !== `/calls/${current?.interaction?.call}`) throw new Error();
       return;
     }
     if (request.verb !== "post" || !current || !(request.elt instanceof HTMLFormElement)) throw new Error();
@@ -81,14 +83,23 @@ document.addEventListener("htmx:beforeOnLoad", event => {
     checkResponseProfile(xhr.getResponseHeader("Content-Type") ?? "", header => xhr.getResponseHeader(header) !== null);
     if (xhr.status >= 300) {
       const failure = parseFailure(xhr.responseText);
-      if (response.requestConfig.verb === "post" && failure.command !== response.requestConfig.parameters.command) throw new Error();
+      const command = response.requestConfig.verb === "post" ? response.requestConfig.parameters.command :
+        response.requestConfig.path.startsWith("/calls/") ? current?.interaction?.originCommand : undefined;
+      if (command && failure.command !== command) throw new Error();
       event.preventDefault();
       status.textContent = `Server error ${failure.code}: ${failure.message} outcome=${failure.outcome}` +
         (failure.command ? ` command=${failure.command}` : "") +
         (failure.outcome === "failed" ? "; prior explicit commits may persist." : "");
       return;
     }
-    candidates.set(xhr, parsePage(xhr.responseText));
+    const page = parsePage(xhr.responseText);
+    const interaction = page.interaction;
+    if (response.requestConfig.path.startsWith("/calls/") &&
+        (page.handle !== current?.handle || (interaction &&
+          (interaction.call !== current?.interaction?.call || interaction.originCommand !== current?.interaction?.originCommand)))) throw new Error();
+    if (response.requestConfig.verb === "post" && interaction &&
+        (page.handle !== current?.handle || interaction.originCommand !== response.requestConfig.parameters.command)) throw new Error();
+    candidates.set(xhr, page);
   } catch {
     event.preventDefault();
     notice(response);
@@ -99,11 +110,23 @@ document.addEventListener("htmx:afterSwap", event => {
   const response = (event as CustomEvent<Response>).detail;
   const accepted = candidates.get(response.xhr);
   if (!accepted) { notice(response); return; }
+  if (accepted.interaction?.call !== current?.interaction?.call) pollDeadline = Date.now() + 15000;
   current = accepted;
   const url = new URL(location.href);
   url.search = new URLSearchParams({ handle: current.handle }).toString();
   history.replaceState(null, "", url);
-  status.textContent = current.unsupported ? `${current.unsupported} unsupported controls remain visible.` : "Ready";
+  if (current.interaction) {
+    status.textContent = "Working…";
+    setTimeout(() => {
+      if (current !== accepted) return;
+      if (Date.now() >= pollDeadline) {
+        status.textContent = `AL operation pending; read /calls/${accepted.interaction!.call} before retrying.`;
+        return;
+      }
+      void htmx.ajax("get", `/calls/${accepted.interaction!.call}`, { source: root, target: root, swap: "innerHTML" })
+        .catch(() => notice());
+    }, 50);
+  } else status.textContent = current.unsupported ? `${current.unsupported} unsupported controls remain visible.` : "Ready";
 });
 
 for (const name of ["htmx:sendError", "htmx:timeout", "htmx:responseError", "htmx:onLoadError"]) {

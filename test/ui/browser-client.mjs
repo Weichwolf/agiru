@@ -85,7 +85,7 @@ export async function browserAction(page, origin, model, identity) {
   const received = page.waitForResponse(response => response.url() === `${origin}/commands` &&
     response.request().method() === "POST");
   await page.locator(`[data-control="${escaped}"] button`).click();
-  const response = await received;
+  const response = await finishedResponse(page, origin, await received);
   assert.equal(response.status(), 200, await response.text());
   await page.waitForFunction(previous => document.querySelector("#workspace article")?.dataset.revision !== previous, model.revision);
   await settled(page);
@@ -101,7 +101,7 @@ export async function browserSet(page, origin, model, identity, text) {
     response.request().method() === "POST");
   await control.locator("input[name=text]").fill(text);
   await control.locator("button").click();
-  const response = await received;
+  const response = await finishedResponse(page, origin, await received);
   assert.equal(response.status(), 200, await response.text());
   await page.waitForFunction(previous => document.querySelector("#workspace article")?.dataset.revision !== previous,
     model.revision);
@@ -109,4 +109,12 @@ export async function browserSet(page, origin, model, identity, text) {
   const result = { page: parsePage(await response.text()), status: response.status() };
   await assertBrowserPage(page, result.page);
   return result;
+}
+
+async function finishedResponse(page, origin, response) {
+  if (response.status() !== 200) return response;
+  const interaction = parsePage(await response.text()).interaction;
+  if (!interaction) return response;
+  return page.waitForResponse(async next => next.url() === `${origin}/calls/${interaction.call}` &&
+    (next.status() !== 200 || !parsePage(await next.text()).interaction));
 }

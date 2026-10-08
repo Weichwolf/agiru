@@ -7,6 +7,7 @@
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/HttpServer.h"
+#include "runtime/HttpServerOptions.h"
 #include "runtime/PageDispatcher.h"
 #include "runtime/PageHostOptions.h"
 #include "runtime/PageHtml.h"
@@ -28,8 +29,10 @@
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <exception>
 #include <functional>
 #include <limits>
@@ -41,6 +44,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -59,6 +63,7 @@ constexpr unsigned kInternalError = 500;
 constexpr std::size_t kMaximumParameters = 8;
 constexpr auto kMaximumContextLifetime = std::chrono::hours(24);
 constexpr std::string_view kActionPrefix = "$agiru.";
+constexpr std::string_view kCallPrefix = "/calls/";
 using Parameters = std::map<std::string, std::string, std::less<>>;
 
 struct Diagnostic {
@@ -189,6 +194,79 @@ struct PageFrame {
   std::optional<PageListView> list;
 };
 
+struct Call {
+  std::mutex mutex;
+  std::condition_variable ready;
+  std::string handle = GenerateSecureToken();
+  std::string pageHandle;
+  Guid user;
+  PageId page;
+  std::string revision;
+  std::string command;
+  std::optional<ServerHttpResponse> result;
+  std::exception_ptr error;
+  bool finished = false;
+};
+
+class Executor {
+public:
+  explicit Executor(const PageHostOptions &options) : capacity_(options.executionQueue) {
+    try {
+      for (std::size_t at = 0; at < options.executionWorkers; ++at) {
+        workers_.emplace_back([this] { Work(); });
+      }
+    } catch (...) {
+      Stop();
+      throw;
+    }
+  }
+
+  ~Executor() { Stop(); }
+
+  Executor(const Executor &) = delete;
+  Executor &operator=(const Executor &) = delete;
+
+  void Submit(std::function<void()> work) {
+    const std::lock_guard lock(mutex_);
+    if (stopping_ || queue_.size() >= capacity_) { Refuse("PageHostCapacity"); }
+    queue_.push_back(std::move(work));
+    ready_.notify_one();
+  }
+
+private:
+  void Stop() {
+    {
+      const std::lock_guard lock(mutex_);
+      stopping_ = true;
+    }
+    ready_.notify_all();
+    for (auto &worker : workers_) {
+      if (worker.joinable()) { worker.join(); }
+    }
+  }
+
+  void Work() {
+    for (;;) {
+      std::function<void()> work;
+      {
+        std::unique_lock lock(mutex_);
+        ready_.wait(lock, [this] { return stopping_ || !queue_.empty(); });
+        if (queue_.empty()) { return; }
+        work = std::move(queue_.front());
+        queue_.pop_front();
+      }
+      work();
+    }
+  }
+
+  std::size_t capacity_;
+  std::mutex mutex_;
+  std::condition_variable ready_;
+  std::deque<std::function<void()>> queue_;
+  std::vector<std::thread> workers_;
+  bool stopping_ = false;
+};
+
 struct Context {
   Context(const Guid &principal, const PageHostOptions &options)
       : session(principal, options.session),
@@ -197,6 +275,8 @@ struct Context {
   }
 
   std::mutex mutex;
+  std::mutex callMutex;
+  std::shared_ptr<Call> call;
   Session session;
   std::unique_ptr<PageInstance> page;
   std::optional<PageListView> list;
@@ -293,8 +373,10 @@ void ValidatePageHostOptions(const PageHostOptions &options) {
   } catch (const Error &) { Refuse("PageHostConfiguration"); }
   if (options.database.empty() || options.company.empty() || options.origin.empty() ||
       options.contexts == 0 || options.navigationDepth == 0 || options.commands == 0 ||
-      options.receiptBytes == 0 || options.lifetime.count() <= 0 ||
-      options.lifetime > kMaximumContextLifetime) {
+      options.receiptBytes == 0 || options.executionWorkers == 0 ||
+      options.executionWorkers > HttpServerOptions::kMaxWorkers || options.executionQueue == 0 ||
+      options.responseWait.count() <= 0 || options.responseWait > std::chrono::seconds(1) ||
+      options.lifetime.count() <= 0 || options.lifetime > kMaximumContextLifetime) {
     Refuse("PageHostConfiguration");
   }
 }
@@ -330,14 +412,130 @@ struct PageCommandHost::Impl {
         tableAuthority(std::move(tableAuthorization)) {
     ValidatePageHostOptions(options);
     if (!authorize || !tableAuthority) { Refuse("PageHostConfiguration"); }
+    executor = std::make_unique<Executor>(options);
+  }
+
+  ~Impl() { executor.reset(); }
+
+  std::string Working(const Call &call) const {
+    std::string html = R"(<article data-agiru-profile="3" data-view="interaction" data-page=")";
+    html += std::to_string(call.page.Value());
+    html += R"(" data-handle=")" + call.pageHandle + R"(" data-revision=")" + call.revision;
+    html += R"(" data-state="working" data-call=")" + call.handle;
+    html += R"(" data-origin-command=")" + call.command;
+    html += R"("><h1>Working</h1><output data-unsupported-count="0"></output></article>)";
+    return html;
+  }
+
+  ServerHttpResponse Await(const std::shared_ptr<Call> &call) const {
+    std::unique_lock lock(call->mutex);
+    call->ready.wait_for(lock, options.responseWait, [&] { return call->finished; });
+    if (call->finished) {
+      if (call->error) {
+        try {
+          std::rethrow_exception(call->error);
+        } catch (const CommandFailure &) { throw; } catch (const Error &error) {
+          if (call->command.empty()) { throw; }
+          throw CommandFailure(
+              {.message = error.what(),
+               .code = error.Code(),
+               .command = call->command,
+               .outcome = error.Code().starts_with("PageHost") ? "refused" : "unknown"});
+        }
+      }
+      auto result = call->result;
+      if (!result) { Refuse("PageHostReceipt"); }
+      return std::move(*result);
+    }
+    return {.body = Working(*call),
+            .headers = {{.name = "Content-Location", .value = "/?handle=" + call->pageHandle}}};
+  }
+
+  void PublishCall(const std::shared_ptr<Call> &call,
+                   std::function<ServerHttpResponse()> execution) {
+    {
+      const std::lock_guard lock(mutex);
+      std::erase_if(calls, [](const auto &entry) { return entry.second.expired(); });
+      calls.emplace(call->handle, call);
+    }
+    try {
+      executor->Submit([call, execution = std::move(execution)] {
+        std::optional<ServerHttpResponse> result;
+        std::exception_ptr error;
+        try {
+          result = execution();
+        } catch (...) { error = std::current_exception(); }
+        {
+          const std::lock_guard lock(call->mutex);
+          call->result = std::move(result);
+          call->error = error;
+          call->finished = true;
+        }
+        call->ready.notify_all();
+      });
+    } catch (...) {
+      const std::lock_guard lock(mutex);
+      calls.erase(call->handle);
+      throw;
+    }
+  }
+
+  void CallOwnership(Connection &connection, const Call &call, const Guid &user) const {
+    const std::array<std::optional<std::string>, 4> binds{
+        call.pageHandle, user.ToStorageText(), host, options.company};
+    const auto rows =
+        connection.Execute("SELECT handle FROM agiru_client.page_contexts WHERE handle = $1 "
+                           "AND user_security_id = $2::uuid AND host_id = $3 AND company = $4 "
+                           "AND expires_at > clock_timestamp()",
+                           binds);
+    if (user != call.user || rows.Rows() != 1) { Refuse("PageHostGone"); }
+    Session authority(user, options.session);
+    authority.CompanyName(options.company);
+    authority.TablePermissions(tableAuthority);
+    SessionCommand command(authority, connection);
+    const auto *entry = FindPage(call.page);
+    if (entry == nullptr) { Refuse("PageHostGone"); }
+    authorize(*entry->page, PageHostOperation::Read, {});
+    if (!call.command.empty()) {
+      const std::array<std::optional<std::string>, 2> receipt{call.pageHandle, call.command};
+      const auto completed = connection.Execute(
+          "SELECT page_id FROM agiru_client.page_commands WHERE handle = $1 AND command_id = $2 "
+          "AND outcome = 'complete'",
+          receipt);
+      if (completed.Rows() == 1) {
+        const auto identity = completed.Value(0, 0);
+        if (!identity) { Refuse("PageHostReceipt"); }
+        const auto number = Number(*identity);
+        if (number > std::numeric_limits<std::int32_t>::max()) { Refuse("PageHostReceipt"); }
+        entry = FindPage(PageId{static_cast<std::int32_t>(number)});
+        if (entry == nullptr) { Refuse("PageHostReceipt"); }
+        authorize(*entry->page, PageHostOperation::Read, {});
+        AuthorizeSnapshot(*entry->page, entry->page->layout);
+        AuthorizeSnapshot(*entry->page, entry->page->actions);
+      }
+    }
+    command.Keep();
+  }
+
+  ServerHttpResponse Poll(Connection &connection, const Guid &user, std::string_view handle) {
+    if (!Token(handle)) { Refuse("PageHostInput"); }
+    std::shared_ptr<Call> call;
+    {
+      const std::lock_guard lock(mutex);
+      const auto found = calls.find(handle);
+      if (found == calls.end()) { Refuse("PageHostGone"); }
+      call = found->second.lock();
+      if (!call) { Refuse("PageHostGone"); }
+    }
+    CallOwnership(connection, *call, user);
+    return Await(call);
   }
 
   std::shared_ptr<Context> Retain(const Guid &user) {
     const std::lock_guard lock(mutex);
     std::erase_if(contexts, [](const auto &item) {
       const std::unique_lock idle(item.second->mutex, std::try_to_lock);
-      return idle.owns_lock() &&
-             (item.second->invalid || item.second->deadline <= std::chrono::steady_clock::now());
+      return idle.owns_lock() && item.second->deadline <= std::chrono::steady_clock::now();
     });
     if (contexts.size() >= options.contexts) { Refuse("PageHostCapacity"); }
     auto context = std::make_shared<Context>(user, options);
@@ -367,7 +565,7 @@ struct PageCommandHost::Impl {
     if (!revision || Number(*revision) != context.revision) { Refuse("PageHostRevision"); }
   }
 
-  std::string Render(Context &context) {
+  std::string Render(Context &context) const {
     auto &page = *context.page;
     authorize(page.Declaration(), PageHostOperation::Read, {});
     std::vector<PageHtmlAction> actions;
@@ -415,16 +613,10 @@ struct PageCommandHost::Impl {
             .headers = {{.name = "Content-Location", .value = "/?handle=" + context.handle}}};
   }
 
-  ServerHttpResponse Open(Connection &connection, const Guid &user, const Parameters &values) {
-    constexpr std::array<std::string_view, 3> names{"page", "mode", "company"};
-    Known(values, names);
-    const auto company = Get(values, "company");
-    if (!company.empty() && company != options.company) { Refuse("PageHostPermission"); }
+  ServerHttpResponse RunOpen(Connection &connection,
+                             const std::shared_ptr<Context> &context,
+                             const Parameters &values) {
     const auto number = Number(Get(values, "page"));
-    if (number == 0 || number > std::numeric_limits<std::int32_t>::max()) {
-      Refuse("PageHostInput");
-    }
-    auto context = Retain(user);
     const std::lock_guard lock(context->mutex);
     try {
       SessionCommand command(context->session, connection);
@@ -441,30 +633,93 @@ struct PageCommandHost::Impl {
       } else {
         context->page->Open(mode);
       }
-      const std::array<std::optional<std::string>, 5> binds{
-          context->handle,
-          user.ToStorageText(),
-          host,
-          options.company,
-          std::to_string(options.lifetime.count())};
-      connection.Run(
-          "INSERT INTO "
-          "agiru_client.page_contexts(handle,user_security_id,host_id,company,expires_at) "
-          "VALUES ($1,$2::uuid,$3,$4,clock_timestamp() + $5::integer * interval '1 second')",
-          binds);
       auto result = Response(*context, Render(*context));
       command.Keep();
       return result;
     } catch (...) {
       context->invalid = true;
+      const Connection cleanup(options.database);
+      const std::array<std::optional<std::string>, 1> binds{context->handle};
+      cleanup.Run("UPDATE agiru_client.page_contexts SET invalidated = true WHERE handle = $1",
+                  binds);
       throw;
     }
+  }
+
+  ServerHttpResponse Open(Connection &connection, const Guid &user, const Parameters &values) {
+    constexpr std::array<std::string_view, 3> names{"page", "mode", "company"};
+    Known(values, names);
+    const auto company = Get(values, "company");
+    if (!company.empty() && company != options.company) { Refuse("PageHostPermission"); }
+    const auto number = Number(Get(values, "page"));
+    if (number == 0 || number > std::numeric_limits<std::int32_t>::max()) {
+      Refuse("PageHostInput");
+    }
+    const auto page = PageId{static_cast<std::int32_t>(number)};
+    const auto *entry = FindPage(page);
+    if (entry == nullptr) { Refuse("PageHostMissing"); }
+    {
+      Session admission(user, options.session);
+      admission.CompanyName(options.company);
+      admission.TablePermissions(tableAuthority);
+      SessionCommand command(admission, connection);
+      authorize(*entry->page, Opening(Mode(*entry->page, Get(values, "mode"))), {});
+      command.Keep();
+    }
+    auto context = Retain(user);
+    auto call = std::make_shared<Call>();
+    call->pageHandle = context->handle;
+    call->user = user;
+    call->page = page;
+    call->revision = "0";
+    {
+      const std::lock_guard lock(context->callMutex);
+      context->call = call;
+    }
+    const std::array<std::optional<std::string>, 5> binds{context->handle,
+                                                          user.ToStorageText(),
+                                                          host,
+                                                          options.company,
+                                                          std::to_string(options.lifetime.count())};
+    connection.Run(
+        "INSERT INTO "
+        "agiru_client.page_contexts(handle,user_security_id,host_id,company,expires_at) "
+        "VALUES ($1,$2::uuid,$3,$4,clock_timestamp() + $5::integer * interval '1 second')",
+        binds);
+    try {
+      PublishCall(call, [this, context, values = Parameters(values)] {
+        Connection lease(options.database);
+        return RunOpen(lease, context, values);
+      });
+    } catch (...) {
+      const std::lock_guard lock(context->mutex);
+      context->invalid = true;
+      const std::array<std::optional<std::string>, 1> handle{context->handle};
+      connection.Run("UPDATE agiru_client.page_contexts SET invalidated = true WHERE handle = $1",
+                     handle);
+      const std::lock_guard retained(mutex);
+      contexts.erase(context->handle);
+      throw;
+    }
+    return Await(call);
   }
 
   ServerHttpResponse Read(Connection &connection, const Guid &user, const Parameters &values) {
     constexpr std::array<std::string_view, 1> names{"handle"};
     Known(values, names);
     auto context = Find(Get(values, "handle"));
+    {
+      const std::lock_guard callLock(context->callMutex);
+      if (context->call) {
+        const std::lock_guard state(context->call->mutex);
+        if (!context->call->finished) {
+          CallOwnership(connection, *context->call, user);
+          return {
+              .body = Working(*context->call),
+              .headers = {{.name = "Content-Location", .value = "/?handle=" + context->handle}}};
+        }
+      }
+    }
     const std::unique_lock lock(context->mutex, std::try_to_lock);
     if (!lock.owns_lock()) { Refuse("PageHostBusy"); }
     Ownership(connection, *context, user);
@@ -612,7 +867,7 @@ struct PageCommandHost::Impl {
          .text = Get(values, "text")}));
   }
 
-  void AuthorizeSnapshot(const PageDef &page, std::span<const ControlDef> controls) {
+  void AuthorizeSnapshot(const PageDef &page, std::span<const ControlDef> controls) const {
     for (const auto &control : controls) {
       authorize(page,
                 PageHostOperation::Control,
@@ -626,7 +881,7 @@ struct PageCommandHost::Impl {
   std::optional<ServerHttpResponse> Replay(Connection &connection,
                                            Context &context,
                                            const Parameters &values,
-                                           const std::string &digest) {
+                                           const std::string &digest) const {
     const std::array<std::optional<std::string>, 2> binds{context.handle,
                                                           std::string(Get(values, "command"))};
     const auto rows = connection.Execute(
@@ -710,8 +965,7 @@ struct PageCommandHost::Impl {
       Refuse("PageHostInput");
     }
     auto context = Find(Get(values, "page"));
-    const std::unique_lock lock(context->mutex, std::try_to_lock);
-    if (!lock.owns_lock()) { Refuse("PageHostBusy"); }
+    const std::unique_lock lock(context->mutex);
     Ownership(connection, *context, user);
     if (Get(values, "csrf") != context->csrf) { Refuse("PageHostPermission"); }
     const auto digest = SecureTokenDigest(request.body);
@@ -790,17 +1044,59 @@ struct PageCommandHost::Impl {
     }
   }
 
+  ServerHttpResponse
+  SubmitWrite(Connection &connection, const Guid &user, const ServerHttpRequest &request) {
+    if (request.Header("Content-Type") != "application/x-www-form-urlencoded" ||
+        request.Header("Origin") != options.origin) {
+      Refuse("PageHostInput");
+    }
+    const auto values = Parse(request.body, true);
+    auto context = Find(Get(values, "page"));
+    std::shared_ptr<Call> call;
+    {
+      const std::lock_guard admission(context->callMutex);
+      if (context->call) {
+        const std::lock_guard state(context->call->mutex);
+        if (!context->call->finished) { Refuse("PageHostBusy"); }
+      }
+      const std::unique_lock idle(context->mutex, std::try_to_lock);
+      if (!idle.owns_lock()) { Refuse("PageHostBusy"); }
+      Ownership(connection, *context, user);
+      call = std::make_shared<Call>();
+      call->pageHandle = context->handle;
+      call->user = user;
+      call->page = context->page->Declaration().id;
+      call->revision = std::to_string(context->revision);
+      call->command = Get(values, "command");
+      if (!Token(call->command)) { Refuse("PageHostInput"); }
+      const auto previous = std::exchange(context->call, call);
+      try {
+        PublishCall(call, [this, user, request = ServerHttpRequest(request)] {
+          Connection lease(options.database);
+          return Write(lease, user, request);
+        });
+      } catch (...) {
+        context->call = previous;
+        throw;
+      }
+    }
+    return Await(call);
+  }
+
   ServerHttpResponse Handle(const ServerHttpRequest &request) {
     Connection connection(options.database);
     const auto user = LookupClientCredential(connection, request.Header("Authorization"));
     if (!user) { Refuse("PageHostAuthentication"); }
+    if (request.method == "GET" && request.target.starts_with(kCallPrefix)) {
+      return Poll(connection, *user, std::string_view(request.target).substr(kCallPrefix.size()));
+    }
     if (request.method == "GET" && request.target.starts_with("/?")) {
       const auto values = Parse(std::string_view(request.target).substr(2), false);
       return values.contains("handle") ? Read(connection, *user, values)
                                        : Open(connection, *user, values);
     }
     if (request.method == "POST" && request.target == "/commands") {
-      return Write(connection, *user, request);
+      return SubmitWrite(connection, *user, request);
     }
     return {.status = kMethodNotAllowed,
             .body = "<p>Unsupported page endpoint or method</p>",
@@ -813,6 +1109,8 @@ struct PageCommandHost::Impl {
   std::string host = GenerateSecureToken();
   std::mutex mutex;
   std::map<std::string, std::shared_ptr<Context>, std::less<>> contexts;
+  std::map<std::string, std::weak_ptr<Call>, std::less<>> calls;
+  std::unique_ptr<Executor> executor;
 };
 
 PageCommandHost::PageCommandHost(PageHostOptions options,

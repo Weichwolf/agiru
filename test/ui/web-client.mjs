@@ -16,6 +16,8 @@ let responseHtml = original;
 let responseHeaders = {};
 let responseStatus = 200;
 let responseDelay = 0;
+let workingPolls = -1, workingCommand = "", workingFailure = false;
+const workingHtml = () => `<article data-agiru-profile="3" data-view="interaction" data-page="50400" data-handle="page_1" data-revision="9007199254740993" data-state="working" data-call="call_web" data-origin-command="${workingCommand}"><h1>Working</h1><output data-unsupported-count="0"></output></article>`;
 const assets = new Map(await Promise.all(["index.html", "web.js", "web.css"].map(async name =>
   [name, await readFile(new URL(`../../build/web/${name}`, import.meta.url))])));
 if (process.env.AGIRU_WEB_SCRIPT) assets.set("web.js", await readFile(process.env.AGIRU_WEB_SCRIPT));
@@ -34,6 +36,15 @@ const server = createServer(async (request, response) => {
   requests.push({ method: request.method, path: request.url, headers: request.headers,
     fields: Object.fromEntries(new URLSearchParams(body)) });
   if (request.headers.authorization !== bearer) { response.writeHead(401); response.end(); return; }
+  if (workingPolls >= 0 && request.method === "POST") {
+    workingCommand = requests.at(-1).fields.command;
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); response.end(workingHtml()); return;
+  }
+  if (request.url === "/calls/call_web") {
+    response.writeHead(workingFailure ? 500 : 200, { "Content-Type": "text/html; charset=utf-8" });
+    response.end(workingFailure ? `<article data-agiru-error="1" data-code="AlError" data-command="${workingCommand}" data-outcome="failed"><h1>Request failed</h1><p>Delayed failure</p></article>` :
+      workingPolls-- > 0 ? workingHtml() : original); return;
+  }
   if (responseDelay) await new Promise(resolve => setTimeout(resolve, responseDelay));
   response.writeHead(responseStatus, { "Content-Type": "text/html; charset=utf-8", ...responseHeaders });
   response.end(responseHtml);
@@ -42,7 +53,8 @@ await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ executablePath: process.env.AGIRU_CHROMIUM ?? "/usr/bin/chromium",
   headless: true, args: ["--no-sandbox"] });
-beforeEach(() => { responseHtml = original; responseHeaders = {}; responseStatus = 200; responseDelay = 0; });
+beforeEach(() => { responseHtml = original; responseHeaders = {}; responseStatus = 200; responseDelay = 0;
+  workingPolls = -1; workingCommand = ""; workingFailure = false; });
 afterEach(async () => { for (const context of browser.contexts()) await context.close(); });
 after(async () => {
   await browser.close();
@@ -64,6 +76,34 @@ async function ready(page) {
   await page.waitForFunction(() => !document.querySelector(".htmx-request"));
 }
 const control = (page, name) => page.locator(`section[data-control="${name}"]`);
+
+test("htmx follows a working call with GET only and preserves the native page contract", async () => {
+  const page = await open();
+  await ready(page);
+  workingPolls = 2;
+  const before = requests.length;
+  await control(page, "Post").locator("button").click();
+  await page.waitForFunction(() => document.querySelector("#workspace article")?.dataset.agiruProfile === "3");
+  await page.waitForFunction(() => document.querySelector("#status").textContent.startsWith("2 unsupported"));
+  const calls = requests.slice(before);
+  assert.deepEqual(calls.map(item => [item.method, item.path]),
+    [["POST", "/commands"], ["GET", "/calls/call_web"], ["GET", "/calls/call_web"], ["GET", "/calls/call_web"]]);
+  assert.equal(workingCommand, parsePage(original).controls.find(item => item.identity === "Post").operation.command);
+  await assertBrowserPage(page, parsePage(original));
+  assert.match(page.url(), /\?handle=page_1$/);
+});
+
+test("htmx retains the original command when an asynchronous native action fails", async () => {
+  const page = await open();
+  await ready(page);
+  workingPolls = 1; workingFailure = true;
+  const before = requests.length;
+  await control(page, "Post").locator("button").click();
+  await page.waitForFunction(() => document.querySelector("#status").textContent.startsWith("Server error AlError"));
+  assert.equal(await page.locator("#status").textContent(),
+    `Server error AlError: Delayed failure outcome=failed command=${workingCommand}; prior explicit commits may persist.`);
+  assert.deepEqual(requests.slice(before).map(item => item.method), ["POST", "GET"]);
+});
 
 test("actual browser renders original native HTML with exact values, counted gaps and no persisted token", async () => {
   const page = await open();

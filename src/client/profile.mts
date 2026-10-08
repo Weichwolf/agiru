@@ -13,9 +13,10 @@ export type Control = Readonly<{
   caption: string; depth: number; display?: string; scalar?: Scalar; operation?: Operation; reason?: string;
 }>;
 export type Page = Readonly<{
-  profile: "1" | "2"; view: "current-row" | "list"; page: string; handle: string; revision: string;
+  profile: "1" | "2" | "3"; view: "current-row" | "list" | "interaction"; page: string; handle: string; revision: string;
   caption: string; controls: readonly Control[]; unsupported: number;
   rows?: readonly Row[]; window?: Readonly<{ limit: string; more: boolean; direction: "forward" | "backward" }>;
+  interaction?: Readonly<{ state: "working"; call: string; originCommand: string }>;
 }>;
 export type Row = Readonly<{ handle: string; selected: boolean; caption: string;
   controls: readonly Control[]; select: Operation }>;
@@ -66,7 +67,8 @@ export function checkResponseProfile(contentType: string, hasHeader: (name: stri
 const tags = new Set(["article", "h1", "h2", "h3", "section", "form", "input", "button", "output", "aside", "p"]);
 const scalarAttributes = ["data-type", "data-value", "data-domain", "data-member", "data-undefined", "data-closing"];
 const attributes: Readonly<Record<string, readonly string[]>> = {
-  article: ["data-agiru-profile", "data-view", "data-page", "data-handle", "data-revision", "data-limit", "data-more", "data-direction"],
+  article: ["data-agiru-profile", "data-view", "data-page", "data-handle", "data-revision", "data-limit", "data-more", "data-direction",
+    "data-state", "data-call", "data-origin-command"],
   h1: [], h2: [], h3: [], section: ["data-control", "data-kind", "data-row", "data-selected"],
   form: ["method", "action", "hx-post", "hx-target", "hx-swap"],
   input: ["type", "name", "value", "aria-label", ...scalarAttributes],
@@ -266,7 +268,8 @@ export function parsePage(html: string): Page {
   const root = roots[0]!;
   const profile = attr(root, "data-agiru-profile");
   const view = attr(root, "data-view");
-  check((profile === "1" && view === "current-row") || (profile === "2" && view === "list"), "Unsupported HTML profile");
+  check((profile === "1" && view === "current-row") || (profile === "2" && view === "list") ||
+    (profile === "3" && view === "interaction"), "Unsupported HTML profile");
   const header = { handle: attr(root, "data-handle"), revision: attr(root, "data-revision") };
   const pageId = attr(root, "data-page");
   check(token.test(header.handle) && digits.test(header.revision) && digits.test(pageId), "Invalid page identity");
@@ -274,6 +277,17 @@ export function parsePage(html: string): Page {
   check(items[0]?.tagName === "h1" && items.at(-1)?.tagName === "output", "Missing page heading or census");
   const census = attr(items.at(-1)!, "data-unsupported-count");
   check(digits.test(census) && census.length <= 4 && text(items.at(-1)!) === "", "Invalid unsupported census");
+  if (profile === "3") {
+    const call = attr(root, "data-call"), originCommand = attr(root, "data-origin-command");
+    check(root.attrs.length === 8 && items.length === 2 && text(items[0]!) === "Working" &&
+      items[0]!.attrs.length === 0 && items[1]!.attrs.length === 1 && census === "0" &&
+      attr(root, "data-state") === "working" && token.test(call) && (!originCommand || token.test(originCommand)),
+      "Invalid working interaction");
+    return Object.freeze({ profile, view: "interaction", page: pageId, ...header, caption: "Working",
+      controls: Object.freeze([]), unsupported: 0,
+      interaction: Object.freeze({ state: "working", call, originCommand }) });
+  }
+  check(!["data-state", "data-call", "data-origin-command"].some(name => has(root, name)), "Misplaced interaction metadata");
   const commands = new Map<string, Envelope>();
   const body = items.slice(1, -1);
   const lists = body.filter(node => node.tagName === "section" && attr(node, "data-kind") === "rows");

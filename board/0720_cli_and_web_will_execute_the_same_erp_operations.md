@@ -22,19 +22,44 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   a failed PostgreSQL receipt; prior explicit Commit is not undone. Cleanup/transport
   uncertainty stays `unknown`; refusal describes only the current submission.
 - `src/client/{profile,http,errors,cmd,mcp,web}.mts` share strict error decoding.
-  CMD/MCP retain structured diagnostics; htmx uses text, keeps the existing page and
+  CMD/MCP retain structured diagnostics; htmx uses text, keeps the last accepted state and
   never retries. A mismatched command or malformed response remains WriteUncertain.
   The empty-code fallback `AlError` is transport classification, not changed AL state.
-- `make client-test`: 38 cases, eight executable defects rejected; `make web-test`:
-  eleven Chromium cases, three compiled defects and the actual Caddy asset case pass.
+- `make client-test`: 41 cases, eight executable defects rejected; `make web-test`:
+  thirteen Chromium cases, three compiled defects and the actual Caddy asset case pass.
   `make lint-one UNIT=src/rt/PageCommandHost.cpp JOBS=2`: zero findings. Native rollback,
   durable Commit and external CMD/MCP/browser error parity are exercised by
-  `test/ui/page-host.mjs`; `make page-host-test` passes 82 native HTTP cases at limits
-  40/7/80 under both TryFunction policies and rejects seven compiled defects,
-  including a lost failed receipt. Generated navigation retains 183 checks,
+  `test/ui/page-host.mjs`; `make page-host-test` passes 94 native HTTP cases at limits
+  40/7/80 under both TryFunction policies and rejects eight compiled defects,
+  including a lost failed receipt and blocking HTTP wait. Generated navigation retains 183 checks,
   PageSource 15, PageDispatcher 105 and all sixteen execution defects/one compile refusal.
 - Full ErrorInfo/actionable-error dialogs, Confirm/StrMenu HTTP suspension and modal
   execution remain required; this contract is not working business-workflow acceptance.
+
+## Asynchronous native calls
+
+- `PageCommandHost.cpp` owns a bounded AL executor separate from HTTP workers.
+  Trusted `pages.execution_workers`, `execution_queue` and `response_wait_ms` are
+  explicit in `deploy/dev/agiru.json`; no client parameter selects them. One context
+  admits one call, retaining its AL session and transaction boundary on the AL worker.
+- Shared HTML profile 3 describes `working`, an opaque call handle and original
+  command. Authenticated `GET /calls/<handle>` rechecks PostgreSQL ownership,
+  company/host/lifetime and page permissions; completed command snapshots reauthorize
+  controls. CMD/MCP/htmx poll the same call without reopening or reposting. Polling
+  is bounded; timeout leaves the write uncertain, never cancelled or retried implicitly.
+- `test/ui/page-host.mjs` exercises delayed writes with one HTTP worker, independent
+  uncommitted SQL visibility, foreign-call refusal, single write effects, rollback,
+  durable Commit and actual external CMD/MCP/Chromium completion. `page-host.sh`
+  requires a compiled synchronous-execution defect to fail that responsiveness case.
+  `test/ui/{agent-client,web-client}.mjs` cover strict profile and polling/error identity.
+- This is execution infrastructure, not dialog acceptance. No fake UiHost is installed;
+  native GuiAllowed remains unchanged. Next: real Confirm/StrMenu, deferred messages,
+  live progress and modal/error dialogs, then original Customer and business workflows.
+  Queue saturation, cancellation and multi-user scale still need qualification.
+- `make slice-check` retains 14,225 sources, zero missing; `make all JOBS=2` succeeds,
+  retaining 1,902 diagnostic-slice unlinked gaps. Native configuration passes 232 checks.
+  Targeted clang-tidy is clear for PageCommandHost, NativeServiceConfig, its gate and
+  the generated HTTP fixture runner. Full AL execution and original Customer remain due.
 
 ## Bounded lists and collation
 
@@ -54,12 +79,12 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   commands from one bounded `PageHtml.cpp` renderer; cards retain profile 1. Selection
   retains SQL continuation boundaries. The current-row panel remains alongside rows;
   this is not final BC grid/UI acceptance. No URL/CLI limit or client-side sorting.
-  `make page-host-test JOBS=2`: 15 fixture-host cases and 21 actual-entry cases for
-  each of limits 40/7/80, zero red; both TryFunction policies and six compiled ownership,
-  revision, replay, policy, duplicate-key and ignored-list-limit defects reject.
+  Native HTTP acceptance is counted above: 19 fixture-host cases and 25 actual-entry
+  cases per limit 40/7/80, zero red; both TryFunction policies and eight compiled
+  ownership/revision/replay/policy/duplicate/list-bound/receipt/wait defects reject.
   Actual Chromium DOM rows/typed values/selection agree with external CMD/MCP;
   UTF-8 owned fixture SQL independently confirms population and unchanged row values.
-  Native configuration has 194 checks, zero red. This is authored generated-page proof,
+  Native configuration has 232 checks, zero red. This is authored generated-page proof,
   not original Customer/workflow, production-collation, full ERP or UT acceptance.
   Seven affected native/configuration/generated-consumer units pass clang-tidy without
   additional suppressions; existing current-row HTML/scalar gates retain 164/34 checks

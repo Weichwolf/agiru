@@ -2,7 +2,8 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: provide real HTTP UI-host
+Next: bind the bounded asynchronous HTTP calls to a real session-owned UI host,
+including explicit Confirm/StrMenu answers and deferred messages. Provide actual
 capability/suspension under 0720; the rebuilt native Customer regression now opens/edits
 but retains its interactive Card lifecycle failure.
 Repeat counted AL execution after the verified SelectLatestVersion increment below;
@@ -107,11 +108,17 @@ and the failed SQL receipt before returning `failed`. Cleanup uncertainty return
 over HTTP instead of treating every server-side AL failure as WriteUncertain.
 `test/ui/page-host.mjs` independently checks rollback, Commit, receipts and external
 CMD/MCP/Chromium error parity; `page-host.sh` adds a compiled missing-receipt control.
-`make page-host-test`: 82 native HTTP cases, limits 40/7/80 and both TryFunction
-policies, seven compiled defects rejected; generated navigation 183, PageSource 15,
+`make page-host-test`: 94 native HTTP cases, limits 40/7/80 and both TryFunction
+policies, eight compiled defects rejected; generated navigation 183, PageSource 15,
 PageDispatcher 105 and sixteen execution controls/one compile refusal pass.
-38 client cases/eight executable defects and eleven browser cases/three compiled
-defects pass; targeted PageCommandHost clang-tidy has zero findings. Full ErrorInfo,
+41 client cases/eight executable defects and thirteen browser cases/three compiled
+defects pass. The bounded AL executor keeps HTTP polling available with one HTTP
+worker; delayed field writes retain ownership, one SQL effect, rollback and durable
+Commit across external CMD/MCP/htmx. Trusted execution/queue/response-wait defaults
+are explicit in the server JSON; configuration retains 232 checks, zero red.
+Four affected C++ units pass clang-tidy; slice-check/all pass without removing the
+1,902 unlinked diagnostic-slice gaps. No UiHost is installed by this executor alone;
+GuiAllowed and real-dialog acceptance remain unchanged. Full ErrorInfo,
 live question suspension, financial posting and complete AL acceptance remain open.
 
 `make refresh-records JOBS=2`: 149 C++ checks, 80 generator checks and six compiled

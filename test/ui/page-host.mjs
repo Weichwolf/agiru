@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
 import { commandEnvelope, parseFailure, parsePage } from "../../build/client/profile.mjs";
 import { ServerConfigs } from "./server-config.mjs";
-import { launchBrowser, openBrowserPage, assertBrowserPage, browserAction } from "./browser-client.mjs";
+import { launchBrowser, openBrowserPage, assertBrowserPage, browserAction, browserSet } from "./browser-client.mjs";
 import { renderAscii } from "../../build/client/ascii.mjs";
 
 const execute = promisify(execFile);
@@ -50,6 +50,7 @@ assert.ok(database);
 const dsn = `postgresql://agiru:agiru@127.0.0.1:5432/${database}`;
 if (nativeApplication) {
   serverConfig = await configurations.write({ database: dsn, company: "Fixture + Company", origin,
+    http: { workers: 1 },
     pages: { list_rows: rowLimit },
     transactions: { disable_write_inside_try_functions: disableTryWrites } });
   application = spawn("podman", ["exec", "--user", "1000:1001", container,
@@ -494,4 +495,97 @@ test("external CMD/MCP and actual Chromium consume identical native list rows an
     assert.equal(await sql('SELECT count(*) FROM "Navigation Row"'), "81");
     assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 2'), "2");
   } finally { await mcp.close(); await browser.close(); }
+});
+
+test("a pending native write keeps one HTTP worker available, retains ownership and commits only once", async () => {
+  const fresh = await client.read("/?page=50340&mode=Edit");
+  const other = await client.read("/?page=50341");
+  const old = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1');
+  await sql(`CREATE FUNCTION ui_wait() RETURNS trigger LANGUAGE plpgsql AS $body$
+    BEGIN PERFORM pg_sleep(0.6); RETURN NEW; END $body$;
+    CREATE TRIGGER ui_wait BEFORE UPDATE ON "Navigation Row" FOR EACH ROW EXECUTE FUNCTION ui_wait()`);
+  try {
+    const sent = await post(fresh, "Value", "9100");
+    assert.equal(sent.response.status, 200);
+    const pending = parsePage(sent.html);
+    assert.equal(pending.interaction.state, "working");
+    assert.equal(pending.interaction.originCommand, operation(fresh, "Value").command);
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1'), old);
+    assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands WHERE command_id = '${pending.interaction.originCommand}'`), "started");
+    const foreign = await fetch(origin + `/calls/${pending.interaction.call}`, { headers: second });
+    assert.equal(foreign.status, 410);
+    assert.deepEqual(await client.read(path(other)), other, "unrelated retained reads must not wait for the AL writer");
+    const result = await client.read(`/calls/${pending.interaction.call}`);
+    assert.equal(field(result, "Value"), "9100");
+    assert.equal(BigInt(result.page.revision), BigInt(fresh.page.revision) + 1n);
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID" = 1'), "9100");
+    assert.equal(await sql('SELECT count(*) FROM ui_writes WHERE value=9100'), "1");
+    assert.deepEqual(await client.read(`/calls/${pending.interaction.call}`), result);
+  } finally { await sql('DROP TRIGGER ui_wait ON "Navigation Row"; DROP FUNCTION ui_wait()'); }
+});
+
+test("failed native call polling preserves rollback, durable Commit and the original command diagnostic", async () => {
+  await sql(`CREATE FUNCTION ui_wait() RETURNS trigger LANGUAGE plpgsql AS $body$
+    BEGIN PERFORM pg_sleep(0.3); RETURN NEW; END $body$;
+    CREATE TRIGGER ui_wait BEFORE UPDATE ON "Navigation Row" FOR EACH ROW EXECUTE FUNCTION ui_wait()`);
+  try {
+    for (const action of ["WriteAndFail", "CommitAndFail"]) {
+      const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
+      const fresh = await client.read("/?page=50347&mode=Edit");
+      const sent = await post(fresh, action);
+      assert.equal(sent.response.status, 200);
+      const pending = parsePage(sent.html);
+      assert.equal(pending.interaction.originCommand, operation(fresh, action).command);
+      await assert.rejects(client.read(`/calls/${pending.interaction.call}`), error =>
+        error.code === "AlError" && error.outcome === "failed" && error.command === operation(fresh, action).command &&
+        error.message === (action === "WriteAndFail" ? "rollback fixture error" : "durable fixture error"));
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'),
+        String(BigInt(before) + (action === "CommitAndFail" ? 100n : 0n)));
+      assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands WHERE command_id='${pending.interaction.originCommand}'`), "failed");
+    }
+  } finally { await sql('DROP TRIGGER ui_wait ON "Navigation Row"; DROP FUNCTION ui_wait()'); }
+});
+
+test("external CMD MCP and htmx complete delayed native saves with identical typed and SQL effects", async () => {
+  await sql(`CREATE FUNCTION ui_wait() RETURNS trigger LANGUAGE plpgsql AS $body$
+    BEGIN PERFORM pg_sleep(0.3); RETURN NEW; END $body$;
+    CREATE TRIGGER ui_wait BEFORE UPDATE ON "Navigation Row" FOR EACH ROW EXECUTE FUNCTION ui_wait()`);
+  try {
+    for (const [index, adapter] of ["CMD", "MCP", "web"].entries()) {
+      const browser = adapter === "web" ? await launchBrowser() : undefined;
+      let mcp;
+      try {
+        const fresh = await client.read("/?page=50340&mode=Edit");
+        const text = String(9200 + index);
+        const previousWrites = BigInt(await sql(`SELECT count(*) FROM ui_writes WHERE value=${text}`));
+        const { enabled: _enabled, ...selected } = operation(fresh, "Value");
+        const input = { path: path(fresh), ...selected, text };
+        let result;
+        if (adapter === "CMD") {
+          const output = await execute(process.execPath, ["build/client/cmd.mjs", "--json", "execute", JSON.stringify(input)],
+            { env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } });
+          result = JSON.parse(output.stdout);
+        } else if (adapter === "MCP") {
+          const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
+          const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"));
+          const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"));
+          mcp = new Client({ name: "agiru-delayed-save", version: "1" });
+          await mcp.connect(new StdioClientTransport({ command: process.execPath, args: ["build/client/mcp.mjs"],
+            env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } }));
+          const reply = await mcp.callTool({ name: "agiru_execute", arguments: input });
+          assert.notEqual(reply.isError, true);
+          result = reply.structuredContent;
+        } else {
+          const opened = await openBrowserPage(browser, origin, path(fresh), first.authorization);
+          result = await browserSet(opened.page, origin, fresh.page, "Value", text);
+        }
+        assert.equal(field(result, "Value"), text);
+        assert.equal(result.page.interaction, undefined);
+        assert.deepEqual(await client.read(path(fresh)), result);
+        assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), text);
+        assert.equal(BigInt(await sql(`SELECT count(*) FROM ui_writes WHERE value=${text}`)), previousWrites + 1n);
+        assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands WHERE command_id='${input.command}'`), "complete");
+      } finally { await mcp?.close(); await browser?.close(); }
+    }
+  } finally { await sql('DROP TRIGGER ui_wait ON "Navigation Row"; DROP FUNCTION ui_wait()'); }
 });

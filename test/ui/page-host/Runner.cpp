@@ -177,7 +177,8 @@ void Serve(const std::string &authPath, const std::string &origin, bool seedOnly
       {.database = database.Dsn(), .company = std::string(kCompany), .origin = origin},
       Authorize,
       std::make_shared<TableAuthority>());
-  const agiru::HttpServer server([&](const auto &request) { return host.Handle(request); });
+  const agiru::HttpServer server([&](const auto &request) { return host.Handle(request); },
+                                 {.workers = 1});
   std::fputs("READY\n", stdout);
   std::fflush(stdout);
   while (true) {
