@@ -7,7 +7,7 @@
 | `runtime/` | Runtime integration fixtures: isolation, test contexts, catalogue/reflection and number sequences. |
 | `reporting/` | Report declarations, layout asset integrity and registry/linking fixtures. Not full rendering coverage. |
 | `tooling/` | Build, lint, snapshot and test-runner checks; their Python helpers and existing diagnostic baselines. |
-| `ui/` | Shared semantic HTML, external agent CMD/MCP transports and future actual browser/SQL parity. |
+| `ui/` | Shared semantic HTML, external CMD/MCP and actual browser/SQL operation parity. |
 
 `transpiler/golden/` contains authored C++ output specifications. Do not regenerate
 them from observed compiler output. Keep authored AL fixtures with their owning
@@ -77,12 +77,21 @@ without disclosing its values or changing either table.
 AL calls use a separate bounded executor and shared profile-3 `working` status; clients
 poll the opaque call instead of repeating admission. Delayed field writes run with one
 HTTP worker and independent SQL observers; CMD/MCP/htmx must retain exact final values,
-one write effect, rollback/durable Commit and original failure identities. This does not
-qualify Confirm/StrMenu, cancellation, queue saturation or multi-user scale.
+one write effect, rollback/durable Commit and original failure identities. Questions and
+modals retain the original AL stack, explicit answers and timeout/cancellation rollback.
+This does not qualify queue saturation, disconnect cancellation or multi-user scale.
 Compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt and
 synchronous-execution defects must fail named cases. The fixture
 has real generated pages and SQL grants, not a full BC permission provider or browser
 acceptance. It reuses the page-navigation compilation pipeline and private auth-file helper.
+Separate credentials for the same user cannot read/write/replay each other's contexts,
+poll calls, answer questions, operate modals or fetch modal receipts. Independent SQL
+checks verifier ownership and unchanged effects; two compiled client-binding defects
+must fail. Legacy unbound contexts are invalidated without deleting their receipt evidence.
+This is bearer-client isolation, not browser cookie login or stolen-token device binding.
+Fresh modal inputs renew the idle answer wait within the absolute context lifetime;
+reads and identical command replay do not. Independent SQL verifies no premature commit,
+and a compiled fixed-deadline defect must fail the active-input case.
 
 `make erp-fixture JOBS=2` qualifies a disposable clone of the verified native shared
 CRONUS transfer. It copies all eleven original Company columns exactly, provisions the
@@ -96,13 +105,13 @@ client preparation, not actual Customer execution, system-role installation or a
 `make erp-client-test JOBS=2` reuses that isolated fixture and freezes existing native
 binaries under `/tmp` while the external CMD/MCP and actual Chromium/htmx use Caddy.
 The shared browser helper compares rendered controls, typed values and command identities
-with the agent model; native SQL remains the independent effect oracle. Seven explicit cases
+with the agent model; native SQL remains the independent effect oracle. Eleven explicit cases
 cover unassigned-user refusal, original Customer List state, Card selection, Unicode Name
-Validate/Save via CMD/MCP/HTML forms and independent SQL/audit/rowversion/receipt effects.
+Validate/Save and original template-based creation/edit/reopen via CMD/MCP/HTML forms,
+with independent SQL/audit/rowversion/receipt effects and unchanged ledger fingerprints.
 Dependent cases fail explicitly when their prerequisite did not execute; they never vanish
-or become skipped acceptance. Current result: one pass, six failures. Customer List refuses
-at `System.GuiAllowed()` without a production UI host. Frozen existing binaries are not
-proof of the current integration build, actual browser/htmx execution or full ERP parity.
+or become skipped acceptance. The accepted baseline passes eleven cases; a copied existing
+binary is not proof of the current integration build, full ERP parity or posting acceptance.
 
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.

@@ -84,22 +84,24 @@ void PublishQuestion(const PageHostOptions &options,
                      const PageCall &call,
                      const PageQuestion &question) {
   const Connection connection(options.database);
-  const std::array<std::optional<std::string>, 9> binds{question.handle,
-                                                        call.pageHandle,
-                                                        call.handle,
-                                                        call.user.ToStorageText(),
-                                                        call.host,
-                                                        call.revision,
-                                                        call.command,
-                                                        question.kind,
-                                                        std::to_string(question.choices.size())};
+  const std::array<std::optional<std::string>, 10> binds{question.handle,
+                                                         call.pageHandle,
+                                                         call.handle,
+                                                         call.user.ToStorageText(),
+                                                         call.host,
+                                                         call.revision,
+                                                         call.command,
+                                                         question.kind,
+                                                         std::to_string(question.choices.size()),
+                                                         call.credential};
   if (connection
           .Execute("INSERT INTO agiru_client.page_dialogs "
                    "(handle,page_handle,call_handle,user_security_id,host_id,revision,command_id,"
                    "kind,choices,expires_at) "
                    "SELECT $1,$2,$3,$4::uuid,$5,$6::bigint,$7,$8,$9::integer,expires_at "
                    "FROM agiru_client.page_contexts WHERE handle=$2 AND user_security_id=$4::uuid "
-                   "AND host_id=$5 AND NOT invalidated AND expires_at>clock_timestamp()",
+                   "AND host_id=$5 AND credential_digest=$10 "
+                   "AND NOT invalidated AND expires_at>clock_timestamp()",
                    binds)
           .Affected() != 1) {
     Refuse("PageHostGone");

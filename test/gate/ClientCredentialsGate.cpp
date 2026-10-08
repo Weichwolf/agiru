@@ -87,6 +87,19 @@ void CredentialContracts() {
                digest == agiru::SecureTokenDigest(first) ||
                    digest == agiru::SecureTokenDigest(second));
   }
+  const auto peer = agiru::IssueClientCredential(writer, agiru::Guid(kUser), std::chrono::hours(1));
+  const auto firstIdentity = agiru::LookupClientCredentialIdentity(writer, "Bearer " + first);
+  const auto peerIdentity = agiru::LookupClientCredentialIdentity(writer, "Bearer " + peer);
+  CHECK_TRUE("separate clients of the same user retain different credential identities",
+             firstIdentity && peerIdentity && firstIdentity->user == peerIdentity->user &&
+                 firstIdentity->user == agiru::Guid(kUser) &&
+                 firstIdentity->verifier != peerIdentity->verifier);
+  CHECK_TRUE("client identity is its durable verifier, never the bearer secret",
+             firstIdentity && firstIdentity->verifier == agiru::SecureTokenDigest(first));
+  const auto framed = agiru::LookupClientCredentialIdentity(observer, "bEaReR  " + first);
+  CHECK_TRUE("credential identity does not depend on accepted Authorization framing",
+             framed && firstIdentity && framed->user == firstIdentity->user &&
+                 framed->verifier == firstIdentity->verifier);
   for (const auto *const invalid :
        {"", "Bearer", "Bearer ", "Basic abc", "Bearer ag1_bad", "User "}) {
     CHECK_TRUE("malformed credentials refuse without success",
@@ -105,6 +118,9 @@ void CredentialContracts() {
              agiru::RevokeClientCredential(writer, agiru::SecureTokenDigest(first)));
   CHECK_TRUE("revocation survives a different connection",
              !agiru::LookupClientCredential(observer, "Bearer " + first));
+  CHECK_TRUE("client-identity lookup retains revocation without disabling a peer client",
+             !agiru::LookupClientCredentialIdentity(observer, "Bearer " + first) &&
+                 agiru::LookupClientCredentialIdentity(observer, "Bearer " + peer));
   CHECK_TRUE("revocation retains an idempotent audit identity",
              !agiru::RevokeClientCredential(writer, agiru::SecureTokenDigest(first)));
   writer.Run(

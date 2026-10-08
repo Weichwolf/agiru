@@ -3,6 +3,7 @@ import { test, after } from "node:test";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { chmod } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
 import { commandEnvelope, parseFailure, parsePage } from "../../build/client/profile.mjs";
@@ -72,12 +73,13 @@ if (nativeApplication) {
   });
 }
 
-for (const suffix of ["", ".second"]) {
+for (const suffix of ["", ".second", ".peer"]) {
   await execute("podman", ["cp", `${container}:${native}/auth.json${suffix}`, `${proof}/auth.json${suffix}`]);
   await chmod(`${proof}/auth.json${suffix}`, 0o600);
 }
 const first = await readAuth(`${proof}/auth.json`);
 const second = await readAuth(`${proof}/auth.json.second`);
+const peer = await readAuth(`${proof}/auth.json.peer`);
 const client = new AgentClient(origin, first);
 async function sql(statement) {
   const result = await execute("podman", ["exec", "--user", "1000:1001", container,
@@ -274,6 +276,33 @@ test("returning to the retained list rereads the committed selected row rather t
   assert.equal(field(back, "Value"), "55");
   saved = await client.execute(path(back), operation(back, "$agiru.card"));
   assert.equal(field(saved, "Value"), "55");
+});
+
+test("same-user clients cannot read, write or replay each other's pages and durable receipts", async () => {
+  const peerClient = new AgentClient(origin, peer);
+  const separate = await peerClient.read("/?page=50340&mode=Edit");
+  assert.notEqual(separate.page.handle, saved.page.handle);
+  const digest = value => createHash("sha256").update(value.authorization.split(/ +/)[1]).digest("hex");
+  assert.notEqual(digest(first), digest(peer));
+  const owner = handle => sql(`SELECT user_security_id::text || '|' || credential_digest
+    FROM agiru_client.page_contexts WHERE handle='${handle}'`);
+  assert.equal(await owner(saved.page.handle), `00000000-0000-0000-0000-000000000001|${digest(first)}`);
+  assert.equal(await owner(separate.page.handle), `00000000-0000-0000-0000-000000000001|${digest(peer)}`);
+  const before = await sql('SELECT count(*) FROM ui_writes');
+  const receipts = await sql('SELECT count(*) FROM agiru_client.page_commands');
+  assert.equal((await fetch(origin + path(saved), { headers: peer })).status, 410);
+  assert.equal((await fetch(origin + path(separate), { headers: first })).status, 410);
+  assert.equal((await post(saved, "Value", "6600", peer)).response.status, 410);
+  assert.equal((await post(separate, "Value", "6601", first)).response.status, 410);
+  assert.equal((await fetch(origin + "/commands", { method: "POST", headers: {
+    ...peer, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body: originalPost })).status, 410);
+  assert.deepEqual(await client.read(path(saved)), saved);
+  assert.deepEqual(await peerClient.read(path(separate)), separate);
+  const framed = new AgentClient(origin, { authorization: first.authorization.replace(/^Bearer /, "bEaReR  ") });
+  assert.deepEqual(await framed.read(path(saved)), saved, "accepted scheme framing cannot change client identity");
+  assert.equal(await sql('SELECT count(*) FROM ui_writes'), before);
+  assert.equal(await sql('SELECT count(*) FROM agiru_client.page_commands'), receipts);
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=2'), "55");
 });
 
 test("foreign identities, company names, unsupported URLs and forged form authority refuse", async () => {
@@ -581,6 +610,10 @@ test("a pending native write keeps one HTTP worker available, retains ownership 
     assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands WHERE command_id = '${pending.interaction.originCommand}'`), "started");
     const foreign = await fetch(origin + `/calls/${pending.interaction.call}`, { headers: second });
     assert.equal(foreign.status, 410);
+    assert.equal((await fetch(origin + `/calls/${pending.interaction.call}`, { headers: peer })).status, 410,
+      "same-user clients cannot poll another client's active call");
+    assert.equal((await fetch(origin + path(fresh), { headers: peer })).status, 410,
+      "same-user clients cannot read another client's working page");
     assert.deepEqual(await client.read(path(other)), other, "unrelated retained reads must not wait for the AL writer");
     const result = await client.read(`/calls/${pending.interaction.call}`);
     assert.equal(field(result, "Value"), "9100");
@@ -657,6 +690,46 @@ test("external CMD MCP and htmx complete delayed native saves with identical typ
   } finally { await sql('DROP TRIGGER ui_wait ON "Navigation Row"; DROP FUNCTION ui_wait()'); }
 });
 
+test("fresh authenticated modal input renews idle wait without committing the caller", async () => {
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
+  const writes = await sql('SELECT count(*) FROM ui_writes');
+  let modal = await client.execute(path(fresh), operation(fresh, "ModalNested"));
+  const started = Date.now();
+  for (let value = 1; value <= 6; ++value) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    modal = await client.execute(path(modal), { ...operation(modal, "OwnerMarker"), text: String(value) });
+    assert.equal(field(modal, "OwnerMarker"), String(value));
+    assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
+    assert.equal(await sql('SELECT count(*) FROM ui_writes'), writes);
+  }
+  assert.ok(Date.now() - started > 5000, "fresh inputs keep a modal alive beyond the configured five-second idle wait");
+  const final = await client.execute(path(modal), operation(modal, "$agiru.modal_ok"));
+  assert.equal(field(final, "Value"), "6");
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), "6");
+});
+
+test("modal reads and identical input replay do not renew idle wait or commit caller writes", async () => {
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
+  const modal = await client.execute(path(fresh), operation(fresh, "ModalNested"));
+  const sent = await post(modal, "OwnerMarker", "77");
+  assert.equal(sent.response.status, 200);
+  const current = { page: parsePage(sent.html), status: 200 };
+  for (let attempt = 0; attempt < 3; ++attempt) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    assert.deepEqual(await client.read(path(current)), current);
+    const replay = await post(modal, "OwnerMarker", "77");
+    assert.equal(replay.response.status, 200);
+    assert.deepEqual(parsePage(replay.html), current.page);
+  }
+  await new Promise(resolve => setTimeout(resolve, 2500));
+  await assert.rejects(client.read(`/calls/${current.page.interaction.call}`), error =>
+    error.code === "UiDialogCancelled" && error.outcome === "failed");
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
+  assert.equal(await sql(`SELECT active FROM agiru_client.page_modals WHERE handle='${current.page.interaction.dialog}'`), "f");
+});
+
 test("native questions preserve the AL transaction, require explicit answers and roll back declines", async () => {
   const fresh = await client.read("/?page=50347&mode=Edit");
   const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
@@ -678,6 +751,8 @@ test("native questions preserve the AL transaction, require explicit answers and
     headers: { ...headers, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ ...envelope.fields, ...changes }).toString() });
   assert.equal((await send({}, second)).status, 410);
+  assert.equal((await send({}, peer)).status, 410, "same-user clients cannot answer another client's question");
+  assert.equal((await fetch(origin + `/calls/${question.page.interaction.call}`, { headers: peer })).status, 410);
   assert.equal((await send({ revision: "999" })).status, 409);
   assert.equal((await send({ csrf: "foreign" })).status, 403);
   assert.equal((await send({ control: "foreign" })).status, 400);
@@ -1046,6 +1121,8 @@ test("modal SQL ownership revisions CSRF replay and permissions fence every inpu
     method: "POST", headers: { ...headers, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ ...envelope.fields, ...changes }) });
   assert.equal((await send({}, second)).status, 410);
+  assert.equal((await send({}, peer)).status, 410, "same-user clients cannot operate another client's modal");
+  assert.equal((await fetch(origin + path(opened), { headers: peer })).status, 410);
   assert.equal((await send({ csrf: "foreign" })).status, 403);
   assert.equal((await send({ revision: "999" })).status, 409);
   assert.equal((await send({}, first, "/modal-commands/not-the-modal")).status, 409);
@@ -1129,6 +1206,8 @@ test("query-close veto and AL errors keep the modal open and require a new expli
     assert.deepEqual(interaction.poll, { path: `/modal-commands/${identity}/${operation(modal, "$agiru.modal_ok").command}`, state: "pending" });
     const foreign = await fetch(origin + interaction.poll.path, { headers: second });
     assert.equal(foreign.status, 410, "a receipt address does not grant its foreign caller authority");
+    assert.equal((await fetch(origin + interaction.poll.path, { headers: peer })).status, 410,
+      "a modal receipt address does not grant authority to a same-user peer client");
     const failure = await finish({ status: pending.response.status, text: async () => pending.html });
     assert.equal(failure.response.status, 500);
     const error = parseFailure(failure.html);

@@ -44,6 +44,31 @@ constexpr std::string_view kExactAmount = "0.12345678901234567890";
 constexpr std::int64_t kExactInteger = 9223372036854775807LL;
 constexpr auto kFixtureDialogTimeout = std::chrono::seconds(5);
 
+void LegacyContextMigration(const agiru::Connection &connection) {
+  agiru::InstallPageCommandHost(connection);
+  connection.Run("ALTER TABLE agiru_client.page_contexts DROP COLUMN credential_digest");
+  connection.Run("INSERT INTO agiru_client.page_contexts(handle,user_security_id,host_id,company,"
+                 "expires_at) VALUES('legacy','00000000-0000-0000-0000-000000000001',"
+                 "'legacy-host','Fixture + Company',clock_timestamp()+interval '1 hour')");
+  connection.Run(
+      "INSERT INTO agiru_client.page_commands(handle,command_id,payload_digest,"
+      "outcome,html,page_id) VALUES('legacy','old','old','complete','<p>old</p>',50340)");
+  agiru::InstallPageCommandHost(connection);
+  const auto migrated = connection.Execute(
+      "SELECT credential_digest IS NULL AND invalidated FROM agiru_client.page_contexts "
+      "WHERE handle='legacy'");
+  CHECK_TRUE("migration invalidates rather than adopts a legacy unbound client context",
+             migrated.Rows() == 1 && migrated.Value(0, 0) == "t");
+  agiru::InstallPageCommandHost(connection);
+  const auto retained = connection.Execute(
+      "SELECT outcome,html FROM agiru_client.page_commands WHERE handle='legacy'");
+  CHECK_TRUE("idempotent client-binding migration preserves old command receipt evidence",
+             retained.Rows() == 1 && retained.Value(0, 0) == "complete" &&
+                 retained.Value(0, 1) == "<p>old</p>");
+  connection.Run("DELETE FROM agiru_client.page_contexts WHERE handle='legacy' "
+                 "AND host_id='legacy-host'");
+}
+
 void NativeGrants(const agiru::Connection &connection) {
   agiru::CreateTable(connection, agiru::platform::kCompanyTable);
   agiru::platform::Company company;
@@ -110,13 +135,16 @@ void Seed(const std::string &dsn, const std::string &authPath) {
   connection.Run(R"(CREATE TRIGGER ui_write_audit AFTER UPDATE ON "Navigation Row"
                     FOR EACH ROW EXECUTE FUNCTION ui_write_audit())");
   agiru::InstallClientCredentials(connection);
-  agiru::InstallPageCommandHost(connection);
+  LegacyContextMigration(connection);
   gate::PrivateAuthFile(
       authPath,
       agiru::IssueClientCredential(connection, agiru::Guid(kUser), std::chrono::hours(1)));
   gate::PrivateAuthFile(
       authPath + ".second",
       agiru::IssueClientCredential(connection, agiru::Guid(kOtherUser), std::chrono::hours(1)));
+  gate::PrivateAuthFile(
+      authPath + ".peer",
+      agiru::IssueClientCredential(connection, agiru::Guid(kUser), std::chrono::hours(1)));
   agiru::Commit();
   const auto name = connection.Execute("SELECT current_database()");
   const auto value = name.Value(0, 0);

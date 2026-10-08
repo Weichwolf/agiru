@@ -67,8 +67,8 @@ std::string IssueClientCredential(const Connection &connection,
   return secret;
 }
 
-std::optional<Guid> LookupClientCredential(const Connection &connection,
-                                           std::string_view authorization) {
+std::optional<ClientCredentialIdentity>
+LookupClientCredentialIdentity(const Connection &connection, std::string_view authorization) {
   constexpr std::size_t kMaximumAuthorization = 128;
   const auto separator = authorization.find(' ');
   if (authorization.size() > kMaximumAuthorization || separator == std::string_view::npos ||
@@ -82,7 +82,8 @@ std::optional<Guid> LookupClientCredential(const Connection &connection,
   if (!secret.starts_with(kPrefix) || !CanonicalDigest(secret.substr(kPrefix.size()))) {
     return std::nullopt;
   }
-  const std::array<std::optional<std::string>, 1> binds{SecureTokenDigest(secret)};
+  const auto verifier = SecureTokenDigest(secret);
+  const std::array<std::optional<std::string>, 1> binds{verifier};
   const auto rows = connection.Execute(
       "SELECT user_security_id::text FROM agiru_client.credentials "
       "WHERE digest = $1 AND revoked_at IS NULL AND expires_at > clock_timestamp()",
@@ -97,7 +98,13 @@ std::optional<Guid> LookupClientCredential(const Connection &connection,
   if (user.IsNull()) {
     throw Error("invalid client credential authority", "ClientCredentialStorage");
   }
-  return user;
+  return ClientCredentialIdentity{.user = user, .verifier = verifier};
+}
+
+std::optional<Guid> LookupClientCredential(const Connection &connection,
+                                           std::string_view authorization) {
+  const auto identity = LookupClientCredentialIdentity(connection, authorization);
+  return identity ? std::optional(identity->user) : std::nullopt;
 }
 
 bool RevokeClientCredential(const Connection &connection, std::string_view digest) {

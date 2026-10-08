@@ -9,7 +9,10 @@ This is one master-data workflow, not posting or complete transaction acceptance
 0058's stale generated build-input selection is qualified; required System.Privacy
 declarations now supply the original Customer Consent TestPage/actions. Rebuild the production
 page setters, then repeat original master-data HTTP and counted AL execution,
-retaining every startup refusal and test identity. Atomic
+retaining every startup refusal and test identity. The current native rebuild stops at
+`EnvironmentCleanupSubs` accessing `Enabled` on omitted `Exchange Sync` in a `not CLEAN28`
+source branch. Qualify source variant/excluded-dependency lowering; no guessed fields,
+successful no-op or removal of mixed core cleanup code. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
 do not defer client construction until all transaction acceptance is complete.
 
@@ -106,8 +109,8 @@ Borrowed modal lifecycle and native transport are qualified in 0720: 270 generat
 navigation, 105 dispatcher and 15 source checks pass; 29 execution defects and one
 compile defect reject. The caller's original AL page/filters survive; false/error close
 attempts can retry; disabled callbacks refuse before opening. Actual HTTP proof has
-158 cases, zero red, across limits 40/7/80 and both TryFunction policies after the
-delayed-error and typed-input repairs. Nineteen compiled defect controls reject at named assertions;
+170 cases, zero red, across limits 40/7/80 and both TryFunction policies after the
+delayed-error, typed-input and client-binding repairs. Twenty-two compiled defect controls reject at named assertions;
 `make page-host-test JOBS=2` exits zero with verified input hashes. Failed close inputs preserve
 their own receipt identity after the HTTP worker returns, never masquerade as successful
 root polling. Classified TestValidation field inputs roll back their own SQL boundary,
@@ -120,6 +123,14 @@ Child-input receipts do not establish root durability. The production ABI rebuil
 at `d31bb87` passes slice-check/all (14,225 slice sources, 1,526 seconds); the later
 source-insertion repair and original Customer workflow are qualified above.
 No finance acceptance.
+
+Client-owned PostgreSQL contexts now include the exact credential verifier, retaining
+AL's original UserSecurityId. Same-user peer credentials cannot adopt pages, calls,
+questions, modals or command receipts. Fresh modal inputs renew their idle answer wait
+without extending the absolute context deadline; reads/replays do not renew it.
+Timeout still rolls back pending caller SQL and preserves prior explicit Commit.
+Cookie lifecycle, concurrent revocation and full session/disconnect cancellation remain
+unqualified under 0720; credential ownership alone is not stolen-token device binding.
 
 Blocking Confirm/StrMenu now enforce trusted
 `transactions.allow_session_call_suspend_when_write_transaction_started`, default true,

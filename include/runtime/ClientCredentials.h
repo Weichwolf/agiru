@@ -14,6 +14,13 @@ namespace agiru {
 
 class Connection;
 
+/// \brief Authenticated user and non-secret credential identity for client-owned state.
+/// \note Separate credentials for one user are separate clients, not interchangeable sessions.
+struct ClientCredentialIdentity {
+  Guid user;            ///< Original system User security GUID.
+  std::string verifier; ///< Canonical SHA-256 verifier; never the bearer secret.
+};
+
 /// \brief Installs the agiru-owned credential store; requires trusted migration authority.
 /// \param connection Database containing the original system User table.
 /// \note No users, credentials or permissions are granted. Caller owns commit/rollback.
@@ -43,6 +50,15 @@ void InstallClientCredentials(const Connection &connection);
 /// Cookies, identity headers, URL credentials and Basic/password sign-in are not accepted here.
 [[nodiscard]] std::optional<Guid> LookupClientCredential(const Connection &connection,
                                                          std::string_view authorization);
+
+/// \brief Resolves the same bearer policy while retaining its exact client identity.
+/// \param connection PostgreSQL authority for expiry, revocation and user ownership.
+/// \param authorization Case-insensitive Bearer scheme followed by the exact issued secret.
+/// \return User and verifier, or nothing for invalid/expired/revoked credentials.
+/// \note Bind retained handles to both fields; a user GUID alone cannot isolate clients.
+/// \throws Error for SQL/crypto/provider failures; never authenticates an anonymous fallback.
+[[nodiscard]] std::optional<ClientCredentialIdentity>
+LookupClientCredentialIdentity(const Connection &connection, std::string_view authorization);
 
 /// \brief Revokes a credential by its public verifier identity; requires trusted operator
 /// authority.

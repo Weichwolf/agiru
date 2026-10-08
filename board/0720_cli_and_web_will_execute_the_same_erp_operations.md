@@ -4,12 +4,13 @@ Status: queued | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: expand setup/master-data workflows under 0727, retaining the accepted original
+Next: qualify HTTPS browser-cookie/CSRF lifecycle, then expand setup/master-data
+workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
 production variable setters and qualify original invalid-input/lookup/dimension cases.
 Never substitute a default template, UT handler or client rule.
-Immediate security prerequisite: qualify client-session ownership and browser session
-transport below before accepting externally accessible client workflows.
+Immediate security prerequisite: qualify browser session transport below before accepting
+externally accessible client workflows; retain the credential-specific ownership regression.
 
 Development packaging: 0726 owns one server/web/PostgreSQL Podman container;
 Node CMD/MCP runs outside over HTTP. Queued process families 0727–0740 own BC
@@ -43,12 +44,25 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   upload/archive/XML limits, trusted proxy/TLS policy and secret-free diagnostics.
   Preserve atomic SQL effects under denial, timeout, disconnect and exhaustion.
 - Current code inspection: `ClientCredentials.cpp` checks bearer expiry/revocation;
-  `PageCommandHost.cpp` binds ownership to user/company/host and checks write CSRF/Origin.
+  `PageCommandHost.cpp` binds ownership to credential/user/company/host and checks write CSRF/Origin.
   `HttpServer.cpp` emits no-store; Caddy declares CSP. Browser uses an in-memory bearer
-  (`src/client/web.mts`), not an HttpOnly cookie. Credential-specific ownership, browser
-  cookie lifecycle and full SaaS isolation remain unqualified; existing fixture counts
-  are not this acceptance. Next coherent increment: same-user client-isolation proof
-  across read/write/poll/dialog/receipt paths, then HTTPS cookie/CSRF lifecycle.
+  (`src/client/web.mts`), not an HttpOnly cookie. Browser cookie lifecycle and full SaaS
+  isolation remain unqualified. Next coherent increment: actual Caddy HTTPS cookie/CSRF
+  lifecycle, including stateful page-open/deep-link entry points and concurrent revocation.
+- Credential identity gates: 36 checks, zero red; `make session-identity` retains
+  75 identity, 49 command, 48 value and 84 generator checks, zero red. Thirteen identity/
+  command/credential/provider and six value defects reject. A same-user peer has a distinct
+  SHA-256 verifier without changing AL UserSecurityId; legacy unbound contexts are
+  invalidated without deleting command evidence. `make page-host-test JOBS=2` passes
+  170/170 regular cases (38 fixture, 44 native for each of limits 40/7/80), without skips
+  or cancellations; all 22 compiled defects reject and input hashes remain unchanged.
+  Independent SQL proves same-user read/write/replay/poll/question/modal/receipt denial
+  without additional effects. Eight affected C++ consumers pass targeted clang-tidy.
+- Local contracts at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
+  `developer/methods-auto/database/database-usersecurityid-method.md` and
+  `administration/understanding-session-timeouts.md`. Predecessor 1730, comment 4,
+  exposed idle-session connection leakage. Modal answer-idle renewal is separate from
+  full BC session timeout/disconnect cancellation, which remains unqualified.
 - References: [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
   consulted 2026-10-08. Sources/tests: `src/rt/{ClientCredentials,PageCommandHost}.cpp`,
@@ -172,8 +186,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   HTTP workers consume immutable snapshots, never AL page pointers. PostgreSQL fences
   ownership, changed-payload replay and receipts; each HTTP operation reauthorizes access.
   Child receipts mean processed input, not a committed caller transaction.
-- Authored generated-page HTTP proof: 35 fixture-host cases and 41 actual `agiru serve`
-  cases for each of limits 40/7/80, including both TryFunction write policies: 158 pass,
+- Authored generated-page HTTP proof: 38 fixture-host cases and 44 actual `agiru serve`
+  cases for each of limits 40/7/80, including both TryFunction write policies: 170 pass,
   zero red. Independent SQL covers explicit selection/GetRecord, original-variable edits,
   nested modals/questions, query-close veto/error retries, cancellation/timeout and later
   caller rollback without undoing an earlier explicit Commit. Message replay preserves
@@ -185,7 +199,9 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Typed input failures also retain their exact child receipt, original values and open
   modal; CMD/MCP/Chromium explicitly correct all nine invalid cases. Tests reuse one root
   page per client rather than widening server context limits or callback deadlines.
-  All nineteen compiled defect controls reject at named assertions; `make page-host-test
+  Fresh modal inputs renew the idle answer wait within the absolute context deadline;
+  passive reads and identical replay do not. Independent SQL proves no premature commit.
+  All twenty-two compiled defect controls reject at named assertions; `make page-host-test
   JOBS=2` exits zero and verifies input hashes. Normal matrices remain complete; each
   mutant executes its affected case and required predecessors, not unrelated timeouts.
   Close-trigger SQL delay uses fixture-only

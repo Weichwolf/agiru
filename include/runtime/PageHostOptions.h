@@ -39,7 +39,8 @@ struct PageHostOptions {
       kDefaultResponseWaitMs};                           ///< Bounded initial response wait.
   std::chrono::seconds lifetime = std::chrono::hours(1); ///< Fixed bounded context lifetime.
   std::chrono::seconds dialogTimeout{
-      kDefaultDialogTimeoutSeconds}; ///< Bounded explicit-answer wait.
+      kDefaultDialogTimeoutSeconds}; ///< Idle explicit-answer wait; fresh modal inputs renew it,
+                                     ///< never beyond lifetime. Reads/replays do not renew it.
   SessionOptions session{}; ///< Trusted immutable runtime policy for every retained context.
 };
 

@@ -46,6 +46,7 @@ struct PageCall {
   std::string pageHandle;
   std::string host;
   std::string csrf;
+  std::string credential;
   Guid user;
   PageId page;
   std::string revision;

@@ -30,6 +30,7 @@ sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/run
   src/rt/SessionCommand.cpp src/rt/Cursor.cpp src/rt/Transaction.cpp \
   include/runtime/TablePermissions.h src/rt/TablePermissions.cpp src/rt/{Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/PageCommandHost.h src/rt/PageCommandHost.cpp test/ui/page-host/Runner.cpp \
+  include/runtime/ClientCredentials.h src/rt/ClientCredentials.cpp \
   src/rt/PageInteraction.{h,cpp} include/runtime/UiHost.h src/rt/UiHost.cpp \
   src/rt/PageModal.{h,cpp} \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \

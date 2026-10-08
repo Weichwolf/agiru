@@ -7,7 +7,7 @@ dsn=${AGIRU_TEST_DSN:-postgresql://agiru:agiru@localhost:5433/agiru_gate}
 proof=$(mktemp -d /tmp/agiru-session-identity.XXXXXX)
 controls=(state guid name)
 command_controls=(rollback commit epoch cursor-owner)
-credential_controls=(credential-expiry credential-revocation credential-owner)
+credential_controls=(credential-expiry credential-revocation credential-owner credential-identity)
 provider_controls=(random-fallback digest-fallback)
 value_controls=(area-thread random-thread zero-seed negative-bound clock-seed wide-bound)
 cleanup() {
@@ -118,6 +118,9 @@ for control in "${credential_controls[@]}"; do
     control == "credential-owner" && /SELECT user_security_id::text FROM agiru_client.credentials/ {
       sub(/user_security_id::text/, "\04700000000-0000-0000-0000-000000000001\047::text"); changed++
     }
+    control == "credential-identity" && /return ClientCredentialIdentity\{.user = user, .verifier = verifier\};/ {
+      sub(/.verifier = verifier/, ".verifier = SecureTokenDigest(user.ToStorageText())"); changed++
+    }
     { print }
     END { if (changed != 1) exit 2 }
   ' src/rt/ClientCredentials.cpp > "$proof/$control.cpp"
@@ -131,6 +134,7 @@ for control in "${credential_controls[@]}"; do
     credential-expiry) rg -q 'expiry is evaluated against PostgreSQL time' "$proof/$control.log" ;;
     credential-revocation) rg -q 'revocation survives a different connection' "$proof/$control.log" ;;
     credential-owner) rg -q 'independent credentials retain exact system GUID ownership' "$proof/$control.log" ;;
+    credential-identity) rg -q 'separate clients of the same user retain different credential identities' "$proof/$control.log" ;;
   esac
 done
 provider_flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -fPIC -c)
@@ -232,4 +236,4 @@ cat "$proof/values.log"
 cat "$proof/values-generator.log"
 cat "$proof/clock.log"
 printf 'session-values: six compiled ownership/seed/bound/clock defects reject; indirect-minimum Random bound remains unqualified\n'
-printf 'session-identity: twelve identity/command/credential/provider defects reject; secure random/digest provider failures refuse; receipts %s\n' "$proof"
+printf 'session-identity: thirteen identity/command/credential/provider defects reject; secure random/digest provider failures refuse; receipts %s\n' "$proof"

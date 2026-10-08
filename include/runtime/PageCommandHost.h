@@ -39,14 +39,16 @@ using PageHostAuthorization =
 
 /// \brief Installs host-owned context/receipt storage using trusted migration authority.
 /// \param connection Database containing the original User and agiru_client credential store.
-/// \note Grants no users or ERP permissions; caller owns commit/rollback.
+/// \note Grants no users or ERP permissions; caller owns commit/rollback. Migration preserves
+/// receipts but invalidates legacy contexts without a credential verifier; never adopts them.
 void InstallPageCommandHost(const Connection &connection);
 
 /// \brief Shared generated-page execution with SQL ownership/revisions and durable receipts.
 /// Request-local connections are released after each command. Private AL pages remain bounded
-/// in this process; PostgreSQL owns user/context identity, expiry, fencing and command outcomes.
+/// in this process; PostgreSQL owns user/company/credential identity, expiry, fencing and outcomes.
+/// Separate credentials for one user cannot share page/call/dialog/receipt handles.
 /// A host restart refuses old handles rather than fabricating recovered AL state. This initial
-/// single-company adapter does not implement company schema routing, passwords, modal suspension,
+/// single-company adapter does not implement company schema routing, passwords, cookie sign-in,
 /// a connection pool, full URL/bookmark/filter semantics or a BC permission-set provider.
 class PageCommandHost {
 public:

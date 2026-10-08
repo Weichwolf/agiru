@@ -70,21 +70,23 @@ private:
 
 void PublishModal(const PageHostOptions &options, const PageCall &call, const PageModal &modal) {
   const Connection connection(options.database);
-  const std::array<std::optional<std::string>, 8> binds{modal.handle,
+  const std::array<std::optional<std::string>, 9> binds{modal.handle,
                                                         call.pageHandle,
                                                         call.handle,
                                                         call.user.ToStorageText(),
                                                         call.host,
                                                         std::to_string(modal.page.Value()),
                                                         modal.prefix,
-                                                        options.company};
+                                                        options.company,
+                                                        call.credential};
   if (connection
           .Execute(
               "INSERT INTO agiru_client.page_modals "
               "(handle,page_handle,call_handle,user_security_id,host_id,page_id,prefix,expires_at) "
               "SELECT $1,$2,$3,$4::uuid,$5,$6::integer,$7,expires_at "
               "FROM agiru_client.page_contexts WHERE handle=$2 AND user_security_id=$4::uuid "
-              "AND host_id=$5 AND company=$8 AND NOT invalidated AND expires_at>clock_timestamp()",
+              "AND host_id=$5 AND company=$8 AND credential_digest=$9 "
+              "AND NOT invalidated AND expires_at>clock_timestamp()",
               binds)
           .Affected() != 1) {
     Refuse("PageHostGone");
@@ -189,8 +191,6 @@ public:
   }
 
   Action Run() {
-    const auto deadline =
-        std::min(call_->deadline, std::chrono::steady_clock::now() + options_.dialogTimeout);
     {
       const std::lock_guard lock(call_->mutex);
       if (call_->cancelled || call_->finished || call_->question) { Refuse("UiHostUnavailable"); }
@@ -209,6 +209,8 @@ public:
       Open();
       PublishSnapshot();
       for (;;) {
+        const auto deadline =
+            std::min(call_->deadline, std::chrono::steady_clock::now() + options_.dialogTimeout);
         const auto input = Wait(deadline);
         if (const auto closed = ExecuteInput(input)) {
           CloseModalReceipt(options_, *modal_);
@@ -514,8 +516,15 @@ std::shared_ptr<PageModalInput> AcceptPageModal(const Connection &connection,
       Unsigned(*count) >= options.commands || Unsigned(*bytes) >= options.receiptBytes) {
     Refuse("PageHostCapacity");
   }
-  const std::array<std::optional<std::string>, 8> admitted{
-      binds[0], binds[1], binds[2], binds[3], binds[4], binds[5], binds[6], modal->prefix};
+  const std::array<std::optional<std::string>, 9> admitted{binds[0],
+                                                           binds[1],
+                                                           binds[2],
+                                                           binds[3],
+                                                           binds[4],
+                                                           binds[5],
+                                                           binds[6],
+                                                           modal->prefix,
+                                                           call.credential};
   if (connection
           .Execute(
               "INSERT INTO "
@@ -526,6 +535,7 @@ std::shared_ptr<PageModalInput> AcceptPageModal(const Connection &connection,
               "AND prefix=$8 AND active AND expires_at>clock_timestamp() "
               "AND EXISTS(SELECT 1 FROM agiru_client.page_contexts p WHERE "
               "p.handle=page_handle AND p.user_security_id=$5::uuid AND p.host_id=$6 "
+              "AND p.credential_digest=$9 "
               "AND NOT p.invalidated AND p.expires_at>clock_timestamp())",
               admitted)
           .Affected() != 1) {
