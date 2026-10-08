@@ -34,7 +34,15 @@ checks; RFC 4231 MAC vectors, provider failure and secret-free SQL statement/row
 are checked independently. Disposable databases and private secrets are removed.
 This is a storage gate, not live HTTPS cookies, browser login or SaaS acceptance (0720).
 
-The same target checks session-owned ApplicationArea and random sequences through
+`make browser-auth JOBS=2` checks the native cookie/CSRF adapter and production page
+front door; nine compiled transport/retention/configuration defects must reject.
+`make browser-https-test` exercises real Caddy TLS, private libmicrohttpd and PostgreSQL
+in one disposable container with an external protocol client and independent SQL probes.
+The private CA is explicitly trusted, never bypassed; cookies, metadata/origin denials,
+rotation, logout and source expiry are checked. Neither target proves actual Chromium
+cookie adoption, cookie-mode ERP effects, stolen-token device binding or full SaaS security.
+
+`make session-identity JOBS=2` also checks session-owned ApplicationArea and random sequences through
 nested, reused, migrated and concurrent workers. Six compiled ownership/seed/bound/clock
 defects must fail named checks. Explicit zero seeds and a compiled fixed-clock fixture
 distinguish both Randomize overloads; generated callers preserve omitted arguments.

@@ -117,6 +117,16 @@ void Pages(const Node &node, PageHostOptions &options) {
   ValidatePageHostOptions(options);
 }
 
+void Browsers(const Node &node, PageHostOptions &options) {
+  constexpr std::array<std::string_view, 4> fields{
+      "enabled", "idle_seconds", "lifetime_seconds", "sessions_per_user"};
+  Object(node, fields);
+  options.browserCookies = Boolean(node, "enabled");
+  options.browser.idle = std::chrono::seconds(Number<std::int64_t>(node, "idle_seconds"));
+  options.browser.lifetime = std::chrono::seconds(Number<std::int64_t>(node, "lifetime_seconds"));
+  options.browser.sessionsPerUser = Number<std::size_t>(node, "sessions_per_user");
+}
+
 class File {
 public:
   explicit File(const std::string &path)
@@ -141,8 +151,14 @@ NativeServiceOptions ParseNativeServiceOptions(std::string_view text) {
   if (text.size() > NativeServiceOptions::kConfigBytes) { Invalid(); }
   try {
     const auto root = Node::parse(text, true);
-    constexpr std::array<std::string_view, 7> fields{
-        "schema", "database", "company", "origin", "http", "pages", "transactions"};
+    constexpr std::array<std::string_view, 8> fields{"schema",
+                                                     "database",
+                                                     "company",
+                                                     "origin",
+                                                     "http",
+                                                     "pages",
+                                                     "transactions",
+                                                     "browser_sessions"};
     Object(root, fields);
     if (Number<unsigned>(root, "schema") != 1) { Invalid(); }
     NativeServiceOptions options;
@@ -151,6 +167,7 @@ NativeServiceOptions ParseNativeServiceOptions(std::string_view text) {
     options.pages.company = Text(root, "company");
     options.pages.origin = Text(root, "origin");
     options.http = Transport(root["http"]);
+    Browsers(root["browser_sessions"], options.pages);
     Pages(root["pages"], options.pages);
     constexpr std::array<std::string_view, 2> transactions{
         "disable_write_inside_try_functions",

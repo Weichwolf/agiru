@@ -45,6 +45,8 @@
 			lb_retries 0
 			lb_try_duration 0s
 			header_up -Forwarded
+			header_up X-Forwarded-Proto {http.request.scheme}
+			header_up X-Forwarded-Host {http.request.hostport}
 			header_up X-Real-IP {http.request.remote.host}
 			flush_interval -1
 			transport http {

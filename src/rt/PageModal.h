@@ -61,5 +61,6 @@ std::shared_ptr<PageModalInput> AcceptPageModal(const Connection &connection,
                                                 std::string_view handle,
                                                 std::string_view revision,
                                                 PageModalInput input,
-                                                const PageHostOptions &options);
+                                                const PageHostOptions &options,
+                                                bool &fresh);
 }

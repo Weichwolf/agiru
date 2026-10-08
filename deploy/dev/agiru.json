@@ -3,6 +3,12 @@
   "database": "host=127.0.0.1 port=5432 dbname=agiru_master user=agiru",
   "company": "CRONUS International Ltd",
   "origin": "http://127.0.0.1:8080",
+  "browser_sessions": {
+    "enabled": false,
+    "idle_seconds": 1200,
+    "lifetime_seconds": 28800,
+    "sessions_per_user": 8
+  },
   "http": {
     "port": 18080,
     "loopback": true,

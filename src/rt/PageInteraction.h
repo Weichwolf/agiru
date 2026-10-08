@@ -71,7 +71,7 @@ std::unique_ptr<UiHost> MakePageUiHost(const std::shared_ptr<PageCall> &call,
                                        const PageHostAuthorization &authorization);
 std::string RenderPageInteraction(const PageCall &call);
 std::string AppendPageMessages(const PageCall &call, std::string html);
-void AcceptPageAnswer(const Connection &connection,
+bool AcceptPageAnswer(const Connection &connection,
                       PageCall &call,
                       std::string_view command,
                       std::string_view control);

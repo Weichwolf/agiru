@@ -11,7 +11,7 @@ cleanup() {
 }
 trap cleanup EXIT
 git rev-parse HEAD > "$proof/head"
-sha256sum Makefile include/runtime/{BrowserSession,ClientCredentials,SecureToken}.h \
+sha256sum Makefile include/runtime/{BrowserSession,BrowserSessionOptions,ClientCredentials,SecureToken}.h \
   src/rt/{BrowserSession,ClientCredentials}.cpp src/rt/CredentialFormat.h src/net/SecureToken.cpp \
   test/gate/{BrowserSessionGate.cpp,OwnedDatabase.h,PrivateAuthFile.h} \
   test/runtime/browser-sessions.sh test/runtime/browser-sessions/MacProvider.cpp \

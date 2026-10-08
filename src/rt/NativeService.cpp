@@ -1,6 +1,7 @@
 #include "runtime/NativeService.h"
 
 #include "meta/PageDef.h"
+#include "runtime/BrowserSession.h"
 #include "runtime/ClientCredentials.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
@@ -59,7 +60,7 @@ private:
   SignalMask previous_{};
 };
 
-void VerifyStorage(const std::string &database, const std::string &company) {
+void VerifyStorage(const std::string &database, const std::string &company, bool browserCookies) {
   const Connection connection(database);
   const auto rows = connection.Execute(R"(SELECT "Name" FROM "Company" LIMIT 2)");
   if (rows.Rows() != 1 || rows.Value(0, 0) != company) {
@@ -76,6 +77,9 @@ void VerifyStorage(const std::string &database, const std::string &company) {
       "SELECT 1 FROM agiru_client.page_contexts LIMIT 0",
       "SELECT 1 FROM agiru_client.page_commands LIMIT 0"};
   for (const auto probe : probes) { static_cast<void>(connection.Execute(probe)); }
+  if (browserCookies) {
+    static_cast<void>(connection.Execute("SELECT 1 FROM agiru_client.browser_sessions LIMIT 0"));
+  }
 }
 
 }
@@ -86,7 +90,7 @@ void RunNativeService(const NativeServiceOptions &options) {
   if (!options.http.loopback || options.http.port == 0) {
     throw Error("native listener must use a nonzero private loopback port", "ServerConfiguration");
   }
-  VerifyStorage(options.pages.database, options.pages.company);
+  VerifyStorage(options.pages.database, options.pages.company, options.pages.browserCookies);
   const InstalledPermissionSets system;
   const auto permissions = std::make_shared<NativePermissions>(system);
   PageCommandHost host(
@@ -104,6 +108,7 @@ void RunNativeService(const NativeServiceOptions &options) {
 void InitializeNativeClient(const std::string &database) {
   const Session session(database);
   InstallClientCredentials(session.Database());
+  InstallBrowserSessions(session.Database());
   InstallPageCommandHost(session.Database());
   Commit();
 }

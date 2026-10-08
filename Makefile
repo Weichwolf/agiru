@@ -26,6 +26,14 @@ export CCACHE_SLOPPINESS
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-web dev-configure dev-exec dev-check
 .PHONY: page-profile client client-test web web-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions refresh-records record-windows
 .PHONY: browser-sessions
+.PHONY: browser-auth browser-https-test
+
+browser-auth: comments db ## qualify native browser authentication protocol and compiled denial defects
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_BrowserHttpGate gate_NativeServiceConfigGate
+	@B="$(B)" bash "$(SELF)/test/ui/browser-auth.sh"
+
+browser-https-test: ## qualify actual Caddy HTTPS cookie transport against a disposable SQL probe
+	@bash "$(SELF)/test/ui/browser-https.sh"
 
 browser-sessions: comments db ## qualify SQL browser-session expiry, rotation, source and admission fences
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_BrowserSessionGate

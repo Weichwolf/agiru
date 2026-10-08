@@ -1,5 +1,6 @@
 #include "platform/User.h"
 #include "runtime/BrowserSession.h"
+#include "runtime/BrowserSessionOptions.h"
 #include "runtime/ClientCredentials.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"

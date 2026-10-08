@@ -1,6 +1,6 @@
 # 0741 — Qualify rollback boundaries and concurrent session execution
 
-Status: in progress | Priority: P0
+Status: queued | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
 Next: qualify disabled native callbacks, shutdown rollback, progress execution and the
 remaining optimistic-write/isolation contracts. Original Customer New/template/save/

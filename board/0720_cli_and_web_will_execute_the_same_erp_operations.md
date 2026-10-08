@@ -1,10 +1,11 @@
 # 0720 — Deliver equivalent web, agent CMD and MCP clients (G2)
 
-Status: queued | Priority: P0
+Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: qualify HTTPS browser-cookie/CSRF lifecycle, then expand setup/master-data
+Next: adopt the HTTPS cookie/CSRF protocol in the actual htmx client and prove
+cookie-mode page/activity/replay parity in Chromium, then expand setup/master-data
 workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
 production variable setters and qualify original invalid-input/lookup/dimension cases.
@@ -46,9 +47,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 - Current code inspection: `ClientCredentials.cpp` checks bearer expiry/revocation;
   `PageCommandHost.cpp` binds ownership to credential/user/company/host and checks write CSRF/Origin.
   `HttpServer.cpp` emits no-store; Caddy declares CSP. Browser uses an in-memory bearer
-  (`src/client/web.mts`), not an HttpOnly cookie. Browser cookie lifecycle and full SaaS
-  isolation remain unqualified. Next coherent increment: actual Caddy HTTPS cookie/CSRF
-  lifecycle, including stateful page-open/deep-link entry points and concurrent revocation.
+  (`src/client/web.mts`), not an HttpOnly cookie. The native cookie protocol below is
+  separate from actual browser adoption and full SaaS isolation, which remain unqualified.
 - Credential identity gates: 36 checks, zero red; `make session-identity` retains
   75 identity, 49 command, 48 value and 84 generator checks, zero red. Thirteen identity/
   command/credential/provider and six value defects reject. A same-user peer has a distinct
@@ -76,8 +76,43 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   command, credential, session-value and generator regressions remain green.
   Sources: `include/runtime/BrowserSession.h`, `src/rt/BrowserSession.cpp`,
   `src/net/SecureToken.cpp`, `test/gate/BrowserSessionGate.cpp` and
-  `test/runtime/browser-sessions{.sh,/MacProvider.cpp}`. Next remains actual HTTPS
-  transport with exact Origin/CSRF/Fetch Metadata checks before any AL entry point.
+  `test/runtime/browser-sessions{.sh,/MacProvider.cpp}`.
+- Native cookie transport: `src/rt/BrowserHttp.{h,cpp}` is shared by production
+  `PageCommandHost.cpp`. Browser ERP reads and writes require session-bound CSRF,
+  same-origin Fetch Metadata, exact configured proxy authority/TLS and write Origin;
+  navigation/prefetch, duplicate cookies and cookie/bearer ambiguity refuse before AL.
+  Retained AL work strips raw cookies, bearers and forwarding authority. Agent bearer
+  requests remain independent. Trusted `browser_sessions` settings are complete in
+  `deploy/dev/agiru.json`; activation on HTTP refuses. Development defaults stay disabled.
+  Same-origin bootstrap is passive; rotation/logout commit before issuing/deleting cookies.
+  Fresh operations request idle renewal; cookie-mode AL activity/replay qualification
+  and active-stack revocation/cancellation remain due.
+  `make browser-auth JOBS=2`: 37 protocol/front-door and 280 configuration checks,
+  zero red; nine compiled CSRF/metadata/proxy/origin/cookie/retention/HTTPS-policy
+  defects reject. Eleven affected compiled C++ units pass targeted clang-tidy.
+  Current SQL/session regressions retain 61 browser-session, 75 identity, 49 command,
+  36 credential, 48 value and 84 generator checks, zero red; their negative controls
+  still reject. Container runs explicitly select the container-local gate DSN.
+- `make browser-https-test` uses the official Debian Caddy, private libmicrohttpd and
+  PostgreSQL together in a disposable container, with an external Node protocol client.
+  All nine TLS/cookie/CSRF/rotation/logout/source-expiry cases pass without disabling
+  certificate verification; an untrusted CA is rejected. Forged forwarding headers are
+  replaced and denials leave independent SQL probe effects unchanged. This is a SQL
+  protocol probe, not actual Chromium cookie adoption or ERP workflow acceptance.
+  Durable sources: `test/ui/browser-https.{sh,mjs}`, `test/gate/BrowserHttpGate.cpp`,
+  `deploy/dev/Caddyfile`; no WI dependency on disposable receipts.
+- Predecessor `~/Git/openerp/board/1775_a_session_per_tab.md`: do not equate a shared
+  browser authentication cookie with AL page state. Retain explicit independent page
+  contexts; reject global session managers, URL credentials and unbounded tab sessions.
+  Two actual browser tabs still need qualification. Never claim stolen-cookie device binding.
+- Current `make page-host-test JOBS=2` attempt: generated navigation 270, dispatcher
+  105 and source 15 checks pass with their 29 execution controls/one compile refusal.
+  The external fixture passes 38/38; production-shaped native configuration passes
+  43/44, with `CMD MCP and Chromium refuse invalid typed modal input and retain the
+  caller for explicit correction` cancelled at its unchanged 60-second timeout.
+  Consequently limits 7/80 and the 22 page-host mutation runs were not executed.
+  Preserve this failure; rerun/diagnose it, never count cancellation as green or increase
+  the timeout/defect baseline. Native TLS/SQL gates are not complete client acceptance.
 - References: [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
   consulted 2026-10-08. Sources/tests: `src/rt/{ClientCredentials,PageCommandHost}.cpp`,

@@ -312,7 +312,7 @@ std::string AppendPageMessages(const PageCall &call, std::string html) {
   return html;
 }
 
-void AcceptPageAnswer(const Connection &connection,
+bool AcceptPageAnswer(const Connection &connection,
                       PageCall &call,
                       std::string_view command,
                       std::string_view control) {
@@ -356,10 +356,11 @@ void AcceptPageAnswer(const Connection &connection,
     if (replay.Rows() != 1 || replay.Value(0, 0) != std::to_string(choice)) {
       Refuse("PageHostDialogStale");
     }
-    return;
+    return false;
   }
   call.question->answer = choice;
   call.ready.notify_all();
+  return true;
 }
 
 }

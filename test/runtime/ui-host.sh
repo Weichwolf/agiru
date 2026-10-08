@@ -15,6 +15,7 @@ sha256sum include/runtime/{UiHost,SessionOptions,Session,SessionCommand,Transact
   src/rt/{UiHost,TypeMethods,SingleInstance}.cpp src/rt/SessionState.h \
   src/rt/{Session,SessionCommand,Transaction}.cpp \
   src/rt/NativeServiceConfig.cpp deploy/dev/agiru.json test/gate/NativeServiceConfigGate.cpp \
+  include/runtime/{BrowserSessionOptions,PageHostOptions}.h src/rt/BrowserHttp.{h,cpp} \
   src/rt/written/BuiltinsWritten.cpp test/gate/UiHostGate.cpp test/gate/OwnedDatabase.h \
   test/runtime/ui-host.sh "$gate" "$B/gate_NativeServiceConfigGate" \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" "$B/libagiru_db.so" \

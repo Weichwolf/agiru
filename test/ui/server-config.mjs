@@ -16,7 +16,7 @@ export class ServerConfigs {
   async write(overrides, name = "server.json") {
     assert.match(name, /^[a-z][a-z0-9-]*\.json$/);
     const config = { ...defaults, ...overrides };
-    for (const section of ["http", "pages", "transactions"]) {
+    for (const section of ["http", "pages", "transactions", "browser_sessions"]) {
       config[section] = { ...defaults[section], ...overrides[section] };
     }
     const host = `${this.proof}/${name}`;

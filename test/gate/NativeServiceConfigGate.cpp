@@ -1,3 +1,4 @@
+#include "runtime/BrowserSessionOptions.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/HttpServerOptions.h"
 #include "runtime/NativeService.h"
@@ -72,6 +73,10 @@ void Defaults() {
              !options.pages.database.contains("password") &&
                  options.pages.company == "CRONUS International Ltd" &&
                  options.pages.origin == "http://127.0.0.1:8080");
+  CHECK_TRUE("HTTP template disables cookies and explicitly declares every browser default",
+             !options.pages.browserCookies && options.pages.browser.idle == pages.browser.idle &&
+                 options.pages.browser.lifetime == pages.browser.lifetime &&
+                 options.pages.browser.sessionsPerUser == pages.browser.sessionsPerUser);
   auto root = Node::parse(Template());
   root["http"]["workers"] = Node(2);
   root["transactions"]["disable_write_inside_try_functions"] = Node(true);
@@ -118,7 +123,7 @@ void Schema() {
     CHECK_TRUE("missing root authority or settings never silently default",
                Refuses(missing.dump()));
   }
-  for (const std::string_view section : {"http", "pages", "transactions"}) {
+  for (const std::string_view section : {"http", "pages", "transactions", "browser_sessions"}) {
     for (const auto &member : original[section].Members()) {
       auto missing = original;
       missing[section].erase(member.first);
@@ -170,6 +175,54 @@ void Schema() {
       policy["transactions"][member.first] = invalid;
       CHECK_TRUE("transaction policies accept only actual booleans", Refuses(policy.dump()));
     }
+  }
+}
+
+void BrowserPolicy() {
+  const auto original = Node::parse(Template());
+  auto enabled = original;
+  enabled["browser_sessions"]["enabled"] = Node(true);
+  CHECK_TRUE("cookies cannot be activated on the HTTP development origin", Refuses(enabled.dump()));
+  enabled["origin"] = Node(std::string("https://localhost:8443"));
+  const auto selected = agiru::ParseNativeServiceOptions(enabled.dump());
+  CHECK_TRUE("explicit HTTPS browser activation retains shared trusted session limits",
+             selected.pages.browserCookies &&
+                 selected.pages.browser.idle == agiru::BrowserSessionOptions::kDefaultIdle);
+  for (const auto &invalid : {Node{}, Node(1), Node(std::string("true"))}) {
+    auto root = original;
+    root["browser_sessions"]["enabled"] = invalid;
+    CHECK_TRUE("browser activation is an actual trusted boolean", Refuses(root.dump()));
+  }
+  for (const std::string_view field : {"idle_seconds", "lifetime_seconds", "sessions_per_user"}) {
+    for (const auto &bad : {Node::Number("0"),
+                            Node::Number("-1"),
+                            Node::Number("1.0"),
+                            Node::Number("1e0"),
+                            Node(std::string("1")),
+                            Node(false)}) {
+      auto root = original;
+      root["browser_sessions"][field] = bad;
+      CHECK_TRUE("browser bounds refuse nonpositive fractional exponent or coerced values",
+                 Refuses(root.dump()));
+    }
+  }
+  for (const auto &[field, value] : {std::pair{"idle_seconds", "28801"},
+                                     {"lifetime_seconds", "86401"},
+                                     {"sessions_per_user", "1025"}}) {
+    auto root = original;
+    root["browser_sessions"][field] = Node::Number(value);
+    CHECK_TRUE("browser policy shares storage lifetime and admission ceilings",
+               Refuses(root.dump()));
+  }
+  for (const std::string_view origin : {"https://",
+                                        "https://localhost/",
+                                        "https://localhost?q=1",
+                                        "https://localhost#x",
+                                        "https://user@localhost"}) {
+    auto root = enabled;
+    root["origin"] = Node(std::string(origin));
+    CHECK_TRUE("browser origin is an exact HTTPS authority without path query fragment or userinfo",
+               Refuses(root.dump()));
   }
 }
 
@@ -314,6 +367,7 @@ void FileBounds() {
 int main() {
   return gate::Run("NativeServiceConfig", [] {
     Defaults();
+    BrowserPolicy();
     Schema();
     DuplicatesAndNumbers();
     FileBounds();

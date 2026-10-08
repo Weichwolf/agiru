@@ -48,7 +48,8 @@ void InstallPageCommandHost(const Connection &connection);
 /// in this process; PostgreSQL owns user/company/credential identity, expiry, fencing and outcomes.
 /// Separate credentials for one user cannot share page/call/dialog/receipt handles.
 /// A host restart refuses old handles rather than fabricating recovered AL state. This initial
-/// single-company adapter does not implement company schema routing, passwords, cookie sign-in,
+/// single-company adapter exposes HTTPS development-credential exchange, not password login.
+/// It does not implement company schema routing,
 /// a connection pool, full URL/bookmark/filter semantics or a BC permission-set provider.
 class PageCommandHost {
 public:

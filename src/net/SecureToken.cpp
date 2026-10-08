@@ -83,4 +83,10 @@ std::string SecureTokenMac(std::string_view secret, std::string_view domain) {
   return Hex(digest);
 }
 
+bool SecureTokenEqual(std::string_view expected, std::string_view supplied) {
+  return expected.size() == supplied.size() &&
+         (expected.empty() ||
+          CRYPTO_memcmp(expected.data(), supplied.data(), expected.size()) == 0);
+}
+
 }

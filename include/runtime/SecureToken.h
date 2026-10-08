@@ -28,4 +28,10 @@ namespace agiru {
 /// \throws Error if the MAC provider fails; native backend only, WASM remains unqualified.
 [[nodiscard]] std::string SecureTokenMac(std::string_view secret, std::string_view domain);
 
+/// \brief Compares equal-length secret bytes without content-dependent early exits.
+/// \param expected Trusted exact bytes. \param supplied Untrusted exact bytes.
+/// \return False for different lengths; otherwise the private provider's constant-time equality.
+/// \note Length is public; no normalization. Native provider, WASM remains unqualified.
+[[nodiscard]] bool SecureTokenEqual(std::string_view expected, std::string_view supplied);
+
 }

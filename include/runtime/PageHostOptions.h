@@ -1,5 +1,6 @@
 #pragma once
 
+#include "runtime/BrowserSessionOptions.h"
 #include "runtime/SessionOptions.h"
 
 #include <chrono>
@@ -41,7 +42,9 @@ struct PageHostOptions {
   std::chrono::seconds dialogTimeout{
       kDefaultDialogTimeoutSeconds}; ///< Idle explicit-answer wait; fresh modal inputs renew it,
                                      ///< never beyond lifetime. Reads/replays do not renew it.
-  SessionOptions session{}; ///< Trusted immutable runtime policy for every retained context.
+  SessionOptions session{};        ///< Trusted immutable runtime policy for every retained context.
+  bool browserCookies = false;     ///< Explicit HTTPS-only activation; HTTP keeps agent bearers.
+  BrowserSessionOptions browser{}; ///< Trusted browser expiry/admission limits.
 };
 
 /// \brief Validates page/session configuration without connecting to SQL or running AL.

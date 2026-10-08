@@ -471,7 +471,9 @@ std::shared_ptr<PageModalInput> AcceptPageModal(const Connection &connection,
                                                 std::string_view handle,
                                                 std::string_view revision,
                                                 PageModalInput input,
-                                                const PageHostOptions &options) {
+                                                const PageHostOptions &options,
+                                                bool &fresh) {
+  fresh = false;
   input.modal = handle;
   const std::array<std::optional<std::string>, 7> binds{std::string(handle),
                                                         input.command,
@@ -546,6 +548,7 @@ std::shared_ptr<PageModalInput> AcceptPageModal(const Connection &connection,
   accepted->page = modal->page;
   modal->input = accepted;
   modal->busy = true;
+  fresh = true;
   call.ready.notify_all();
   return accepted;
 }

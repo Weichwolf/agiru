@@ -23,6 +23,7 @@
 #include "type/RecordId.h"
 #include "type/Utf8.h"
 
+#include "BrowserHttp.h"
 #include "HtmlText.h"
 #include "PageInteraction.h"
 #include "PageListHtml.h"
@@ -379,6 +380,7 @@ std::string RequestCommand(const ServerHttpRequest &request) {
 }
 
 void ValidatePageHostOptions(const PageHostOptions &options) {
+  detail::ValidateBrowserHttpOptions(options);
   try {
     ValidateRecordWindowLimit(options.listRows);
   } catch (const Error &) { Refuse("PageHostConfiguration"); }
@@ -717,7 +719,10 @@ struct PageCommandHost::Impl {
     }
   }
 
-  ServerHttpResponse Open(Connection &connection, const Client &client, const Parameters &values) {
+  ServerHttpResponse Open(Connection &connection,
+                          const Client &client,
+                          const Parameters &values,
+                          std::string_view browserCsrf) {
     constexpr std::array<std::string_view, 3> names{"page", "mode", "company"};
     Known(values, names);
     const auto company = Get(values, "company");
@@ -737,6 +742,7 @@ struct PageCommandHost::Impl {
       const auto mode = Mode(*entry->page, Get(values, "mode"));
       authorize(*entry->page, Opening(mode), {});
       if (mode == PageOpenMode::New && !Insertable(*entry->page)) { Refuse("PageHostUnsupported"); }
+      detail::RenewPageClient(connection, client, browserCsrf);
       command.Keep();
     } catch (const Error &error) {
       throw CommandFailure(
@@ -1112,6 +1118,7 @@ struct PageCommandHost::Impl {
                      "= $4::integer "
                      "WHERE handle = $1 AND command_id = $2",
                      completed);
+      detail::RenewPageClient(connection, client, request.Header("X-Agiru-CSRF"));
       command.Keep();
       return result;
     } catch (const std::exception &execution) {
@@ -1217,7 +1224,10 @@ struct PageCommandHost::Impl {
     {
       const std::lock_guard lock(call->mutex);
       if (call->modal) { ModalReadAuthority(connection, *call, call->modal->page); }
-      detail::AcceptPageAnswer(connection, *call, Get(values, "command"), Get(values, "control"));
+      if (detail::AcceptPageAnswer(
+              connection, *call, Get(values, "command"), Get(values, "control"))) {
+        detail::RenewPageClient(connection, client, request.Header("X-Agiru-CSRF"));
+      }
     }
     return Await(connection, call);
   }
@@ -1366,38 +1376,49 @@ struct PageCommandHost::Impl {
                               .command = candidate.command,
                               .outcome = "refused"});
       }
+      bool fresh = false;
       input = detail::AcceptPageModal(
-          connection, *call, handle, Get(values, "revision"), std::move(candidate), options);
+          connection, *call, handle, Get(values, "revision"), std::move(candidate), options, fresh);
+      if (fresh) { detail::RenewPageClient(connection, client, request.Header("X-Agiru-CSRF")); }
     }
     return ModalResult(connection, call, input);
   }
 
   ServerHttpResponse Handle(const ServerHttpRequest &request) {
     Connection connection(options.database);
-    const auto client = LookupClientCredentialIdentity(connection, request.Header("Authorization"));
-    if (!client) { Refuse("PageHostAuthentication"); }
+    if (auto endpoint = detail::BrowserSessionEndpoint(connection, request, options)) {
+      return std::move(*endpoint);
+    }
+    const auto client = detail::AuthenticatePageClient(connection, request, options);
+    const auto retained = detail::RetainedPageRequest(request, client.csrf);
+    return Dispatch(connection, client.identity, retained);
+  }
+
+  ServerHttpResponse
+  Dispatch(Connection &connection, const Client &client, const ServerHttpRequest &request) {
     if (request.method == "GET" && request.target.starts_with("/modal-commands/")) {
       return ModalPoll(
           connection,
-          *client,
+          client,
           std::string_view(request.target).substr(std::string_view("/modal-commands/").size()));
     }
     if (request.method == "GET" && request.target.starts_with(kCallPrefix)) {
-      return Poll(connection, *client, std::string_view(request.target).substr(kCallPrefix.size()));
+      return Poll(connection, client, std::string_view(request.target).substr(kCallPrefix.size()));
     }
     if (request.method == "GET" && request.target.starts_with("/?")) {
       const auto values = Parse(std::string_view(request.target).substr(2), false);
-      return values.contains("handle") ? Read(connection, *client, values)
-                                       : Open(connection, *client, values);
+      return values.contains("handle")
+                 ? Read(connection, client, values)
+                 : Open(connection, client, values, request.Header("X-Agiru-CSRF"));
     }
     if (request.method == "POST" && request.target == "/commands") {
-      return SubmitWrite(connection, *client, request);
+      return SubmitWrite(connection, client, request);
     }
     if (request.method == "POST" && request.target == "/answers") {
-      return Answer(connection, *client, request);
+      return Answer(connection, client, request);
     }
     if (request.method == "POST" && request.target.starts_with("/modal-commands/")) {
-      return ModalCommand(connection, *client, request);
+      return ModalCommand(connection, client, request);
     }
     return {.status = kMethodNotAllowed,
             .body = "<p>Unsupported page endpoint or method</p>",
