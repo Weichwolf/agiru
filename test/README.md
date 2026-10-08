@@ -101,6 +101,11 @@ proof of the current integration build, actual browser/htmx execution or full ER
 Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 `make test JOBS=2` for all local checks, and `make tc JOBS=2` after generator changes.
 `make verify-check` checks build tooling without rebuilding C++.
+Frozen runs pin the selected build's database, source, app/slice and build-type settings,
+with explicit database/source overrides. Private configuration is hash-checked; `make
+configure CMAKE_ARGS=<declared-settings>` runs before targets, including reused builds.
+Missing/changed configuration or configure failure refuses execution; inherited `B`
+cannot select live outputs. SnapshotGate covers quoted values, private storage and refusal.
 
 `make dev-check` is a host-only Podman packaging check, separate from `make test`:
 it uses owned disposable containers/volumes to verify committed SQL persistence,

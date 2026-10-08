@@ -84,7 +84,15 @@ The frozen rerun at `375a80e` retains 185 cases but has 62 red: its cold CMake b
 ignored the explicitly supplied gate DSN/source roots and compiled the default
 localhost:5433 connection and absent local AL path. PostgreSQL in the development
 container is on 5432. XMLport import now passes all four profiles in that run.
-Correct frozen configuration and rerun; this is not a green manifest or an AL UT result.
+`scripts/verify_snapshot.py` now pins selected-build database/source/app/slice settings
+in private hash-checked configuration and invokes `make configure` before targets,
+including reused builds. Explicit database/source roots override the selected cache;
+inherited B/Make overrides cannot redirect the lane. SnapshotGate passes 21 checks,
+including exact quoted/dollar values, source refusal, private storage, changed configuration
+and configure failure. `make verify-check`: 29 checks, zero red; the complete tooling
+suite passes 261 tests. The corrected frozen `make test JOBS=2` rerun is active;
+its actual CMake cache now selects PostgreSQL 5432, the verified AL source and the
+diagnostic slice independently of live B. Complete manifest/AL UT acceptance remains open.
 
 Native command failures now require affected-row proof for durable page invalidation
 and the failed SQL receipt before returning `failed`. Cleanup uncertainty returns

@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import time
@@ -15,6 +16,84 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = {'.git', 'build', 'build-asan', 'work', 'compile_commands.json'}
 CACHE_DIRS = {'__pycache__', '.pytest_cache'}
+CONFIGURATION_KEYS = ('AGIRU_TEST_DSN', 'AGIRU_MASTER_DSN', 'AGIRU_AL_SOURCE',
+                      'AGIRU_BC_SOURCE', 'AGIRU_BUILD_APPS', 'AGIRU_BUILD_SLICE',
+                      'CMAKE_BUILD_TYPE')
+
+
+def build_configuration(root):
+    if not (root / 'CMakeLists.txt').is_file():
+        return None
+    selected = os.environ.get('B')
+    build = root / selected if selected else (root / 'compile_commands.json').resolve().parent
+    cache = build / 'CMakeCache.txt'
+    settings = {}
+    if cache.is_file():
+        for line in cache.read_text().splitlines():
+            key, separator, value = line.partition('=')
+            name = key.split(':', 1)[0]
+            if separator and name in CONFIGURATION_KEYS:
+                settings[name] = value
+    for name in CONFIGURATION_KEYS[:4]:
+        if name in os.environ:
+            settings[name] = os.environ[name]
+    if any(any(unit in value for unit in ('\0', '\r', '\n')) for value in settings.values()):
+        raise RuntimeError('CMake configuration contains a multiline or NUL value')
+    if not all(settings.get(name) for name in CONFIGURATION_KEYS[:4]):
+        raise RuntimeError('frozen verification requires a configured selected build or explicit '
+                           'AGIRU_TEST_DSN, AGIRU_MASTER_DSN, AGIRU_AL_SOURCE and AGIRU_BC_SOURCE')
+    for name in ('AGIRU_AL_SOURCE', 'AGIRU_BC_SOURCE'):
+        path = (root / settings[name]).resolve()
+        if not path.is_dir():
+            raise RuntimeError(f'{name} configuration does not name an existing directory')
+        settings[name] = str(path)
+    return settings
+
+
+def freeze_configuration(settings, run):
+    path = run / 'cmake-configuration.json'
+    descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(descriptor, 'w') as output:
+        json.dump(settings, output, sort_keys=True)
+        output.write('\n')
+    return input_digest(path)
+
+
+def cmake_arguments(settings):
+    return shlex.join([f'-D{name}={value}' for name, value in settings.items()]).replace('$', '$$')
+
+
+def configure_snapshot(run, build_source, metadata, environment, output):
+    expected = metadata.get('cmake_configuration_sha256')
+    if not expected:
+        return None
+    path = run / 'cmake-configuration.json'
+    if (not path.is_file() or path.is_symlink() or path.stat().st_mode & 0o077 or
+            input_digest(path) != expected):
+        raise RuntimeError('frozen CMake configuration differs')
+    settings = json.loads(path.read_text())
+    if (not isinstance(settings, dict) or
+            not all(settings.get(name) for name in CONFIGURATION_KEYS[:4]) or
+            any(name not in CONFIGURATION_KEYS or not isinstance(value, str) or
+                any(unit in value for unit in ('\0', '\r', '\n'))
+                for name, value in settings.items())):
+        raise RuntimeError('invalid frozen CMake configuration')
+    if (run / 'bc_source').exists():
+        original = Path(settings['AGIRU_BC_SOURCE'])
+        try:
+            relative = Path(settings['AGIRU_AL_SOURCE']).relative_to(original)
+        except ValueError as error:
+            raise RuntimeError('AL gate root is outside the frozen BC source tree') from error
+        settings['AGIRU_BC_SOURCE'] = str(run / 'bc_source')
+        settings['AGIRU_AL_SOURCE'] = str(run / 'bc_source' / relative)
+    for name in CONFIGURATION_KEYS[:4]:
+        environment[name] = settings[name]
+    arguments = cmake_arguments(settings)
+    output.write('VERIFY CONFIGURE: declared database/source/build settings\n')
+    output.flush()
+    return subprocess.run(['make', '-C', str(build_source), 'configure',
+                           f'CMAKE_ARGS={arguments}'], env=environment, stdout=output,
+                          stderr=subprocess.STDOUT, check=False).returncode
 
 
 def verification_root(root=None):
@@ -214,6 +293,10 @@ def start(arguments):
                     'log': str(run / 'verify.log'),
                     'targets': arguments.targets, 'jobs': arguments.jobs,
                     'created_utc': stamp, 'status': 'queued'}
+        configuration = build_configuration(ROOT)
+        if configuration is not None:
+            metadata['cmake_configuration_sha256'] = freeze_configuration(configuration, run)
+            metadata['cmake_configuration_keys'] = sorted(configuration)
         if 'ut' in arguments.targets or 'transpile' in arguments.targets:
             bc = Path(os.environ.get('AGIRU_BC_SOURCE', Path.home() / 'Git/BCApps/src'))
             notice = Path(os.environ.get('AGIRU_LAYOUT_SOURCE_NOTICE', bc.parent / 'LICENSE'))
@@ -288,7 +371,7 @@ def run_snapshot(run):
     metadata['artifacts'] = str(run / 'artifacts')
     write_json(metadata_path, metadata)
     environment = dict(os.environ)
-    for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES'):
+    for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'B', 'CMAKE_ARGS'):
         environment.pop(name, None)
     environment.pop('AGIRU_BC_REVISION', None)
     environment.pop('AGIRU_SYSTEM_SYMBOLS', None)
@@ -315,10 +398,17 @@ def run_snapshot(run):
         else:
             environment['AGIRU_SYSTEM_SYMBOLS'] = str(symbols)
     with (run / 'verify.log').open('a') as output:
+        try:
+            configured = configure_snapshot(run, build_source, metadata, environment, output)
+            if configured is not None:
+                outcomes['configure'] = configured
+        except (OSError, ValueError, RuntimeError) as error:
+            output.write(f'VERIFY REFUSED: {error}\n')
+            outcomes['configure'] = 2
         for target in metadata['targets']:
             output.write(f'VERIFY TARGET {target}\n')
             output.flush()
-            if outcomes.get('system_symbols_immutable') or outcomes.get('layout_source_notice_immutable'):
+            if outcomes.get('system_symbols_immutable') or outcomes.get('layout_source_notice_immutable') or outcomes.get('configure'):
                 output.write('VERIFY REFUSED: frozen dependency identity differs\n')
                 outcomes[target] = 2
                 continue
@@ -337,6 +427,14 @@ def run_snapshot(run):
     metadata['post_source_sha256'] = digest(build_source)
     if metadata['post_source_sha256'] != metadata['source_sha256']:
         outcomes['source_immutable'] = 1
+    expected_configuration = metadata.get('cmake_configuration_sha256')
+    if expected_configuration:
+        configuration = run / 'cmake-configuration.json'
+        metadata['post_cmake_configuration_sha256'] = (
+            input_digest(configuration) if configuration.is_file() else None)
+        if (configuration.is_symlink() or
+                metadata['post_cmake_configuration_sha256'] != expected_configuration):
+            outcomes['configuration_immutable'] = 1
     if expected_symbols:
         metadata['post_system_symbols_sha256'] = digest(symbols)
         if metadata['post_system_symbols_sha256'] != expected_symbols or has_links(symbols):

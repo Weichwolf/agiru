@@ -218,6 +218,8 @@ direct build; freeze only when continued editing or reproducible isolation requi
   Relocated BC sources need `AGIRU_LAYOUT_SOURCE_NOTICE=<original-notice>` for `test`;
   missing notices refuse before dependency copying, not after the build.
   Snapshots/lane sources under `/tmp` are immutable inputs, never development trees.
+  Snapshots pin selected-build database/source/app settings and configure their own build;
+  inherited `B` never selects live outputs. Configuration failures refuse verification.
   Receipts identify Git HEAD, content/dependency hashes, target exits and test population.
 - At most one six-job integration lane. Local gates use two jobs; never overlap mutating
   tests on the same gate database. Serialize lint with build-database reconfiguration.

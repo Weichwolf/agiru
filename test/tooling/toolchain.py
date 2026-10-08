@@ -2986,6 +2986,108 @@ class NativeToolchainGate(unittest.TestCase):
 
 
 class SnapshotGate(unittest.TestCase):
+    def test_selected_build_configuration_is_pinned_and_explicit_roots_win(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'CMakeLists.txt').touch()
+            selected = root / 'selected'
+            selected.mkdir()
+            old = root / 'old source'
+            old.mkdir()
+            new = root / 'new source'
+            new.mkdir()
+            (selected / 'CMakeCache.txt').write_text(
+                'AGIRU_TEST_DSN:STRING=postgresql://fixture:fixture@127.0.0.1:5432/gate\n'
+                'AGIRU_MASTER_DSN:STRING=postgresql://fixture:fixture@127.0.0.1:5432/master\n'
+                f'AGIRU_AL_SOURCE:STRING={old}\nAGIRU_BC_SOURCE:STRING={old}\n'
+                'AGIRU_BUILD_APPS:BOOL=OFF\nAGIRU_BUILD_SLICE:BOOL=ON\nCMAKE_BUILD_TYPE:STRING=\n')
+            with patch.dict(os.environ, {'B': str(selected), 'AGIRU_AL_SOURCE': str(new),
+                                         'AGIRU_BC_SOURCE': str(new)}, clear=True):
+                settings = verify.build_configuration(root)
+            self.assertEqual(settings['AGIRU_TEST_DSN'],
+                             'postgresql://fixture:fixture@127.0.0.1:5432/gate')
+            self.assertEqual(settings['AGIRU_AL_SOURCE'], str(new))
+            self.assertEqual(settings['AGIRU_BC_SOURCE'], str(new))
+            self.assertEqual(settings['AGIRU_BUILD_SLICE'], 'ON')
+            self.assertEqual(settings['AGIRU_BUILD_APPS'], 'OFF')
+            signature = verify.freeze_configuration(settings, root)
+            private = root / 'cmake-configuration.json'
+            self.assertEqual(stat.S_IMODE(private.stat().st_mode), 0o600)
+            self.assertEqual(signature, hashlib.sha256(private.read_bytes()).hexdigest())
+            with patch.dict(os.environ, {'B': str(selected), 'AGIRU_AL_SOURCE': str(root / 'missing')}, clear=True):
+                with self.assertRaisesRegex(RuntimeError, 'AGIRU_AL_SOURCE'):
+                    verify.build_configuration(root)
+
+    def test_make_configuration_roundtrips_quoted_values_without_shell_or_make_expansion(self):
+        repository = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fake = root / 'bin'
+            fake.mkdir()
+            executable = fake / 'cmake'
+            executable.write_text('#!/usr/bin/env python3\nimport json, os, sys\n'
+                                  'from pathlib import Path\n'
+                                  'Path(os.environ["CONFIGURE_RECEIPT"]).write_text(json.dumps(sys.argv[1:]))\n')
+            executable.chmod(0o755)
+            receipt = root / 'args.json'
+            values = {'AGIRU_TEST_DSN': "host=127.0.0.1 password='fixture-$quoted;$(false)'",
+                      'AGIRU_AL_SOURCE': str(root / "quoted '$source directory")}
+            environment = isolated_make_environment()
+            environment.update(PATH=str(fake) + os.pathsep + environment['PATH'],
+                               CONFIGURE_RECEIPT=str(receipt))
+            result = subprocess.run(['make', '-f', str(repository / 'Makefile'), 'configure',
+                                     f'SELF={root}', f'B={root / "build directory"}',
+                                     f'CMAKE_ARGS={verify.cmake_arguments(values)}'],
+                                    env=environment, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            arguments = json.loads(receipt.read_text())
+            self.assertEqual(arguments[:6], ['-S', str(root), '-B', str(root / 'build directory'), '-G', 'Ninja'])
+            self.assertTrue(all(f'-D{name}={value}' in arguments for name, value in values.items()))
+
+    def test_frozen_configuration_is_applied_before_targets_and_external_B_cannot_leak(self):
+        with tempfile.TemporaryDirectory() as folder:
+            run = Path(folder)
+            source = run / 'source'
+            source.mkdir()
+            (source / 'Makefile').write_text('B := $(CURDIR)/build\nconfigure:\n'
+                                           '\t@mkdir -p "$(B)"\n'
+                                           '\t@printf "%s\\n" configured > "$(B)/configured"\n'
+                                           'probe:\n\t@test -f "$(B)/configured"\n')
+            signature = verify.freeze_configuration({name: 'fixture' for name in verify.CONFIGURATION_KEYS[:4]}, run)
+            original = {'status': 'queued', 'targets': ['probe'], 'jobs': 1,
+                        'source_sha256': verify.digest(source), 'cmake_configuration_sha256': signature}
+            (run / 'result.json').write_text(json.dumps(original))
+            with patch.dict(os.environ, B=str(run / 'external'), CMAKE_ARGS='unfrozen overrides'):
+                self.assertEqual(verify.run_snapshot(run), 0)
+            result = json.loads((run / 'result.json').read_text())
+            self.assertEqual(result['target_exits'], {'configure': 0, 'probe': 0})
+            self.assertEqual(result['post_cmake_configuration_sha256'], signature)
+            self.assertTrue((source / 'build/configured').is_file())
+            self.assertFalse((run / 'external').exists())
+            (source / 'build/configured').unlink()
+            (run / 'cmake-configuration.json').write_text('{}')
+            (run / 'result.json').write_text(json.dumps(original))
+            self.assertEqual(verify.run_snapshot(run), 1)
+            result = json.loads((run / 'result.json').read_text())
+            self.assertEqual(result['target_exits']['configure'], 2)
+            self.assertEqual(result['target_exits']['probe'], 2)
+            self.assertFalse((source / 'build/configured').exists())
+
+    def test_failed_configuration_refuses_targets_instead_of_using_stale_outputs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            run = Path(folder)
+            source = run / 'source'
+            source.mkdir()
+            (source / 'Makefile').write_text('configure:\n\t@exit 7\nprobe:\n\t@touch ran\n')
+            signature = verify.freeze_configuration({name: 'fixture' for name in verify.CONFIGURATION_KEYS[:4]}, run)
+            (run / 'result.json').write_text(json.dumps({'status': 'queued', 'targets': ['probe'], 'jobs': 1,
+                'source_sha256': verify.digest(source), 'cmake_configuration_sha256': signature}))
+            self.assertEqual(verify.run_snapshot(run), 1)
+            result = json.loads((run / 'result.json').read_text())
+            self.assertNotEqual(result['target_exits']['configure'], 0)
+            self.assertEqual(result['target_exits']['probe'], 2)
+            self.assertFalse((source / 'ran').exists())
+
     def test_missing_runner_is_failed_not_a_permanent_running_lane(self):
         with tempfile.TemporaryDirectory() as folder:
             receipt = Path(folder) / 'result.json'

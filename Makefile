@@ -13,10 +13,13 @@ ifeq ($(origin CXX),default)
 CXX := clang++-19
 endif
 export CXX
+CMAKE_ARGS ?=
+CMAKE_CONFIGURE = cmake -S "$(SELF)" -B "$(B)" -G Ninja \
+  -DCMAKE_CXX_COMPILER="$(CXX)" -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
-.PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
+.PHONY: all apps builtins census comments configure cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences rowversions table-keys reflection-metadata
 .PHONY: verify-check
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-storage native-codeunits streams
@@ -110,9 +113,10 @@ db: $(B)/CMakeCache.txt   ## compile_commands.json for clangd and clang-tidy
 	@ln -sf $(B)/compile_commands.json $(SELF)/compile_commands.json
 
 $(B)/CMakeCache.txt:
-	@cmake -S $(SELF) -B $(B) -G Ninja \
-	  -DCMAKE_CXX_COMPILER=$(CXX) \
-	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+	@$(CMAKE_CONFIGURE) $(CMAKE_ARGS)
+
+configure:        ## explicitly configure B (CMAKE_ARGS supplies declared CMake settings)
+	@$(CMAKE_CONFIGURE) $(CMAKE_ARGS)
 
 lint: lint-config gates tc ## format and analysis over what changed (FULL=1: the whole tree and the baselines)
 	@B="$(B)" AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} JOBS=$(JOBS) FULL=$(FULL) sh $(SELF)/test/tooling/lint.sh
