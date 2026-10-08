@@ -49,6 +49,22 @@ business workflows are active in 0720; full G1 acceptance does not block their i
   Zero unmeasured files; seven conditional assignments still refuse.
   Reproduce with `make census` against BCApps `d99152ee35f0` and the pinned policy.
   This is inventory, not an executable UT result.
+- Bound `Layers/W1/BaseApp/Office365Credentials.Page.al` (page 1312, Office 365
+  Credentials) to the approved `microsoft-cloud` exclusion: the original source only
+  collects Office 365 credentials to install Outlook Business Inbox add-ins. It is not
+  generic agiru authentication; keep User Card, User Details and its mixed test library,
+  SecretText and Cryptography Management. Source revision: `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`.
+  Raw census remains 36,792 objects with source SHA-256
+  `1868aa2837730b4e4b168401b8eab1f0cb1cd87b2144c423c12ac34d62e9e6c5`;
+  explicit exclusions become 205 and selection 10,506. Every test-method population
+  above is unchanged. The same three sources/seven conditional assignments still
+  refuse inventory; `make census` remains nonzero, not a hidden green claim.
+  `make verify-check VERIFY_CHECKS=SourceInventoryGate`: 20 tests pass, including
+  exact-path/core-neighbor/raw-identity controls and reintroduction of the bounded page.
+  `ProductSourceGate`: seven actual-generator selection/refusal controls pass.
+  The required constructor/field/TestPage/overload emission repairs remain 0720 work;
+  do not remove mixed price or permission codeunits to obtain a build. No direct donor
+  board finding names this page. Native production regeneration remains pending.
 - Native inventory retains 234 raw tables, 233 selected, eighteen bound and
   215 unbound; 35 selected native codeunits have 67 unimplemented methods.
   Other unactivated objects/properties and omitted app roots remain gaps.

@@ -4,11 +4,13 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: finish the keep-going native build inventory, repair generic missing-type/member
+Next: repair the six failed native unity groups' generic missing-type/member
 emission and repeat the original Customer workflow; never patch apps or guess declarations.
 ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
-The continuing build exposes mixed-case unavailable record references, indexed fields,
-unselected TestPage parts and unsupported refusal operations; the native app is not linked.
+The completed keep-going build exposes mixed-case unavailable record references, indexed
+fields, unselected TestPage parts/extension fields and ambiguous FieldNo/refusal operations;
+the native app is not linked. The pure O365 credentials page is now explicitly excluded
+by bounded product policy (0058); production regeneration/build remain pending.
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
@@ -138,8 +140,11 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `test/ui/page-host.mjs` now checks row value, write count and failed receipt in one
   independent SQL statement per rejection, preserving all assertions and exact text values.
   Adapter diagnostics locate the unchanged native deadline during the Web cases after
-  CMD/MCP progress. Fixture 38/38 remains green; native 43/44 still cancels under concurrent
-  compiler load. Repeat the entire matrix without that load before claiming recovery.
+  CMD/MCP progress. A serial repeat without the six-job integration build still passes
+  fixture 38/38 and cancels native case 38/44 at 60 seconds, after the Web array cases.
+  CMD reaches its last correction at 28.826 seconds, MCP at 14.867 seconds; the Web enum
+  cases remain unexecuted. Measure individual HTTP/SQL/client startup costs and repair
+  the latency; compilation contention alone does not explain this failure.
 - References: [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
   consulted 2026-10-08. Sources/tests: `src/rt/{ClientCredentials,PageCommandHost}.cpp`,

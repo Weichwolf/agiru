@@ -3110,6 +3110,42 @@ class SourceInventoryGate(unittest.TestCase):
         self.assertIsNone(scope_inventory.product_reason('ModuleExtra/Check.al', rules))
         self.assertIsNone(scope_inventory.product_reason('module/Check.al', rules))
 
+    def test_o365_credentials_exclusion_keeps_generic_authentication_and_raw_identity(self):
+        source = 'Layers/W1/BaseApp/Office365Credentials.Page.al'
+        policy = json.loads((self.root / 'scope.json').read_text())
+        rules = scope_inventory.product_rules(policy)
+        self.assertEqual(scope_inventory.product_reason(source, rules), 'microsoft-cloud')
+        for required in (
+                'Layers/W1/BaseApp/Modules/System/User/UserCard.Page.al',
+                'System Application/App/User Details/src/UserDetails.Table.al',
+                'System Application/Test Library/User Details/src/UserDetailsTestLibrary.Codeunit.al',
+                source + '.other.al'):
+            self.assertIsNone(scope_inventory.product_reason(required, rules), required)
+        rule = 'microsoft-cloud:' + source
+        bounded_policy = dict(self.policy, product_exclude=[rule])
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            excluded = root / source
+            excluded.parent.mkdir(parents=True)
+            excluded.write_text('page 1312 "Office 365 Credentials" {}')
+            neighbor = root / 'Layers/W1/BaseApp/GenericAuthentication.Page.al'
+            neighbor.write_text('namespace Microsoft.Fixture; page 50390 "Generic Authentication" {}')
+            apps = {'apps': [{'name': 'base', 'source': 'Layers/W1/BaseApp'}]}
+            report = scope_inventory.inventory(root, apps, bounded_policy)
+            self.assertFalse(report['errors'], report['errors'])
+            self.assertEqual(report['summary']['objects'], 2)
+            self.assertEqual(report['summary']['selected_objects'], 1)
+            self.assertEqual(report['summary']['product_excluded_objects'], 1)
+            identity = next(row for row in report['objects'] if row['id'] == 1312)
+            self.assertEqual(identity['name'], 'Office 365 Credentials')
+            self.assertEqual(identity['product_exclusion_reason'], 'microsoft-cloud')
+            restored = scope_inventory.inventory(root, apps,
+                dict(bounded_policy, product_exclude=[]))
+            self.assertFalse(restored['errors'], restored['errors'])
+            self.assertEqual(restored['summary']['objects'], report['summary']['objects'])
+            self.assertEqual(restored['summary']['selected_objects'], 2)
+            self.assertEqual(restored['summary']['product_excluded_objects'], 0)
+
     def test_source_domains_are_separate_without_shrinking_raw_populations(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

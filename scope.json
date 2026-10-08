@@ -86,6 +86,7 @@
   ],
   "_product_doc": "Explicit approved source exclusions, reason:path relative to BCApps/src; system-symbols/ selects the original System package source domain. A trailing slash selects a bounded module directory, otherwise a single exact file. No filename/namespace heuristic. Raw object and method identities always remain inventoried. Exclude commercial license/trial state and Microsoft service implementations, not generic notifications, users, permissions or ERP workflows.",
   "product_exclude": [
+    "microsoft-cloud:Layers/W1/BaseApp/Office365Credentials.Page.al",
     "licensing-and-microsoft-cloud:Layers/W1/Tests/SMB/O365RoleCenterNotifications.Codeunit.al",
     "licensing-and-microsoft-cloud:System Application/App/Tenant License State/src/TenantLicenseStateImpl.Codeunit.al",
     "licensing-and-microsoft-cloud:System Application/App/Azure AD Tenant/src/AzureADTenantImpl.Codeunit.al",
