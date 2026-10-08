@@ -336,6 +336,12 @@ def namespace_selected(namespace, policy):
     return longest(policy['include']) > longest(policy['exclude'])
 
 
+def area_selected(area, policy):
+    name = area.lower()
+    return name not in {value.lower() for value in policy.get('area_exclude', [])} and not any(
+        name.endswith(value.lower()) for value in policy.get('area_exclude_suffix', []))
+
+
 def configured_apps(configuration):
     apps = configuration['apps']
     if not apps or len({app['name'] for app in apps}) != len(apps):
@@ -405,9 +411,12 @@ def inventory(root, configuration, policy, source_domain='bcapps'):
         app_root = next((parent for parent in parents if parent in declared_roots), None)
         configured = [app['name'] for app in apps if
                       source.startswith(app['source'] + '/')]
+        area = next((source[len(app['source']) + 1:].split('/')[0] for app in apps
+                     if source.startswith(app['source'] + '/')), '')
         reason = product_reason(source, rules)
         row = {'source': source, 'app_root': app_root, 'configured_apps': configured,
-               'product_exclusion_reason': reason}
+               'product_exclusion_reason': reason, 'area': area,
+               'area_selected': area_selected(area, policy)}
         files.append(row)
         try:
             raw = path.read_bytes()
@@ -432,9 +441,14 @@ def inventory(root, configuration, policy, source_domain='bcapps'):
             row['objects'] = len(found)
             row['conditional_source'] = bool(re.search(r'^\s*#(?:if|elif)\b', text, re.M | re.I))
             for index, item in enumerate(found):
+                selected = bool(configured) and reason is None and (
+                    row['namespace_selected'] and (row['area_selected'] or
+                    not (item['kind'] == 'codeunit' and item['test_subtype'])))
                 item.update(source=source, declaration_index=index, app_root=app_root,
                             configured_apps=configured, namespace_selected=row['namespace_selected'],
-                            product_exclusion_reason=reason)
+                            product_exclusion_reason=reason, area=area,
+                            area_selected=row['area_selected'],
+                            selection_selected=selected)
                 kinds[item['kind']] += 1
                 objects.append(item)
         except (OSError, UnicodeError, ValueError) as error:
@@ -465,6 +479,12 @@ def inventory(root, configuration, policy, source_domain='bcapps'):
                                                             if item['product_exclusion_reason']),
                         'product_required_test_methods': sum(len(item['methods']) for item in test_units
                                                             if not item['product_exclusion_reason']),
+                        'selected_objects': sum(item['selection_selected'] for item in objects),
+                        'selected_test_codeunits': sum(item['selection_selected'] for item in test_units),
+                        'selected_test_methods': sum(len(item['methods']) for item in test_units
+                                                     if item['selection_selected']),
+                        'omitted_required_test_methods': sum(len(item['methods']) for item in test_units
+                            if not item['selection_selected'] and not item['product_exclusion_reason']),
                         'objects_by_kind': dict(sorted(kinds.items())),
                         'encodings': dict(sorted(encodings.items())),
                         'outside_configured_app_files': sum(not row['configured_apps'] for row in files),

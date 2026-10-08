@@ -41,11 +41,14 @@ business workflows are active in 0720; full G1 acceptance does not block their i
   No former Field/Table Metadata storage refusal remains in this measured population.
   Keep provider write guards: catalogue calculations must not provision SQL copies.
   Correlated native predicates, invalid-content diagnostics and full providers remain gaps.
-- Raw census: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
-  113,111 methods; fifteen approved exclusions leave 113,096 required.
+- Raw census, 2026-10-08: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
+  113,111 methods. The refreshed scope explicitly excludes 202 test codeunits /
+  3,744 methods, leaving 109,367 product-required methods. Configured selection:
+  1,194 test codeunits / 38,420 methods; 70,947 required methods remain outside
+  selection and visible as coverage gaps, not additional approved exclusions.
   Zero unmeasured files; seven conditional assignments still refuse.
   Reproduce with `make census` against BCApps `d99152ee35f0` and the pinned policy.
-  This is not the configured 2,314-method executable milestone.
+  This is inventory, not an executable UT result.
 - Native inventory retains 234 raw tables, 233 selected, eighteen bound and
   215 unbound; 35 selected native codeunits have 67 unimplemented methods.
   Other unactivated objects/properties and omitted app roots remain gaps.
@@ -71,7 +74,8 @@ business workflows are active in 0720; full G1 acceptance does not block their i
 - [0073](0073_generated_expressions_will_preserve_al_types_and_evaluation_effects.md):
   declaration-owned calls, var/value context and expression lowering.
 - [0063](0063_reports_will_execute_datasets_and_render_declared_layouts.md):
-  required native report/dataset/request contracts; renderer work follows G1.
+  required native report/dataset/request contracts; renderer work follows concrete
+  client/report prerequisites, not complete G1 acceptance.
 - Qualified prerequisites do not require all future work of an owning WI;
   activation still needs this WI's unchanged-population comparison.
 
@@ -92,17 +96,38 @@ business workflows are active in 0720; full G1 acceptance does not block their i
 | P0 | User/company/app authorization, scoped encrypted storage, sequence identity/migration, provider-owned tenant facts | `include/runtime/{Table,RecordRef}.h`, `src/rt/{IsolatedStorage,NumberSequence,NumberSequenceStorage,Storage}.cpp`; context/schema identity before integration |
 | P1 | Reliable Make statuses, complete compiler inputs, no-PCH/app dependency controls and decreasing lint/suppression debt | `Makefile`, `scripts/`, `cmake/`, `test/{gate,runtime,transpiler,tooling}/`; never replace UT with tooling proof |
 
-## Scope audit (2026-10-05)
+## Scope alignment (2026-10-08)
 
 - O365/Microsoft 365 and other Microsoft cloud integrations are excluded product
   requirements. Retain core ERP, contact CRM, permissions, local APIs and generic
   HTTP/SMTP/SFTP/file/Excel-workbook functionality. An O365 name is not sufficient:
   `Invoicing/O365SalesCancelInvoice.Codeunit.al` uses generic document email.
-- Compared with the refreshed implementation policy, agiru additionally admits
-  `Microsoft.Integration.{Dataverse,D365Sales,SyncEngine}`,
-  `System.Azure.Identity`, `System.Privacy` and `System.Telemetry`;
-  it no longer excludes `Microsoft.CRM.Outlook` or the namespace-less Graph area.
-  These are technical reachability differences, not approved cloud requirements.
+- Refreshed `~/Git/openerp/` archive SHA256
+  `bdd25abe5cff00db252130d247d80ed5d733a30d18d3167b83aad7e2ed7324ce`;
+  its only `*scope.json`, `scripts/transpiler/scope.json`, has SHA256
+  `7c03ea285e63bd18e2a30649038f43151dca810b450df3c47b7d5f2609fc7776`.
+  Namespace arrays and test-area arrays now match; remove former Dataverse/D365Sales/
+  SyncEngine, Azure.Identity, Privacy and Telemetry re-inclusions, and restore
+  Outlook/Graph carve-outs. Preserve implemented code and generic ERP requirements.
+- Resolve the reference's 24 exact test names, O365 prefix and plan suffix into
+  bounded `scope.json.product_exclude` source paths, never Python identifier rules
+  in C++. At BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`, the complete
+  excluded test-source sets agree: 109 W1 files (72 O365, thirteen plan-suffix,
+  24 named) and 93 localized overrides. Keep existing three private/native product
+  exclusions. Required permission tests 139400/134612/139004/132903 remain selected.
+  Whole excluded suites do not remove generic charts, posting, users or reporting.
+- `src/tc/Main.cpp` applies area exclusions to Test codeunits only; libraries and
+  ordinary tables remain available. Namespace admission cannot bypass test-area
+  exclusion: seven BCPT samples exposed that defect in the independent comparison.
+  `scripts/scope_inventory.py` reports raw,
+  selected, explicitly excluded and omitted-required populations independently.
+  Namespace/area omission is not proof that every omitted object is a cloud service.
+- UT raw population remains eighty / 2,314. Canonical selection is 77 / 2,298:
+  138002 (two methods) and 139319 (one) have explicit suite exclusions;
+  134627 (thirteen) is the reference's Graph-area omission, separately classified.
+  `scripts/{ut_manifest,ut_milestone}.py` retain raw/excluded manifests, exact reasons,
+  scope hash and population totals; empty selection refuses before execution.
+  Previous 2,314-method results above are not renamed as new-scope passes.
 - Concrete wrong admission: W1 `CRM/Outlook/O365GraphAuthentication.Codeunit.al`
   (7108) requests Graph/O365 tokens; `O365BidirectionalSync.Codeunit.al`
   (7106) calls graph.microsoft.com. Bound their service source exclusions and
@@ -111,13 +136,27 @@ business workflows are active in 0720; full G1 acceptance does not block their i
   Teams/Excel-online/Power BI and Entra/cloud-specific branches from source before
   changing `scope.json.product_exclude`. Preserve generic counterparts and mixed
   settings/privacy/work-date/notification callers. No successful license/cloud stubs.
-- Existing four exact product rules exclude two private service/licensing
-  implementations, native TenantLicenseState and the fifteen-method notification
-  test object. Resolve mixed public callers rather than inventing Paid/tenant facts.
-- Prove raw = selected + explicitly excluded, with every identity and reason;
+- OCR, payment providers and migration-to-BC implementations in mixed namespaces
+  remain a source/dependency audit, not permission to drop Incoming Documents,
+  generic payment/file exchange or RapidStart. Predecessor 1998/2000 proposes
+  AL-level replacement after country composition; reject successful retirement stubs.
+  Country conflicts need object/signature/body-hash proof before modifying sources.
+- Prove raw = selected + explicitly excluded + visible omissions, with every
+  identity and reason;
   compare source-counted UT before/after. Reachability/namespace omissions remain gaps.
   Predecessor 760/1134 rejects dependency-touch and no-op-based test exclusions.
-  This review did not change the executable policy or any test denominator.
+  Before/after source digest and raw identities agree; the same seven conditional
+  assignments still refuse in the same three files. `make census` remains exit 1,
+  not a green full-tree qualification. Reproduce with the pinned BCApps revision.
+- Verification: native `make tc JOBS=2` passes; `make lint-one
+  UNIT=src/tc/Main.cpp JOBS=2` has zero diagnostics. `make verify-check
+  VERIFY_CHECKS='ProductSourceGate ManifestGate MilestoneGate SourceInventoryGate'`
+  passes 57 tests; unrestricted `make verify-check VERIFY_CHECKS=` passes 265, zero
+  failures. Select the verified native build/BC source and dedicated gate DSN explicitly.
+  Controls retain exact-source boundaries, libraries, both namespace forms, missing
+  targets, wrong runner totals and empty-selection refusal with raw receipts.
+  Independent configured test selection agrees with the reference: 1,194 codeunits /
+  38,420 methods, zero mismatches. These are scope/tooling proofs, not an AL UT run.
 
 ## Acceptance
 

@@ -14,7 +14,7 @@ import threading
 import time
 from urllib.parse import urlsplit, urlunsplit
 
-from ut_manifest import scan
+from ut_manifest import partition, scan
 from ut_results import aggregate
 from source_revision import bc_revision, git_revision as source_revision
 
@@ -256,10 +256,14 @@ def main(arguments):
     work_date = os.environ.get('AGIRU_WORK_DATE', '2028-01-25')
     source = Path(os.environ.get('AGIRU_BC_SOURCE', Path.home() / 'Git/BCApps/src'))
     tests_root = source / 'Layers/W1/Tests'
-    manifest = scan(tests_root)
+    raw_manifest = scan(tests_root)
+    scope_bytes = (ROOT / 'scope.json').read_bytes()
+    manifest, excluded = partition(raw_manifest, source, tests_root, json.loads(scope_bytes))
     output.parent.mkdir(parents=True, exist_ok=True)
     manifest_path = Path(str(output) + '.manifest.json')
     write_json(manifest_path, manifest)
+    write_json(Path(str(output) + '.raw-manifest.json'), raw_manifest)
+    write_json(Path(str(output) + '.excluded.json'), excluded)
     parts = Path(tempfile.mkdtemp(prefix=output.name + '.parts.', dir=output.parent))
     for entry in manifest:
         (parts / f"{entry['id']}.status").write_text('-1\n')
@@ -273,6 +277,13 @@ def main(arguments):
         'image_sha256': {},
         'source_revision': None,
         'source_manifest_sha256': manifest_digest,
+        'scope_sha256': hashlib.sha256(scope_bytes).hexdigest(),
+        'raw_codeunits': len(raw_manifest),
+        'raw_methods': sum(len(entry['methods']) for entry in raw_manifest),
+        'selected_codeunits': len(manifest),
+        'selected_methods': sum(len(entry['methods']) for entry in manifest),
+        'excluded_codeunits': len(excluded),
+        'excluded_methods': sum(len(entry['methods']) for entry in excluded),
         'source_files_sha256': None,
         'seed_database': None,
         'seed_identity': None,
@@ -289,6 +300,8 @@ def main(arguments):
     write_json(metadata_path, metadata)
     preflight = time.monotonic()
     try:
+        if not manifest:
+            raise ValueError('the scope selects no UT codeunits; raw identities are retained')
         if stop.is_set():
             raise InterruptedError('UT preflight interrupted')
         workers = int(arguments[2]) if len(arguments) >= 3 else 6
@@ -303,7 +316,7 @@ def main(arguments):
         maintenance = maintenance_dsn(dsn)
         metadata['agiru_revision'] = source_revision(ROOT)
         metadata['source_revision'] = bc_source_revision(source)
-        metadata['source_files_sha256'] = source_sha256(manifest, tests_root)
+        metadata['source_files_sha256'] = source_sha256(raw_manifest, tests_root)
         metadata['seed_database'] = urlsplit(dsn).path.lstrip('/') if '://' in dsn else None
         if build:
             built = run_build(workers, stop)
@@ -328,7 +341,10 @@ def main(arguments):
             stem.with_suffix('.log').write_text(f'INCOMPLETE: preflight refused: {message}\n')
             stem.with_suffix('.status').write_text(str(status) + '\n')
         elapsed = int(time.monotonic() - preflight)
-        aggregate(manifest, parts, output, metadata['workers'] or 0, elapsed)
+        if manifest:
+            aggregate(manifest, parts, output, metadata['workers'] or 0, elapsed)
+        else:
+            output.write_text(f'INCOMPLETE: preflight refused: {message}\n')
         return finish_run(metadata_path, metadata, status, [message])
     metadata['preflight_seconds'] = int(time.monotonic() - preflight)
     write_json(metadata_path, metadata)

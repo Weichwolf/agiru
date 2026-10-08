@@ -172,10 +172,16 @@ bool InScope(const Run &run, const std::filesystem::path &path) {
     return false;
   }
   const std::string nameSpace = DeclaredNamespace(path);
-  if (!nameSpace.empty()) { return agiru::gen::Holds(*run.scope, nameSpace); }
+  if (!nameSpace.empty() && !agiru::gen::Holds(*run.scope, nameSpace)) { return false; }
   const std::filesystem::path relative = path.lexically_relative(run.root);
   if (relative.empty() || relative.begin() == relative.end()) { return true; }
-  return agiru::gen::HoldsArea(*run.scope, relative.begin()->string());
+  if (agiru::gen::HoldsArea(*run.scope, relative.begin()->string())) { return true; }
+  if (!agiru::gen::LowerKey(path.filename().string()).ends_with(".codeunit.al")) { return true; }
+  try {
+    const auto unit = agiru::al::ParseCodeunit(Read(path));
+    const auto *subtype = agiru::al::Find(unit.properties, "Subtype");
+    return subtype == nullptr || agiru::gen::LowerKey(subtype->text) != "test";
+  } catch (const agiru::al::ParseError &) { return true; }
 }
 
 std::vector<std::filesystem::path> SourcesEndingIn(const Run &run, std::string_view suffix) {

@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import re
 
+from scope_inventory import area_selected, declarations, namespace_selected, product_reason, product_rules
+
 QUOTED = re.compile(r'"(?:""|[^"])*"')
 IGNORED = re.compile(r'''"(?:""|[^"])*"|//[^\n]*|/\*.*?\*/|'(?:''|[^'])*'|\ufeff''', re.S)
 OBJECT = re.compile(r'\bcodeunit\s+(\d+)\s+("(?:""|[^"])*"|[\w.]+)', re.I)
@@ -41,6 +43,34 @@ def scan(root):
     if len({e['id'] for e in entries}) != len(entries) or len({e['name'] for e in entries}) != len(entries):
         raise ValueError('UT codeunit IDs and names must be unique')
     return sorted(entries, key=lambda e: e['id'])
+
+
+def partition(entries, source_root, app_root, policy):
+    """Keep raw identities while applying the transpiler's canonical selection policy."""
+    if not policy.get('include'):
+        raise ValueError('scope.json: the include list is empty')
+    rules = product_rules(policy)
+    for _, source in rules:
+        if not source.startswith('system-symbols/') and not (source_root / source).exists():
+            raise ValueError(f'scope.json: product exclusion target is missing: {source}')
+    selected, excluded = [], []
+    for entry in entries:
+        path = Path(entry['source'])
+        product = product_reason(path.relative_to(source_root).as_posix(), rules)
+        raw = path.read_bytes()
+        text = raw.decode('utf-16' if raw.startswith((b'\xff\xfe', b'\xfe\xff')) else 'utf-8-sig')
+        namespace, _ = declarations(text)
+        area = path.relative_to(app_root).parts[0].lower()
+        reason = product
+        if reason is None and namespace and not namespace_selected(namespace, policy):
+            reason = 'selection-namespace'
+        if reason is None and not area_selected(area, policy):
+            reason = 'selection-area'
+        if reason is None:
+            selected.append(entry)
+        else:
+            excluded.append(dict(entry, reason=reason, product_exclusion_reason=product))
+    return selected, excluded
 
 
 if __name__ == '__main__':

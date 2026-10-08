@@ -2507,6 +2507,41 @@ class ProductSourceGate(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse(list((self.root / 'generated').rglob('*UT.h')))
 
+    def test_test_area_rules_retain_libraries_and_raw_test_identities(self):
+        folder = self.root / 'source/Graph'
+        folder.mkdir()
+        (folder / 'Excluded.Codeunit.al').write_text(
+            'namespace Microsoft.Fixture; codeunit 50145 "Graph UT" { Subtype = Test; '
+            '[Test] procedure Check() begin end; }')
+        (folder / 'Unnamespaced.Codeunit.al').write_text(
+            'codeunit 50148 "Other Graph UT" { Subtype = Test; [Test] procedure Check() begin end; }')
+        (folder / 'Library.Codeunit.al').write_text('codeunit 50146 "Graph Library" {}')
+        (folder / 'Data.Table.al').write_text('table 50147 "Graph Data" { fields { field(1; No; Integer) {} } '
+                                             'keys { key(PK; No) {} } }')
+        policy = dict(self.policy, area_exclude=['Graph'])
+        (self.root / 'scope.json').write_text(json.dumps(policy))
+        result = self.run_transpiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        paths = {path.name for path in (self.root / 'generated').rglob('*.h')}
+        self.assertNotIn('GraphUT.h', paths)
+        self.assertNotIn('OtherGraphUT.h', paths)
+        self.assertIn('GraphLibrary.h', paths)
+        self.assertIn('GraphData.h', paths)
+        raw = milestone.scan(self.root / 'source')
+        kept, excluded = milestone.partition(raw, self.root, self.root / 'source', policy)
+        self.assertEqual({entry['id'] for entry in raw}, {50142, 50143, 50145, 50148})
+        self.assertEqual([entry['id'] for entry in kept], [50143])
+        self.assertEqual([(entry['id'], entry['reason']) for entry in excluded],
+                         [(50142, 'bc-licensing'), (50145, 'selection-area'), (50148, 'selection-area')])
+        report = scope_inventory.inventory(self.root, {
+            'apps': [{'name': 'fixture', 'source': 'source'}]}, policy)
+        self.assertEqual(report['summary']['test_methods'], 4)
+        self.assertEqual(report['summary']['selected_test_methods'], 1)
+        self.assertEqual(report['summary']['product_excluded_test_methods'], 1)
+        self.assertEqual(report['summary']['omitted_required_test_methods'], 2)
+        self.assertTrue(next(item for item in report['objects'] if item['id'] == 50146)[
+            'selection_selected'])
+
     def test_malformed_unknown_duplicate_and_unbounded_rules_refuse(self):
         for entries in (['no-reason'], ['unsupported:source/Excluded.Codeunit.al'],
                         ['bc-licensing:/outside'], ['bc-licensing:source/../outside'],
@@ -3767,8 +3802,9 @@ class MilestoneGate(unittest.TestCase):
         }''')
         repo = SCRIPT.parents[2]
         for name in ('ut-milestone.sh', 'ut_milestone.py', 'ut_manifest.py', 'ut_results.py',
-                     'source_revision.py'):
+                     'source_revision.py', 'scope_inventory.py'):
             shutil.copyfile(repo / 'scripts' / name, self.root / 'scripts' / name)
+        (self.root / 'scope.json').write_text(json.dumps({'include': ['Microsoft'], 'exclude': []}))
         self.runner = self.root / 'build/agiru'
         self.psql = self.root / 'build/psql'
         self.psql.write_text('#!/bin/sh\nexit 0\n')
@@ -3804,6 +3840,41 @@ class MilestoneGate(unittest.TestCase):
         self.runner_output('2 of 2 passed', 42)
         result = subprocess.run(self.command, env=self.env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_scope_receipts_keep_excluded_methods_without_invoking_them(self):
+        tests = self.root / 'al/Layers/W1/Tests'
+        (tests / 'Excluded.al').write_text('codeunit 50101 "Excluded UT" { Subtype = Test; '
+                                         '[Test] procedure Removed() begin end; }')
+        (self.root / 'scope.json').write_text(json.dumps({'include': ['Microsoft'], 'exclude': [],
+            'product_exclude': ['bc-licensing:Layers/W1/Tests/Excluded.al']}))
+        self.runner_output('2 of 2 passed')
+        result = subprocess.run(self.command, env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        output = self.root / 'build/ut.log'
+        raw = json.loads(Path(str(output) + '.raw-manifest.json').read_text())
+        kept = json.loads(Path(str(output) + '.manifest.json').read_text())
+        excluded = json.loads(Path(str(output) + '.excluded.json').read_text())
+        self.assertEqual([entry['id'] for entry in raw], [50100, 50101])
+        self.assertEqual([entry['id'] for entry in kept], [50100])
+        self.assertEqual((excluded[0]['id'], excluded[0]['methods'], excluded[0]['reason']),
+                         (50101, ['Removed'], 'bc-licensing'))
+        receipt = json.loads(Path(str(output) + '.run.json').read_text())
+        self.assertEqual((receipt['raw_methods'], receipt['selected_methods'], receipt['excluded_methods']),
+                         (3, 2, 1))
+        self.assertEqual(receipt['scope_sha256'],
+                         hashlib.sha256((self.root / 'scope.json').read_bytes()).hexdigest())
+
+    def test_zero_selected_population_refuses_and_retains_raw_receipts(self):
+        (self.root / 'scope.json').write_text(json.dumps({'include': ['Microsoft'], 'exclude': [],
+            'product_exclude': ['bc-licensing:Layers/W1/Tests/Example.al']}))
+        self.runner_output('2 of 2 passed')
+        result = subprocess.run(self.command, env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn('scope selects no UT codeunits', result.stderr)
+        self.assertNotIn('UT MILESTONE: 0 of 0', result.stdout)
+        self.assertFalse((self.root / 'build/runner.pid').exists())
+        raw = json.loads((self.root / 'build/ut.log.raw-manifest.json').read_text())
+        self.assertEqual(raw[0]['methods'], ['First', 'Second'])
 
     def test_selected_build_controls_runner_freshness_hashes_and_nested_make(self):
         self.runner_output('2 of 2 passed')
@@ -4283,6 +4354,22 @@ class ManifestGate(unittest.TestCase):
 }''')
         with self.assertRaisesRegex(ValueError, 'no UT codeunits'):
             self.manifest.scan(self.root)
+
+    def test_partition_never_converts_missing_rules_or_namespace_omissions_into_product_exclusions(self):
+        self.write('Example.al', 'namespace Microsoft.Integration; '
+                   'codeunit 50100 "Example UT" { Subtype = Test; [Test] procedure Case() begin end; }')
+        raw = self.manifest.scan(self.root)
+        policy = {'include': ['Microsoft'], 'exclude': ['Microsoft.Integration']}
+        kept, excluded = self.manifest.partition(raw, self.root, self.root, policy)
+        self.assertFalse(kept)
+        self.assertEqual(excluded[0]['reason'], 'selection-namespace')
+        self.assertIsNone(excluded[0]['product_exclusion_reason'])
+        self.assertEqual(raw[0]['methods'], ['Case'])
+        with self.assertRaisesRegex(ValueError, 'include list is empty'):
+            self.manifest.partition(raw, self.root, self.root, dict(policy, include=[]))
+        with self.assertRaisesRegex(ValueError, 'target is missing'):
+            self.manifest.partition(raw, self.root, self.root, dict(policy,
+                product_exclude=['microsoft-cloud:Missing.al']))
 
 
 class ResultIdentityGate(unittest.TestCase):
