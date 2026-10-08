@@ -4,13 +4,13 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: repair the six failed native unity groups' generic missing-type/member
+Next: repair the remaining native groups' generic missing-type/member
 emission and repeat the original Customer workflow; never patch apps or guess declarations.
 ExchangeSync.Enabled and GlobalAdminMessage's unselected named page now compile.
-The completed keep-going build exposes mixed-case unavailable record references, indexed
-fields, unselected TestPage parts/extension fields and ambiguous FieldNo/refusal operations;
+The previous keep-going build exposed mixed-case unavailable record references, indexed
+fields and unselected TestPage parts/extension fields. The regenerated FieldNo group now compiles;
 the native app is not linked. The pure O365 credentials page is now explicitly excluded
-by bounded product policy (0058); production regeneration/build remain pending.
+by bounded product policy (0058) and the generated build selection; full native linking remains pending.
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
 Customer template (1380) → create → edit → independent reopen regression. Regenerate
@@ -222,10 +222,16 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 
 - Production regeneration retains 21 unresolved control anchors, 618 unsupported
   object kinds and 122 refused properties: translator exit 1, source-origin check 0.
-  The 14,225-file slice check passes; the completed keep-going native build has six
-  failed unity groups (526/650/551/028/421/140), not a remaining GlobalAdminMessage
-  failure. The current field/part/type/overload repairs and bounded O365 exclusion
-  need production regeneration and linking; none is full native/ERP acceptance.
+  Current regeneration preserves generator exit 1 and source-origin check 0. Slice-check:
+  14,225 raw entries, 13,592 selected, 101 product-excluded, 532 omitted, zero missing.
+  Do not confuse these diagnostic source entries with the full AL test population.
+  The previous keep-going build failed six groups (526/650/551/028/421/140).
+  After regeneration, group 140 including original `RetenPolInstallBaseApp.cpp` compiles
+  with the production PCH, warning policy and source-selection checks:
+  `make dev-exec COMMAND='cmake --build /workspace/build/podman -j 2 --target
+  CMakeFiles/agiru_slice.dir/Unity/unity_stable/140/root_cxx.cxx.o'`.
+  The O365 credentials source is explicitly excluded; remaining generic field/part/type
+  repairs and full linking remain open. This narrow compile is not full native/ERP acceptance.
   Named Page.Run/RunModal now lower through the numbered runtime API, with an explicit
   kind/name refusal before dispatch instead of an invented absent class or object zero.
   Compiled fixtures cover optional records/field numbers, Action results and mixed-case
