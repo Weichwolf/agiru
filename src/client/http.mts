@@ -61,7 +61,8 @@ export class AgentClient {
     } catch { throw new ClientError("PathRefused", "Only same-origin root-relative paths are allowed"); }
   }
 
-  async #request(path: string, fields?: Readonly<Record<string, string>>, command?: string, timeout = this.#timeout): Promise<Result> {
+  async #request(path: string, fields?: Readonly<Record<string, string>>, command?: string, timeout = this.#timeout,
+                 originCommand?: string): Promise<Result> {
     const url = this.#url(path);
     const body = fields ? new URLSearchParams(fields).toString() : undefined;
     if (body && Buffer.byteLength(body) > limits.bytes) throw new ClientError("RequestLimit", "Command byte budget exceeded");
@@ -89,7 +90,8 @@ export class AgentClient {
       const html = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, size));
       if (!response.ok) {
         const failure = parseFailure(html);
-        if (command && failure.command !== command) throw new ClientError("ResponseRefused", "Error command identity does not match the submitted command");
+        const expected = failure.outcome === "refused" ? command : originCommand ?? command;
+        if (command && failure.command !== expected) throw new ClientError("ResponseRefused", "Error command identity does not match the submitted command");
         throw new ServerError(failure.code, failure.message, failure.outcome, failure.command || undefined);
       }
       const page = parsePage(html);
@@ -117,7 +119,7 @@ export class AgentClient {
           interaction.originCommand !== (command ?? "")))) {
         throw new ClientError(command ? "WriteUncertain" : "ResponseRefused", "Operation identity changed while polling", command);
       }
-      if (!interaction) return result;
+      if (!interaction || interaction.state !== "working") return result;
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new ClientError(command ? "WriteUncertain" : "OperationPending",
         `AL operation is still pending; read /calls/${call} to reconcile without replaying it`, command);
@@ -148,11 +150,12 @@ export class AgentClient {
       throw new ClientError("StalePage", "Page handle or revision changed; read and choose a new command explicitly");
     }
     const envelope = commandEnvelope(current.page, { ...requested, enabled: true }, requested.text);
+    const originCommand = current.page.interaction?.originCommand ?? requested.command;
     const deadline = Date.now() + this.#timeout;
     const submit = async (): Promise<Result> => {
-      return this.#request(envelope.path, envelope.fields, requested.command);
+      return this.#request(envelope.path, envelope.fields, requested.command, this.#timeout, originCommand);
     };
-    return this.#follow(await submit(), deadline, requested.command, requested.page);
+    return this.#follow(await submit(), deadline, originCommand, requested.page);
   }
 }
 

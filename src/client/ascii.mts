@@ -16,7 +16,11 @@ function field(control: Control, command = ""): string {
 
 export function renderAscii(page: Page, budget = 262144): string {
   const lines = [`page ${page.page} ${quote(page.caption)} handle=${page.handle} rev=${page.revision} view=${page.view}`];
-  if (page.interaction) lines.push(`working call=${page.interaction.call} command=${page.interaction.originCommand || "(opening)"}`);
+  if (page.interaction) {
+    lines.push(`${page.interaction.state} call=${page.interaction.call} command=${page.interaction.originCommand || "(opening)"}`);
+    if (page.interaction.dialog) lines.push(`dialog=${page.interaction.dialog} default=${page.interaction.defaultChoice} prompt=${quote(page.interaction.prompt!)}`);
+  }
+  for (const message of page.messages ?? []) lines.push(`message ${message.handle} ${quote(message.text)}`);
   for (const control of page.controls) {
     const key = quote(control.identity);
     if (control.kind === "group") continue;

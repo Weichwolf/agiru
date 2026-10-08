@@ -62,6 +62,7 @@ void Defaults() {
                  options.pages.executionWorkers == pages.executionWorkers &&
                  options.pages.executionQueue == pages.executionQueue &&
                  options.pages.responseWait == pages.responseWait &&
+                 options.pages.dialogTimeout == pages.dialogTimeout &&
                  options.pages.lifetime == pages.lifetime &&
                  options.pages.session.disableWriteInsideTryFunctions ==
                      pages.session.disableWriteInsideTryFunctions &&
@@ -80,10 +81,12 @@ void Defaults() {
   constexpr auto kConfiguredExecutionWorkers = 3;
   constexpr auto kConfiguredExecutionQueue = 5;
   constexpr auto kConfiguredResponseWaitMs = 7;
+  constexpr auto kConfiguredDialogSeconds = 13;
   root["pages"]["list_rows"] = Node(kConfiguredListRows);
   root["pages"]["execution_workers"] = Node(kConfiguredExecutionWorkers);
   root["pages"]["execution_queue"] = Node(kConfiguredExecutionQueue);
   root["pages"]["response_wait_ms"] = Node(kConfiguredResponseWaitMs);
+  root["pages"]["dialog_timeout_seconds"] = Node(kConfiguredDialogSeconds);
   root["company"] = Node(std::string("Original + Gesellschaft 東京"));
   const auto selected = agiru::ParseNativeServiceOptions(root.dump());
   CHECK_TRUE("trusted explicit worker and transaction policies are retained",
@@ -97,6 +100,8 @@ void Defaults() {
                  selected.pages.executionQueue == kConfiguredExecutionQueue &&
                  selected.pages.responseWait ==
                      std::chrono::milliseconds(kConfiguredResponseWaitMs));
+  CHECK_TRUE("dialog answer timeout is an independent trusted server setting",
+             selected.pages.dialogTimeout == std::chrono::seconds(kConfiguredDialogSeconds));
   CHECK_TRUE("integer budgets never travel through binary floating point",
              selected.pages.receiptBytes == 9007199254740993ULL);
   root["company"] = Node(std::string("Changed"));
@@ -220,8 +225,9 @@ void DuplicatesAndNumbers() {
     CHECK_TRUE("server parser shares native transport resource validation", Refuses(root.dump()));
   }
   auto lifetime = original;
-  for (const auto &[field, value] :
-       {std::pair{"execution_workers", "257"}, {"response_wait_ms", "1001"}}) {
+  for (const auto &[field, value] : {std::pair{"execution_workers", "257"},
+                                     {"response_wait_ms", "1001"},
+                                     {"dialog_timeout_seconds", "86401"}}) {
     auto invalid = original;
     invalid["pages"][field] = Node::Number(value);
     CHECK_TRUE("AL workers and initial response wait have explicit ceilings",

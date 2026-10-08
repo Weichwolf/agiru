@@ -33,8 +33,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   40/7/80 under both TryFunction policies and rejects eight compiled defects,
   including a lost failed receipt and blocking HTTP wait. Generated navigation retains 183 checks,
   PageSource 15, PageDispatcher 105 and all sixteen execution defects/one compile refusal.
-- Full ErrorInfo/actionable-error dialogs, Confirm/StrMenu HTTP suspension and modal
-  execution remain required; this contract is not working business-workflow acceptance.
+- Full ErrorInfo/actionable-error dialogs and modal execution remain required;
+  this contract is not working business-workflow acceptance.
 
 ## Asynchronous native calls
 
@@ -52,10 +52,28 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   durable Commit and actual external CMD/MCP/Chromium completion. `page-host.sh`
   requires a compiled synchronous-execution defect to fail that responsiveness case.
   `test/ui/{agent-client,web-client}.mjs` cover strict profile and polling/error identity.
-- This is execution infrastructure, not dialog acceptance. No fake UiHost is installed;
-  native GuiAllowed remains unchanged. Next: real Confirm/StrMenu, deferred messages,
-  live progress and modal/error dialogs, then original Customer and business workflows.
-  Queue saturation, cancellation and multi-user scale still need qualification.
+- The real session-owned endpoint in `src/rt/PageInteraction.{h,cpp}` provides
+  Confirm/StrMenu and deferred messages over the same AL call/SQL transaction.
+  PostgreSQL owns explicit-answer fencing; `/answers` rechecks owner/company,
+  original-action permissions, CSRF, revision and nonce. Identical answers reconcile
+  without reexecution; changed, foreign and replaced answers refuse.
+  `pages.dialog_timeout_seconds` defaults to 300. Timeout/shutdown unwind, never
+  consent; presentation defaults are not answers. HTML byte refusal precedes publication.
+  Messages appear at a question or completion, retaining Unicode and stable identities.
+  Web/CMD/MCP consume one strict profile; only `working` polls automatically.
+  Confirmed asynchronous failures restore the browser's previous inspected business page;
+  that snapshot does not revive an invalidated server context or grant retry authority.
+- `test/ui/page-host.mjs`: 114 positive native HTTP cases at limits 40/7/80 and
+  both TryFunction policies, independently checking pending writes, rollback,
+  prior Commit, nested questions, menu cancel/selection, messages and duplicate effects.
+  `make page-host-test` rejects eleven compiled defects, including automatic default
+  consent, implicit dialog Commit and changed-answer replay; source hashes remain unchanged.
+  `make client-test`: 43 cases/eight executable defects; `make web-test`:
+  fourteen Chromium cases/three compiled defects plus the actual Caddy asset case.
+  Native configuration retains 242 checks; five affected C++ units pass clang-tidy.
+  Progress explicitly refuses `UiProgressUnsupported`; live progress, modal/error
+  dialogs, original Customer and business workflows remain due. Native disabled
+  callback-policy, queue saturation, shutdown rollback and multi-user scale still need qualification.
 - `make slice-check` retains 14,225 sources, zero missing; `make all JOBS=2` succeeds,
   retaining 1,902 diagnostic-slice unlinked gaps. Native configuration passes 232 checks.
   Targeted clang-tidy is clear for PageCommandHost, NativeServiceConfig, its gate and

@@ -92,15 +92,16 @@ HttpServerOptions Transport(const Node &node) {
 }
 
 void Pages(const Node &node, PageHostOptions &options) {
-  constexpr std::array<std::string_view, 9> fields{"contexts",
-                                                   "navigation_depth",
-                                                   "commands",
-                                                   "receipt_bytes",
-                                                   "list_rows",
-                                                   "lifetime_seconds",
-                                                   "execution_workers",
-                                                   "execution_queue",
-                                                   "response_wait_ms"};
+  constexpr std::array<std::string_view, 10> fields{"contexts",
+                                                    "navigation_depth",
+                                                    "commands",
+                                                    "receipt_bytes",
+                                                    "list_rows",
+                                                    "lifetime_seconds",
+                                                    "execution_workers",
+                                                    "execution_queue",
+                                                    "response_wait_ms",
+                                                    "dialog_timeout_seconds"};
   Object(node, fields);
   options.contexts = Number<std::size_t>(node, "contexts");
   options.navigationDepth = Number<std::size_t>(node, "navigation_depth");
@@ -111,6 +112,8 @@ void Pages(const Node &node, PageHostOptions &options) {
   options.executionQueue = Number<std::size_t>(node, "execution_queue");
   options.responseWait = std::chrono::milliseconds(Number<unsigned>(node, "response_wait_ms"));
   options.lifetime = std::chrono::seconds(Number<std::int64_t>(node, "lifetime_seconds"));
+  options.dialogTimeout =
+      std::chrono::seconds(Number<std::int64_t>(node, "dialog_timeout_seconds"));
   ValidatePageHostOptions(options);
 }
 

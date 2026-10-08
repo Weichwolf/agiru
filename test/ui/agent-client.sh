@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 proof=$(mktemp -d /tmp/agiru-agent-client.XXXXXX)
-sha256sum src/client/*.{mts,json} test/ui/agent-client.{sh,mjs} \
+sha256sum src/client/*.{mts,json} test/ui/agent-client.{sh,mjs} test/ui/dialog-fixture.mjs \
   include/runtime/PageHtml.h src/rt/PageHtml.cpp src/rt/HtmlText.{h,cpp} test/gate/PageHtmlGate.cpp > "$proof/inputs.sha256"
 if [[ -n ${AGIRU_PAGE_HTML_GATE:-} ]]; then
   "$AGIRU_PAGE_HTML_GATE" > "$proof/cpp-gate.log"
@@ -35,8 +35,8 @@ for control in rounded-scalars disabled-command stale-revision double-post block
     control == "stale-revision" && /if \(current.page.handle !== requested.page \|\| current.page.revision !== requested.revision\)/ {
       sub(/current.page.handle !== requested.page \|\| current.page.revision !== requested.revision/, "false"); changed++
     }
-    control == "double-post" && /return this.#request\(envelope.path, envelope.fields, requested.command\);/ {
-      sub(/return this.#request/, "await this.#request(envelope.path, envelope.fields, requested.command); return this.#request"); changed++
+    control == "double-post" && /return this.#request\(envelope.path, envelope.fields, requested.command, this.#timeout, originCommand\);/ {
+      sub(/return this.#request/, "await this.#request(envelope.path, envelope.fields, requested.command, this.#timeout, originCommand); return this.#request"); changed++
     }
     control == "blocking-auth" && /constants\.O_NONBLOCK/ {
       sub(/ \| constants\.O_NONBLOCK/, ""); changed++
@@ -48,8 +48,8 @@ for control in rounded-scalars disabled-command stale-revision double-post block
     control == "opening-replay" && /if \(!retained\)/ {
       sub(/!retained/, "false"); changed++
     }
-    control == "error-identity" && /if \(command && failure.command !== command\)/ {
-      sub(/command && failure.command !== command/, "false"); changed++
+    control == "error-identity" && /if \(command && failure.command !== expected\)/ {
+      sub(/command && failure.command !== expected/, "false"); changed++
     }
     { print }
     END { if (changed != 1) exit 2 }

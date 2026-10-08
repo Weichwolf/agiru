@@ -11,7 +11,7 @@ export function launchBrowser() {
 }
 
 async function settled(page) {
-  await page.waitForFunction(() => /^(Ready|[0-9]+ unsupported|Page request refused|Write outcome uncertain)/
+  await page.waitForFunction(() => /^(Ready|Explicit answer required|[0-9]+ unsupported|Page request refused|Write outcome uncertain)/
     .test(document.querySelector("#status").textContent));
   await page.waitForFunction(() => !document.querySelector(".htmx-request"));
 }
@@ -63,6 +63,12 @@ export async function assertBrowserPage(page, model) {
       handle: article.dataset.handle, revision: article.dataset.revision,
       caption: article.querySelector(":scope > h1").textContent,
       controls,
+      ...(article.dataset.agiruProfile === "3" ? { interaction: { state: article.dataset.state,
+        call: article.dataset.call, originCommand: article.dataset.originCommand,
+        ...(article.dataset.dialog ? { dialog: article.dataset.dialog, defaultChoice: article.dataset.default,
+          prompt: article.querySelector('[data-prompt]').textContent } : {}) } } : {}),
+      ...([...article.querySelectorAll('[data-message]')].length ? { messages:
+        [...article.querySelectorAll('[data-message]')].map(node => ({ handle: node.dataset.message, text: node.textContent })) } : {}),
       ...(article.dataset.agiruProfile === "2" ? { rows, window: { limit: article.dataset.limit,
         more: article.dataset.more === "true", direction: article.dataset.direction } } : {}),
       unsupported: article.querySelector(":scope > output[data-unsupported-count]").dataset.unsupportedCount,
@@ -77,17 +83,24 @@ export async function assertBrowserPage(page, model) {
       command: row.select.command, enabled: row.select.enabled } }));
   assert.deepEqual(rendered, { profile: model.profile, view: model.view, page: model.page, handle: model.handle,
     revision: model.revision, caption: model.caption, controls, unsupported: String(model.unsupported),
+    ...(model.interaction ? { interaction: model.interaction } : {}),
+    ...(model.messages?.length ? { messages: model.messages } : {}),
     ...(rows ? { rows, window: model.window } : {}) });
 }
 
 export async function browserAction(page, origin, model, identity) {
   const escaped = await page.evaluate(value => CSS.escape(value), identity);
-  const received = page.waitForResponse(response => response.url() === `${origin}/commands` &&
+  const endpoint = model.interaction?.dialog ? "/answers" : "/commands";
+  const received = page.waitForResponse(response => response.url() === `${origin}${endpoint}` &&
     response.request().method() === "POST");
   await page.locator(`[data-control="${escaped}"] button`).click();
   const response = await finishedResponse(page, origin, await received);
   assert.equal(response.status(), 200, await response.text());
-  await page.waitForFunction(previous => document.querySelector("#workspace article")?.dataset.revision !== previous, model.revision);
+  await page.waitForFunction(previous => {
+    const article = document.querySelector("#workspace article");
+    return article?.dataset.revision !== previous.revision ||
+      (article?.dataset.agiruProfile === "3" && article.dataset.dialog !== previous.interaction?.dialog);
+  }, model);
   await settled(page);
   const result = { page: parsePage(await response.text()), status: response.status() };
   await assertBrowserPage(page, result.page);
@@ -111,10 +124,10 @@ export async function browserSet(page, origin, model, identity, text) {
   return result;
 }
 
-async function finishedResponse(page, origin, response) {
+export async function finishedResponse(page, origin, response) {
   if (response.status() !== 200) return response;
   const interaction = parsePage(await response.text()).interaction;
-  if (!interaction) return response;
+  if (!interaction || interaction.state !== "working") return response;
   return page.waitForResponse(async next => next.url() === `${origin}/calls/${interaction.call}` &&
-    (next.status() !== 200 || !parsePage(await next.text()).interaction));
+    (next.status() !== 200 || parsePage(await next.text()).interaction?.state !== "working"));
 }

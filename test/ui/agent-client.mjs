@@ -6,6 +6,7 @@ import { execFile, spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { questionHtml } from "./dialog-fixture.mjs";
 const modules = process.env.AGIRU_CLIENT_MODULES ? pathToFileURL(process.env.AGIRU_CLIENT_MODULES + "/") : new URL("../../build/client/", import.meta.url);
 const { parsePage, parseFailure, commandEnvelope, limits } = await import(new URL("profile.mjs", modules));
 const { renderAscii, quote } = await import(new URL("ascii.mjs", modules));
@@ -23,6 +24,7 @@ const failureHtml = (command = "cmd_1_7", outcome = "failed") =>
   `<article data-agiru-error="1" data-code="UiWriteTransaction" data-command="${command}" data-outcome="${outcome}"><h1>Request failed</h1><p>Grüezi &lt;script&gt; 東京 &amp; blocked.</p></article>`;
 let failureMode = "";
 let workingCommand = "", workingPolls = 0;
+let questionMode = false;
 const workingHtml = command => `<article data-agiru-profile="3" data-view="interaction" data-page="50400" data-handle="page_1" data-revision="9007199254740993" data-state="working" data-call="call_1" data-origin-command="${command}"><h1>Working</h1><output data-unsupported-count="0"></output></article>`;
 const server = createServer(async (request, response) => {
   received.push({ method: request.method, path: request.url, headers: request.headers });
@@ -40,11 +42,20 @@ const server = createServer(async (request, response) => {
     }
     response.end(failureMode === "working-forever" || workingPolls < 2 ? workingHtml(workingCommand) : html); return;
   }
+  if (questionMode && request.method === "GET") {
+    response.setHeader("Content-Type", "text/html; charset=utf-8"); response.end(questionHtml()); return;
+  }
   if (request.method === "POST") {
     posts++;
     let body = "";
     for await (const chunk of request) body += chunk;
     received.at(-1).body = Object.fromEntries(new URLSearchParams(body));
+    if (questionMode && request.url === "/answers") {
+      response.setHeader("Content-Type", "text/html; charset=utf-8");
+      if (failureMode === "question-failure") { response.statusCode = 500; response.end(failureHtml()); }
+      else response.end(html);
+      return;
+    }
     if (request.url === "/disconnect") { request.socket.destroy(); return; }
     if (failureMode.startsWith("working")) {
       workingCommand = received.at(-1).body.command; workingPolls = 0;
@@ -104,6 +115,46 @@ test("working profile is bounded, non-executable and carries the original operat
     workingHtml("").replace("<h1>Working</h1>", "<h1>Working</h1><p>hidden business data</p>"),
     workingHtml("").replace('data-call="call_1"', 'data-call="//foreign"')]) refuses(invalid);
   refuses(html.replace('data-agiru-profile="1"', 'data-agiru-profile="1" data-call="call_1"'));
+});
+
+test("question profile preserves explicit choices, presentation defaults and deferred Unicode messages", () => {
+  const question = parsePage(questionHtml());
+  assert.equal(question.interaction.state, "confirm");
+  assert.equal(question.interaction.defaultChoice, "1");
+  assert.equal(question.interaction.prompt, "Choose explicitly <script>?");
+  assert.deepEqual(question.messages, [{ handle: "message_1", text: "Before <script> 東京." }]);
+  assert.deepEqual(question.controls.map(item => item.caption), ["No", "Yes"]);
+  assert.equal(commandEnvelope(question, question.controls[0].operation).path, "/answers");
+  assert.match(renderAscii(question), /default=1 prompt="Choose explicitly <script>\?"/);
+  assert.match(renderAscii(question), /message message_1 "Before <script> 東京\."/);
+  const menu = parsePage(questionHtml({ kind: "menu", choices: ["Cancel", "First", "東京"], defaultChoice: "2" }));
+  assert.deepEqual(menu.controls.map(item => item.operation.command), ["dialog_1_0", "dialog_1_1", "dialog_1_2"]);
+  for (const [from, to] of [
+    ['data-default="1"', 'data-default="2"'], ['data-dialog="dialog_1"', 'data-dialog="foreign"'],
+    ['action="/answers"', 'action="/commands"'], ['>No<', '>Cancel<'],
+    ['data-message="message_1"', 'data-message=""'], ['data-prompt="true"', 'data-prompt="false"'],
+    ['data-kind="action"', 'data-kind="group"'], ['command" value="dialog_1_0"', 'command" value="dialog_1_00"'],
+  ]) refuses(questionHtml().replace(from, to));
+});
+
+test("agents return questions without answering defaults or polling and continue the original command explicitly", async () => {
+  questionMode = true;
+  const before = received.length, previousPosts = posts;
+  try {
+    const result = await client.read("/?handle=page_1");
+    assert.equal(result.page.interaction.state, "confirm");
+    assert.equal(received.length, before + 1);
+    assert.equal(posts, previousPosts);
+    const selected = { page: result.page.handle, revision: result.page.revision, ...result.page.controls[0].operation };
+    const answered = await client.execute("/?handle=page_1", selected);
+    assert.deepEqual(answered, { page, status: 200 });
+    assert.equal(posts, previousPosts + 1);
+    assert.equal(received.at(-1).path, "/answers");
+    assert.equal(received.at(-1).body.command, "dialog_1_0");
+    failureMode = "question-failure";
+    await assert.rejects(client.execute("/?handle=page_1", selected), error =>
+      error.code === "UiWriteTransaction" && error.command === "cmd_1_7" && error.outcome === "failed");
+  } finally { questionMode = false; failureMode = ""; }
 });
 
 test("opening and writes poll the same call without repeating AL admission", async () => {

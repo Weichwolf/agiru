@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { AgentClient } from "../../build/client/http.mjs";
 import { parsePage, commandEnvelope } from "../../build/client/profile.mjs";
 import { assertBrowserPage } from "./browser-client.mjs";
+import { questionHtml } from "./dialog-fixture.mjs";
 
 const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
 const { chromium } = require("playwright-core");
@@ -93,6 +94,26 @@ test("htmx follows a working call with GET only and preserves the native page co
   assert.match(page.url(), /\?handle=page_1$/);
 });
 
+test("htmx renders explicit questions and messages without automatic defaults or polling", async () => {
+  responseHtml = questionHtml();
+  const model = parsePage(responseHtml);
+  const page = await open("/?handle=page_1");
+  await ready(page);
+  await page.waitForFunction(() => document.querySelector("#status").textContent === "Explicit answer required.");
+  await assertBrowserPage(page, model);
+  const before = requests.length;
+  await page.waitForTimeout(200);
+  assert.equal(requests.length, before, "an unanswered question must not generate a request");
+  assert.equal(await page.locator("#workspace script").count(), 0);
+  responseHtml = original;
+  const answer = model.controls[0];
+  await control(page, answer.identity).locator("button").click();
+  await page.waitForFunction(() => document.querySelector("#status").textContent.startsWith("2 unsupported"));
+  assert.equal(requests.length, before + 1);
+  assert.equal(requests.at(-1).path, "/answers");
+  assert.deepEqual(requests.at(-1).fields, { ...commandEnvelope(model, answer.operation).fields });
+});
+
 test("htmx retains the original command when an asynchronous native action fails", async () => {
   const page = await open();
   await ready(page);
@@ -103,6 +124,7 @@ test("htmx retains the original command when an asynchronous native action fails
   assert.equal(await page.locator("#status").textContent(),
     `Server error AlError: Delayed failure outcome=failed command=${workingCommand}; prior explicit commits may persist.`);
   assert.deepEqual(requests.slice(before).map(item => item.method), ["POST", "GET"]);
+  await assertBrowserPage(page, parsePage(original));
 });
 
 test("actual browser renders original native HTML with exact values, counted gaps and no persisted token", async () => {

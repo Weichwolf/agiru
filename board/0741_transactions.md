@@ -2,10 +2,10 @@
 
 Status: in progress | Priority: P0
 Depends on: existing PostgreSQL/session/HTTP runtime, not full UT acceptance.
-Next: bind the bounded asynchronous HTTP calls to a real session-owned UI host,
-including explicit Confirm/StrMenu answers and deferred messages. Provide actual
-capability/suspension under 0720; the rebuilt native Customer regression now opens/edits
-but retains its interactive Card lifecycle failure.
+Next: rerun original Customer with the real question/message endpoint under 0720;
+qualify disabled native callbacks, shutdown rollback, progress/modal execution and
+the remaining optimistic-write/isolation contracts. The latest Customer measurement
+precedes this endpoint and retains its interactive Card lifecycle failure.
 Repeat counted AL execution after the verified SelectLatestVersion increment below;
 retain every startup refusal and test identity. Atomic
 optimistic Modify/Delete/Rename, BC locks and transaction-type transitions remain due;
@@ -70,7 +70,8 @@ Reference: developer `administration/server-instance-settings.md` and
 BCApps `Finance/GeneralLedger/Posting/GenJnlPost.Codeunit.al` calls Confirm Management
 before posting. Predecessor `openerp/runtime/ui_host.py` has no corresponding policy;
 its implicit headless answers and session-per-thread transport are not adopted.
-Actual HTTP suspension and modal/report/request-page callbacks remain unimplemented.
+HTTP Confirm/StrMenu suspension and deferred messages now use a real session-owned
+endpoint; modal/report/request-page callbacks and live progress remain gaps.
 Production generated consumers have been rebuilt after the expanded SessionOptions
 value ABI: `make slice-check all B=/workspace/build/podman JOBS=6` exits zero,
 14,225 slice sources, 2,901 seconds. The 1,902 unlinked AL procedures remain gaps;
@@ -108,9 +109,17 @@ worker; delayed field writes retain ownership, one SQL effect, rollback and dura
 Commit across external CMD/MCP/htmx. Trusted execution/queue/response-wait defaults
 are explicit in the server JSON; configuration retains 232 checks, zero red.
 Four affected C++ units pass clang-tidy; slice-check/all pass without removing the
-1,902 unlinked diagnostic-slice gaps. No UiHost is installed by this executor alone;
-GuiAllowed and real-dialog acceptance remain unchanged. Full ErrorInfo,
-live question suspension, financial posting and complete AL acceptance remain open.
+1,902 unlinked diagnostic-slice gaps. The real endpoint in `src/rt/PageInteraction.cpp`
+now enables native GuiAllowed without a capability flag or forced control visibility.
+The shared profile and SQL-fenced `/answers` channel preserve one executing AL stack,
+independent pending-write visibility, explicit Commit and rollback on decline/timeout.
+HTML refusal precedes question publication. `test/ui/page-host.mjs` has 114 positive
+HTTP cases across limits/policies and external CMD/MCP/Chromium, with eleven compiled
+defects rejected; native configuration
+242, agent 43 and browser fourteen plus Caddy cases pass. Five affected C++ units have
+zero clang-tidy findings. Live progress explicitly refuses `UiProgressUnsupported`;
+disabled native callback policy, shutdown rollback, modal/ErrorInfo, financial posting
+and complete AL acceptance remain open. Client contract/evidence owner: 0720.
 
 `make refresh-records JOBS=2`: 149 C++ checks, 80 generator checks and six compiled
 defects rejected. `runtime/RecordRefresh.h` owns both official overloads;

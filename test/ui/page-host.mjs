@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
 import { commandEnvelope, parseFailure, parsePage } from "../../build/client/profile.mjs";
 import { ServerConfigs } from "./server-config.mjs";
-import { launchBrowser, openBrowserPage, assertBrowserPage, browserAction, browserSet } from "./browser-client.mjs";
+import { launchBrowser, openBrowserPage, assertBrowserPage, browserAction, browserSet, finishedResponse } from "./browser-client.mjs";
 import { renderAscii } from "../../build/client/ascii.mjs";
 
 const execute = promisify(execFile);
@@ -51,7 +51,7 @@ const dsn = `postgresql://agiru:agiru@127.0.0.1:5432/${database}`;
 if (nativeApplication) {
   serverConfig = await configurations.write({ database: dsn, company: "Fixture + Company", origin,
     http: { workers: 1 },
-    pages: { list_rows: rowLimit },
+    pages: { list_rows: rowLimit, dialog_timeout_seconds: 5 },
     transactions: { disable_write_inside_try_functions: disableTryWrites } });
   application = spawn("podman", ["exec", "--user", "1000:1001", container,
     "env", ...(process.env.AGIRU_PAGE_HOST_PRELOAD ? [`LD_PRELOAD=${process.env.AGIRU_PAGE_HOST_PRELOAD}`] : []),
@@ -92,13 +92,23 @@ const operation = (result, name) => {
   return { page: result.page.handle, revision: result.page.revision, ...command };
 };
 const path = result => `/?handle=${result.page.handle}`;
-async function post(result, name, text, headers = first) {
+async function post(result, name, text, headers = first, complete = true) {
   const selected = operation(result, name);
   const envelope = commandEnvelope(result.page, selected, text);
   const body = new URLSearchParams(envelope.fields).toString();
-  const response = await fetch(origin + envelope.path, { method: "POST",
+  let response = await fetch(origin + envelope.path, { method: "POST",
     headers: { ...headers, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body });
-  return { response, body, html: await response.text() };
+  let html = await response.text();
+  const deadline = Date.now() + 15000;
+  while (complete && response.status === 200) {
+    const interaction = parsePage(html).interaction;
+    if (interaction?.state !== "working") break;
+    assert.ok(Date.now() < deadline, "native call must finish without repeating the POST");
+    await new Promise(resolve => setTimeout(resolve, 50));
+    response = await fetch(origin + `/calls/${interaction.call}`, { headers, signal: AbortSignal.timeout(15000) });
+    html = await response.text();
+  }
+  return { response, body, html };
 }
 const opened = await client.read("/?page=50341&company=Fixture%20%2B%20Company");
 
@@ -329,7 +339,7 @@ test("CMD/MCP/htmx preserve native AL diagnostics and failed receipts without im
         await assertBrowserPage(page, fresh.page);
         const received = page.waitForResponse(response => response.url() === `${origin}/commands` && response.request().method() === "POST");
         await page.locator('[data-control="CommitAndFail"] button').click();
-        const response = await received;
+        const response = await finishedResponse(page, origin, await received);
         assert.equal(response.status(), 500);
         const failure = parseFailure(await response.text());
         error = { error: failure.code, message: failure.message, command: failure.command, outcome: failure.outcome };
@@ -505,7 +515,7 @@ test("a pending native write keeps one HTTP worker available, retains ownership 
     BEGIN PERFORM pg_sleep(0.6); RETURN NEW; END $body$;
     CREATE TRIGGER ui_wait BEFORE UPDATE ON "Navigation Row" FOR EACH ROW EXECUTE FUNCTION ui_wait()`);
   try {
-    const sent = await post(fresh, "Value", "9100");
+    const sent = await post(fresh, "Value", "9100", first, false);
     assert.equal(sent.response.status, 200);
     const pending = parsePage(sent.html);
     assert.equal(pending.interaction.state, "working");
@@ -532,7 +542,7 @@ test("failed native call polling preserves rollback, durable Commit and the orig
     for (const action of ["WriteAndFail", "CommitAndFail"]) {
       const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
       const fresh = await client.read("/?page=50347&mode=Edit");
-      const sent = await post(fresh, action);
+      const sent = await post(fresh, action, undefined, first, false);
       assert.equal(sent.response.status, 200);
       const pending = parsePage(sent.html);
       assert.equal(pending.interaction.originCommand, operation(fresh, action).command);
@@ -588,4 +598,158 @@ test("external CMD MCP and htmx complete delayed native saves with identical typ
       } finally { await mcp?.close(); await browser?.close(); }
     }
   } finally { await sql('DROP TRIGGER ui_wait ON "Navigation Row"; DROP FUNCTION ui_wait()'); }
+});
+
+test("native questions preserve the AL transaction, require explicit answers and roll back declines", async () => {
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
+  const writes = await sql('SELECT count(*) FROM ui_writes');
+  const question = await client.execute(path(fresh), operation(fresh, "ConfirmWrite"));
+  assert.equal(question.page.interaction.state, "confirm");
+  assert.equal(question.page.interaction.defaultChoice, "1");
+  assert.equal(question.page.interaction.originCommand, operation(fresh, "ConfirmWrite").command);
+  assert.equal(question.page.interaction.prompt, `Save value ${BigInt(before) + 10n}?`);
+  assert.deepEqual(question.page.messages.map(item => item.text), ["Before question <script> 東京."]);
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
+  assert.equal(await sql('SELECT count(*) FROM ui_writes'), writes);
+  const dialog = question.page.interaction.dialog;
+  assert.equal(await sql(`SELECT answer IS NULL AND NOT closed FROM agiru_client.page_dialogs WHERE handle='${dialog}'`), "t");
+  const original = operation(fresh, "ConfirmWrite").command;
+  const selected = question.page.controls[0].identity;
+  const envelope = commandEnvelope(question.page, operation(question, selected));
+  const send = async (changes = {}, headers = first) => fetch(origin + "/answers", { method: "POST",
+    headers: { ...headers, Origin: origin, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...envelope.fields, ...changes }).toString() });
+  assert.equal((await send({}, second)).status, 410);
+  assert.equal((await send({ revision: "999" })).status, 409);
+  assert.equal((await send({ csrf: "foreign" })).status, 403);
+  assert.equal((await send({ control: "foreign" })).status, 400);
+  assert.equal((await send({ command: `${dialog}_00`, control: `$agiru.answer_${dialog}_00` })).status, 400);
+  assert.equal((await send({ command: `${dialog}_9`, control: `$agiru.answer_${dialog}_9` })).status, 400);
+  assert.equal((await send({ command: "foreign_0", control: "$agiru.answer_foreign_0" })).status, 409);
+  if (nativeApplication) {
+    await sql(`UPDATE "Tenant Permission" SET "Execute Permission"=0 WHERE "Role ID"='EDITOR' AND "Object Type"=8 AND "Object ID"=50347`);
+  } else {
+    await sql("UPDATE ui_grants SET writable=false WHERE user_security_id='00000000-0000-0000-0000-000000000001'");
+  }
+  try { assert.equal((await send()).status, 403, "answering must reauthorize the original action"); }
+  finally {
+    if (nativeApplication) await sql(`UPDATE "Tenant Permission" SET "Execute Permission"=1 WHERE "Role ID"='EDITOR' AND "Object Type"=8 AND "Object ID"=50347`);
+    else await sql("UPDATE ui_grants SET writable=true WHERE user_security_id='00000000-0000-0000-0000-000000000001'");
+  }
+  assert.deepEqual(await client.read(path(fresh)), question, "polls must not answer a presentation default");
+  await assert.rejects(client.execute(path(question), operation(question, selected)), error =>
+    error.message === "explicit decline" && error.command === original && error.outcome === "failed");
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
+  assert.equal(await sql('SELECT count(*) FROM ui_writes'), writes);
+  assert.equal(await sql(`SELECT answer::text || ':' || closed::text FROM agiru_client.page_dialogs WHERE handle='${dialog}'`), "0:true");
+});
+
+test("nested native questions reject replaced answers and preserve explicit Commit on later error", async () => {
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const before = BigInt(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'));
+  const firstQuestion = await client.execute(path(fresh), operation(fresh, "TwoQuestions"));
+  const yes = firstQuestion.page.controls[1].identity;
+  const sent = await post(firstQuestion, yes);
+  assert.equal(sent.response.status, 200);
+  const secondQuestion = { page: parsePage(sent.html), status: 200 };
+  assert.equal(secondQuestion.page.interaction.prompt, "Second?");
+  assert.notEqual(secondQuestion.page.interaction.dialog, firstQuestion.page.interaction.dialog);
+  const replay = await post(firstQuestion, yes);
+  assert.deepEqual(parsePage(replay.html), secondQuestion.page);
+  const changed = await post(firstQuestion, firstQuestion.page.controls[0].identity);
+  assert.equal(changed.response.status, 409);
+  const completed = await client.execute(path(secondQuestion), operation(secondQuestion, secondQuestion.page.controls[1].identity));
+  assert.equal(field(completed, "Value"), String(before + 1n));
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), String(before + 1n));
+  const committed = await client.read("/?page=50347&mode=Edit");
+  const question = await client.execute(path(committed), operation(committed, "CommittedConfirm"));
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), String(before + 11n));
+  await assert.rejects(client.execute(path(question), operation(question, question.page.controls[0].identity)), error =>
+    error.message === "declined after commit" && error.command === operation(committed, "CommittedConfirm").command);
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), String(before + 11n));
+});
+
+test("external CMD MCP and htmx explicitly answer native menus with matching messages and SQL effects", async () => {
+  for (const [index, adapter] of ["CMD", "MCP", "web"].entries()) {
+    const browser = adapter === "web" ? await launchBrowser() : undefined;
+    let mcp;
+    try {
+      const fresh = await client.read("/?page=50347&mode=Edit");
+      const input = selected => {
+        const { enabled: _enabled, ...command } = selected;
+        return { path: path({ page: { handle: command.page } }), ...command };
+      };
+      const agent = async selected => {
+        if (adapter === "CMD") {
+          const reply = await execute(process.execPath, ["build/client/cmd.mjs", "--json", "execute", JSON.stringify(input(selected))],
+            { env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } });
+          return JSON.parse(reply.stdout);
+        }
+        const reply = await mcp.callTool({ name: "agiru_execute", arguments: input(selected) });
+        assert.notEqual(reply.isError, true);
+        assert.ok(reply.content.some(item => item.type === "text" &&
+          item.text.includes(reply.structuredContent.page.interaction ? "Choose explicitly" : "Selected")));
+        return reply.structuredContent;
+      };
+      if (adapter === "MCP") {
+        const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
+        const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"));
+        const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"));
+        mcp = new Client({ name: "agiru-explicit-dialog", version: "1" });
+        await mcp.connect(new StdioClientTransport({ command: process.execPath, args: ["build/client/mcp.mjs"],
+          env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } }));
+      }
+      const opened = browser ? await openBrowserPage(browser, origin, path(fresh), first.authorization) : undefined;
+      const question = opened ? await browserAction(opened.page, origin, fresh.page, "MenuWrite") : await agent(operation(fresh, "MenuWrite"));
+      assert.equal(question.page.interaction.state, "menu");
+      assert.equal(question.page.interaction.defaultChoice, "2");
+      assert.deepEqual(question.page.controls.map(item => item.caption), ["Cancel", "First", "Second", "東京"]);
+      const replayQuestion = await client.read(path(fresh));
+      assert.deepEqual(replayQuestion, question);
+      if (adapter === "CMD") {
+        const compact = await execute(process.execPath, ["build/client/cmd.mjs", "read", path(fresh)],
+          { env: { ...process.env, AGIRU_ORIGIN: origin, AGIRU_AUTH_FILE: `${proof}/auth.json` } });
+        assert.match(compact.stdout, /default=2 prompt="Choose explicitly <script>\."/);
+        assert.ok(compact.stdout.includes('"東京"'));
+      }
+      if (opened) await opened.page.screenshot({ path: `${proof}/native-menu-question.png`, fullPage: true });
+      const choice = index === 0 ? 0 : index === 1 ? 3 : 1;
+      const answer = question.page.controls[choice].identity;
+      const audit = BigInt(await sql('SELECT count(*) FROM ui_writes'));
+      const result = opened ? await browserAction(opened.page, origin, question.page, answer) : await agent(operation(question, answer));
+      assert.equal(field(result, "Value"), String(choice));
+      assert.deepEqual(result.page.messages.map(item => item.text), [`Selected ${choice}.`]);
+      assert.deepEqual(await client.read(path(fresh)), result);
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), String(choice));
+      assert.equal(BigInt(await sql('SELECT count(*) FROM ui_writes')), audit + 1n);
+      const replay = await post(replayQuestion, answer);
+      assert.deepEqual(parsePage(replay.html), result.page);
+      assert.equal(BigInt(await sql('SELECT count(*) FROM ui_writes')), audit + 1n);
+      if (opened) await opened.page.screenshot({ path: `${proof}/native-menu-result.png`, fullPage: true });
+    } finally { await mcp?.close(); await browser?.close(); }
+  }
+});
+
+test("an unanswered native question times out without consent or implicit commit", async () => {
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
+  const question = await client.execute(path(fresh), operation(fresh, "ConfirmWrite"));
+  assert.equal(question.page.interaction.state, "confirm");
+  await new Promise(resolve => setTimeout(resolve, 5100));
+  await assert.rejects(client.read(`/calls/${question.page.interaction.call}`), error =>
+    error.code === "UiDialogCancelled" && error.outcome === "failed" &&
+    error.command === operation(fresh, "ConfirmWrite").command);
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
+  assert.equal(await sql(`SELECT answer IS NULL AND closed FROM agiru_client.page_dialogs WHERE handle='${question.page.interaction.dialog}'`), "t");
+});
+
+test("native question HTML byte refusal rolls back before publishing an unreachable dialog", async () => {
+  const fresh = await client.read("/?page=50347&mode=Edit");
+  const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
+  const selected = operation(fresh, "OversizedQuestion");
+  await assert.rejects(client.execute(path(fresh), selected), error =>
+    error.code === "PageHtmlLimit" && error.outcome === "failed" && error.command === selected.command);
+  assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
+  assert.equal(await sql(`SELECT count(*) FROM agiru_client.page_dialogs WHERE command_id='${selected.command}'`), "0");
 });

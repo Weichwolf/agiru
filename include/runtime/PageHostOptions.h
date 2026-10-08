@@ -22,6 +22,8 @@ struct PageHostOptions {
       16; ///< Initial AL worker bound, not per session.
   static constexpr std::size_t kDefaultExecutionQueue = 32; ///< Initial queued AL command bound.
   static constexpr unsigned kDefaultResponseWaitMs = 50;    ///< Initial synchronous response probe.
+  static constexpr unsigned kDefaultDialogTimeoutSeconds =
+      300;              ///< Five-minute explicit-answer bound.
   std::string database; ///< One verified company's SQL connection string; never from a URL.
   std::string company;  ///< Exact configured company; other names refuse, never relabel SQL.
   std::string origin;   ///< Trusted externally visible origin for browser command CSRF checks.
@@ -36,6 +38,8 @@ struct PageHostOptions {
   std::chrono::milliseconds responseWait{
       kDefaultResponseWaitMs};                           ///< Bounded initial response wait.
   std::chrono::seconds lifetime = std::chrono::hours(1); ///< Fixed bounded context lifetime.
+  std::chrono::seconds dialogTimeout{
+      kDefaultDialogTimeoutSeconds}; ///< Bounded explicit-answer wait.
   SessionOptions session{}; ///< Trusted immutable runtime policy for every retained context.
 };
 

@@ -42,6 +42,7 @@ constexpr int kInitialValueStep = 11;
 constexpr int kRestrictedValue = 999;
 constexpr std::string_view kExactAmount = "0.12345678901234567890";
 constexpr std::int64_t kExactInteger = 9223372036854775807LL;
+constexpr auto kFixtureDialogTimeout = std::chrono::seconds(5);
 
 void NativeGrants(const agiru::Connection &connection) {
   agiru::CreateTable(connection, agiru::platform::kCompanyTable);
@@ -173,10 +174,12 @@ void Serve(const std::string &authPath, const std::string &origin, bool seedOnly
       if (command == 'Q' || command == EOF) { return; }
     }
   }
-  agiru::PageCommandHost host(
-      {.database = database.Dsn(), .company = std::string(kCompany), .origin = origin},
-      Authorize,
-      std::make_shared<TableAuthority>());
+  agiru::PageCommandHost host({.database = database.Dsn(),
+                               .company = std::string(kCompany),
+                               .origin = origin,
+                               .dialogTimeout = kFixtureDialogTimeout},
+                              Authorize,
+                              std::make_shared<TableAuthority>());
   const agiru::HttpServer server([&](const auto &request) { return host.Handle(request); },
                                  {.workers = 1});
   std::fputs("READY\n", stdout);

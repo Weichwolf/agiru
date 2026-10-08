@@ -16,7 +16,9 @@ export type Page = Readonly<{
   profile: "1" | "2" | "3"; view: "current-row" | "list" | "interaction"; page: string; handle: string; revision: string;
   caption: string; controls: readonly Control[]; unsupported: number;
   rows?: readonly Row[]; window?: Readonly<{ limit: string; more: boolean; direction: "forward" | "backward" }>;
-  interaction?: Readonly<{ state: "working"; call: string; originCommand: string }>;
+  messages?: readonly Readonly<{ handle: string; text: string }>[];
+  interaction?: Readonly<{ state: "working" | "confirm" | "menu"; call: string; originCommand: string;
+    dialog?: string; defaultChoice?: string; prompt?: string }>;
 }>;
 export type Row = Readonly<{ handle: string; selected: boolean; caption: string;
   controls: readonly Control[]; select: Operation }>;
@@ -68,12 +70,12 @@ const tags = new Set(["article", "h1", "h2", "h3", "section", "form", "input", "
 const scalarAttributes = ["data-type", "data-value", "data-domain", "data-member", "data-undefined", "data-closing"];
 const attributes: Readonly<Record<string, readonly string[]>> = {
   article: ["data-agiru-profile", "data-view", "data-page", "data-handle", "data-revision", "data-limit", "data-more", "data-direction",
-    "data-state", "data-call", "data-origin-command"],
+    "data-state", "data-call", "data-origin-command", "data-dialog", "data-default"],
   h1: [], h2: [], h3: [], section: ["data-control", "data-kind", "data-row", "data-selected"],
   form: ["method", "action", "hx-post", "hx-target", "hx-swap"],
   input: ["type", "name", "value", "aria-label", ...scalarAttributes],
   button: ["type", "disabled"], output: ["data-unsupported-count", ...scalarAttributes],
-  aside: ["role", "data-control", "data-unsupported"], p: ["data-control"],
+  aside: ["role", "data-control", "data-unsupported"], p: ["data-control", "data-message", "data-prompt"],
 };
 
 function element(node: Tree.ChildNode): Tree.Element {
@@ -253,6 +255,55 @@ function listRows(node: Tree.Element, page: Pick<Page, "handle" | "revision">,
   return result;
 }
 
+function messages(nodes: readonly Tree.Element[]): NonNullable<Page["messages"]> {
+  const seen = new Set<string>();
+  const entries = nodes.filter(node => has(node, "data-message")).map(node => {
+    const handle = attr(node, "data-message");
+    check(node.tagName === "p" && node.attrs.length === 1 && token.test(handle) && !seen.has(handle), "Invalid message");
+    seen.add(handle);
+    return Object.freeze({ handle, text: text(node) });
+  });
+  check(entries.length <= limits.controls, "Message budget exceeded");
+  return Object.freeze(entries);
+}
+
+function interaction(root: Tree.Element, header: Pick<Page, "handle" | "revision">, pageId: string,
+                     items: readonly Tree.Element[], census: string): Page {
+  const call = attr(root, "data-call"), originCommand = attr(root, "data-origin-command");
+  const state = attr(root, "data-state");
+  check(token.test(call) && (!originCommand || token.test(originCommand)) &&
+    items[0]!.attrs.length === 0 && items.at(-1)!.attrs.length === 1 && census === "0", "Invalid interaction identity");
+  if (state === "working") {
+    check(root.attrs.length === 8 && items.length === 2 && text(items[0]!) === "Working", "Invalid working interaction");
+    return Object.freeze({ profile: "3", view: "interaction", page: pageId, ...header, caption: "Working",
+      controls: Object.freeze([]), unsupported: 0, interaction: Object.freeze({ state, call, originCommand }) });
+  }
+  check((state === "confirm" || state === "menu") && root.attrs.length === 10 &&
+    text(items[0]!) === "Question", "Invalid question interaction");
+  const dialog = attr(root, "data-dialog"), defaultChoice = attr(root, "data-default");
+  check(token.test(dialog) && /^(?:0|[1-9][0-9]{0,2})$/.test(defaultChoice), "Invalid question identity or default");
+  const body = items.slice(1, -1);
+  const prompts = body.filter(node => has(node, "data-prompt"));
+  check(prompts.length === 1 && prompts[0]!.tagName === "p" && prompts[0]!.attrs.length === 1 &&
+    attr(prompts[0]!, "data-prompt") === "true", "Invalid question prompt");
+  const commands = new Map<string, Envelope>();
+  const entries = controls(body.filter(node => !has(node, "data-message") && !prompts.includes(node)), header, commands);
+  check(entries.length > 0 && entries.length <= 128 && BigInt(defaultChoice) < BigInt(entries.length), "Invalid question choices");
+  for (const [index, entry] of entries.entries()) {
+    const command = `${dialog}_${index}`;
+    check(entry.kind === "action" && entry.identity === `$agiru.answer_${command}` &&
+      entry.operation?.command === command && entry.operation.enabled && commands.get(command)?.path === "/answers",
+      "Question answer contract mismatch");
+  }
+  if (state === "confirm") check(entries.length === 2 && entries[0]!.caption === "No" && entries[1]!.caption === "Yes", "Invalid confirm choices");
+  else check(entries.length >= 2 && entries[0]!.caption === "Cancel", "Invalid menu cancellation");
+  const result: Page = Object.freeze({ profile: "3", view: "interaction", page: pageId, ...header, caption: "Question",
+    controls: Object.freeze(entries), unsupported: 0, messages: messages(body),
+    interaction: Object.freeze({ state, call, originCommand, dialog, defaultChoice, prompt: text(prompts[0]!) }) });
+  envelopes.set(result, commands);
+  return result;
+}
+
 export function parsePage(html: string): Page {
   check(new TextEncoder().encode(html).byteLength <= limits.bytes, "HTML byte budget exceeded");
   check(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(html) && html.isWellFormed(), "Invalid HTML text");
@@ -278,21 +329,15 @@ export function parsePage(html: string): Page {
   const census = attr(items.at(-1)!, "data-unsupported-count");
   check(digits.test(census) && census.length <= 4 && text(items.at(-1)!) === "", "Invalid unsupported census");
   if (profile === "3") {
-    const call = attr(root, "data-call"), originCommand = attr(root, "data-origin-command");
-    check(root.attrs.length === 8 && items.length === 2 && text(items[0]!) === "Working" &&
-      items[0]!.attrs.length === 0 && items[1]!.attrs.length === 1 && census === "0" &&
-      attr(root, "data-state") === "working" && token.test(call) && (!originCommand || token.test(originCommand)),
-      "Invalid working interaction");
-    return Object.freeze({ profile, view: "interaction", page: pageId, ...header, caption: "Working",
-      controls: Object.freeze([]), unsupported: 0,
-      interaction: Object.freeze({ state: "working", call, originCommand }) });
+    return interaction(root, header, pageId, items, census);
   }
-  check(!["data-state", "data-call", "data-origin-command"].some(name => has(root, name)), "Misplaced interaction metadata");
+  check(!["data-state", "data-call", "data-origin-command", "data-dialog", "data-default"].some(name => has(root, name)), "Misplaced interaction metadata");
   const commands = new Map<string, Envelope>();
   const body = items.slice(1, -1);
   const lists = body.filter(node => node.tagName === "section" && attr(node, "data-kind") === "rows");
   check(lists.length === (profile === "2" ? 1 : 0), "List profile structure mismatch");
-  const entries = controls(body.filter(node => !lists.includes(node)), header, commands);
+  const queued = messages(body);
+  const entries = controls(body.filter(node => !lists.includes(node) && !has(node, "data-message")), header, commands);
   let rows: readonly Row[] | undefined;
   let window: Page["window"];
   if (profile === "2") {
@@ -311,7 +356,8 @@ export function parsePage(html: string): Page {
   const unsupported = cells.filter(control => control.kind === "unsupported").length;
   check(BigInt(census) === BigInt(unsupported), "Unsupported controls disappeared from the census");
   const result: Page = Object.freeze({ profile: profile as "1" | "2", view: view as "current-row" | "list", page: pageId, ...header,
-    caption: text(items[0]!), controls: Object.freeze(entries), unsupported, ...(rows && window ? { rows, window } : {}) });
+    caption: text(items[0]!), controls: Object.freeze(entries), unsupported, ...(queued.length ? { messages: queued } : {}),
+    ...(rows && window ? { rows, window } : {}) });
   envelopes.set(result, commands);
   return result;
 }

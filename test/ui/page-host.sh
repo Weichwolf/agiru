@@ -8,6 +8,7 @@ git rev-parse HEAD > "$proof/head.txt"
 sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSession,SessionCommand}.h \
   src/rt/{PageCommandHost,PageHtml,PageInstance,SessionCommand,HtmlText}.cpp src/rt/HtmlText.h \
   src/rt/PageListHtml.h include/runtime/{PageWindow,RecordWindow}.h src/rt/RecordWindow.cpp \
+  src/rt/PageInteraction.{h,cpp} include/runtime/UiHost.h src/rt/UiHost.cpp \
   include/runtime/TablePermissions.h src/rt/{TablePermissions,Session,Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/NativePermissions.h src/rt/{NativePermissions,NativePermissionSnapshot}.cpp \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
@@ -15,7 +16,7 @@ sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSe
   include/runtime/{HttpServerOptions,PageHostOptions,SessionOptions}.h \
   src/net/JsonEngine.{h,cpp} test/gate/NativeServiceConfigGate.cpp \
   src/cli/{Main,Services}.cpp src/cli/Services.h test/gate/NativePermissionFixture.h \
-  test/ui/page-host.{sh,mjs} test/ui/{server-config,browser-client}.mjs test/ui/page-host/Runner.cpp test/runtime/page-navigation.sh \
+  test/ui/page-host.{sh,mjs} test/ui/{server-config,browser-client,dialog-fixture}.mjs test/ui/page-host/Runner.cpp test/runtime/page-navigation.sh \
   test/runtime/page-navigation/*.al test/gate/PrivateAuthFile.h \
   src/client/*.{mts,json} > "$proof/inputs.sha256"
 make dev-exec COMMAND='findmnt -T /tmp'
@@ -31,6 +32,10 @@ cleanup() {
   for control in owner revision replay policy duplicates list-limit failure-receipt blocking-al; do
     if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
     make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
+  done
+  for control in dialog-default dialog-commit dialog-replay; do
+    make --no-print-directory dev-exec COMMAND="rm -f -- $native/$control.cpp $native/$control.so" || :
+    if [[ -f "$proof/$control.cpp" ]]; then unlink "$proof/$control.cpp"; fi
   done
 }
 trap cleanup EXIT
@@ -114,6 +119,35 @@ for control in owner revision replay policy list-limit failure-receipt blocking-
   make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
   unlink "$proof/$control.cpp"
 done
+for control in dialog-default dialog-commit dialog-replay; do
+  podman exec --user agiru "${AGIRU_DEV_CONTAINER:-agiru-dev}" awk -v control="$control" '
+    control == "dialog-default" && /call->question = held;/ {
+      $0 = $0 " held->answer = held->defaultChoice;"; changed++
+    }
+    control == "dialog-commit" && /PublishQuestion\(options_, \*call, \*held\);/ {
+      $0 = "    agiru::Commit(); " $0; changed++
+    }
+    control == "dialog-replay" && /replay.Value\(0, 0\) != std::to_string\(choice\)/ {
+      sub(/replay.Value\(0, 0\) != std::to_string\(choice\)/, "false"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' /workspace/src/rt/PageInteraction.cpp > "$proof/$control.cpp"
+  podman cp "$proof/$control.cpp" "${AGIRU_DEV_CONTAINER:-agiru-dev}:$native/$control.cpp"
+  make --no-print-directory dev-exec COMMAND="clang++-19 -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Isrc/rt -include runtime/Error.h -fPIC -shared $native/$control.cpp --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 -L/workspace/build/podman -Wl,-rpath,/workspace/build/podman -lagiru_rt -lagiru_net -lagiru_db -o $native/$control.so" \
+    > "$proof/$control.compile.log" 2>&1
+  status=0
+  AGIRU_PAGE_HOST_NATIVE="$native" AGIRU_PAGE_HOST_PROOF="$proof" AGIRU_PAGE_HOST_PRELOAD="$native/$control.so" \
+    node --test test/ui/page-host.mjs > "$proof/$control.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  case "$control" in
+    dialog-default|dialog-commit) rg -q '^not ok .*native questions preserve the AL transaction' "$proof/$control.log" ;;
+    dialog-replay) rg -q '^not ok .*nested native questions reject replaced answers' "$proof/$control.log" ;;
+  esac
+  for auth in "$proof/auth.json" "$proof/auth.json.second"; do unlink "$auth"; done
+  make --no-print-directory dev-exec COMMAND="rm -f -- $native/auth.json $native/auth.json.second $native/$control.cpp $native/$control.so"
+  unlink "$proof/$control.cpp"
+done
 podman exec --user agiru "${AGIRU_DEV_CONTAINER:-agiru-dev}" awk '
   /if \(rejectDuplicates && object.contains\(name\)\)/ {
     sub(/rejectDuplicates && object.contains\(name\)/, "false"); changed++
@@ -132,4 +166,4 @@ rg -q 'FAIL.*duplicate configuration keys refuse' "$proof/duplicates.log"
 make --no-print-directory dev-exec COMMAND="rm -f -- $native/duplicates.cpp $native/duplicates.so"
 unlink "$proof/duplicates.cpp"
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'page-host: generated-page SQL effects, asynchronous AL calls and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; eight compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt/blocking-AL defects rejected; not full ERP acceptance; %s\n' "$proof"
+printf 'page-host: generated-page SQL effects, asynchronous AL calls, explicit questions/messages and failed-command diagnostics over Caddy/C++, external CMD/MCP/htmx and config-only agiru serve; list limits 7/40/80 and both TryFunction write policies; eleven compiled ownership/revision/replay/policy/duplicate/list-bound/failed-receipt/blocking-AL/default-answer/implicit-commit/changed-answer defects rejected; not full ERP acceptance; %s\n' "$proof"

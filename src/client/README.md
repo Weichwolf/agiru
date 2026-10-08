@@ -3,8 +3,8 @@
 Node 20+, outside the agiru/PostgreSQL container. `make client` installs the locked
 dependencies and compiles into `build/client/`; `make client-test` qualifies a
 declared C++ HTML/HTTP fixture, not production ERP parity. Server HTTP wiring,
-native authentication and retained page sessions exist; dialogs, bounded lists and
-business workflows remain incomplete.
+native authentication, retained page sessions and bounded lists exist. Complete
+business workflows, progress windows, modal pages and actionable errors remain open.
 
 ```sh
 export AGIRU_ORIGIN=http://127.0.0.1:8080
@@ -34,9 +34,16 @@ node build/client/mcp.mjs
   HTML is bounded to 1 MiB, structured responses to 4 MiB and ASCII to 256 KiB.
   An oversized ASCII view reports its refusal explicitly; full values remain in
   JSON/MCP structured results, with `presentation.ascii=refused`.
+- Profile 2 carries bounded SQL windows; `pages.list_rows` defaults to 40 and is
+  configurable only on the server. No client-side sorting or limit override.
+- Profile 3 carries a running call or explicit Confirm/StrMenu question. CMD/MCP
+  return questions immediately; choose an advertised answer with `execute`.
+  Defaults are presentation, never consent. Cancel is menu choice zero. Copied
+  messages appear after execution or at a question; HTML and ASCII retain Unicode.
 - HTTP is same-origin, HTTPS except loopback development; redirects refuse.
-  No write retries. `WriteUncertain` includes the command ID: reconcile the
-  future server receipt endpoint before choosing another command.
+  No write retries. Running calls use authenticated `GET /calls/<advertised-call>`;
+  `WriteUncertain` retains the command ID. Reconcile before choosing another command;
+  durable call recovery across process replacement remains unqualified.
 - Optional `AGIRU_AUTH_FILE`: owned regular file, mode 0600, at most 8 KiB;
   symlinks/devices/FIFOs refuse without waiting. JSON keys only `authorization`
   and/or `cookie`. Keep outside Git. Credentials
@@ -60,7 +67,7 @@ No CDN, business rules, inline scripts, eval or automatic command retries. Unkno
 response effects and fragments refuse before htmx processes them. Browser and agent
 commands share the advertised exact envelope; server authorization stays authoritative.
 `make web-test` uses actual system Chromium with Playwright 1.63.0 (Apache-2.0,
-test-only); ten native-HTML fixture cases, one actual Caddy asset/routing case and
+test-only); fourteen native-HTML fixture cases, one actual Caddy asset/routing case and
 three defective compiled bundles,
 not production SQL/dialog/ERP acceptance. esbuild 0.28.2 (MIT) is build-only.
 The bundle ships dependency licenses; the native server does not use Node.js.
