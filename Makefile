@@ -25,6 +25,11 @@ export CCACHE_SLOPPINESS
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-storage native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-web dev-configure dev-exec dev-check
 .PHONY: page-profile client client-test web web-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions refresh-records record-windows
+.PHONY: browser-sessions
+
+browser-sessions: comments db ## qualify SQL browser-session expiry, rotation, source and admission fences
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_BrowserSessionGate
+	@B="$(B)" bash "$(SELF)/test/runtime/browser-sessions.sh"
 
 record-windows: comments db ## qualify bounded SQL windows and collation-consistent continuation
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_RecordWindowGate

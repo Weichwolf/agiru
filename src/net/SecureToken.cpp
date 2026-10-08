@@ -62,4 +62,25 @@ std::string SecureTokenDigest(std::string_view secret) {
   return Hex(digest);
 }
 
+std::string SecureTokenMac(std::string_view secret, std::string_view domain) {
+  std::array<unsigned char, kSecretBytes> digest{};
+  std::size_t length = 0;
+  const auto *const result = EVP_Q_mac(nullptr,
+                                       "HMAC",
+                                       nullptr,
+                                       "SHA256",
+                                       nullptr,
+                                       secret.data(),
+                                       secret.size(),
+                                       reinterpret_cast<const unsigned char *>(domain.data()),
+                                       domain.size(),
+                                       digest.data(),
+                                       digest.size(),
+                                       &length);
+  if (result == nullptr || length != digest.size()) {
+    throw Error("secure token MAC is unavailable", "SecureTokenProvider");
+  }
+  return Hex(digest);
+}
+
 }

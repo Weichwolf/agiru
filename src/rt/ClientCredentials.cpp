@@ -5,7 +5,8 @@
 #include "runtime/SecureToken.h"
 #include "type/Guid.h"
 
-#include <algorithm>
+#include "CredentialFormat.h"
+
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -19,13 +20,6 @@ namespace {
 
 constexpr auto kMaximumLifetime = std::chrono::hours(24);
 constexpr std::string_view kPrefix = "ag1_";
-constexpr std::size_t kDigestCharacters = 64;
-
-bool CanonicalDigest(std::string_view text) {
-  return text.size() == kDigestCharacters && std::ranges::all_of(text, [](char unit) {
-           return (unit >= '0' && unit <= '9') || (unit >= 'a' && unit <= 'f');
-         });
-}
 
 bool BearerScheme(std::string_view text) {
   constexpr std::string_view expected = "bearer";
@@ -79,7 +73,8 @@ LookupClientCredentialIdentity(const Connection &connection, std::string_view au
   secret.remove_prefix(secret.find_first_not_of(' ') == std::string_view::npos
                            ? secret.size()
                            : secret.find_first_not_of(' '));
-  if (!secret.starts_with(kPrefix) || !CanonicalDigest(secret.substr(kPrefix.size()))) {
+  if (!secret.starts_with(kPrefix) ||
+      !detail::CanonicalCredentialDigest(secret.substr(kPrefix.size()))) {
     return std::nullopt;
   }
   const auto verifier = SecureTokenDigest(secret);
@@ -108,7 +103,7 @@ std::optional<Guid> LookupClientCredential(const Connection &connection,
 }
 
 bool RevokeClientCredential(const Connection &connection, std::string_view digest) {
-  if (!CanonicalDigest(digest)) {
+  if (!detail::CanonicalCredentialDigest(digest)) {
     throw Error("invalid client credential verifier", "ClientCredentialInput");
   }
   const std::array<std::optional<std::string>, 1> binds{std::string(digest)};

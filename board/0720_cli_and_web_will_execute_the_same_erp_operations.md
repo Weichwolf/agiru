@@ -63,6 +63,21 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `administration/understanding-session-timeouts.md`. Predecessor 1730, comment 4,
   exposed idle-session connection leakage. Modal answer-idle renewal is separate from
   full BC session timeout/disconnect cancellation, which remains unqualified.
+- SQL browser-session authority: `make browser-sessions JOBS=2` has 61 checks,
+  zero red; nine compiled deadline/source/CSRF/admission/rotation defects reject.
+  HMAC follows [RFC 4231](https://www.rfc-editor.org/rfc/rfc4231.html) vectors;
+  provider failure refuses. Actual SQL statement/row tracing contains no cookie,
+  source bearer or CSRF secrets. PostgreSQL stores only SHA-256 verifiers, caps
+  idle/absolute expiry by source expiry, serializes per-user admission and atomically
+  rotates/revokes identities without extending their original deadline. Independent
+  connections prove commit/rollback and competing issuance. This is a storage gate,
+  not HTTPS cookie, browser adoption, active-stack cancellation or SaaS acceptance.
+  Five affected compiled C++ units pass targeted clang-tidy; existing identity,
+  command, credential, session-value and generator regressions remain green.
+  Sources: `include/runtime/BrowserSession.h`, `src/rt/BrowserSession.cpp`,
+  `src/net/SecureToken.cpp`, `test/gate/BrowserSessionGate.cpp` and
+  `test/runtime/browser-sessions{.sh,/MacProvider.cpp}`. Next remains actual HTTPS
+  transport with exact Origin/CSRF/Fetch Metadata checks before any AL entry point.
 - References: [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
   consulted 2026-10-08. Sources/tests: `src/rt/{ClientCredentials,PageCommandHost}.cpp`,

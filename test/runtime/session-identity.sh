@@ -31,6 +31,7 @@ sha256sum src/rt/Session.cpp include/runtime/Session.h include/platform/User.h \
   test/gate/SessionIdentityGate.cpp test/gate/OwnedDatabase.h test/gate/PrivateAuthFile.h test/runtime/session-identity.sh \
   test/gate/AccountFixturePermissions.h include/runtime/TablePermissions.h src/rt/TablePermissions.cpp \
   include/runtime/{SecureToken,ClientCredentials}.h src/net/SecureToken.cpp src/rt/ClientCredentials.cpp \
+  src/rt/CredentialFormat.h \
   test/gate/ClientCredentialsGate.cpp test/runtime/client-credentials/ProviderFailure.cpp \
   include/BuiltinsWritten.h src/rt/written/BuiltinsWritten.cpp src/rt/SessionRandom.{h,cpp} \
   src/rt/UiHost.cpp test/gate/{SessionValues,GenReceiver}Gate.cpp test/runtime/session-values/Clock.cpp \

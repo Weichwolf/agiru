@@ -19,13 +19,20 @@ integration slice, not the AL test denominator.
 
 `make session-identity JOBS=2` qualifies host-supplied user GUIDs against the system
 User table, committed audit ownership and persistent AL state across exclusive
-per-command SQL leases. Twelve compiled defects test identity, rollback, durable
+per-command SQL leases. Thirteen compiled defects test identity, rollback, durable
 completion, cursor ownership, credential expiry/revocation/ownership and crypto failure.
 Disposable databases also check idle contexts, worker reuse, revocation, deferred failures
 and broken-connection cleanup. Native agent bearer credentials store only verifiers;
 random/digest provider failures explicitly refuse. The provider fixture has a successful
 compile receipt before lint. This is not browser/password sign-in, a connection pool or page/table authorization;
 container qualifiers need `AGIRU_TEST_DSN` pointing at container-local PostgreSQL.
+
+`make browser-sessions JOBS=2` qualifies PostgreSQL browser identities separate from
+agent bearers: source-capped idle/absolute expiry, revocation, atomic rotation/rollback,
+CSRF verifiers and serialized per-user admission. Nine compiled defects must fail named
+checks; RFC 4231 MAC vectors, provider failure and secret-free SQL statement/row tracing
+are checked independently. Disposable databases and private secrets are removed.
+This is a storage gate, not live HTTPS cookies, browser login or SaaS acceptance (0720).
 
 The same target checks session-owned ApplicationArea and random sequences through
 nested, reused, migrated and concurrent workers. Six compiled ownership/seed/bound/clock

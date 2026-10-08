@@ -12,7 +12,7 @@ sha256sum Makefile include/runtime/{PageCommandHost,PageHtml,PageInstance,PageSe
   src/rt/PageListHtml.h include/runtime/{PageWindow,RecordWindow}.h src/rt/RecordWindow.cpp \
   src/rt/PageInteraction.{h,cpp} include/runtime/UiHost.h src/rt/UiHost.cpp \
   src/rt/PageModal.{h,cpp} \
-  include/runtime/ClientCredentials.h src/rt/ClientCredentials.cpp \
+  include/runtime/ClientCredentials.h src/rt/ClientCredentials.cpp src/rt/CredentialFormat.h \
   include/runtime/TablePermissions.h src/rt/{TablePermissions,Session,Table,Navigate,Query,RecordRef}.cpp \
   include/runtime/NativePermissions.h src/rt/{NativePermissions,NativePermissionSnapshot}.cpp \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \

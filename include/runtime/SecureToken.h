@@ -21,4 +21,11 @@ namespace agiru {
 /// \warning Not password hashing. Caller must supply independently generated secure secrets.
 [[nodiscard]] std::string SecureTokenDigest(std::string_view secret);
 
+/// \brief HMAC-SHA-256 of exact bytes with an exact secret key, using the private provider.
+/// \param secret Independent high-entropy key bytes; never a password or public identifier.
+/// \param domain Exact domain/message bytes, including NUL; no normalization.
+/// \return Sixty-four lowercase hexadecimal characters; no weak provider fallback.
+/// \throws Error if the MAC provider fails; native backend only, WASM remains unqualified.
+[[nodiscard]] std::string SecureTokenMac(std::string_view secret, std::string_view domain);
+
 }
