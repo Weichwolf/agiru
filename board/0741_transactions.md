@@ -70,8 +70,11 @@ BCApps `Finance/GeneralLedger/Posting/GenJnlPost.Codeunit.al` calls Confirm Mana
 before posting. Predecessor `openerp/runtime/ui_host.py` has no corresponding policy;
 its implicit headless answers and session-per-thread transport are not adopted.
 Actual HTTP suspension and modal/report/request-page callbacks remain unimplemented.
-Rebuild production generated consumers after the expanded SessionOptions value ABI;
-these focused gates do not qualify old factories, full AL execution or a client dialog.
+Production generated consumers have been rebuilt after the expanded SessionOptions
+value ABI: `make slice-check all B=/workspace/build/podman JOBS=6` exits zero,
+14,225 slice sources, 2,901 seconds. The 1,902 unlinked AL procedures remain gaps;
+this is not complete-app compilation, full AL execution or a working client dialog.
+The complete `make test JOBS=2` manifest rerun is in progress, not a pass.
 
 `make refresh-records JOBS=2`: 149 C++ checks, 80 generator checks and six compiled
 defects rejected. `runtime/RecordRefresh.h` owns both official overloads;

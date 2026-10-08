@@ -195,16 +195,17 @@ Implementation: `src/rt/{PageCommandHost,SessionCommand,written/BuiltinsWritten}
   opening admission, modal pages, bounded delivery and automatic progress teardown remain
   pending. No new production UI or ERP milestone is claimed. References above plus
   `methods-auto/dialog/dialog-{update,close}-method.md`; predecessor threading is not adopted.
-  The complete native `make test JOBS=2` rerun passes 181 cases, zero red, including
+  The earlier native `make test JOBS=2` rerun passed 181 cases, zero red, including
   257 tooling tests. Changed-code `make lint JOBS=2`: 28/330 units, zero findings,
-  unchanged suppression count. The native ERP image rebuild and Customer rerun remain pending;
+  unchanged suppression count. The current post-callback-policy full manifest is running;
   these gates/fixtures do not execute the source-counted AL UT or qualify actual browsers.
 
 - Original Customer client regression: `make erp-client-test JOBS=2`,
-  current configured-list image at `003a48b`: seven cases, six pass/one failure,
+  rebuilt callback-policy native source `b8d83b2` with client `2f6f2e2`:
+  seven cases, six pass/one failure,
   zero skipped/cancelled. `make slice-check all B=/workspace/build/podman JOBS=6`
-  rebuilt production factories for the expanded PageInstance API: 14,225 diagnostic
-  slice sources, zero missing, native build exit 0 in 2,377 seconds; not full-app or UT
+  rebuilt production factories for the expanded PageInstance/SessionOptions APIs: 14,225
+  diagnostic slice sources, zero missing, native build exit 0 in 2,901 seconds; not full-app or UT
   acceptance. The 40-row Customer window independently matches SQL primary-key order
   and every No./Name value, preserves exact Code/Text types and one selected row,
   and agrees across external CMD/MCP and actual Chromium. The seed/source revision
