@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: regenerate the production apps and rebuild native ERP consumers of the qualified
-stored-platform binding, then rerun original Item template/card/create/edit/reopen under 0727.
+Next: finish the native ERP consumer rebuild of the qualified stored-platform binding,
+then rerun original Item template/card/create/edit/reopen under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
@@ -47,6 +47,11 @@ Contracts at the pinned revisions below: developer `methods-auto/record/record-r
 `src/Tenant Database Tables/EntityText.Table.al` and `src/System Enums/EntityTextScenario.Enum.al`;
 user `includes/create_new_item.md`; predecessor 1700/924 (reject historical constant-success stubs).
 This is stored-table/permission qualification, not fresh Item workflow acceptance.
+Production regeneration after 76e7efe emits the real Entity Text record in Marketing
+Text; 233 selected System table declarations now have 23 bound/210 unbound, with zero
+source refusals. Source-origin verification exits 0; generator exit 1 retains all 5708
+property refusals. Slice-check retains raw 14226/selected 14023/product-excluded 102/
+omitted 101, zero missing, exit 0. The native rebuild and Item replay remain unaccepted.
 At 6a1556c, the earlier
 PageWindowProvider refusal occurred because PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate

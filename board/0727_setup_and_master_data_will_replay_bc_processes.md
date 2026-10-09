@@ -3,7 +3,7 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: regenerate/rebuild native ERP consumers of 0720's stored-platform binding and
+Next: finish rebuilding native ERP consumers of 0720's stored-platform binding and
 rerun the three retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
 setup/master-data workflows.
 
@@ -98,7 +98,8 @@ setup/master-data workflows.
   0720 now qualifies the actual missing platform-table binding from verified System
   declarations: GenNativeBinding 199 checks, NativeStorage 84 SQL/runtime checks,
   three source defects rejected. Both AL permission forms observe revocation without
-  bypasses; production regeneration/rebuild and fresh Item replay remain required.
+  bypasses. Production declarations are regenerated; the native rebuild and fresh
+  Item replay remain required. The last accepted client measurement is still 26/29.
   Item List declares OnFindRecord/OnNextRecord: stored Rec
   normally, temporary attribute/pick selection conditionally. Preserve both sources,
   custom navigation and bounded windows; removing the declaration check alone would
