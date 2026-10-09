@@ -191,6 +191,10 @@ business workflows are active in 0720; full G1 acceptance does not block their i
   Teams/Excel-online/Power BI and Entra/cloud-specific branches from source before
   changing `scope.json.product_exclude`. Preserve generic counterparts and mixed
   settings/privacy/work-date/notification callers. No successful license/cloud stubs.
+  The bounded W1 BaseApp `Modules/System/PowerBI/` cloud implementation is now explicitly
+  classified: 47 raw objects retained, no test-method loss. Page-part/call selection and
+  its native refusal/effect qualifier are owned by 0720; generic charts remain required.
+  Full raw census still refuses the existing three conditional sources/seven variants.
 - OCR, payment providers and migration-to-BC implementations in mixed namespaces
   remain a source/dependency audit, not permission to drop Incoming Documents,
   generic payment/file exchange or RapidStart. Predecessor 1998/2000 proposes

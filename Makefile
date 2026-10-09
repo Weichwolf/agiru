@@ -25,6 +25,7 @@ export CCACHE_SLOPPINESS
 .PHONY: test-contexts text-positions catalogue base64 encoding hashing conversion record-order record-position codeunit-record page-navigation boolean-expressions for-loops control-extensions native-table-ids native-storage native-codeunits streams
 .PHONY: system-profiles variant-text xmlport-import dev-image dev-start dev-stop dev-web dev-configure dev-exec dev-check
 .PHONY: page-profile client client-test web web-test http-test page-host-test erp-fixture erp-client-test session-identity ui-host table-permissions permission-sets native-permissions refresh-records record-windows
+.PHONY: product-pages
 .PHONY: browser-sessions
 .PHONY: browser-auth browser-https-test
 
@@ -232,6 +233,11 @@ for-loops: comments db tc ## execute captured AL for-loop bounds and counter/con
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenCodeunitGate
 	@"$(B)/gate_GenCodeunitGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/for-loops.sh"
+
+product-pages: comments db tc ## execute approved page-part selection while retaining core and refusal effects
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenPageSelectionGate
+	@"$(B)/gate_GenPageSelectionGate"
+	@B="$(B)" bash "$(SELF)/test/transpiler/product-pages.sh"
 
 xmlport-import: comments db tc ## execute generated XMLport field validation and assignment order
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_GenXmlPortGate gate_XmlPortGate

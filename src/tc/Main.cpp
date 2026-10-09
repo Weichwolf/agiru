@@ -9,6 +9,7 @@
 #include "NativeMethods.h"
 #include "NativeSource.h"
 #include "ObjectKind.h"
+#include "PageSelection.h"
 #include "PageWriter.h"
 #include "Parser.h"
 #include "QueryWriter.h"
@@ -2967,6 +2968,84 @@ void NoteProductExclusions(const Job &job, const agiru::gen::TranspileScope &sco
   }
 }
 
+void IndexProductPages(const Job &job,
+                       const agiru::gen::TranspileScope &scope,
+                       agiru::gen::Objects &objects) {
+  std::set<std::pair<agiru::gen::SourceDomain, std::filesystem::path>> paths;
+  for (const auto &rule : scope.productExclude) {
+    const auto root =
+        rule.domain == agiru::gen::SourceDomain::SystemSymbols ? job.systemSymbols : job.source;
+    const auto target = root / rule.source;
+    if (std::filesystem::is_directory(target)) {
+      Run scan;
+      scan.root = target;
+      for (const auto &path : SourcesEndingIn(scan, ".Page.al")) {
+        paths.emplace(rule.domain, path);
+      }
+    } else if (agiru::gen::LowerKey(target.filename().string()).ends_with(".page.al")) {
+      paths.emplace(rule.domain, target);
+    }
+  }
+  for (const auto &[domain, path] : paths) {
+    const auto declaration = agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::Page);
+    if (!declaration.found) {
+      throw std::runtime_error("product selection: excluded page has no declaration: " +
+                               path.string());
+    }
+    agiru::al::PageObject page;
+    page.id = declaration.id;
+    page.name = declaration.name;
+    page.nameSpace = declaration.nameSpace;
+    const auto root =
+        domain == agiru::gen::SourceDomain::SystemSymbols ? job.systemSymbols : job.source;
+    agiru::gen::IndexProductPage(scope, path.lexically_relative(root), page, objects, domain);
+  }
+}
+
+std::string SelectionCell(std::string_view value) {
+  std::string out;
+  for (const char character : value) {
+    switch (character) {
+      case '\\': out += "\\\\"; break;
+      case '\t': out += "\\t"; break;
+      case '\r': out += "\\r"; break;
+      case '\n': out += "\\n"; break;
+      default: out += character; break;
+    }
+  }
+  return out;
+}
+
+void NotePageSelection(std::string &receipt,
+                       const std::filesystem::path &source,
+                       const agiru::al::PageObject &page,
+                       const std::vector<agiru::gen::PageSelectionRow> &rows) {
+  for (const auto &row : rows) {
+    const std::array cells{row.kind,
+                           source.generic_string(),
+                           std::to_string(page.id),
+                           page.name,
+                           row.control,
+                           row.target,
+                           row.targetSource,
+                           row.reason,
+                           row.location,
+                           row.member};
+    for (std::size_t at = 0; at < cells.size(); ++at) {
+      if (at != 0) { receipt += '\t'; }
+      receipt += SelectionCell(cells[at]);
+    }
+    receipt += '\n';
+    std::println("product page-{} {} {}.{}: {} ({})",
+                 row.kind,
+                 page.id,
+                 page.name,
+                 row.control,
+                 row.location,
+                 row.reason);
+  }
+}
+
 struct LayoutCounts {
   std::size_t reports = 0;
   std::size_t bound = 0;
@@ -3327,6 +3406,8 @@ private:
   Enums nativeEnums;
   Pages nativeReports;
   std::size_t nativeGaps = 0;
+  std::string productPageSelection =
+      "kind\tsource\tpage_id\tpage\tcontrol\ttarget\ttarget_source\treason\tlocation\tmember\n";
 
   void WriteBuildInputs() {
     if (job.output.empty()) { return; }
@@ -3343,15 +3424,19 @@ private:
     WriteFile({.directory = job.output, .relative = "generation-scope.json"},
               Read(job.apps.parent_path() / "scope.json"));
     WriteFile({.directory = job.output, .relative = "generation-apps.json"}, Read(job.apps));
+    WriteFile({.directory = job.output, .relative = "generation-product-parts.tsv"},
+              productPageSelection);
     kept.insert(job.output / "generation-sources.txt");
     kept.insert(job.output / "generation-scope.json");
     kept.insert(job.output / "generation-apps.json");
+    kept.insert(job.output / "generation-product-parts.tsv");
   }
 
   void ReadInputs() {
     apps = agiru::gen::ReadApps(job.apps);
     scope = agiru::gen::ReadScope(job.apps.parent_path() / "scope.json");
     NoteProductExclusions(job, scope);
+    IndexProductPages(job, scope, objects);
     nativeSources = job.systemSymbols.empty() ? agiru::gen::NativeSources{}
                                               : agiru::gen::ReadNativeSources(job.systemSymbols);
     const auto rawNativeTables = nativeSources.tables.size();
@@ -3546,10 +3631,17 @@ private:
     parsed = IndexPages(run, pages, objects);
     RefreshReportControls(parsedReports, objects);
     extensions.emitted += MergePageExtensions(store, parsed);
-    for (const agiru::al::PageObject &page : parsed.objects) {
+    for (std::size_t at = 0; at < parsed.objects.size(); ++at) {
+      auto &page = parsed.objects[at];
+      const auto selected = agiru::gen::SelectProductPageParts(page, objects);
+      NotePageSelection(productPageSelection,
+                        (source / parsed.paths[at]).lexically_relative(job.source),
+                        page,
+                        selected);
       const auto found = objects.pages.find(agiru::gen::LowerKey(page.name));
       if (found != objects.pages.end()) {
         found->second.fields = agiru::gen::ControlIdentifiers(page, objects);
+        found->second.parts = agiru::gen::PartPages(page);
       }
     }
     agiru::gen::NoteObjectNames(objects);

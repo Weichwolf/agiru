@@ -40,6 +40,8 @@ for script in test/tooling/function-size.sh test/runtime/required-isolation.sh t
   fi
 done
 n=$((n + 1))
+if ! B="$B" bash test/transpiler/product-pages.sh; then red=$((red + 1)); fi
+n=$((n + 1))
 if ! B="$B" bash test/ui/page-profile.sh; then red=$((red + 1)); fi
 n=$((n + 1))
 if ! B="$B" bash test/runtime/session-identity.sh; then red=$((red + 1)); fi

@@ -1,0 +1,1 @@
+{"include":["Fixture"],"exclude":["Fixture.Cloud","Fixture.Unselected"],"product_exclude":["microsoft-cloud:fixture/cloud/"]}

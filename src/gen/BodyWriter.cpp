@@ -723,14 +723,17 @@ private:
   struct ControlRefusal {
     std::string call;
     std::vector<const al::Expr *> arguments;
+    bool productExcluded = false;
   };
 
   std::optional<ControlRefusal> RefusedControlCall(const al::Expr &expression) const {
     std::vector<std::string> names;
     ControlRefusal out;
+    std::size_t calls = 0;
     const al::Expr *walk = &expression;
     while (true) {
       if (walk->kind == al::ExprKind::Call && !walk->children.empty()) {
+        ++calls;
         for (std::size_t i = walk->children.size(); i > 1; --i) {
           out.arguments.insert(out.arguments.begin(), &walk->children[i - 1]);
         }
@@ -759,6 +762,8 @@ private:
       whole += names[i];
     }
     out.call = "::agiru::AbsentControl(" + Literal(whole) + ")";
+    out.productExcluded = calls == 1 && first == 1 && names.size() == 4 &&
+                          SameName(names[2], "Page") && scope_.ProductExcludedControl(names[1]);
     return out;
   }
 
@@ -932,7 +937,10 @@ private:
       for (const al::Expr *argument : refused->arguments) {
         out += "static_cast<void>(" + Expression(*argument, 0) + "), ";
       }
-      return out + refused->call + ")";
+      return out +
+             (use == ValueUse::Discarded && refused->productExcluded ? "static_cast<void>(0)"
+                                                                     : refused->call) +
+             ")";
     }
     if (const std::string tried = Tried(expression, use); !tried.empty()) { return tried; }
     if (callee.kind == al::ExprKind::Name && SameName(callee.text, "Error") &&
@@ -2641,7 +2649,14 @@ public:
   }
 
   [[nodiscard]] bool AbsentControl(std::string_view name) const override {
+    if (ProductExcludedControl(name)) { return true; }
     return AbsentWithin(page_.layout, name);
+  }
+
+  [[nodiscard]] bool ProductExcludedControl(std::string_view name) const override {
+    const auto excluded = objects_.productExcludedParts.find(LowerKey(page_.name));
+    return excluded != objects_.productExcludedParts.end() &&
+           excluded->second.contains(LowerKey(std::string(name)));
   }
 
   [[nodiscard]] std::string AbsentDotNet(std::string_view name) const override {

@@ -137,6 +137,11 @@ public:
     return false;
   }
 
+  [[nodiscard]] virtual bool ProductExcludedControl(std::string_view name) const {
+    static_cast<void>(name);
+    return false;
+  }
+
   [[nodiscard]] virtual bool AbsentPart(const OfVariable &member) const {
     static_cast<void>(member);
     return false;

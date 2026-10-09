@@ -4,10 +4,10 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: classify and remove explicitly product-excluded Power BI page parts/calls through
-the shared source-selection policy, retaining raw identities and generic charts. Never
-silence unselected controls with successful no-ops or patch generated apps. Regenerate,
-link and repeat the original Customer workflow, including concurrent-edit rejection.
+Next: regenerate, link and repeat the original Customer workflow, including concurrent-edit
+rejection. Bounded product-page selection is now implemented and fixture-qualified below;
+it is not yet proven in the original Customer image. Never silence unselected controls
+with successful no-ops or patch generated apps.
 The native diagnostic-slice integration now compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1761 AL procedures
 still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
@@ -39,6 +39,40 @@ Sources: `include/runtime/Page.h`, `test/gate/PageDispatcherGate.cpp`,
 `test/runtime/page-navigation.sh`. Client rowversion conflicts remain unqualified;
 `Storage.cpp` currently updates by primary key without an observed-version predicate,
 and `PageSession.h::RereadBeforeEdit_` refreshes the stored record before entry.
+
+Product-page selection: `scope.json` explicitly excludes only
+`Layers/W1/BaseApp/Modules/System/PowerBI/` as Microsoft-cloud integration. The independent
+raw census at the BCApps revision above retains all 47 module objects: fourteen codeunits,
+fourteen tables, nine pages, six enums and four interfaces. Total raw population remains
+36,792 objects / 113,111 test methods; explicit excluded objects rise from 205 to 252,
+with excluded test methods unchanged at 3,744 and selected methods unchanged at 38,420.
+The census still exits nonzero for the existing three sources/seven conditional variants;
+it is not G1 acceptance. Generic visualization and mixed callers remain required.
+`PageSelection.{h,cpp}` indexes only bounded policy targets, rejects ambiguous identities
+and removes their parts after extension composition. Discarded direct
+`CurrPage.<part>.Page.<method>` calls retain argument evaluation once, in AL source order.
+Consumed values, non-CurrPage receivers, unknown ERP parts and generic chart add-ins
+continue to refuse explicitly. `generation-product-parts.tsv` records owning source/page,
+original part alias, target source/reason and raw statement location/member; cells escape
+backslash, tab, CR and LF. Original procedure bodies/identities remain inventoried.
+`make product-pages B=/workspace/build/podman JOBS=2` passes 22 generator and ten native
+execution checks; all five compiled removal/domain/namespace/value/order defects reject.
+Its independent fixture census retains five raw objects: one explicit exclusion, three
+selected and one namespace omission. Existing GenPage 58 and GenCodeunit 83 checks pass.
+GenScope now passes 297 checks after correcting stale assertions from before the reference
+policy adoption (`70cdccd`), preserving namespace-only omissions as unclassified gaps and
+testing bounded O365 suite classification separately from name-only matching.
+Sources: `src/gen/{PageSelection,BodyWriter,CodeunitWriter}.{h,cpp}`, `src/tc/Main.cpp`,
+`test/gate/{GenPageSelection,GenScope}Gate.cpp`, `test/transpiler/product-pages{.sh,/}`.
+Changed-code `make lint B=/workspace/build/podman JOBS=2` covers 27/347 handwritten
+units with zero failures; the twelve-suppression baseline is unchanged, not FULL lint.
+References at the pinned revisions above: developer `properties/devenv-subpagelink-property.md`,
+BCApps `Modules/System/PowerBI/README.md` and the embedded part's SetPageContext/
+SetFilterToMultipleValues declarations, user `across-how-use-financials-data-source-powerbi.md`;
+predecessor `scripts/transpiler/scope.py` and the retained Customer part/calls are evidence,
+not permission to introduce successful missing-part stubs.
+Production regeneration/integration and original client execution remain pending.
+
 Immediate security prerequisite: qualify browser session transport below before accepting
 externally accessible client workflows; retain the credential-specific ownership regression.
 

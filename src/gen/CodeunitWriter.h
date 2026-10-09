@@ -72,6 +72,14 @@ struct CodeunitHeader {
 
 using FieldEnums = std::map<std::string, std::map<std::string, std::string>>;
 
+struct ProductPage {
+  std::int32_t id = 0;
+  std::string name;
+  std::string nameSpace;
+  std::string source;
+  std::string reason;
+};
+
 struct Objects {
   TableIndex tables;
   TableIndex reports;
@@ -82,6 +90,8 @@ struct Objects {
   TableIndex pages;
   EnumIndex enums;
   FieldEnums fieldEnums;
+  std::map<std::string, ProductPage> productExcludedPages;
+  std::map<std::string, std::set<std::string>> productExcludedParts;
   std::span<const al::TableObject> nativeTables;
 
   std::string module;
