@@ -14238,3 +14238,8 @@ base/finance/vat/registration/table/VATRegNoLookupQuota.cpp
 base/finance/vat/registration/table/VATRegNoLookupQuota.def.cpp
 base/core/table/SynthRelationMappingBuffer.def.cpp
 system/system/text/codeunit/EntityTextImpl.cpp
+system/system/ai/codeunit/CopilotCapability.cpp
+system/system/ai/codeunit/CopilotCapabilityImpl.cpp
+system/system/ai/table/CopilotSettings.cpp
+system/system/ai/table/CopilotSettings.def.cpp
+system/system/ai/enum/AzureAIServiceType.cpp

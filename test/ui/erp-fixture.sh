@@ -23,6 +23,18 @@ original_company() {
 "$systemId","$systemCreatedAt","$systemCreatedBy","$systemModifiedAt","$systemModifiedBy"
 FROM system."Company") TO STDOUT'
 }
+original_capabilities() {
+  source_sql $'COPY (SELECT
+(\'x\'||encode("timestamp",\'hex\'))::bit(64)::bigint,
+"Capability","App Id","Availability","Publisher","Status","Learn More Url","Service Type","Billing Type",
+"$systemId","$systemCreatedAt","$systemCreatedBy","$systemModifiedAt","$systemModifiedBy"
+FROM system."Copilot Settings" ORDER BY "Capability","App Id") TO STDOUT'
+}
+copied_capabilities() {
+  native_sql "$1" 'COPY (SELECT "timestamp","Capability","App Id","Availability","Publisher","Status",
+"Learn More Url","Service Type","Billing Type","SystemId","SystemCreatedAt","SystemCreatedBy",
+"SystemModifiedAt","SystemModifiedBy" FROM "Copilot Settings" ORDER BY "Capability","App Id") TO STDOUT'
+}
 "${native_exec[@]}" findmnt -T /tmp
 "${native_exec[@]}" df -h /tmp
 proof=$(mktemp -d /tmp/agiru-erp-fixture.XXXXXX)
@@ -69,6 +81,9 @@ AND details->>'source_database'='$source_database' FROM agiru_seed_provenance")
 [[ "$identity" = t ]] || { printf 'erp-fixture: seed lacks matching complete typed-readback provenance\n' >&2; exit 1; }
 [[ $(source_sql 'SELECT count(*) FROM system."Company"') = 1 ]]
 [[ $(source_sql 'SELECT octet_length("timestamp")=8 AND get_byte("timestamp",0)<128 AND "Evaluation Company" IN (0,1) FROM system."Company"') = t ]]
+[[ $(source_sql 'SELECT count(*) FROM system."Copilot Settings"') = 1 ]]
+[[ $(source_sql 'SELECT octet_length("timestamp")=8 AND get_byte("timestamp",0)<128 FROM system."Copilot Settings"') = t ]]
+[[ $(source_sql 'SELECT count(*) FROM system."Copilot Settings" WHERE "Capability"=2015') = 0 ]]
 company=$(source_sql 'SELECT "Name" FROM system."Company"')
 [[ -n "$company" && "$company" != *$'\n'* && "$company" != *$'\r'* ]]
 [[ $(native_sql postgres "SELECT count(*) FROM pg_database WHERE datname='$database'") = 0 ]]
@@ -77,14 +92,15 @@ created=1
 native_sql postgres "COMMENT ON DATABASE \"$database\" IS 'agiru ERP fixture $nonce'"
 dsn="postgresql://agiru:agiru@127.0.0.1:5432/$database"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
-  -Iinclude -Itest/gate -Iapps/platform -Iapps/shared)
-"${native_exec[@]}" sha256sum "$native_build"/libagiru_{app_platform,rt,net,db}.so > "$proof/libraries.sha256"
+  -Iinclude -Itest/gate -Iapps/platform -Iapps/system -Iapps/shared)
+refusals="$native_build/CMakeFiles/agiru.dir/unlinked.cpp.o"
+"${native_exec[@]}" sha256sum "$native_build"/libagiru_{app_platform,slice,rt,net,db,al}.so "$refusals" > "$proof/libraries.sha256"
 "${native_exec[@]}" "$native_build/agiru" client-init --database "$dsn" \
   > "$proof/client-storage-migration.log" 2>&1
 "${native_exec[@]}" clang++-19 "${flags[@]}" -c test/ui/erp/Prepare.cpp -o "$native/prepare.o"
 "${native_exec[@]}" clang++-19 -stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
-  "$native/prepare.o" "-L$native_build" "-Wl,-rpath,$native_build" \
-  -lagiru_app_platform -lagiru_rt -lagiru_net -lagiru_db -o "$native/prepare"
+  "$native/prepare.o" "$refusals" "-Wl,--export-dynamic" "-L$native_build" "-Wl,-rpath,$native_build" \
+  -lagiru_app_platform -lagiru_slice -lagiru_rt -lagiru_net -lagiru_db -o "$native/prepare"
 jq -n --arg directory /workspace --arg file /workspace/test/ui/erp/Prepare.cpp \
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
   clang++-19 "${flags[@]}" -c /workspace/test/ui/erp/Prepare.cpp -o "$native/prepare.o" > "$proof/commands.json"
@@ -107,6 +123,21 @@ native_sql "$database" 'COPY (SELECT "timestamp","Name","Evaluation Company","Di
   > "$proof/company-target.tsv"
 cmp "$proof/company-source.tsv" "$proof/company-target.tsv"
 [[ $(native_sql "$database" 'SELECT last_value >= (SELECT max("timestamp") FROM "Company") FROM agiru_platform.rowversions_v1') = t ]]
+[[ $(native_sql "$database" 'SELECT count(*) FROM "Copilot Settings"') = 0 ]]
+original_capabilities > "$proof/capabilities-source.tsv"
+podman exec --interactive --user agiru "$container" psql -X -v ON_ERROR_STOP=1 -d "$database" \
+  -c 'COPY "Copilot Settings" ("timestamp","Capability","App Id","Availability","Publisher","Status",
+"Learn More Url","Service Type","Billing Type","SystemId","SystemCreatedAt","SystemCreatedBy",
+"SystemModifiedAt","SystemModifiedBy") FROM STDIN' \
+  < "$proof/capabilities-source.tsv" > "$proof/capabilities-copy.log"
+copied_capabilities "$database" > "$proof/capabilities-target.tsv"
+cmp "$proof/capabilities-source.tsv" "$proof/capabilities-target.tsv"
+native_sql "$database" $'BEGIN;
+SELECT pg_catalog.pg_advisory_xact_lock(x\'41475256\'::integer, 1);
+SELECT pg_catalog.setval(\'agiru_platform.rowversions_v1\'::regclass,
+GREATEST(agiru_platform.last_rowversion_v1(), (SELECT max("timestamp") FROM "Copilot Settings")), true);
+COMMIT' > "$proof/rowversions-import.log"
+[[ $(native_sql "$database" 'SELECT last_value >= (SELECT max("timestamp") FROM "Copilot Settings") FROM agiru_platform.rowversions_v1') = t ]]
 "${native_exec[@]}" "$native/prepare" "$dsn" "$company" "$native/auth.json" | tee "$proof/prepare.log"
 [[ $("${native_exec[@]}" stat --format=%a "$native/auth.json") = 600 ]]
 [[ $("${native_exec[@]}" stat --format=%a "$native/auth.json.denied") = 600 ]]
@@ -122,10 +153,14 @@ native_sql "$seed" 'SELECT status,details FROM agiru_seed_provenance' > "$proof/
 cmp "$proof/seed-before.txt" "$proof/seed-after.txt"
 original_company > "$proof/company-source-after.tsv"
 cmp "$proof/company-source.tsv" "$proof/company-source-after.tsv"
-"${native_exec[@]}" sha256sum "$native_build"/libagiru_{app_platform,rt,net,db}.so > "$proof/libraries-after.sha256"
+original_capabilities > "$proof/capabilities-source-after.tsv"
+cmp "$proof/capabilities-source.tsv" "$proof/capabilities-source-after.tsv"
+copied_capabilities "$database" > "$proof/capabilities-target-after.tsv"
+cmp "$proof/capabilities-source.tsv" "$proof/capabilities-target-after.tsv"
+"${native_exec[@]}" sha256sum "$native_build"/libagiru_{app_platform,slice,rt,net,db,al}.so "$refusals" > "$proof/libraries-after.sha256"
 cmp "$proof/libraries.sha256" "$proof/libraries-after.sha256"
 sha256sum --check --status "$proof/inputs.sha256"
-printf 'erp-fixture: original Company copied exactly; explicit tenant authority and denial; no ERP workflow acceptance\n'
+printf 'erp-fixture: original Company and capability rows copied exactly; permission-backed original registry queries; explicit tenant authority and denial; no ERP workflow acceptance\n'
 if [[ "$mode" = client ]]; then
   "${native_exec[@]}" mkdir "$native/binaries"
   binaries=(agiru libagiru_rt.so libagiru_net.so libagiru_db.so libagiru_al.so libagiru_slice.so libagiru_app_platform.so)
@@ -141,5 +176,7 @@ if [[ "$mode" = client ]]; then
     AGIRU_ERP_COMPANY="$company" node --test test/ui/erp-client.mjs \
     > "$proof/client.log" 2>&1 || { cat "$proof/client.log"; exit 1; }
   cat "$proof/client.log"
+  copied_capabilities "$database" > "$proof/capabilities-client-after.tsv"
+  cmp "$proof/capabilities-source.tsv" "$proof/capabilities-client-after.tsv"
   sha256sum --check --status "$proof/client-inputs.sha256"
 fi

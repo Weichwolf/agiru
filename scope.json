@@ -77,6 +77,17 @@
     "System.Test.Integration.Graph"
   ],
   "_dependency_doc": "Dataverse, D365Sales, SyncEngine and Outlook declarations supply original mixed configuration/event dependencies of core ERP pages. Selecting these declarations does not add Microsoft-cloud services to product requirements or replace their behavior with constants. Explicit bounded product exclusions still win; unavailable providers remain explicit refusals.",
+  "_source_doc": "Exact original declarations supply the local capability registry, stored schema and typed enum/interface dependencies used by Entity Text. This does not select the System.AI namespace or Azure/Microsoft-cloud providers, nor approve licensing/billing feature gates. Preserve original data and refuse unavailable service implementations.",
+  "source_include": [
+    "System Application/App/AI/src/Copilot/CopilotCapability.Codeunit.al",
+    "System Application/App/AI/src/Copilot/CopilotCapabilityImpl.Codeunit.al",
+    "System Application/App/AI/src/Copilot/CopilotSettings.Table.al",
+    "System Application/App/AI/src/Copilot/CopilotAvailability.Enum.al",
+    "System Application/App/AI/src/Copilot/CopilotStatus.Enum.al",
+    "System Application/App/AI/src/Copilot/CopilotBillingType.Enum.al",
+    "System Application/App/AI/src/Copilot/AzureAIServiceType.Enum.al",
+    "System Application/App/AI/src/Copilot/Interfaces/AIServiceName.Interface.al"
+  ],
   "_area_doc": "Namespace-less sources use their top-level folder within the configured app. Match the reference test-area selection, including Graph; retain raw identities and report omitted coverage separately. Test libraries and generic local Graph/API functionality remain required.",
   "area_exclude": [
     "Azure AI",

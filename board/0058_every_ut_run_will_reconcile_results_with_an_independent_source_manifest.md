@@ -10,7 +10,7 @@ business workflows are active in 0720; full G1 acceptance does not block their i
 ## Current evidence
 
 - 0720 activates original mixed dependency declarations, not new cloud requirements.
-  Census remains 36,792 raw objects / 113,111 methods; selection becomes 10,767 objects
+  Census remains 36,792 raw objects / 113,111 methods; selection becomes 10,775 objects
   with unchanged 252 explicit exclusions, 38,420 selected / 109,367 required test methods
   and the same three-source/seven-variant refusal. Parser UT remains 77/2,298; total
   parsed methods 38,421 still disagree with census by one. Generation retains 5,708

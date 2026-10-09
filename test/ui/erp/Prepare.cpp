@@ -17,6 +17,10 @@
 #include "Check.h"
 #include "PlatformModule.h"
 #include "PrivateAuthFile.h"
+#include "SystemModule.h"
+#include "system/ai/codeunit/CopilotCapability.h"
+#include "system/ai/enum/CopilotCapability.h"
+#include "system/ai/table/CopilotSettings.h"
 #include "system/security/access_control/table/AccessControl.h"
 #include "system/security/access_control/table/TenantPermission.h"
 #include "system/security/access_control/table/TenantPermissionSet.h"
@@ -69,6 +73,35 @@ void Schema(const agiru::Connection &connection) {
                table->module != nullptr && table->module->id == agiru::app::Platform::kModule.id);
     agiru::ProvisionTable(connection, *table);
   }
+  const auto &registry = agiru::TableTraits<agiru::System::AI::CopilotSettings_Table>::kTable;
+  CHECK_TRUE("capability registry storage retains the original System Application owner",
+             registry.module != nullptr && registry.module->id == agiru::app::System::kModule.id);
+  CHECK_TRUE("capability registry retains shared-company storage and its composite key",
+             !registry.dataPerCompany && !registry.replicateData && registry.keys.size() == 1 &&
+                 registry.keys.front().fields.size() == 2);
+  agiru::ProvisionTable(connection, registry);
+}
+
+void RegistryReadback(const agiru::Connection &connection) {
+  using Capability = agiru::System::AI::CopilotCapability_Enum;
+  agiru::System::AI::CopilotSettings_Table settings;
+  CHECK_TRUE("the transferred capability registry has an original source row",
+             settings.FindFirst());
+  if (gate::failures != 0) { throw std::runtime_error("registry source readback refused"); }
+  agiru::System::AI::CopilotCapability_Codeunit registry;
+  CHECK_TRUE("original registry query finds the exact transferred capability and app",
+             registry.IsCapabilityRegistered(settings.Capability, settings.AppId));
+  CHECK_TRUE("a capability row belonging to another app is not registered for System Application",
+             settings.AppId != agiru::Guid(agiru::app::System::kModule.id) &&
+                 !registry.IsCapabilityRegistered(settings.Capability));
+  CHECK_TRUE("Entity Text is unregistered according to transferred rows, not a provider constant",
+             !registry.IsCapabilityRegistered(Capability::EntityText));
+  CHECK_TRUE("matching the transferred app does not ignore a different capability",
+             !registry.IsCapabilityRegistered(Capability::EntityText, settings.AppId));
+  CHECK_TRUE("repeated registry queries replace both filters without stale state",
+             registry.IsCapabilityRegistered(settings.Capability, settings.AppId));
+  const auto count = connection.Execute(R"(SELECT count(*)::text FROM "Copilot Settings")");
+  CHECK_TEXT("registry reads do not insert, delete or register a capability", Cell(count, 0), "1");
 }
 
 void Grant(agiru::PermissionObject kind) {
@@ -136,6 +169,7 @@ void Authority(const std::string &dsn, std::string_view company) {
     agiru::Session session(dsn, agiru::Guid(identity));
     session.CompanyName(company);
     session.TablePermissions(authority);
+    if (identity == kUser) { RegistryReadback(session.Database()); }
     const auto expected = identity == kUser ? Level::Direct : Level::None;
     for (const auto operation :
          {Operation::Read, Operation::Insert, Operation::Modify, Operation::Delete}) {

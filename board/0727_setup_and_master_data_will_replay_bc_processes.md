@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: use 0720's exact source-selection contract to activate the original local capability
-registry/storage dependency and faithful import; qualify the three retained Item workflows, then expand
+Next: qualify the three retained Item workflows using 0720's now-qualified original
+local capability registry/storage and faithful source import, then expand
 invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
 
 ## Processes and implementation
@@ -113,6 +113,10 @@ invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
   Its native image now compiles/links, but Item replay remains unaccepted. 0720 qualifies
   exact source activation without namespace/cloud/sibling expansion or product-policy bypass;
   faithful registry data and actual Item effects remain required, not constant substitutes.
+  The original registry dependency and faithful import now pass under 0720:
+  native linking exits 0; isolated schema 6/6 and preparation 31/31 pass, including
+  positive/negative app/capability filters and exact source/audit/rowversion preservation.
+  The full 29-case client rerun is next; no new Item workflow pass is claimed.
   Item List declares OnFindRecord/OnNextRecord: stored Rec
   normally, temporary attribute/pick selection conditionally. Preserve both sources,
   custom navigation and bounded windows; removing the declaration check alone would

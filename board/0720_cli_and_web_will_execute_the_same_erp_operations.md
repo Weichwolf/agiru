@@ -4,12 +4,14 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: finish the native rebuild of the narrowly selected original capability registry,
-qualify faithful source import and rerun all 29 original-client cases under 0727.
+Next: rerun all 29 original-client cases under 0727 with the qualified original
+capability registry and faithful source import.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
-The latest complete native consumer rebuild including Entity Text Impl. exits 0 (2683 seconds).
+The latest native rebuild including Entity Text Impl. and the capability registry
+records exit 0 (4032 seconds); a subsequent incremental `make all` confirms exit 0
+in one second after the outer observation wrapper ended with signal exit 143.
 Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
 The latest completed expanded original-client regression retains 23 Customer and three Vendor passes;
@@ -22,8 +24,8 @@ constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0. Preserve the
 current 1841 unlinked-source identities in `build/podman/unlinked.cpp`, mechanically
-derived by `scripts/unlinked.py`, down from 1850 in the preceding image.
-EntityTextImpl has no remaining entry. This net reduction is not full source acceptance;
+derived by `scripts/unlinked.py`, byte-identical to the preceding image.
+EntityTextImpl has no remaining entry. This is not full source acceptance;
 retain all remaining identities and investigate coverage changes. Complete
 generated-app compilation is not proven.
 The accepted 26-case 2026-10-09 `make erp-client-test JOBS=2` run passes preparation
@@ -132,8 +134,8 @@ No service body, source-specific branch or generated-app edit is introduced.
 RefusedGate passes 22/22; JsonGate 250/250, TextGate 91/91 and TextMethodGate 47/47.
 Generated text/product consumers pass 13/13 each; six text controls (including two
 compiled false-answer defects), eight selection controls and four invalid policies
-reject, with unchanged input hashes. Full native linking and the Item replay remain
-unaccepted. Sources: `include/type/{StringValue,JsonObject}.h`,
+reject, with unchanged input hashes. Full native linking now passes; the Item replay
+remains unaccepted. Sources: `include/type/{StringValue,JsonObject}.h`,
 `test/gate/RefusedGate.cpp`, `test/runtime/text-positions.sh` and the product-pages
 AL/Runner fixtures. Contracts at the pinned developer revision:
 `methods-auto/text/text-contains-method.md` and
@@ -142,6 +144,21 @@ AL/Runner fixtures. Contracts at the pinned developer revision:
 Predecessor 760/1997 retains the mixed dependency/service distinction.
 Both changed compiled C++ consumers (RefusedGate and product-pages Runner) pass
 targeted clang-tidy with zero failures; this is not FULL lint or UT acceptance.
+Production activation selects eight exact original registry/storage/enum/interface
+files without selecting System.AI or a cloud provider; five original CPP consumers
+are appended to the slice. `make erp-fixture JOBS=2` passes schema 6/6 and preparation
+31/31; the compiled Prepare consumer passes targeted clang-tidy with zero failures.
+The owned clone preserves all fourteen canonical capability columns, including
+audit identity/time and original rowversion; import advances only its sequence under
+the existing allocator lock. Source rows and sealed seed provenance remain unchanged.
+Original IsCapabilityRegistered finds the copied capability/app and rejects a different
+app or capability, including absent Entity Text 2015; repeated queries replace both
+filters. This is SQL-backed original AL, not an empty registry or constant answer.
+The helper links the server's hashed, exported refusal object, preserving all 1841
+throw-only gaps rather than failing in the dynamic loader. Original stored FlowFields,
+provider execution and the three Item workflows remain unqualified. Durable sources:
+`scope.json`, `test/slice`, `test/ui/{erp-fixture.sh,erp/Prepare.cpp}` and the original
+BCApps Copilot files above; import fencing matches `scripts/seed_demo.py`.
 0073 retains cross-app `NavApp.GetCallerModuleInfo`: current lowering passes the
 callee's module, not its caller's. Same-System-app registry checks do not qualify it.
 At 6a1556c, the earlier
