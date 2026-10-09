@@ -25,6 +25,7 @@
 #include "system/security/access_control/table/TenantPermission.h"
 #include "system/security/access_control/table/TenantPermissionSet.h"
 #include "system/security/access_control/table/TenantPermissionSetRel.h"
+#include "system/text/table/EntityText.h"
 
 #include <array>
 #include <chrono>
@@ -68,11 +69,16 @@ void Schema(const agiru::Connection &connection) {
   for (const auto *table : {&agiru::TableTraits<original::AccessControl_Table>::kTable,
                             &agiru::TableTraits<original::TenantPermissionSet_Table>::kTable,
                             &agiru::TableTraits<Permissions>::kTable,
-                            &agiru::TableTraits<original::TenantPermissionSetRel_Table>::kTable}) {
-    CHECK_TRUE("permission storage has its original System owner",
+                            &agiru::TableTraits<original::TenantPermissionSetRel_Table>::kTable,
+                            &agiru::TableTraits<agiru::System::Text::EntityText_Table>::kTable}) {
+    CHECK_TRUE("native storage has its original System owner",
                table->module != nullptr && table->module->id == agiru::app::Platform::kModule.id);
     agiru::ProvisionTable(connection, *table);
   }
+  const auto &entity = agiru::TableTraits<agiru::System::Text::EntityText_Table>::kTable;
+  CHECK_TRUE("Entity Text retains declared company storage and its four-field key",
+             entity.dataPerCompany && !entity.replicateData && entity.keys.size() == 1 &&
+                 entity.keys.front().fields.size() == 4);
   const auto &registry = agiru::TableTraits<agiru::System::AI::CopilotSettings_Table>::kTable;
   CHECK_TRUE("capability registry storage retains the original System Application owner",
              registry.module != nullptr && registry.module->id == agiru::app::System::kModule.id);
@@ -80,6 +86,22 @@ void Schema(const agiru::Connection &connection) {
              !registry.dataPerCompany && !registry.replicateData && registry.keys.size() == 1 &&
                  registry.keys.front().fields.size() == 2);
   agiru::ProvisionTable(connection, registry);
+}
+
+void EntityTextReadback(bool allowed) {
+  agiru::System::Text::EntityText_Table entity;
+  CHECK_TRUE("Entity Text read permission follows the native authenticated assignment",
+             static_cast<bool>(entity.ReadPermission()) == allowed);
+  if (allowed) {
+    CHECK_TRUE("the original empty Entity Text population is readable, not fabricated",
+               !entity.FindFirst());
+  } else {
+    bool refused = false;
+    try {
+      entity.FindFirst();
+    } catch (const agiru::Error &error) { refused = error.Code() == "Permission"; }
+    CHECK_TRUE("an unassigned user cannot read even an empty Entity Text table", refused);
+  }
 }
 
 void RegistryReadback(const agiru::Connection &connection) {
@@ -169,6 +191,7 @@ void Authority(const std::string &dsn, std::string_view company) {
     agiru::Session session(dsn, agiru::Guid(identity));
     session.CompanyName(company);
     session.TablePermissions(authority);
+    EntityTextReadback(identity == kUser);
     if (identity == kUser) { RegistryReadback(session.Database()); }
     const auto expected = identity == kUser ? Level::Direct : Level::None;
     for (const auto operation :

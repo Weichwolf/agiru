@@ -35,6 +35,17 @@ copied_capabilities() {
 "Learn More Url","Service Type","Billing Type","SystemId","SystemCreatedAt","SystemCreatedBy",
 "SystemModifiedAt","SystemModifiedBy" FROM "Copilot Settings" ORDER BY "Capability","App Id") TO STDOUT'
 }
+original_entity_text() {
+  source_sql $'COPY (SELECT (\'x\'||encode("timestamp",\'hex\'))::bit(64)::bigint,
+"Company","Source Table Id","Source System Id","Scenario","Preview Text","Text",
+"$systemId","$systemCreatedAt","$systemCreatedBy","$systemModifiedAt","$systemModifiedBy"
+FROM system."Entity Text" ORDER BY "Company","Source Table Id","Source System Id","Scenario") TO STDOUT'
+}
+copied_entity_text() {
+  native_sql "$1" 'COPY (SELECT "timestamp","Company","Source Table Id","Source System Id","Scenario",
+"Preview Text","Text","SystemId","SystemCreatedAt","SystemCreatedBy","SystemModifiedAt","SystemModifiedBy"
+FROM "Entity Text" ORDER BY "Company","Source Table Id","Source System Id","Scenario") TO STDOUT'
+}
 "${native_exec[@]}" findmnt -T /tmp
 "${native_exec[@]}" df -h /tmp
 proof=$(mktemp -d /tmp/agiru-erp-fixture.XXXXXX)
@@ -84,6 +95,7 @@ AND details->>'source_database'='$source_database' FROM agiru_seed_provenance")
 [[ $(source_sql 'SELECT count(*) FROM system."Copilot Settings"') = 1 ]]
 [[ $(source_sql 'SELECT octet_length("timestamp")=8 AND get_byte("timestamp",0)<128 FROM system."Copilot Settings"') = t ]]
 [[ $(source_sql 'SELECT count(*) FROM system."Copilot Settings" WHERE "Capability"=2015') = 0 ]]
+[[ $(source_sql 'SELECT count(*) FROM system."Entity Text"') = 0 ]]
 company=$(source_sql 'SELECT "Name" FROM system."Company"')
 [[ -n "$company" && "$company" != *$'\n'* && "$company" != *$'\r'* ]]
 [[ $(native_sql postgres "SELECT count(*) FROM pg_database WHERE datname='$database'") = 0 ]]
@@ -138,6 +150,14 @@ SELECT pg_catalog.setval(\'agiru_platform.rowversions_v1\'::regclass,
 GREATEST(agiru_platform.last_rowversion_v1(), (SELECT max("timestamp") FROM "Copilot Settings")), true);
 COMMIT' > "$proof/rowversions-import.log"
 [[ $(native_sql "$database" 'SELECT last_value >= (SELECT max("timestamp") FROM "Copilot Settings") FROM agiru_platform.rowversions_v1') = t ]]
+[[ $(native_sql "$database" 'SELECT count(*) FROM "Entity Text"') = 0 ]]
+original_entity_text > "$proof/entity-text-source.tsv"
+podman exec --interactive --user agiru "$container" psql -X -v ON_ERROR_STOP=1 -d "$database" \
+  -c 'COPY "Entity Text" ("timestamp","Company","Source Table Id","Source System Id","Scenario",
+"Preview Text","Text","SystemId","SystemCreatedAt","SystemCreatedBy","SystemModifiedAt","SystemModifiedBy")
+FROM STDIN' < "$proof/entity-text-source.tsv" > "$proof/entity-text-copy.log"
+copied_entity_text "$database" > "$proof/entity-text-target.tsv"
+cmp "$proof/entity-text-source.tsv" "$proof/entity-text-target.tsv"
 "${native_exec[@]}" "$native/prepare" "$dsn" "$company" "$native/auth.json" | tee "$proof/prepare.log"
 [[ $("${native_exec[@]}" stat --format=%a "$native/auth.json") = 600 ]]
 [[ $("${native_exec[@]}" stat --format=%a "$native/auth.json.denied") = 600 ]]
@@ -157,10 +177,14 @@ original_capabilities > "$proof/capabilities-source-after.tsv"
 cmp "$proof/capabilities-source.tsv" "$proof/capabilities-source-after.tsv"
 copied_capabilities "$database" > "$proof/capabilities-target-after.tsv"
 cmp "$proof/capabilities-source.tsv" "$proof/capabilities-target-after.tsv"
+original_entity_text > "$proof/entity-text-source-after.tsv"
+cmp "$proof/entity-text-source.tsv" "$proof/entity-text-source-after.tsv"
+copied_entity_text "$database" > "$proof/entity-text-target-after.tsv"
+cmp "$proof/entity-text-source.tsv" "$proof/entity-text-target-after.tsv"
 "${native_exec[@]}" sha256sum "$native_build"/libagiru_{app_platform,slice,rt,net,db,al}.so "$refusals" > "$proof/libraries-after.sha256"
 cmp "$proof/libraries.sha256" "$proof/libraries-after.sha256"
 sha256sum --check --status "$proof/inputs.sha256"
-printf 'erp-fixture: original Company and capability rows copied exactly; permission-backed original registry queries; explicit tenant authority and denial; no ERP workflow acceptance\n'
+printf 'erp-fixture: original Company, capability and Entity Text populations copied exactly; permission-backed original reads; explicit tenant authority and denial; no ERP workflow acceptance\n'
 if [[ "$mode" = client ]]; then
   "${native_exec[@]}" mkdir "$native/binaries"
   binaries=(agiru libagiru_rt.so libagiru_net.so libagiru_db.so libagiru_al.so libagiru_slice.so libagiru_app_platform.so)
@@ -178,5 +202,7 @@ if [[ "$mode" = client ]]; then
   cat "$proof/client.log"
   copied_capabilities "$database" > "$proof/capabilities-client-after.tsv"
   cmp "$proof/capabilities-source.tsv" "$proof/capabilities-client-after.tsv"
+  copied_entity_text "$database" > "$proof/entity-text-client-after.tsv"
+  cmp "$proof/entity-text-source.tsv" "$proof/entity-text-client-after.tsv"
   sha256sum --check --status "$proof/client-inputs.sha256"
 fi

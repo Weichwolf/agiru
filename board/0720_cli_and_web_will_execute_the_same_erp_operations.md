@@ -5,7 +5,7 @@ Depends on: existing generated page declarations, typed record/session primitive
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
 Next: rerun all 29 original-client cases under 0727 with the qualified original
-capability registry and faithful source import.
+capability registry and Entity Text schema/population imports.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
@@ -14,11 +14,12 @@ records exit 0 (4032 seconds); a subsequent incremental `make all` confirms exit
 in one second after the outer observation wrapper ended with signal exit 143.
 Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
-The latest completed expanded original-client regression retains 23 Customer and three Vendor passes;
-all three Item cases now open List 31 and modal 1378, then fail on explicit template
-confirmation at missing `Copilot Capability.IsCapabilityRegistered`, after the linked
-original Entity Text Impl. body executes. The absent AL diagnostic wrongly says .NET;
-this is a source-selection gap, not a CLR dependency. Preserve
+The latest complete original-client replay at 568ad0c passes preparation 31/31 and
+client 26/29: 23 Customer and three Vendor passes, three Item failures, no skipped
+or cancelled cases, outer exit 2, 611151 ms. Item template confirmation now passes
+the original capability query and fails on missing SQL relation Entity Text in the
+owned clone. Fixture/client hashes remain unchanged. This is missing fixture storage,
+not the former unavailable AL registry call or an approved exclusion. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
@@ -159,6 +160,22 @@ throw-only gaps rather than failing in the dynamic loader. Original stored FlowF
 provider execution and the three Item workflows remain unqualified. Durable sources:
 `scope.json`, `test/slice`, `test/ui/{erp-fixture.sh,erp/Prepare.cpp}` and the original
 BCApps Copilot files above; import fencing matches `scripts/seed_demo.py`.
+The next Item blocker is qualified fixture provisioning, not a runtime workaround:
+source `agiru-pg/cronus/system."Entity Text"` has twelve stored columns and zero rows.
+`make erp-fixture JOBS=2` now passes schema 8/8 and preparation 37/37; Prepare's
+targeted clang-tidy passes with zero failures. ProvisionTable uses the original
+2000000132 declaration/owner, default company storage, ReplicateData=false and
+four-field key. Canonical source/target copies remain exactly equal before/after
+permission-backed reads; the unassigned user has false ReadPermission and its
+FindFirst raises Permission even on an empty table. Source rows/seed provenance and
+native libraries/refusal object remain unchanged. No fabricated virtual provider,
+permission bypass, business mask or generated-app edit is introduced. Contracts:
+verified System `src/Tenant Database Tables/EntityText.Table.al`, BCApps original
+`Entity Text/src/EntityTextFactboxPart.Page.al::SetContext`; developer
+`properties/devenv-{datapercompany,replicatedata}-property.md` and
+`methods-auto/record/record-readpermission-method.md`; predecessors 906/924/1700.
+This accepts the actual empty source population, not nonempty import/BLOB content
+or Item creation; the unchanged full 29-case rerun remains due.
 0073 retains cross-app `NavApp.GetCallerModuleInfo`: current lowering passes the
 callee's module, not its caller's. Same-System-app registry checks do not qualify it.
 At 6a1556c, the earlier

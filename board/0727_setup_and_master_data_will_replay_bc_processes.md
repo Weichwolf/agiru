@@ -4,7 +4,7 @@ Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
 Next: qualify the three retained Item workflows using 0720's now-qualified original
-local capability registry/storage and faithful source import, then expand
+local capability registry, Entity Text storage and faithful source import, then expand
 invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
 
 ## Processes and implementation
@@ -88,16 +88,13 @@ invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
   SelectVendorTemplList.Page,VendorTemplMgt.Codeunit}.al`; user
   `includes/create_new_vendor.md`; predecessor 1503/1761/1954. This accepts the native
   Vendor sequence, not a fresh BC-sandbox comparison, purchase posting or the full family.
-- Item workflows are retained, not accepted: at c080918 code/2959bb3 receipt HEAD the expanded
-  `CI=1 make erp-client-test JOBS=2`
-  run has preparation 22/22, client 26/29, three failures, no skips/cancellations,
-  outer exit 2. After the native consumer rebuild (2683 seconds, exit 0),
-  CMD/MCP/Web each open original List 31 and New's modal 1378 with both templates.
-  Explicit template confirmation fails during FactBox initialization:
-  `Copilot Capability.IsCapabilityRegistered` is unselected, although its caller
-  EntityTextImpl now executes the linked original source. The .NET-labelled refusal
-  describes an absent AL codeunit, not a CLR requirement.
-  Fixture/client input hashes and original Company source remain unchanged.
+- Item workflows are retained, not accepted: at 568ad0c the full
+  `CI=1 make erp-client-test JOBS=2` passes preparation 31/31 and client 26/29,
+  three failures, no skips/cancellations, outer exit 2, 611151 ms.
+  CMD/MCP/Web open original List 31 and New's modal 1378 with both templates.
+  Explicit template confirmation now executes the original capability query but
+  fails on absent SQL relation Entity Text in the owned clone. Fixture/client hashes
+  remain unchanged. Later Item edit/reopen/full-row/ledger checks remain unexecuted.
   The earlier PageWindowProvider and absent-table ReadPermission refusals are repaired,
   not approved exclusions or constant-success substitutes.
   0720 now qualifies the actual missing platform-table binding from verified System
@@ -112,10 +109,12 @@ invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
   four rejected compiled defects and two clean targeted clang-tidy consumers (0720).
   Its native image now compiles/links, but Item replay remains unaccepted. 0720 qualifies
   exact source activation without namespace/cloud/sibling expansion or product-policy bypass;
-  faithful registry data and actual Item effects remain required, not constant substitutes.
-  The original registry dependency and faithful import now pass under 0720:
-  native linking exits 0; isolated schema 6/6 and preparation 31/31 pass, including
-  positive/negative app/capability filters and exact source/audit/rowversion preservation.
+  actual Item effects remain required, not constant substitutes.
+  Original registry and Entity Text schema/population imports now pass under 0720:
+  native linking exits 0; isolated schema 8/8 and preparation 37/37 pass, including
+  positive/negative app/capability filters, authenticated/denied Entity Text reads and
+  exact source/audit/rowversion preservation. Original Entity Text has zero rows;
+  its schema comes from verified System symbols, not guessed usage or a fake provider.
   The full 29-case client rerun is next; no new Item workflow pass is claimed.
   Item List declares OnFindRecord/OnNextRecord: stored Rec
   normally, temporary attribute/pick selection conditionally. Preserve both sources,
