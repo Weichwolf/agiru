@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: finish rebuilding native ERP consumers of 0720's stored-platform binding and
-rerun the three retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
+Next: link the original Entity Text Impl. prerequisite through 0720 and rerun the
+three retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
 setup/master-data workflows.
 
 ## Processes and implementation
@@ -88,18 +88,23 @@ setup/master-data workflows.
   SelectVendorTemplList.Page,VendorTemplMgt.Codeunit}.al`; user
   `includes/create_new_vendor.md`; predecessor 1503/1761/1954. This accepts the native
   Vendor sequence, not a fresh BC-sandbox comparison, purchase posting or the full family.
-- Item workflows are retained, not accepted: the expanded `make erp-client-test JOBS=2`
+- Item workflows are retained, not accepted: at 269fdaa the expanded
+  `CI=1 make erp-client-test JOBS=2`
   run has preparation 22/22, client 26/29, three failures, no skips/cancellations,
-  outer exit 2. After the native consumer rebuild at 1d41c43 (2483 seconds, exit 0),
-  CMD/MCP/Web each open original List 31, then New fails before modal 1378:
-  `Entity Text.ReadPermission` is misclassified as an unimplemented .NET member.
+  outer exit 2. After the native consumer rebuild (2232 seconds, exit 0),
+  CMD/MCP/Web each open original List 31 and New's modal 1378 with both templates.
+  Explicit template confirmation fails during FactBox initialization:
+  `EntityTextImpl_Codeunit::CanSuggest()` has no linked original source.
   Fixture/client input hashes and original Company source remain unchanged.
-  The earlier PageWindowProvider refusal at 6a1556c is superseded by this new blocker.
+  The earlier PageWindowProvider and absent-table ReadPermission refusals are repaired,
+  not approved exclusions or constant-success substitutes.
   0720 now qualifies the actual missing platform-table binding from verified System
   declarations: GenNativeBinding 199 checks, NativeStorage 84 SQL/runtime checks,
   three source defects rejected. Both AL permission forms observe revocation without
-  bypasses. Production declarations are regenerated; the native rebuild and fresh
-  Item replay remain required. The last accepted client measurement is still 26/29.
+  bypasses. Production declarations and native consumers are rebuilt; all 26
+  Customer/Vendor cases remain green on this fresh image. The measured client result
+  remains 26/29. The image retains 1850 mechanically counted unlinked-source identities,
+  four more than its predecessor; that delta remains a gap, not a higher accepted baseline.
   Item List declares OnFindRecord/OnNextRecord: stored Rec
   normally, temporary attribute/pick selection conditionally. Preserve both sources,
   custom navigation and bounded windows; removing the declaration check alone would

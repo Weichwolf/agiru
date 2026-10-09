@@ -4,21 +4,25 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: finish the native ERP consumer rebuild of the qualified stored-platform binding,
+Next: link the original Entity Text Impl. source required by Item's FactBox, rebuild,
 then rerun original Item template/card/create/edit/reopen under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
-The complete native consumer rebuild after custom-window activation exits 0 (2483 seconds).
+The complete native consumer rebuild after stored-platform activation exits 0 (2232 seconds).
 Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
 The fresh expanded original-client regression retains 23 Customer and three Vendor passes;
-all three Item cases now open List 31, then fail at New before the template modal. Preserve
+all three Item cases now open List 31 and modal 1378, then fail on explicit template
+confirmation at the unlinked original `Entity Text Impl.CanSuggest`. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0. Preserve the
-1846 known unlinked-source refusals; complete generated-app compilation is not proven.
+current 1850 unlinked-source identities in `build/podman/unlinked.cpp`, mechanically
+derived by `scripts/unlinked.py`. This is four more than the previous image, not an
+accepted higher defect baseline; retain and investigate the delta. Complete
+generated-app compilation is not proven.
 The accepted 26-case 2026-10-09 `make erp-client-test JOBS=2` run passes preparation
 22/22 and client 26/26, with zero failures/skips/cancellations; outer exit 0.
 Its fresh 29-case rerun at 1d41c43 retains preparation 22/22 and all 26 Customer/Vendor passes;
@@ -51,7 +55,15 @@ Production regeneration after 76e7efe emits the real Entity Text record in Marke
 Text; 233 selected System table declarations now have 23 bound/210 unbound, with zero
 source refusals. Source-origin verification exits 0; generator exit 1 retains all 5708
 property refusals. Slice-check retains raw 14226/selected 14023/product-excluded 102/
-omitted 101, zero missing, exit 0. The native rebuild and Item replay remain unaccepted.
+omitted 101, zero missing, exit 0. At 269fdaa the native rebuild exits 0, and the fresh
+`CI=1 make erp-client-test JOBS=2` passes preparation 22/22 and client 26/29:
+three Item failures, zero skips/cancellations, outer exit 2. Fixture/client hashes and
+original Company copy remain unchanged. The ReadPermission refusal is repaired;
+New now exposes both original Item templates before consent. Explicit confirmation
+reaches FactBox initialization, which calls the declared but unlinked
+`EntityTextImpl_Codeunit::CanSuggest()`. Original `EntityTextAOAISettings.cpp` is
+already in the slice; inspect its real permission/capability checks, not constant
+feature substitutes. Retain all later Item edit/reopen/SQL assertions, still unaccepted.
 At 6a1556c, the earlier
 PageWindowProvider refusal occurred because PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate
