@@ -92,7 +92,7 @@ async function workflowDriver(adapter, initial) {
       return text === undefined ? browserAction(web.page, origin, current.page, identity)
         : browserSet(web.page, origin, current.page, identity, text);
     },
-    async attemptedSet(current, identity, text) {
+    async attempt(current, identity, text) {
       const request = operation(current, identity, text);
       if (adapter === "CMD") {
         try { return { request, result: JSON.parse((await cmd("execute", request)).stdout) }; }
@@ -108,20 +108,24 @@ async function workflowDriver(adapter, initial) {
         assert.deepEqual(JSON.parse(reply.content[0].text), reply.structuredContent);
         return { request, failure: reply.structuredContent };
       }
-      assert.equal(current.page.interaction, undefined, "this attempt must use an original root card");
       const escaped = await web.page.evaluate(value => CSS.escape(value), identity);
       const control = web.page.locator(`[data-control="${escaped}"]`);
-      const received = web.page.waitForResponse(response => response.url() === `${origin}/commands` &&
+      const endpoint = await control.locator("form").getAttribute("action");
+      assert.match(endpoint, /^\/(?!\/)[A-Za-z0-9_/-]+$/);
+      const received = web.page.waitForResponse(response => response.url() === origin + endpoint &&
         response.request().method() === "POST");
-      await control.locator("input[name=text]").fill(text);
+      if (text !== undefined) await control.locator("input[name=text]").fill(text);
       await control.locator("button").click();
       const response = await finishedResponse(web.page, origin, await received);
       if (response.status() === 200) {
         return { request, result: { page: parsePage(await response.text()), status: response.status() } };
       }
       const failure = parseFailure(await response.text());
-      await web.page.waitForFunction(message => document.querySelector("#status")?.textContent.includes(message),
-        failure.message);
+      await web.page.waitForFunction(failure => {
+        const status = document.querySelector("#status")?.textContent ?? "";
+        return status.includes(`Server error ${failure.code}: ${failure.message} outcome=${failure.outcome}`) &&
+          status.includes(`command=${failure.command}`);
+      }, failure);
       return { request, failure: { error: failure.code, message: failure.message,
         outcome: failure.outcome, command: failure.command } };
     },
@@ -455,7 +459,7 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
         const row = await customerSnapshot(number);
         const population = await customerPopulation();
         const ledgers = await ledgerSnapshot();
-        const attempt = await driver.attemptedSet(normalized, "Country/Region Code", missing);
+        const attempt = await driver.attempt(normalized, "Country/Region Code", missing);
         await writeFile(`${proof}/customer-${adapter.toLowerCase()}-invalid-country.json`, JSON.stringify({
           number, input: missing, normalized: normalized.page, attempt, stored: await customer(number) }));
         assert.equal(attempt.result, undefined, "unknown country must not return a successful page");
@@ -496,6 +500,9 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
         assert.ok(control, "original Customer Card must expose its Blocked field");
         assert.deepEqual(control.scalar, { type: "Enum", value: ordinal, domain: "table/18/field/39",
           member, undefined: false, closing: false });
+        assert.deepEqual(control.choices, [["0", " "], ["1", "Ship"], ["2", "Invoice"], ["3", "All"]]
+          .map(([value, member]) => ({ value, member, caption: member })),
+        "all adapters must discover the original enum's exact ordered values, AL names and captions");
         assert.equal(control.display, member, "display caption must not replace the exact enum ordinal/member");
       };
       let previous = await customer(number);
@@ -538,6 +545,76 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
 }
 
 for (const adapter of ["CMD", "MCP", "Web"]) {
+  test(`${adapter} preserves an original Customer privacy block on No and clears it only after explicit Yes`,
+    { timeout: 120000 }, async () => {
+      const number = createdCustomers.get(adapter);
+      assert.ok(number, "original Customer creation prerequisite failed; privacy blocking was not executed");
+      const effects = ["Privacy Blocked", "Blocked", "SystemModifiedAt", "SystemModifiedBy", "timestamp",
+        "agiru$write_owner_v1", "Last Modified Date Time", "Last Date Modified"];
+      const unchanged = await customerSnapshot(number, effects);
+      const others = await customerPopulation(number);
+      const ledgers = await ledgerSnapshot();
+      let current = await reopenCustomer(adapter, number);
+      let driver = await workflowDriver(adapter, current);
+      let refused;
+      try {
+        current = await driver.action(current, "Privacy Blocked", "true");
+        assert.equal(field(current, "Privacy Blocked"), "true");
+        assert.equal(field(current, "Blocked"), "3");
+        assert.equal(await sql(`SELECT "Privacy Blocked"::text||':'||"Blocked"::text
+          FROM "Customer" WHERE "No."=${quoted(number)}`), "true:3");
+        const before = await customerSnapshot(number);
+        const request = operation(current, "Blocked", "Ship");
+        const question = await driver.action(current, "Blocked", "Ship");
+        assert.equal(question.page.interaction?.state, "confirm");
+        assert.equal(question.page.interaction.defaultChoice, "0");
+        assert.equal(question.page.interaction.originCommand, request.command);
+        assert.equal(question.page.interaction.prompt,
+          "If you change the Blocked field, the Privacy Blocked field is changed to No. Do you want to continue?");
+        assert.deepEqual(question.page.controls.map(control => control.caption), ["No", "Yes"]);
+        assert.equal(await customerSnapshot(number), before, "awaiting an answer must not save either field or audit stamp");
+        await driver.screenshot(`customer-${adapter.toLowerCase()}-privacy-question`);
+        const no = question.page.controls.find(control => control.caption === "No");
+        refused = await driver.attempt(question, no.identity);
+        assert.deepEqual(refused.failure, { error: "PageValidation", message: "", outcome: "failed", command: request.command });
+        assert.equal(refused.result, undefined);
+        assert.equal(await customerSnapshot(number), before,
+          "Error('') after No must roll back every business/audit field and preserve rowversion exactly");
+        assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands
+          WHERE handle=${quoted(current.page.handle)} AND command_id=${quoted(request.command)}`), "failed");
+        assert.equal(await sql(`SELECT answer::text||':'||closed::text FROM agiru_client.page_dialogs
+          WHERE handle=${quoted(question.page.interaction.dialog)}`), "0:true");
+      } finally { await driver.close(); }
+      current = await reopenCustomer(adapter, number);
+      assert.equal(field(current, "Privacy Blocked"), "true");
+      assert.equal(field(current, "Blocked"), "3");
+      driver = await workflowDriver(adapter, current);
+      let accepted;
+      try {
+        const question = await driver.action(current, "Blocked", "Ship");
+        assert.equal(question.page.interaction?.state, "confirm");
+        const yes = question.page.controls.find(control => control.caption === "Yes");
+        accepted = await driver.action(question, yes.identity);
+        assert.equal(field(accepted, "Privacy Blocked"), "false");
+        assert.equal(field(accepted, "Blocked"), "1");
+        assert.equal(await sql(`SELECT "Privacy Blocked"::text||':'||"Blocked"::text
+          FROM "Customer" WHERE "No."=${quoted(number)}`), "false:1");
+        assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands
+          WHERE handle=${quoted(current.page.handle)} AND command_id=${quoted(question.page.interaction.originCommand)}`), "complete");
+        await driver.screenshot(`customer-${adapter.toLowerCase()}-privacy-released`);
+      } finally { await driver.close(); }
+      const reopened = await reopenCustomer(adapter, number);
+      assert.equal(field(reopened, "Privacy Blocked"), "false");
+      assert.equal(field(reopened, "Blocked"), "1");
+      assert.equal(await customerSnapshot(number, effects), unchanged);
+      assert.equal(await customerPopulation(number), others);
+      assert.equal(await ledgerSnapshot(), ledgers);
+      await writeFile(`${proof}/customer-${adapter.toLowerCase()}-privacy.json`,
+        JSON.stringify({ number, refused, accepted, reopened, stored: await customer(number) }));
+    });
+}
+
+for (const adapter of ["CMD", "MCP", "Web"]) {
   test(`${adapter} refuses an original Customer edit from a stale page without overwriting a peer's committed changes`,
     { timeout: 120000 }, async () => {
       assert.ok(selected, "original Customer List prerequisite failed; concurrency was not executed");
@@ -555,7 +632,7 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
         assert.ok(BigInt(current.version) > BigInt(observed.version));
         const unchanged = await customerSnapshot(selected);
         const ledgers = await ledgerSnapshot();
-        const attempt = await driver.attemptedSet(stale, "Credit Limit (LCY)", "8765.43");
+        const attempt = await driver.attempt(stale, "Credit Limit (LCY)", "8765.43");
         await writeFile(`${proof}/customer-${adapter.toLowerCase()}-stale-write.json`, JSON.stringify({
           stale: stale.page, committed: committed.page, before: current, attempt,
           stored: await customer(selected) }));

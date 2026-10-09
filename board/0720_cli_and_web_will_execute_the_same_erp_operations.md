@@ -4,18 +4,19 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: regenerate production app declarations and rebuild every native ABI consumer,
-then qualify original Customer choice discovery/write/SQL parity, privacy-block
-confirmation/rollback, remaining invalid/duplicate/
-lookup/dimension cases and vendor/item/setup processes under 0727.
-The last original-client baseline (eef54ac) passes all twenty Customer cases; the
-new FieldDef/PageValue ABI requires regeneration/rebuild and another original run. Preserve
+Next: resolve the retained typed-modal timeout and qualify active-stack expiry/revocation
+cancellation, then expand invalid/duplicate/lookup/dimension and vendor/item/setup
+processes under 0727.
+Production enum declarations are regenerated; source-origin and slice checks pass.
+The complete native ABI-consumer rebuild exits 0 (2702 seconds). Regeneration still
+refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
+The current original-client regression passes all twenty-three Customer cases. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
-The protected-observation native diagnostic-slice image compiles and links with `make dev-exec
-COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1846 AL procedures
-still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
-`make erp-client-test JOBS=2` passes preparation 22/22 and client 20/20,
+The native diagnostic-slice image compiles and links with `make dev-exec
+COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0. Preserve the
+1846 known unlinked-source refusals; complete generated-app compilation is not proven.
+`make erp-client-test JOBS=2` passes preparation 22/22 and client 23/23,
 with zero failures/skips/cancellations; outer exit 0. Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
 over external CMD/MCP and actual Chromium. All three stale-page cases now refuse
@@ -26,6 +27,17 @@ preserve the complete Customer and four ledger populations and independently reo
 Three blocking cases save/reopen Ship, Invoice, All and the exact blank member through
 CMD/MCP/Chromium. Independent SQL qualifies ordinals, audit/rowversion and original
 OnModify timestamps while preserving all other fields/Customers/ledgers (0727).
+Original dropdowns expose 0/space, 1/Ship, 2/Invoice and 3/All in source order across
+all adapters. Three privacy cases execute the original Customer triggers: true sets
+Blocked=All; changing to Ship suspends for an explicit Confirm with default No.
+SQL proves no save while waiting; No preserves the entire row/audit/rowversion and
+records the failed original command plus closed answer 0. The uncoded Error('') retains
+empty text and production PageSessionDiagnostics classifies it as PageValidation.
+Explicit Yes clears privacy blocking and saves Ship; an independent card reopens
+false/1. Remaining business fields, other Customers and four ledger populations stay
+unchanged. Browser setter/action waits share revision-or-dialog-state detection;
+the real Chromium confirmation and released card are captured. Same-card continuation
+after root validation failure, posting enforcement and BC visual parity are not qualified.
 Enum/Option choices now flow from immutable table/type declarations through borrowed
 PageValue spans into native semantic HTML selects and the shared TypeScript parser.
 Values, AL member names and captions stay separate; enum display order follows the
@@ -45,8 +57,8 @@ failures; not FULL lint. The PageValue standalone header comparison is 326.6 ms 
 and 349.6 ms after (three no-PCH rounds each); no performance improvement is claimed.
 Fresh BrowserHttp/BrowserSession/SessionIdentity gates pass 37/61/75 checks. This does
 not qualify active-stack revocation/cancellation or cryptographic stolen-cookie binding.
-Page-level OptionCaption/ML overrides and original Customer dropdown/SQL parity remain
-unqualified; no claim that sales/journal posting enforces the chosen block.
+Page-level OptionCaption/ML overrides remain unqualified; no claim that sales/journal
+posting enforces the chosen block.
 The declaration-order prerequisite is implemented in `src/gen/EnumWriter.cpp`:
 `EnumTraits::kDisplayOrdinals` retains source/base-before-extension order separately
 from sorted `kValues`; it adds immutable ordinal metadata, not per-session copies.
@@ -69,9 +81,9 @@ Option values from captions. Reproduce using `make dev-exec` with
 the explicit verified `AGIRU_SYSTEM_SYMBOLS` (SHA-256
 `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`).
 Sources: `test/gate/GenEnumGate.cpp`, `test/transpiler/native-enums{.sh,/}` and
-`test/transpiler/native-enum-package.sh`. Production regeneration and HTML/ASCII
-choice transport remain required; the existing runtime's enum reflection order is
-not qualified by these presentation-metadata gates.
+`test/transpiler/native-enum-package.sh`. Production declarations and native consumers
+are rebuilt, and original Customer choice/SQL parity passes above. These presentation
+gates do not qualify every runtime enum-reflection operation.
 The owned clone, binary/auth copies and native process are drained and removed;
 an independent SQL check finds no remaining ERP fixture database. This proves these
 workflows, not complete client/ERP parity, tenant matching, visual BC parity or scale.

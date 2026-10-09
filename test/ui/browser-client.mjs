@@ -92,6 +92,15 @@ export async function assertBrowserPage(page, model) {
     ...(rows ? { rows, window: model.window } : {}) });
 }
 
+async function changed(page, model) {
+  await page.waitForFunction(previous => {
+    const article = document.querySelector("#workspace article");
+    return article?.dataset.revision !== previous.revision ||
+      (article?.dataset.state !== previous.interaction?.state || article?.dataset.dialog !== previous.interaction?.dialog);
+  }, model);
+  await settled(page);
+}
+
 export async function browserAction(page, origin, model, identity) {
   const escaped = await page.evaluate(value => CSS.escape(value), identity);
   const endpoint = model.interaction?.state === "modal" ? `/modal-commands/${model.interaction.dialog}` :
@@ -101,12 +110,7 @@ export async function browserAction(page, origin, model, identity) {
   await page.locator(`[data-control="${escaped}"] button`).click();
   const response = await finishedResponse(page, origin, await received);
   assert.equal(response.status(), 200, await response.text());
-  await page.waitForFunction(previous => {
-    const article = document.querySelector("#workspace article");
-    return article?.dataset.revision !== previous.revision ||
-      (article?.dataset.state !== previous.interaction?.state || article?.dataset.dialog !== previous.interaction?.dialog);
-  }, model);
-  await settled(page);
+  await changed(page, model);
   const result = { page: parsePage(await response.text()), status: response.status() };
   await assertBrowserPage(page, result.page);
   return result;
@@ -127,9 +131,7 @@ export async function browserSet(page, origin, model, identity, text) {
   await control.locator("button").click();
   const response = await finishedResponse(page, origin, await received);
   assert.equal(response.status(), 200, await response.text());
-  await page.waitForFunction(previous => document.querySelector("#workspace article")?.dataset.revision !== previous,
-    model.revision);
-  await settled(page);
+  await changed(page, model);
   const result = { page: parsePage(await response.text()), status: response.status() };
   await assertBrowserPage(page, result.page);
   return result;

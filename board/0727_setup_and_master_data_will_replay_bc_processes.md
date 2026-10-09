@@ -3,8 +3,7 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: qualify customer privacy-block confirmation/rollback and expand
-invalid/duplicate/lookup/dimension cases and the remaining
+Next: expand invalid/duplicate/lookup/dimension cases and the remaining
 setup/master-data workflows; vendor/item creation follows the accepted original
 template → customer → edit → independent reopen regression.
 
@@ -36,9 +35,9 @@ template → customer → edit → independent reopen regression.
   `scripts/analysis/patch_target_overlap.py`, `test/openerp/runtime/test_layer_view.py`;
   BC `ERM RS Package Operations::ImportPackageWithDuplicatedXMLFields`.
 
-- Last original-client prerequisite regression (eef54ac), 2026-10-09:
+- Current original-client prerequisite regression, 2026-10-09:
   `make erp-client-test JOBS=2` passes
-  preparation 22/22 and client 20/20, with zero failures/skips/cancellations, exit 0.
+  preparation 22/22 and client 23/23, with zero failures/skips/cancellations, exit 0.
   Original Customer List/Card/edit/create cases pass across external CMD/MCP and
   actual Chromium. All three stale-page cases now return native failure diagnostics
   and durable failed receipts without changing any committed field/audit/rowversion
@@ -51,11 +50,16 @@ template → customer → edit → independent reopen regression.
   rowversion, unchanged creation identity, remaining fields, other Customers and
   four ledger populations. Original OnModify updates Last Modified Date Time and
   Last Date Modified; independent SQL clock bounds qualify these rather than hiding
-  their effects. This is the current UTC profile: My Settings timezone/Today,
-  privacy-block confirmation, block enforcement on sales/journal posting and enum
-  original dropdown discovery remain unqualified. 0720 implements shared native
-  HTML/ASCII choice discovery; its new metadata ABI still needs regeneration, a complete
-  native consumer rebuild and this original SQL/browser regression repeated.
+  their effects. Original dropdown discovery now proves the exact ordered ordinal,
+  AL member and caption arrays across all three clients. Production declarations and
+  native ABI consumers are rebuilt. Three additional privacy cases qualify the original
+  confirmation: true sets All; the pending question saves nothing; explicit No produces
+  PageValidation with empty AL text and preserves the full row/audit/rowversion; explicit
+  Yes saves false/Ship. SQL verifies failed/complete original command receipts, closed
+  answer 0, unchanged remaining fields/other Customers/four ledger populations and
+  independently reopened values. Real Chromium covers both branches. My Settings
+  timezone/Today, same-card continuation after root validation failure, privacy or
+  block enforcement on sales/journal posting and BC visual parity remain unqualified.
   These are native validation proofs, not a newly executed BC-sandbox comparison.
   The retained eleven original cases verify the 40-row window, exact Unicode values, permissions
   and durable receipts; modal 1380 exposes all
@@ -74,7 +78,8 @@ template → customer → edit → independent reopen regression.
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,
   `purchasing-how-register-new-vendors.md`, `inventory-how-register-new-items.md`,
   `finance-setup-finance.md`, `ui-create-number-series.md`, `finance-dimensions.md`,
-  `receivables-how-block-customers.md` (distinct Ship/Invoice/All restrictions).
+  `receivables-how-block-customers.md` (distinct Ship/Invoice/All restrictions) and
+  `admin-responding-to-requests-about-personal-data.md` (restricting data processing).
 - Validation contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
   `methods-auto/code/code-data-type.md`, `methods-auto/record/record-validate-method.md`,
   `properties/devenv-validatetablerelation-property.md` and
@@ -85,14 +90,18 @@ template → customer → edit → independent reopen regression.
   Predecessor WIs 962/1132 distinguish relation-validation diagnostics/order from
   lookup metadata; disabling validation never removes the lookup contract.
   Enum/time contracts at those revisions: `methods-auto/enum/enum-frominteger-method.md`,
-  `devenv-extensible-enums.md`, `methods-auto/system/system-{currentdatetime,today}-method.md`;
+  `devenv-extensible-enums.md`, `methods-auto/system/system-{currentdatetime,today}-method.md`,
+  `methods-auto/dialog/dialog-confirm-method.md` (omitted default is No);
   `Layers/W1/BaseApp/Sales/Customer/CustomerBlocked.Enum.al` declares 0/space, 1/Ship,
   2/Invoice, 3/All. Customer field 39 validates privacy blocking; OnModify calls
   SetLastModifiedDateTime. Predecessor 1576 separates typed Option identity from
   display captions; 548 retains blocked opening-balance failures due to missing setup,
   not proof of correct transaction blocking.
-  `test/ui/erp-client.mjs` retains all seventeen earlier cases plus the three blocking cases;
-  `test/ui/erp-fixture.sh` migrates private write ownership only on its owned clone.
+  `test/ui/erp-client.mjs` retains all twenty earlier cases plus three privacy cases;
+  `test/ui/browser-client.mjs` shares revision-or-dialog-state waits for setters/actions.
+  `include/runtime/{PageSession,ErrorValue}.h` declares the uncoded validation classifier
+  and unchanged AL text. `test/ui/erp-fixture.sh` migrates private write ownership only
+  on its owned clone.
 - BC reference, 2026-10-06, company CRONUS CH: Customers 22 → New → three-template
   selection → DEBITOR MANDANT → Customer Card 21 creates own C00060. Saved Name
   `AGIRU 261006 - Customer`, Address `AGIRU Testweg 6`, Country CH and Credit Limit
