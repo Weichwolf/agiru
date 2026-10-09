@@ -342,11 +342,31 @@ def area_selected(area, policy):
         name.endswith(value.lower()) for value in policy.get('area_exclude_suffix', []))
 
 
-def selection_reason(namespace, area, test, policy, source_domain='bcapps'):
+def source_includes(policy):
+    entries = policy.get('source_include', [])
+    if not isinstance(entries, list):
+        raise ValueError('source includes must be an array')
+    seen = set()
+    for source in entries:
+        if not isinstance(source, str) or not source.endswith('.al'):
+            raise ValueError('source includes require exact AL file identities')
+        path = PurePosixPath(source)
+        if path.is_absolute() or '\\' in source or any(
+                part in ('', '.', '..') for part in source.split('/')):
+            raise ValueError('source includes need bounded relative file paths')
+        if source in seen:
+            raise ValueError('duplicate source include')
+        seen.add(source)
+    return seen
+
+
+def selection_reason(namespace, area, test, policy, source_domain='bcapps', source=None):
     if source_domain == 'system-symbols':
         return None
     if source_domain != 'bcapps':
         raise ValueError('unknown source domain')
+    if source in policy.get('source_include', []):
+        return None
     if not namespace_selected(namespace, policy):
         return 'selection-namespace'
     if test and not area_selected(area, policy):
@@ -404,12 +424,16 @@ def inventory(root, configuration, policy, source_domain='bcapps'):
         raise ValueError('AL source root must be a directory')
     apps = configured_apps(configuration)
     all_rules = product_rules(policy)
+    all_includes = source_includes(policy)
     if source_domain not in ('bcapps', 'system-symbols'):
         raise ValueError('unknown source domain')
     prefix = 'system-symbols/'
     rules = [(reason, source[len(prefix):] if source_domain == 'system-symbols' else source)
              for reason, source in all_rules
              if source.startswith(prefix) == (source_domain == 'system-symbols')]
+    includes = [source[len(prefix):] if source_domain == 'system-symbols' else source
+                for source in all_includes
+                if source.startswith(prefix) == (source_domain == 'system-symbols')]
     declared_roots = {path.parent.relative_to(root).as_posix()
                       for path in root.rglob('app.json') if path.is_file()}
     files, objects, errors = [], [], []
@@ -454,7 +478,8 @@ def inventory(root, configuration, policy, source_domain='bcapps'):
             row['conditional_source'] = bool(re.search(r'^\s*#(?:if|elif)\b', text, re.M | re.I))
             for index, item in enumerate(found):
                 omission = selection_reason(namespace, area,
-                    item['kind'] == 'codeunit' and item['test_subtype'], policy, source_domain)
+                    item['kind'] == 'codeunit' and item['test_subtype'], policy, source_domain,
+                    source if source_domain == 'bcapps' else prefix + source)
                 selected = bool(configured) and reason is None and omission is None
                 item.update(source=source, declaration_index=index, app_root=app_root,
                             configured_apps=configured, namespace_selected=row['namespace_selected'],
@@ -473,6 +498,8 @@ def inventory(root, configuration, policy, source_domain='bcapps'):
                   for source in missing_roots)
     errors.extend({'source': source, 'error': 'product exclusion target is missing'}
                   for _, source in rules if not (root / source).exists())
+    errors.extend({'source': source, 'error': 'source include target is missing'}
+                  for source in includes if not (root / source).is_file())
     test_units = [item for item in objects if item['kind'] == 'codeunit' and item['test_subtype']]
     return {'format': 1, 'scope': 'raw source; conditional variants retained, not an executable manifest',
             'source_root': str(root), 'source_domain': source_domain,

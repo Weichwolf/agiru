@@ -173,6 +173,9 @@ bool InScope(const Run &run, const std::filesystem::path &path) {
   if (agiru::gen::ProductExclusion(*run.scope, path.lexically_relative(run.sourceRoot))) {
     return false;
   }
+  if (agiru::gen::SourceIncluded(*run.scope, path.lexically_relative(run.sourceRoot))) {
+    return true;
+  }
   const std::string nameSpace = DeclaredNamespace(path);
   if (!nameSpace.empty() && !agiru::gen::Holds(*run.scope, nameSpace)) { return false; }
   const std::filesystem::path relative = path.lexically_relative(run.root);
@@ -2968,6 +2971,22 @@ void NoteProductExclusions(const Job &job, const agiru::gen::TranspileScope &sco
   }
 }
 
+void NoteSourceIncludes(const Job &job, const agiru::gen::TranspileScope &scope) {
+  constexpr std::string_view kNativePrefix = "system-symbols/";
+  for (const std::string &entry : scope.sourceInclude) {
+    const bool native = entry.starts_with(kNativePrefix);
+    const auto source = native ? std::string_view(entry).substr(kNativePrefix.size()) : entry;
+    if (native && job.systemSymbols.empty()) {
+      throw std::runtime_error("scope.json: System source include requires --system-symbols: " +
+                               entry);
+    }
+    if (!std::filesystem::is_regular_file((native ? job.systemSymbols : job.source) / source)) {
+      throw std::runtime_error("scope.json: source include target is missing: " + entry);
+    }
+    std::println("explicit source include: {} (product exclusions remain authoritative)", entry);
+  }
+}
+
 void IndexProductPages(const Job &job,
                        const agiru::gen::TranspileScope &scope,
                        agiru::gen::Objects &objects) {
@@ -3436,6 +3455,7 @@ private:
     apps = agiru::gen::ReadApps(job.apps);
     scope = agiru::gen::ReadScope(job.apps.parent_path() / "scope.json");
     NoteProductExclusions(job, scope);
+    NoteSourceIncludes(job, scope);
     IndexProductPages(job, scope, objects);
     nativeSources = job.systemSymbols.empty() ? agiru::gen::NativeSources{}
                                               : agiru::gen::ReadNativeSources(job.systemSymbols);

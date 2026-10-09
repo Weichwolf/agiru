@@ -18,9 +18,13 @@ Retain original notices.
 the actual transpiler, composed page extensions and native generated C++ execution.
 Raw object identities remain independently inventoried; removed parts and discarded
 direct `CurrPage.<part>.Page.<method>` calls appear in `generation-product-parts.tsv`.
-Arguments still evaluate once in source order. Consumed values, namespace-only omissions,
-unknown ERP parts and generic chart add-ins retain explicit refusals. Five compiled
-selection/domain/namespace/value/order defects must fail named checks. This is selection proof,
+Arguments still evaluate once in source order. Exact `source_include` files can activate
+local dependencies without selecting namespace siblings or overriding product exclusions.
+Transpiler and independent inventory reject traversal, directories, duplicates and missing files;
+the generated-build projection retains the same selection and product precedence.
+Consumed values, remaining namespace omissions, unknown ERP parts and generic chart add-ins
+retain explicit refusals. Eight compiled selection/domain/namespace/value/order/activation
+defects must fail named checks. This is selection proof,
 not chart rendering, original Customer workflow or full ERP acceptance.
 
 `run.sh` runs the local regression population. `slice` is the ordered generated C++

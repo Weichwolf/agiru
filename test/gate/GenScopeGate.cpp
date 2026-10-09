@@ -181,6 +181,34 @@ void ConfiguredMatchersAgree(const Scope &scope) {
   }
 }
 
+void ExplicitFilesRetainTheirBoundaries() {
+  agiru::gen::TranspileScope rules;
+  rules.include = {"Fixture"};
+  rules.exclude = {"Fixture.Cloud"};
+  rules.sourceInclude = {"fixture/Local.Codeunit.al",
+                         "fixture/cloud/Remote.Page.al",
+                         "system-symbols/src/Native.Table.al"};
+  rules.productExclude.push_back({.reason = "microsoft-cloud", .source = "fixture/cloud/"});
+  CHECK_TRUE("an exact local dependency is selected despite its namespace omission",
+             agiru::gen::SourceIncluded(rules, "fixture/Local.Codeunit.al") &&
+                 !agiru::gen::Holds(rules, "Fixture.Cloud"));
+  for (const std::string_view source : {"fixture/Local.Codeunit.alOther.Codeunit.al",
+                                        "fixture/LocalOther.Codeunit.al",
+                                        "fixture/local.Codeunit.al",
+                                        "fixture/child/Local.Codeunit.al"}) {
+    CHECK_TRUE("source activation never widens to siblings, descendants or case aliases",
+               !agiru::gen::SourceIncluded(rules, source));
+  }
+  CHECK_TRUE("an explicit product exclusion wins over source activation",
+             !agiru::gen::SourceIncluded(rules, "fixture/cloud/Remote.Page.al"));
+  CHECK_TRUE("native activation uses its explicit source domain",
+             agiru::gen::SourceIncluded(
+                 rules, "src/Native.Table.al", agiru::gen::SourceDomain::SystemSymbols) &&
+                 !agiru::gen::SourceIncluded(rules, "src/Native.Table.al") &&
+                 !agiru::gen::SourceIncluded(
+                     rules, "fixture/Local.Codeunit.al", agiru::gen::SourceDomain::SystemSymbols));
+}
+
 } // namespace
 
 int main() {
@@ -192,5 +220,6 @@ int main() {
     TheNamespaceDecidesTheDirectory();
     NamespaceSelectionUsesTheSameTieRule();
     ConfiguredMatchersAgree(scope);
+    ExplicitFilesRetainTheirBoundaries();
   });
 }

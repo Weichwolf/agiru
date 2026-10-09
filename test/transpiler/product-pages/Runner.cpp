@@ -18,6 +18,8 @@ template <class Call> void Refused(std::string_view claim, std::string_view path
 
 void Execute() {
   agiru::Fixture::FeatureHost_Page page;
+  CHECK_TRUE("an explicitly selected local dependency executes its original AL body",
+             page.DependencyValue() == 55);
   page.OpenFeatures();
   CHECK_TRUE("discarded product calls preserve argument effects once in source order",
              page.Current() == 12355);

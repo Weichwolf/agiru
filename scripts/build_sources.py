@@ -9,7 +9,7 @@ from pathlib import Path, PurePosixPath
 import re
 import sys
 
-from scope_inventory import configured_apps, product_reason, product_rules, selection_reason
+from scope_inventory import configured_apps, product_reason, product_rules, selection_reason, source_includes
 from unity_groups import group_sources, slice_sources
 from ut_manifest import IGNORED
 
@@ -117,6 +117,7 @@ def project(arguments):
     if not policy.get('include'):
         raise ValueError('scope.json: the include list is empty')
     rules = product_rules(policy)
+    source_includes(policy)
     apps_bytes = (root / 'apps.json').read_bytes()
     configured_apps(json.loads(apps_bytes))
     emitted, current, generation_error = generation(generated, scope_bytes, apps_bytes)
@@ -149,7 +150,7 @@ def project(arguments):
         if not reason and source and not origin.get('source_missing', True):
             domain = 'system-symbols' if source.startswith('system-symbols/') else 'bcapps'
             reason = selection_reason(origin.get('namespace', ''), origin.get('area', ''),
-                                      origin.get('test', False), policy, domain)
+                                      origin.get('test', False), policy, domain, source)
             if reason:
                 decision = 'omitted'
         present = (generated / cpp).is_file()

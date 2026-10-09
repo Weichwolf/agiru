@@ -158,11 +158,11 @@ void RequireRelativeSource(std::string_view name) {
   const std::filesystem::path source(name);
   if (name.empty() || source.is_absolute() || name.find('\\') != std::string_view::npos ||
       name.find("//") != std::string_view::npos) {
-    throw std::runtime_error("scope.json: product exclusions require relative source paths");
+    throw std::runtime_error("scope.json: source rules require relative source paths");
   }
   for (const auto &part : source) {
     if (part == "." || part == "..") {
-      throw std::runtime_error("scope.json: product exclusions cannot traverse source roots");
+      throw std::runtime_error("scope.json: source rules cannot traverse source roots");
     }
   }
 }
@@ -183,6 +183,17 @@ std::optional<std::string_view> ProductExclusion(const TranspileScope &scope,
   return std::nullopt;
 }
 
+bool SourceIncluded(const TranspileScope &scope,
+                    const std::filesystem::path &relativeSource,
+                    SourceDomain domain) {
+  const std::string source = relativeSource.generic_string();
+  RequireRelativeSource(source);
+  if (ProductExclusion(scope, relativeSource, domain)) { return false; }
+  const std::string selected =
+      (domain == SourceDomain::SystemSymbols ? "system-symbols/" : "") + source;
+  return std::ranges::find(scope.sourceInclude, selected) != scope.sourceInclude.end();
+}
+
 TranspileScope ReadScope(const std::filesystem::path &path) {
   const std::ifstream file(path);
   if (!file) { throw std::runtime_error("scope.json: cannot read " + path.string()); }
@@ -194,6 +205,17 @@ TranspileScope ReadScope(const std::filesystem::path &path) {
   scope.exclude = reader.At("\"exclude\"");
   scope.areaExclude = reader.At("\"area_exclude\"");
   scope.areaExcludeSuffix = reader.At("\"area_exclude_suffix\"");
+  std::set<std::string> included;
+  for (const std::string &source : reader.At("\"source_include\"")) {
+    RequireRelativeSource(source);
+    if (!source.ends_with(".al")) {
+      throw std::runtime_error("scope.json: source includes require exact AL file identities");
+    }
+    if (!included.insert(source).second) {
+      throw std::runtime_error("scope.json: duplicate source include");
+    }
+    scope.sourceInclude.push_back(source);
+  }
   std::set<std::string> selected;
   for (const std::string &entry : reader.At("\"product_exclude\"")) {
     const std::size_t colon = entry.find(':');

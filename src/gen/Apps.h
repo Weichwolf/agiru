@@ -30,6 +30,7 @@ struct TranspileScope {
   std::vector<std::string> areaExclude;
   std::vector<std::string> areaExcludeSuffix;
   std::vector<SourceExclusion> productExclude;
+  std::vector<std::string> sourceInclude;
 };
 
 [[nodiscard]] bool Holds(const TranspileScope &scope, std::string_view nameSpace);
@@ -42,5 +43,9 @@ TranspileScope ReadScope(const std::filesystem::path &path);
 ProductExclusion(const TranspileScope &scope,
                  const std::filesystem::path &relativeSource,
                  SourceDomain domain = SourceDomain::BCApps);
+
+[[nodiscard]] bool SourceIncluded(const TranspileScope &scope,
+                                  const std::filesystem::path &relativeSource,
+                                  SourceDomain domain = SourceDomain::BCApps);
 
 }

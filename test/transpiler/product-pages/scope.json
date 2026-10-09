@@ -1,1 +1,1 @@
-{"include":["Fixture"],"exclude":["Fixture.Cloud","Fixture.Unselected"],"product_exclude":["microsoft-cloud:fixture/cloud/"]}
+{"include":["Fixture"],"exclude":["Fixture.Cloud","Fixture.Unselected"],"source_include":["fixture/dependency/LocalDependency.Codeunit.al","fixture/cloud/Remote.Page.al"],"product_exclude":["microsoft-cloud:fixture/cloud/"]}

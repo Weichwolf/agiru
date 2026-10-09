@@ -30,6 +30,9 @@ page 50300 "Feature Host"
     procedure UnknownAddIn()
     begin CurrPage.Chart.Refresh(Bump(8)); end;
     procedure Current(): Integer begin exit(Value); end;
+    procedure DependencyValue(): Integer
+    var Dependency: Codeunit Fixture.Cloud."Local Dependency";
+    begin exit(Dependency.Value()); end;
     procedure RequiredTouches(): Integer begin exit(CurrPage.Required.Page.TouchCount()); end;
     procedure Bump(Number: Integer): Integer
     begin Value := Value * 10 + Number; exit(Value); end;

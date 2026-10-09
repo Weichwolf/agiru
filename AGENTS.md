@@ -21,6 +21,8 @@ documentation and commits are English.
 - Root `scope.json` is the single selection policy for the transpiler and independent
   inventory. Product exclusions name bounded source paths and approved reasons;
   namespace/area reachability is not a complete product classification.
+  `source_include` activates exact AL file identities across namespace/area omissions;
+  explicit product exclusions still win. No directories, traversal or missing targets.
 
 ## Delivery order
 

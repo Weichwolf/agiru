@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: inspect 0720's running full 29-case replay after the native Entity Text Impl. rebuild
-(2683 seconds, exit 0); qualify the three retained Item workflows, then expand
+Next: use 0720's exact source-selection contract to activate the original local capability
+registry/storage dependency and faithful import; qualify the three retained Item workflows, then expand
 invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
 
 ## Processes and implementation
@@ -88,13 +88,15 @@ invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
   SelectVendorTemplList.Page,VendorTemplMgt.Codeunit}.al`; user
   `includes/create_new_vendor.md`; predecessor 1503/1761/1954. This accepts the native
   Vendor sequence, not a fresh BC-sandbox comparison, purchase posting or the full family.
-- Item workflows are retained, not accepted: at 269fdaa the expanded
+- Item workflows are retained, not accepted: at c080918 code/2959bb3 receipt HEAD the expanded
   `CI=1 make erp-client-test JOBS=2`
   run has preparation 22/22, client 26/29, three failures, no skips/cancellations,
-  outer exit 2. After the native consumer rebuild (2232 seconds, exit 0),
+  outer exit 2. After the native consumer rebuild (2683 seconds, exit 0),
   CMD/MCP/Web each open original List 31 and New's modal 1378 with both templates.
   Explicit template confirmation fails during FactBox initialization:
-  `EntityTextImpl_Codeunit::CanSuggest()` has no linked original source.
+  `Copilot Capability.IsCapabilityRegistered` is unselected, although its caller
+  EntityTextImpl now executes the linked original source. The .NET-labelled refusal
+  describes an absent AL codeunit, not a CLR requirement.
   Fixture/client input hashes and original Company source remain unchanged.
   The earlier PageWindowProvider and absent-table ReadPermission refusals are repaired,
   not approved exclusions or constant-success substitutes.
@@ -103,12 +105,14 @@ invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
   three source defects rejected. Both AL permission forms observe revocation without
   bypasses. Production declarations and native consumers are rebuilt; all 26
   Customer/Vendor cases remain green on this fresh image. The measured client result
-  remains 26/29. The image retains 1850 mechanically counted unlinked-source identities,
-  four more than its predecessor; that delta remains a gap, not a higher accepted baseline.
+  remains 26/29. The image retains 1841 mechanically counted unlinked-source identities,
+  down from 1850; remaining gaps are not an accepted defect baseline.
   The original missing codeunit is appended to the slice. Its Char-to-Text Replace
   compile prerequisite is qualified by 47 TextMethod, 91 Text and 13 generated checks,
   four rejected compiled defects and two clean targeted clang-tidy consumers (0720).
-  Its actual stable unity consumer now compiles; full linking and Item replay remain pending.
+  Its native image now compiles/links, but Item replay remains unaccepted. 0720 qualifies
+  exact source activation without namespace/cloud/sibling expansion or product-policy bypass;
+  faithful registry data and actual Item effects remain required, not constant substitutes.
   Item List declares OnFindRecord/OnNextRecord: stored Rec
   normally, temporary attribute/pick selection conditionally. Preserve both sources,
   custom navigation and bounded windows; removing the declaration check alone would

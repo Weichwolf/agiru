@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: inspect the running full 29-case original-client replay after linking Entity Text Impl.;
-repair the observed Item blocker, then qualify template/card/create/edit/reopen under 0727.
+Next: activate narrowly named original capability registry/storage declarations and
+import faithful source data; rebuild and rerun all 29 original-client cases under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
@@ -14,7 +14,9 @@ Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
 The latest completed expanded original-client regression retains 23 Customer and three Vendor passes;
 all three Item cases now open List 31 and modal 1378, then fail on explicit template
-confirmation at the unlinked original `Entity Text Impl.CanSuggest`. Preserve
+confirmation at missing `Copilot Capability.IsCapabilityRegistered`, after the linked
+original Entity Text Impl. body executes. The absent AL diagnostic wrongly says .NET;
+this is a source-selection gap, not a CLR dependency. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
@@ -75,7 +77,11 @@ source/UTF-8/replacement defects reject; input hashes stay unchanged. Both chang
 C++ test consumers pass targeted clang-tidy, zero failures, not FULL lint.
 The stable unity consumer containing original EntityTextImpl now compiles, exit 0;
 source-check retains raw 14227/selected 14024/excluded 102/omitted 101, zero missing.
-Full native linking now exits 0; the fresh 29-case replay is running, not accepted.
+Full native linking exits 0; the fresh full 29-case replay at c080918 code/2959bb3
+receipt HEAD passes preparation 22/22 and client 26/29, three Item failures, no
+skips/cancellations, outer exit 2. All Customer/Vendor cases remain green; Item's
+explicit template answer now reaches missing Copilot Capability.IsCapabilityRegistered.
+Fixture/client hashes, library hashes and original Company source remain unchanged.
 This does not enable Microsoft-cloud providers or qualify every text operation.
 Contracts at the pinned
 developer revision: `methods-auto/text/text-replace-method.md` and
@@ -96,7 +102,26 @@ This is static/SQL audit, not fresh Item acceptance. Sources at the pinned BCApp
 `AI/src/Copilot/{CopilotCapability.Codeunit,CopilotCapabilityImpl.Codeunit,CopilotSettings.Table}.al`
 and `Entity Text/src/EntityTextCapability.EnumExt.al`; developer
 `methods-auto/record/record-readisolation-method.md`; predecessors 760/1997 retain
-the mixed-namespace/cloud-dependency distinction. Retain the full 29-case replay first.
+the mixed-namespace/cloud-dependency distinction. The full replay confirms this missing
+registry call; later Item edit/reopen/SQL assertions remain unexecuted.
+Exact dependency selection is now qualified without broad System.AI activation:
+`source_include` selects exact original file identities, with product exclusions winning.
+GenScope passes 322/322; `make product-pages JOBS=2` counts seven raw fixture objects,
+four selected, one product-excluded and two omitted, then executes the selected AL
+dependency body in native C++. Eight compiled defects and four invalid policies reject;
+input hashes remain unchanged. Transpiler/inventory refuse traversal, directories,
+duplicates and missing files. `test/tooling/slice-check.sh` proves generated-source
+projection agrees, including product precedence and explicit invalid-path refusal.
+All four affected C++ consumers pass targeted clang-tidy, not FULL lint or UT.
+Root production selection is unchanged until explicit file activation/regeneration.
+Current slice-check retains 14227 raw/14024 selected/102 product-excluded/101 omitted,
+zero missing; the incremental native `make all` exits 0 in two seconds.
+Fresh `make census` retains 36792 raw objects/113111 test methods, 10767 selected
+objects/38420 selected tests and the same three-source/seven-variant refusals; outer
+exit 2, not inventory acceptance. 0058 retains the full coverage gaps.
+Sources: `src/gen/Apps.{h,cpp}`, `src/tc/Main.cpp`,
+`scripts/{scope_inventory,build_sources}.py`, `test/gate/GenScopeGate.cpp`,
+`test/transpiler/product-pages{.sh,/Runner.cpp,/al/fixture/dependency/}`.
 At 6a1556c, the earlier
 PageWindowProvider refusal occurred because PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate
