@@ -4,24 +4,25 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: finish the native rebuild with the original Entity Text Impl. source required by Item's FactBox,
-then rerun original Item template/card/create/edit/reopen under 0727.
+Next: inspect the running full 29-case original-client replay after linking Entity Text Impl.;
+repair the observed Item blocker, then qualify template/card/create/edit/reopen under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
-The complete native consumer rebuild after stored-platform activation exits 0 (2232 seconds).
+The latest complete native consumer rebuild including Entity Text Impl. exits 0 (2683 seconds).
 Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
-The fresh expanded original-client regression retains 23 Customer and three Vendor passes;
+The latest completed expanded original-client regression retains 23 Customer and three Vendor passes;
 all three Item cases now open List 31 and modal 1378, then fail on explicit template
 confirmation at the unlinked original `Entity Text Impl.CanSuggest`. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0. Preserve the
-current 1850 unlinked-source identities in `build/podman/unlinked.cpp`, mechanically
-derived by `scripts/unlinked.py`. This is four more than the previous image, not an
-accepted higher defect baseline; retain and investigate the delta. Complete
+current 1841 unlinked-source identities in `build/podman/unlinked.cpp`, mechanically
+derived by `scripts/unlinked.py`, down from 1850 in the preceding image.
+EntityTextImpl has no remaining entry. This net reduction is not full source acceptance;
+retain all remaining identities and investigate coverage changes. Complete
 generated-app compilation is not proven.
 The accepted 26-case 2026-10-09 `make erp-client-test JOBS=2` run passes preparation
 22/22 and client 26/26, with zero failures/skips/cancellations; outer exit 0.
@@ -74,8 +75,9 @@ source/UTF-8/replacement defects reject; input hashes stay unchanged. Both chang
 C++ test consumers pass targeted clang-tidy, zero failures, not FULL lint.
 The stable unity consumer containing original EntityTextImpl now compiles, exit 0;
 source-check retains raw 14227/selected 14024/excluded 102/omitted 101, zero missing.
-Full native linking and the fresh 29-case replay remain pending; this does not enable
-Microsoft-cloud providers or qualify every text operation. Contracts at the pinned
+Full native linking now exits 0; the fresh 29-case replay is running, not accepted.
+This does not enable Microsoft-cloud providers or qualify every text operation.
+Contracts at the pinned
 developer revision: `methods-auto/text/text-replace-method.md` and
 `methods-auto/char/char-data-type.md`; BCApps original EntityTextImpl.BuildFacts and
 EntityTextAOAISettings.IsEnabled, with their original permission/capability checks.
@@ -369,11 +371,13 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 
 ## P0 security acceptance
 
-- Fresh native requalification at 1d41c43: `make browser-auth JOBS=2` passes
+- Fresh native requalification of c080918 code (receipt HEAD 2959bb3):
+  `make browser-auth JOBS=2` passes
   37 protocol and 280 configuration checks; `make browser-sessions JOBS=2` passes
   61 storage checks plus the MAC-provider refusal; `make page-call-authority JOBS=2`
   passes 75 checks. All 25 compiled security defects reject; input hashes remain
-  unchanged and each outer Make exits 0. Container runs explicitly select
+  unchanged; the combined `make browser-auth browser-sessions page-call-authority`
+  invocation exits 0. Container runs explicitly select
   `AGIRU_TEST_DSN=postgresql://agiru:agiru@127.0.0.1:5432/agiru_gate` and
   `B=/workspace/build/podman`. These are native gates, not a fresh HTTPS/browser run
   or complete SaaS/device-binding acceptance; actual browser evidence is retained below.

@@ -3,9 +3,9 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: finish 0720's native rebuild of the original Entity Text Impl. prerequisite and rerun the
-three retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
-setup/master-data workflows.
+Next: inspect 0720's running full 29-case replay after the native Entity Text Impl. rebuild
+(2683 seconds, exit 0); qualify the three retained Item workflows, then expand
+invalid/duplicate/lookup/dimension and remaining setup/master-data workflows.
 
 ## Processes and implementation
 
