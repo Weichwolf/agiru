@@ -64,6 +64,13 @@ std::string DeclarationMetadata(const al::EnumObject &object,
   out += "  static constexpr bool kExtensible = ";
   out += extensible != nullptr && LowerKey(extensible->text) == "true" ? "true" : "false";
   out += ";\n";
+  out += "  static constexpr std::array<std::int32_t, " + std::to_string(object.values.size()) +
+         "> kDisplayOrdinals{";
+  for (std::size_t at = 0; at < object.values.size(); ++at) {
+    if (at != 0) { out += ", "; }
+    out += std::to_string(object.values[at].ordinal);
+  }
+  out += "};\n";
   out += "  static constexpr std::array<std::string_view, " + std::to_string(sorted.size()) +
          "> kValueImplementations{";
   for (std::size_t at = 0; at < sorted.size(); ++at) {

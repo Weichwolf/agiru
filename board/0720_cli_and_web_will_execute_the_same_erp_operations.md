@@ -4,7 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: expose server-declared Option/Enum choices through the shared HTML/ASCII model,
+Next: carry the new declaration-order enum metadata through table/variable bindings
+into server-declared HTML/ASCII choices and prove CMD/MCP/web discovery/write parity,
 then qualify Customer privacy-block confirmation/rollback, remaining invalid/duplicate/
 lookup/dimension cases and vendor/item/setup processes under 0727.
 The rebuilt native image passes all twenty Customer client cases. Preserve
@@ -27,6 +28,31 @@ OnModify timestamps while preserving all other fields/Customers/ledgers (0727).
 Enum edits currently use text forms in `src/rt/PageHtml.cpp`; valid member choices
 are not yet discoverable from `src/client/profile.mts`. This is not dropdown/UI parity
 or proof that sales/journal posting enforces the chosen block.
+The declaration-order prerequisite is implemented in `src/gen/EnumWriter.cpp`:
+`EnumTraits::kDisplayOrdinals` retains source/base-before-extension order separately
+from sorted `kValues`; it adds immutable ordinal metadata, not per-session copies.
+GenEnumGate passes 28 checks, including the original Flushing Method Filter's
+50-before-5 declaration and an empty enum. `make native-enums` passes 19 execution
+checks; wrong ordinal, caption and sorted-display controls reject, as do the altered
+interface signature and missing platform-owner module. Both app/slice source checks
+retain 3/3 sources, zero omissions/errors; their CMake consumers compile.
+The specialist now supplies its actual scope and verifies source provenance before
+consumer compilation, then checks source/compiler hashes remained unchanged.
+`make native-enum-package` qualifies all 28 enums of the verified system package,
+including independently source-derived display-order assertions. Four changed C++
+units pass targeted clang-tidy, zero failures; not FULL lint, ERP or dropdown acceptance.
+Contracts: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
+`devenv-extensible-enums.md` and `properties/devenv-optioncaption-property.md`;
+BCApps main `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`,
+`Foundation/Enums/FlushingMethodFilter.Enum.al`; predecessor 1576 separates typed
+Option values from captions. Reproduce using `make dev-exec` with
+`make native-enums B=/workspace/build/podman JOBS=2`; package qualification needs
+the explicit verified `AGIRU_SYSTEM_SYMBOLS` (SHA-256
+`f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`).
+Sources: `test/gate/GenEnumGate.cpp`, `test/transpiler/native-enums{.sh,/}` and
+`test/transpiler/native-enum-package.sh`. Production regeneration and HTML/ASCII
+choice transport remain required; the existing runtime's enum reflection order is
+not qualified by these presentation-metadata gates.
 The owned clone, binary/auth copies and native process are drained and removed;
 an independent SQL check finds no remaining ERP fixture database. This proves these
 workflows, not complete client/ERP parity, tenant matching, visual BC parity or scale.

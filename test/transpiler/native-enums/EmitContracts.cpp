@@ -22,7 +22,6 @@ void Emit(const char *path) {
   const std::string source{std::istreambuf_iterator<char>(stream),
                            std::istreambuf_iterator<char>()};
   auto object = agiru::al::ParseEnum(source);
-  std::ranges::sort(object.values, {}, &agiru::al::EnumValueDecl::ordinal);
   const auto type =
       "::agiru::" + agiru::gen::NamespaceSuffix(object.nameSpace) +
       agiru::gen::ClassName(agiru::gen::Identifier(object.name), agiru::gen::ObjectKind::Enum);
@@ -31,6 +30,12 @@ void Emit(const char *path) {
             << "static_assert(Traits::kObjectID == " << object.id << ");\n"
             << "static_assert(Traits::kName == " << agiru::gen::Literal(object.name) << ");\n"
             << "static_assert(Traits::kValues.size() == " << object.values.size() << ");\n";
+  std::cout << "static_assert(Traits::kDisplayOrdinals.size() == " << object.values.size()
+            << ");\n";
+  for (std::size_t at = 0; at < object.values.size(); ++at) {
+    std::cout << "static_assert(Traits::kDisplayOrdinals[" << at
+              << "] == " << object.values[at].ordinal << ");\n";
+  }
   const auto *caption = agiru::al::Find(object.properties, "Caption");
   const auto *scope = agiru::al::Find(object.properties, "Scope");
   const auto *extensible = agiru::al::Find(object.properties, "Extensible");
@@ -50,6 +55,7 @@ void Emit(const char *path) {
     std::cout << "static_assert(Traits::kInterfaces[" << at
               << "] == " << agiru::gen::Literal(object.implements[at]) << ");\n";
   }
+  std::ranges::sort(object.values, {}, &agiru::al::EnumValueDecl::ordinal);
   for (std::size_t at = 0; at < object.values.size(); ++at) {
     const auto &value = object.values[at];
     const auto *valueCaption = agiru::al::Find(value.properties, "Caption");

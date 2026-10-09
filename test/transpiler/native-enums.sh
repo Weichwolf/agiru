@@ -6,6 +6,10 @@ CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-native-enums.XXXXXX)
 printf '%s\n' "$proof" > "$B/native-enums.latest"
 input="$PWD/test/transpiler/native-enums"
+git rev-parse HEAD > "$proof/head.txt"
+sha256sum src/gen/EnumWriter.cpp test/transpiler/native-enums.sh "$B/agirutc" \
+  "$B"/libagiru_{gen,al,rt,net,db}.so > "$proof/inputs.sha256"
+rg --files "$input" | LC_ALL=C sort | xargs -d '\n' sha256sum >> "$proof/inputs.sha256"
 "$B/agirutc" "$input" "$input/apps.json" "$proof/generated" \
   --system-symbols "$input/package" > "$proof/generation.log" 2>&1
 rg -q 'native 1 enum sources bound; 1 enum objects written' "$proof/generation.log"
@@ -31,17 +35,30 @@ jq -n --arg directory "$PWD" --arg file "$PWD/test/transpiler/native-enums/Runne
   > "$proof/source-only.log" 2>&1
 rg -q 'native 1 enum sources bound; 0 enum objects written' "$proof/source-only.log"
 
-for control in wrong-ordinal wrong-caption; do
+for control in wrong-ordinal wrong-caption wrong-display-order; do
   cp -a "$input" "$proof/$control"
   changed="$proof/$control/package/src/unusual-name.aL"
   if [ "$control" = wrong-ordinal ]; then
     sed -i 's/value(10; Chosen)/value(11; Chosen)/' "$changed"
-  else
+  elif [ "$control" = wrong-caption ]; then
     sed -i "s/Caption = 'Chosen value'/Caption = 'Wrong caption'/" "$changed"
   fi
-  cmp -s "$input/package/src/unusual-name.aL" "$changed" && exit 1
+  if [ "$control" != wrong-display-order ]; then
+    cmp -s "$input/package/src/unusual-name.aL" "$changed" && exit 1
+  fi
   "$B/agirutc" "$proof/$control" "$proof/$control/apps.json" "$proof/$control/generated" \
     --system-symbols "$proof/$control/package" > "$proof/$control.log" 2>&1
+  if [ "$control" = wrong-display-order ]; then
+    header="$proof/$control/generated/platform/system/fixture/enum/NativeSparse.h"
+    awk '
+      /kDisplayOrdinals\{10, 0, 70, 5\}/ {
+        sub(/kDisplayOrdinals\{10, 0, 70, 5\}/, "kDisplayOrdinals{0, 5, 10, 70}"); changed++
+      }
+      { print }
+      END { if (changed != 1) exit 2 }
+    ' "$header" > "$header.changed"
+    mv "$header.changed" "$header"
+  fi
   mutant_flags=(-Iinclude -Itest/gate "-I$proof/$control/generated/fixture"
     "-I$proof/$control/generated/shared" "-I$proof/$control/generated/platform"
     "-I$proof/$control/generated/absent")
@@ -53,6 +70,10 @@ for control in wrong-ordinal wrong-caption; do
   if "$proof/$control/runner" > "$proof/$control-execution.log" 2>&1; then
     printf 'native-enums: %s escaped the execution control\n' "$control" >&2
     exit 1
+  fi
+  if [ "$control" = wrong-display-order ]; then
+    rg -q 'base declaration order remains independent of lookup order|extension declaration order follows the base' \
+      "$proof/$control-execution.log"
   fi
 done
 
@@ -80,6 +101,9 @@ cp CMakeLists.txt "$cmake_source/"
 cp -a src include cmake test scripts "$cmake_source/"
 cp -a "$proof/generated" "$cmake_source/apps"
 cp "$input/apps.json" "$cmake_source/apps.json"
+cp "$input/scope.json" "$cmake_source/scope.json"
+python3 scripts/build_sources.py record --root "$input" --bc-source "$input" \
+  --symbols "$input/package" --generated "$cmake_source/apps" > "$proof/source-origins.log"
 printf '%s\n' 'fixture/fixture/codeunit/NativeConsumerUT.cpp' \
   'fixture/fixture/table/NativeRecord.cpp' 'fixture/fixture/table/NativeRecord.def.cpp' \
   > "$cmake_source/test/slice"
@@ -91,6 +115,10 @@ for mode in app slice; do
     -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
     -DAGIRU_BUILD_APPS="$app_mode" -DAGIRU_BUILD_SLICE="$slice_mode" \
     > "$proof/cmake-$mode-configure.log" 2>&1
+  selector_arguments=(--app fixture)
+  if [ "$mode" = slice ]; then selector_arguments=(--slice "$cmake_source/test/slice"); fi
+  python3 scripts/build_sources.py project --root "$cmake_source" "${selector_arguments[@]}" \
+    --check --receipt "$proof/cmake-$mode-sources.json" > "$proof/cmake-$mode-sources.log"
   if [ "$mode" = app ]; then selector='/apps/fixture/'; else selector='/Unity/unity_stable/'; fi
   jq -r --arg selector "$selector" \
     '.[] | select(.file | contains($selector)) | .command | capture(" -o (?<object>[^ ]+) ").object' \
@@ -109,4 +137,5 @@ if cmake -S "$cmake_source" -B "$proof/cmake-missing-module" -G Ninja \
 fi
 rg -q 'source-owned platform module' "$proof/cmake-missing-module.log"
 mv "$proof/module.saved" "$cmake_source/apps/platform/PlatformModule.h"
+sha256sum --check --status "$proof/inputs.sha256"
 printf 'native-enums: app/slice CMake consumers compile without a synthetic platform source; %s\n' "$proof"

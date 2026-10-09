@@ -88,8 +88,23 @@ void TheValueTableIsEmittedSortedEvenWhenAlIsNot() {
   CHECK_TRUE("both ordinals reach the value table",
              fifty != std::string::npos && five != std::string::npos);
   CHECK_TRUE("and 5 is emitted before 50 although AL declares it after", five < fifty);
+  const auto fiftyEnumerator = written.find("= 50,");
+  const auto fiveEnumerator =
+      written.find(agiru::gen::EnumeratorName(object.values.back().name) + " = 5,");
   CHECK_TRUE("while the enumerators keep AL's declaration order",
-             written.find("= 50,") < written.find("PickBackward = 5,"));
+             fiftyEnumerator != std::string::npos && fiveEnumerator != std::string::npos &&
+                 fiftyEnumerator < fiveEnumerator);
+  CHECK_TRUE("presentation explicitly retains declaration order independently of lookup order",
+             Has(written, "kDisplayOrdinals{0, 1, 2, 3, 4, 6, 50, 5}"));
+  CHECK_TRUE("presentation carries numbers, not captions or sorted positions",
+             Has(written, "std::array<std::int32_t, 8> kDisplayOrdinals"));
+}
+
+void AnEmptyEnumDoesNotInventAChoice() {
+  const auto object = agiru::al::ParseEnum("enum 50343 Empty { Extensible = true; }");
+  const auto written = agiru::gen::WriteEnum(object, "Empty.Enum.al", {});
+  CHECK_TRUE("an empty enum explicitly carries no display ordinals",
+             Has(written, "std::array<std::int32_t, 0> kDisplayOrdinals{};"));
 }
 
 void ATableReachesTheEnumObjectByNameAndByHeader() {
@@ -167,6 +182,7 @@ int main() {
   return gate::Run("GenEnum", [] {
     TheDeclaredOrdinalSurvivesTheTranslation();
     TheValueTableIsEmittedSortedEvenWhenAlIsNot();
+    AnEmptyEnumDoesNotInventAChoice();
     ATableReachesTheEnumObjectByNameAndByHeader();
     AnEnumTheRunNeverSawIsReported();
     TheTypeNameIsCanonicalWhateverAlWrote();

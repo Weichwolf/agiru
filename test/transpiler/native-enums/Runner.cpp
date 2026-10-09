@@ -32,7 +32,17 @@ int main() {
     record.Choice = returned;
     CHECK_TRUE("a generated field uses the native type", record.Choice.AsInteger() == kChosen);
     CHECK_TRUE("all base and extension values remain counted",
-               agiru::EnumTraits<Sparse>::kValues.size() == 3);
+               agiru::EnumTraits<Sparse>::kValues.size() == 4);
+    const auto &display = agiru::EnumTraits<Sparse>::kDisplayOrdinals;
+    CHECK_TRUE("display retains every base and extension value", display.size() == 4);
+    CHECK_TRUE("base declaration order remains independent of lookup order",
+               display[0] == kChosen && display[1] == 0);
+    CHECK_TRUE("extension declaration order follows the base even for lower ordinals",
+               display[2] == kExtended && display[3] == 5);
+    CHECK_TRUE("ordinal lookup remains sorted while display order differs",
+               agiru::EnumTraits<Sparse>::kValues[0].ordinal == 0 &&
+                   agiru::EnumTraits<Sparse>::kValues[1].ordinal == 5 &&
+                   agiru::EnumTraits<Sparse>::kValues[2].ordinal == kChosen);
     CHECK_TRUE("source enum ID survives", agiru::EnumTraits<Sparse>::kObjectID == 50240);
     CHECK_TRUE("source extensibility survives", agiru::EnumTraits<Sparse>::kExtensible);
     CHECK_TEXT("source enum scope survives", agiru::EnumTraits<Sparse>::kScope, "Cloud");
