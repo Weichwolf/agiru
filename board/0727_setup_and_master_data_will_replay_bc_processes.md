@@ -35,11 +35,13 @@ template → customer → edit → independent reopen regression.
   `scripts/analysis/patch_target_overlap.py`, `test/openerp/runtime/test_layer_view.py`;
   BC `ERM RS Package Operations::ImportPackageWithDuplicatedXMLFields`.
 
-- Prerequisite regression: `make erp-client-test JOBS=2` passes 7/7 original Customer
-  List/Card/edit cases across external CMD/MCP and actual Chromium, independently
-  checking the 40-row SQL window, exact Unicode saves, permissions and durable receipts.
-  This does not replay the captured New/template sequence or accept this process family.
-- The expanded eleven-case run passes 11/11, none skipped/cancelled; modal 1380 exposes all
+- Current prerequisite regression, 2026-10-09: `make erp-client-test JOBS=2` passes
+  preparation 22/22 and client 11/14, with three failures and none skipped/cancelled.
+  Original Customer List/Card/edit/create cases pass across external CMD/MCP and
+  actual Chromium; all three stale-page conflict cases incorrectly modify the row.
+  Independent SQL verifies the defect; 0720 owns the generic observed-version repair.
+  The eleven passing cases verify the 40-row window, exact Unicode values, permissions
+  and durable receipts; modal 1380 exposes all
   three templates. CMD/MCP/Chromium explicitly select the second template, create one
   customer through original AL, and independently verify creator plus five inherited
   posting/payment/currency fields. Name/Address/Country/Credit Limit persist, and a fresh

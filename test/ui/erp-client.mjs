@@ -5,9 +5,9 @@ import { promisify } from "node:util";
 import { chmod, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { AgentClient, readAuth } from "../../build/client/http.mjs";
-import { parsePage } from "../../build/client/profile.mjs";
+import { parsePage, parseFailure } from "../../build/client/profile.mjs";
 import { ServerConfigs } from "./server-config.mjs";
-import { assertBrowserPage, browserAction, browserSet, launchBrowser, openBrowserPage } from "./browser-client.mjs";
+import { assertBrowserPage, browserAction, browserSet, finishedResponse, launchBrowser, openBrowserPage } from "./browser-client.mjs";
 
 const execute = promisify(execFile);
 const container = process.env.AGIRU_DEV_CONTAINER ?? "agiru-dev";
@@ -49,6 +49,9 @@ async function ledgerSnapshot() {
     COALESCE(md5(string_agg(md5(to_jsonb(entry)::text), '' ORDER BY "Entry No.")), 'empty')
     FROM "${name}" entry)`).join(",")}`);
 }
+async function customerSnapshot(number) {
+  return sql(`SELECT to_jsonb(customer)::text FROM "Customer" customer WHERE "No."=${quoted(number)}`);
+}
 async function cmd(name, value, denied = false) {
   return execute(process.execPath, ["build/client/cmd.mjs", "--json", name,
     typeof value === "string" ? value : JSON.stringify(value)], {
@@ -82,6 +85,39 @@ async function workflowDriver(adapter, initial) {
       }
       return text === undefined ? browserAction(web.page, origin, current.page, identity)
         : browserSet(web.page, origin, current.page, identity, text);
+    },
+    async attemptedSet(current, identity, text) {
+      const request = operation(current, identity, text);
+      if (adapter === "CMD") {
+        try { return { request, result: JSON.parse((await cmd("execute", request)).stdout) }; }
+        catch (error) {
+          assert.equal(error.code, 2);
+          assert.equal(error.stdout, "");
+          return { request, failure: JSON.parse(error.stderr) };
+        }
+      }
+      if (adapter === "MCP") {
+        const reply = await mcp("execute", request);
+        if (!reply.isError) return { request, result: reply.structuredContent };
+        assert.deepEqual(JSON.parse(reply.content[0].text), reply.structuredContent);
+        return { request, failure: reply.structuredContent };
+      }
+      assert.equal(current.page.interaction, undefined, "this attempt must use an original root card");
+      const escaped = await web.page.evaluate(value => CSS.escape(value), identity);
+      const control = web.page.locator(`[data-control="${escaped}"]`);
+      const received = web.page.waitForResponse(response => response.url() === `${origin}/commands` &&
+        response.request().method() === "POST");
+      await control.locator("input[name=text]").fill(text);
+      await control.locator("button").click();
+      const response = await finishedResponse(web.page, origin, await received);
+      if (response.status() === 200) {
+        return { request, result: { page: parsePage(await response.text()), status: response.status() } };
+      }
+      const failure = parseFailure(await response.text());
+      await web.page.waitForFunction(message => document.querySelector("#status")?.textContent.includes(message),
+        failure.message);
+      return { request, failure: { error: failure.code, message: failure.message,
+        outcome: failure.outcome, command: failure.command } };
     },
     async screenshot(name) {
       if (web) await web.page.screenshot({ path: `${proof}/${name}.png`, fullPage: true });
@@ -390,5 +426,43 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
       assert.equal(field(reopened, "Credit Limit (LCY)"), (await customer(field(created, "No."))).credit,
         "fresh exact Decimal transport must retain the declared SQL storage scale, not binary floating point");
       assert.equal(field(reopened, "Balance (LCY)"), "0");
+    });
+}
+
+for (const adapter of ["CMD", "MCP", "Web"]) {
+  test(`${adapter} refuses an original Customer edit from a stale page without overwriting a peer's committed changes`,
+    { timeout: 120000 }, async () => {
+      assert.ok(selected, "original Customer List prerequisite failed; concurrency was not executed");
+      const stale = await reopenCustomer("CMD", selected);
+      const driver = await workflowDriver(adapter, stale);
+      try {
+        const peer = await reopenCustomer("CMD", selected);
+        assert.notEqual(peer.page.handle, stale.page.handle);
+        const observed = await customer(selected);
+        const peerName = `AGIRU ${adapter} COMMITTED PEER Ω 雪`;
+        const committed = JSON.parse((await cmd("execute", operation(peer, "Name", peerName))).stdout);
+        assert.equal(field(committed, "Name"), peerName);
+        const current = await customer(selected);
+        assert.equal(current.name, peerName);
+        assert.ok(BigInt(current.version) > BigInt(observed.version));
+        const unchanged = await customerSnapshot(selected);
+        const ledgers = await ledgerSnapshot();
+        const attempt = await driver.attemptedSet(stale, "Credit Limit (LCY)", "8765.43");
+        await writeFile(`${proof}/customer-${adapter.toLowerCase()}-stale-write.json`, JSON.stringify({
+          stale: stale.page, committed: committed.page, before: current, attempt,
+          stored: await customer(selected) }));
+        assert.equal(await customerSnapshot(selected), unchanged,
+          "a stale page must not overwrite any committed field, audit value or rowversion");
+        assert.equal(await ledgerSnapshot(), ledgers, "a rejected master-data write must leave all ledgers unchanged");
+        assert.equal(attempt.result, undefined, "a stale edit must not return a successful page");
+        assert.ok(attempt.failure?.message, "a stale edit must return an explicit native diagnostic");
+        assert.equal(attempt.failure.outcome, "failed");
+        assert.equal(attempt.failure.command, attempt.request.command);
+        assert.notEqual(attempt.failure.error, "ServerFailure");
+        assert.notEqual(attempt.failure.error, "WriteUncertain");
+        assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands
+          WHERE handle=${quoted(stale.page.handle)} AND command_id=${quoted(attempt.request.command)}`), "failed");
+        await driver.screenshot(`customer-${adapter.toLowerCase()}-stale-write-refused`);
+      } finally { await driver.close(); }
     });
 }

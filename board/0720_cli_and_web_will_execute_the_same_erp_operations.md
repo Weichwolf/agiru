@@ -4,22 +4,24 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: repeat the Customer workflow and concurrent-edit rejection with the newly linked
-mixed runtime dependencies. Original configuration/read/event declarations
-are now selected below; their native workflow execution is not yet proven. Preserve
+Next: reject stale original Customer writes with a generic protected observed-version
+contract and atomic PostgreSQL write predicate; preserve BC's own uncommitted writes.
+The newly linked mixed declarations restore all eleven existing Customer cases. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice integration now compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1846 AL procedures
 still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
-The mixed-dependency image passes `make all` with exit 0. The preceding image's
-`make erp-client-test JOBS=2` passes preparation 22/22 and client 1/14,
-with thirteen failures, zero skips/cancellations; replay of the new image is pending.
-Original Customer List now passes OnInit's ObjectId/selected-part call and fails in
-OnOpenPage at the unselected AL codeunit's IsCRMIntegrationEnabled. Master-data and
-three concurrent-edit cases still do not reach their prerequisites. Historical 11/11
-is not current acceptance. The reused refusal incorrectly labels this AL member as .NET;
-retain the diagnostic gap separately from activation of the real declaration.
+The mixed-dependency image passes `make all` with exit 0. Current
+`make erp-client-test JOBS=2` passes preparation 22/22 and client 11/14,
+with three failures, zero skips/cancellations; outer exit 2. Original Customer List,
+Card, template selection, creation, exact edits and independent reopening succeed
+over external CMD/MCP and actual Chromium. Each stale-page case reaches real AL and
+incorrectly changes the row/audit/rowversion after a peer committed; independent full-row
+SQL proves the defect for CMD, MCP and Web. Their native failure/receipt assertions
+remain unexecuted until the SQL refusal works. No concurrency acceptance is claimed.
+The generic missing-AL diagnostic still incorrectly labels AL members as .NET;
+retain that gap separately. Temporary clones and private binary/auth copies were removed.
 The pure O365 credentials page remains bounded-product-excluded (0058).
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
@@ -32,7 +34,7 @@ Never substitute a default template, UT handler or client rule.
 passes 15 Source, 270 generated navigation and 122 Dispatcher checks, zero red;
 all 34 execution controls and the control-name compile refusal reject, including five
 new identity controls. This does not implement excluded Power BI. Native integration
-and original Customer replay now reach the next opening blocker above. The changed
+and original Customer replay now reach the concurrent-write defect above. The changed
 Dispatcher consumer passes targeted clang-tidy: 1/344 units, zero failures, not FULL.
 Contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
 `methods-auto/page/page-objectid-method.md`; BCApps main
@@ -115,7 +117,7 @@ objects and 5,708 refused properties, including 2,303 ExternalName, 2,250 Extern
 and 1,014 ExternalAccess declarations. Do not discard these or claim backend support.
 Slice-check exits 0: 14,226 raw, 14,023 selected, 102 excluded, 101 omitted, zero missing.
 Native integration exits 0 with 1,846 explicit unlinked-source procedure refusals;
-original Customer replay after activation remains pending. The first link correctly
+original Customer replay after activation passes the eleven existing cases above. The first link correctly
 refused missing data `kSynthRelationMappingBufferTable`; `test/slice` now includes its
 original `base/core/table/SynthRelationMappingBuffer.def.cpp`, not a data stub.
 Its namespace-less original `Integration/Dataverse/SynthRelationMappingBuffer.Table.al`
