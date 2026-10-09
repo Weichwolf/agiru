@@ -4,15 +4,16 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: rebuild the native ERP page consumers of the qualified custom-window adapter,
+Next: repair the generic binding of Record.ReadPermission used by original Item New,
 then rerun original Item template/card/create/edit/reopen under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
-The complete native ABI-consumer rebuild exits 0 (2702 seconds). Regeneration still
+The complete native consumer rebuild after custom-window activation exits 0 (2483 seconds).
+Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
-The last expanded original-client regression passed 23 Customer and three Vendor cases;
-three Item cases failed explicitly at the custom-list provider before this repair. Preserve
+The fresh expanded original-client regression retains 23 Customer and three Vendor passes;
+all three Item cases now open List 31, then fail at New before the template modal. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
@@ -20,9 +21,13 @@ COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0. Preserve th
 1846 known unlinked-source refusals; complete generated-app compilation is not proven.
 The accepted 26-case 2026-10-09 `make erp-client-test JOBS=2` run passes preparation
 22/22 and client 26/26, with zero failures/skips/cancellations; outer exit 0.
-Its expanded 29-case rerun retains preparation 22/22 and all 26 Customer/Vendor passes,
-but all three Item cases fail with PageWindowProvider on original List 31: outer
-exit 2, no skips/cancellations. At 6a1556c, PageWindowSession refused declared OnFindRecord/
+Its fresh 29-case rerun at 1d41c43 retains preparation 22/22 and all 26 Customer/Vendor passes;
+CMD/MCP/Chromium each fail at `$agiru.new`: `Entity Text.ReadPermission` is incorrectly
+classified as an unimplemented .NET member. Outer exit 2, no skips/cancellations;
+fixture/client input hashes and original Company source remain unchanged.
+Record.ReadPermission already has a permission-backed runtime primitive; do not replace
+this refusal with an always-true answer or an Item-specific fix. At 6a1556c, the earlier
+PageWindowProvider refusal occurred because PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate
 an Item-only SQL provider. 0727 retains the exact workflow and reference paths.
 Custom navigation/window prerequisite: `make page-navigation JOBS=2` passes PageSource 15/15,
@@ -44,8 +49,8 @@ Custom rowsRead counts source visits including the probe, not all positioning/AL
 this adapter bounds retained/presented rows, not arbitrary AL scans or provider work.
 Earlier Find/Temporary/RecordPosition gates pass 43/95/67 checks; the affected
 RecordWindow gate retains 23511/23511. Runner and PageRecord consumers pass targeted
-clang-tidy with zero failures; this is not FULL lint, original Item window acceptance
-or a rebuilt ERP image. The no-current-trigger mutant now consumes opening without
+clang-tidy with zero failures; this is not FULL lint or Item creation acceptance.
+The no-current-trigger mutant now consumes opening without
 running the trigger: its named runtime assertion fails, rather than Werror compilation.
 Successful fixture compilation records its lint command before defect execution.
 Sources: `include/runtime/{Page,PageSession,PageWindow,RecordState,Table}.h`,
@@ -56,9 +61,9 @@ Sources: `include/runtime/{Page,PageSession,PageWindow,RecordState,Table}.h`,
 `administration/optimize-sql-al-Database-methods-and-performance-on-server.md`:
 invalidating enumeration does not erase the copied fields used by a fresh seek.
 BCApps Item List's temporary Copy/Next branch and predecessors 1228/1767/1768/1868
-retain the source/provider and calculated-buffer requirements. Fresh native ERP rebuild
-and original Item HTTP/CMD/MCP/Chromium replay remain required; fixture acceptance
-does not replace those workflows or prove BC collation/performance parity.
+retain the source/provider and calculated-buffer requirements. The fresh native ERP rebuild
+and original Item HTTP/CMD/MCP/Chromium run now qualify opening List 31, not its
+template/create/edit/reopen flow or BC collation/performance parity.
 Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
 over external CMD/MCP and actual Chromium. All three stale-page cases now refuse
@@ -295,6 +300,14 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
 
 ## P0 security acceptance
 
+- Fresh native requalification at 1d41c43: `make browser-auth JOBS=2` passes
+  37 protocol and 280 configuration checks; `make browser-sessions JOBS=2` passes
+  61 storage checks plus the MAC-provider refusal; `make page-call-authority JOBS=2`
+  passes 75 checks. All 25 compiled security defects reject; input hashes remain
+  unchanged and each outer Make exits 0. Container runs explicitly select
+  `AGIRU_TEST_DSN=postgresql://agiru:agiru@127.0.0.1:5432/agiru_gate` and
+  `B=/workspace/build/podman`. These are native gates, not a fresh HTTPS/browser run
+  or complete SaaS/device-binding acceptance; actual browser evidence is retained below.
 - Login UX may wait; security does not. Preserve bearer/account/page/TableData checks.
   Any no-login development access is loopback-only and cannot become a public profile.
 - Browser sessions: server-issued opaque CSPRNG tokens, hashed PostgreSQL verifiers;
