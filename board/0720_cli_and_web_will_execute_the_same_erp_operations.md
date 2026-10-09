@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: regenerate, link and repeat the original Customer workflow, including concurrent-edit
+Next: link and repeat the original Customer workflow, including concurrent-edit
 rejection. Bounded product-page selection is now implemented and fixture-qualified below;
 it is not yet proven in the original Customer image. Never silence unselected controls
 with successful no-ops or patch generated apps.
@@ -71,7 +71,18 @@ BCApps `Modules/System/PowerBI/README.md` and the embedded part's SetPageContext
 SetFilterToMultipleValues declarations, user `across-how-use-financials-data-source-powerbi.md`;
 predecessor `scripts/transpiler/scope.py` and the retained Customer part/calls are evidence,
 not permission to introduce successful missing-part stubs.
-Production regeneration/integration and original client execution remain pending.
+Production regeneration writes 18,378 objects (45 changed, zero swept), including the
+original Customer List's preserved ObjectId/record/FieldNo argument evaluations. Its
+receipt records nineteen excluded parts and fourteen discarded calls with ten valid
+columns per row; generic controls and consumed values are not selected away.
+The generator still exits 1: 21 unresolved extension anchors, 618 objects whose kinds
+have no generator and 122 refused property declarations remain counted, not a green
+generation claim.
+The parser retains 77 UT codeunits / 2,298 methods and 38,421 total test methods;
+the one-method discrepancy from the independent census remains open under 0058.
+`make slice-check B=/workspace/build/podman JOBS=2` exits 0: 14,225 raw slice identities,
+13,592 selected, 102 product-excluded, 531 omitted and zero missing.
+Integration and original client execution after these changes remain pending.
 
 Immediate security prerequisite: qualify browser session transport below before accepting
 externally accessible client workflows; retain the credential-specific ownership regression.

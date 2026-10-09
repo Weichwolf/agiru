@@ -2,6 +2,7 @@ apps/*/
 apps/generation-sources.txt
 apps/generation-scope.json
 apps/generation-apps.json
+apps/generation-product-parts.tsv
 apps/source-origins.json
 *.bak
 build/
