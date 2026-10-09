@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: repair the generic binding of Record.ReadPermission used by original Item New,
-then rerun original Item template/card/create/edit/reopen under 0727.
+Next: regenerate the production apps and rebuild native ERP consumers of the qualified
+stored-platform binding, then rerun original Item template/card/create/edit/reopen under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
@@ -26,7 +26,28 @@ CMD/MCP/Chromium each fail at `$agiru.new`: `Entity Text.ReadPermission` is inco
 classified as an unimplemented .NET member. Outer exit 2, no skips/cancellations;
 fixture/client input hashes and original Company source remain unchanged.
 Record.ReadPermission already has a permission-backed runtime primitive; do not replace
-this refusal with an always-true answer or an Item-specific fix. At 6a1556c, the earlier
+this refusal with an always-true answer or an Item-specific fix. The actual cause is an
+unbound stored platform table, not an unsupported Record.ReadPermission primitive.
+The verified System package declares table 2000000132 Entity Text in System.Text.
+Its binding now uses the ordinary table writer, declared fields/key/enum and original
+module; omitted DataPerCompany retains true, ReplicateData remains false. Unknown
+identities and incompatible storage policies still refuse. GenNativeBinding passes
+199 checks. `make native-storage JOBS=2` qualifies five original stored tables with
+84 SQL/runtime checks and three named source defects (InitValue, role width, text width).
+Both authored AL ReadPermission forms compile and observe grant revocation; denied
+reads/writes preserve the complete SQL row/audit/rowversion. Unicode, binary BLOB,
+composite key and authorized update/delete roundtrip without native business rules.
+All three changed compiled C++ consumers pass targeted clang-tidy, zero failures;
+TablePermissionsGate retains 29/29. This is not FULL lint or UT acceptance.
+Sources: `src/gen/CodeunitWriter.cpp`, `test/gate/GenNativeBindingGate.cpp` and
+`test/transpiler/native-storage{.sh,/Runner.cpp,/source/RecordAccess.Codeunit.al}`.
+Contracts at the pinned revisions below: developer `methods-auto/record/record-readpermission-method.md`,
+`properties/devenv-{datapercompany,tabletype}-property.md`; BCApps
+`Layers/W1/BaseApp/Inventory/MarketingText/MarketingText.Codeunit.al`; verified package
+`src/Tenant Database Tables/EntityText.Table.al` and `src/System Enums/EntityTextScenario.Enum.al`;
+user `includes/create_new_item.md`; predecessor 1700/924 (reject historical constant-success stubs).
+This is stored-table/permission qualification, not fresh Item workflow acceptance.
+At 6a1556c, the earlier
 PageWindowProvider refusal occurred because PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate
 an Item-only SQL provider. 0727 retains the exact workflow and reference paths.
@@ -1736,7 +1757,7 @@ TableData boundary: developer `methods-auto/{record,recordref}/*-{readpermission
 writepermission}-method.md`, `devenv-permissions-on-database-objects.md`,
 `properties/devenv-permissions-property.md`, `devenv-temporary-tables.md`; user
 `business-central/ui-define-granular-permissions.md`, at the revisions above.
-Original BC 29.0.54011.55407 System package SHA256
+BC artefact 29.0.54011.55407 contains verified System package version 29.0.55365.0, SHA256
 `f59a4e4200af2b819670655302ce4ba4bfdd51e133cae6d4faf7896e5bba6b44`:
 `Tenant Database Tables/{AccessControl,TenantPermission}.Table.al` and
 `Virtual Tables/AggregatePermissionSet.Table.al` establish identities/signatures,

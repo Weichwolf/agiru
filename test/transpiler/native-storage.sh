@@ -15,12 +15,15 @@ input="$PWD/test/transpiler/native-storage"
 cp -a "$input" "$proof/input"
 mkdir -p "$proof/input/package/src"
 cp "$package/NavxManifest.xml" "$proof/input/package/"
-originals=(AccessControl TenantPermissionSet TenantPermission TenantPermissionSetRel)
+originals=(AccessControl TenantPermissionSet TenantPermission TenantPermissionSetRel EntityText)
 for source in "${originals[@]}"; do
   path="$package/src/Tenant Database Tables/$source.Table.al"
   sha256sum "$path" >> "$proof/originals.sha256"
   cp "$path" "$proof/input/package/src/"
 done
+enum_source="$package/src/System Enums/EntityTextScenario.Enum.al"
+sha256sum "$enum_source" >> "$proof/originals.sha256"
+cp "$enum_source" "$proof/input/package/src/"
 sha256sum "$package/System.app" "$package/NavxManifest.xml" \
   "$package/SymbolReference.json" >> "$proof/originals.sha256"
 cp "$package/provenance.json" "$proof/package-provenance.json"
@@ -29,8 +32,8 @@ generate() {
   local root=$1
   "$B/agirutc" "$root" "$root/apps.json" "$root/generated" \
     --system-symbols "$root/package" --host-runtime 18.0 > "$root/generation.log" 2>&1
-  rg -q '^native 4 table sources parsed, 4 bound, 0 unbound, 0 source refusals;' "$root/generation.log"
-  [[ $(rg --files --no-ignore "$root/generated/platform" -g '*.def.cpp' | wc -l) -eq 4 ]]
+  rg -q '^native 5 table sources parsed, 5 bound, 0 unbound, 0 source refusals;' "$root/generation.log"
+  [[ $(rg --files --no-ignore "$root/generated/platform" -g '*.def.cpp' | wc -l) -eq 5 ]]
 }
 generate "$proof/input"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate
@@ -56,16 +59,19 @@ jq -n --arg directory "$PWD" --arg file "$input/Runner.cpp" \
   "-I$proof/input/generated/shared" "-I$proof/input/generated/absent" \
   "-I$proof/input/generated/fixture" -c "$input/Runner.cpp" -o "$proof/input/runner.o" \
   > "$B/fixture-commands/native-storage.json"
-for control in init-value role-width; do
+for control in init-value role-width entity-width; do
   cp -a "$input" "$proof/$control"
   cp -a "$proof/input/package" "$proof/$control/package"
   changed="$proof/$control/package/src/TenantPermissionSet.Table.al"
   if [[ "$control" = init-value ]]; then
     sed -i 's/InitValue = true;/InitValue = false;/' "$changed"
-  else
+  elif [[ "$control" = role-width ]]; then
     sed -i 's/Code\[20\]/Code[21]/' "$changed"
+  else
+    changed="$proof/$control/package/src/EntityText.Table.al"
+    sed -i 's/Text\[1024\]/Text[1023]/' "$changed"
   fi
-  ! cmp -s "$changed" "$proof/input/package/src/TenantPermissionSet.Table.al"
+  ! cmp -s "$changed" "$proof/input/package/src/$(basename "$changed")"
   generate "$proof/$control"
   compile "$proof/$control"
   if "$proof/$control/runner" > "$proof/$control-execution.log" 2>&1; then
@@ -78,4 +84,5 @@ sha256sum --check --status "$proof/originals.sha256"
 rm -f "$proof/input/runner" "$proof/input/runner.o" \
   "$proof/init-value/runner" "$proof/init-value/runner.o" \
   "$proof/role-width/runner" "$proof/role-width/runner.o"
-printf 'native-storage: four original stored tables; typed SQL rights and two source controls; %s\n' "$proof"
+rm -f "$proof/entity-width/runner" "$proof/entity-width/runner.o"
+printf 'native-storage: five original stored tables; typed SQL rights and three source controls; %s\n' "$proof"

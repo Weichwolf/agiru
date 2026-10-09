@@ -310,6 +310,67 @@ void StoredSystemBindings() {
   }
 }
 
+void StoredEntityBindings() {
+  const auto table = agiru::al::ParseTable(R"(namespace System.Text;
+    table 2000000132 "Entity Text" {
+      ReplicateData = false;
+      fields {
+        field(1; Company; Text[30]) {} field(2; "Source Table Id"; Integer) {}
+        field(3; "Source System Id"; Guid) {} field(4; Scenario; Enum "Entity Text Scenario") {}
+        field(5; "Preview Text"; Text[1024]) {} field(6; Text; Blob) {}
+      }
+      keys { key(Key1; Company, "Source Table Id", "Source System Id", Scenario) { Clustered = true; } }
+    })");
+  const std::array sources{table};
+  agiru::gen::Objects objects;
+  objects.tables = agiru::gen::PlatformTables(sources);
+  objects.module = "::agiru::app::platform::kModule";
+  objects.moduleHeader = "platformModule.h";
+  const auto &binding = objects.tables.at("entity text");
+  CHECK_TRUE("stored Entity Text uses the ordinary writer", !binding.native);
+  CHECK_TEXT("stored Entity Text retains the declared namespace and header",
+             binding.header,
+             "system/text/table/EntityText.h");
+  for (const auto *field :
+       {"company", "source table id", "source system id", "scenario", "preview text", "text"}) {
+    CHECK_TRUE("stored Entity Text binds every original field", binding.fields.contains(field));
+  }
+  const auto definition = agiru::gen::TableDefinitions(table, objects);
+  CHECK_TRUE("omitted DataPerCompany leaves the metadata default unchanged",
+             !definition.contains(".dataPerCompany ="));
+  CHECK_TRUE("stored Entity Text retains its nonreplicated policy",
+             definition.contains(".replicateData = false,"));
+  const auto caller = agiru::al::ParseCodeunit(R"(codeunit 50179 Caller {
+    procedure Called(): Boolean var EntityText: Record "Entity Text";
+    begin exit(EntityText.ReadPermission()); end;
+    procedure Property(): Boolean var EntityText: Record "Entity Text";
+    begin exit(EntityText.ReadPermission); end;
+  })");
+  const auto body = agiru::gen::WriteCodeunitSource(caller, "Caller.al", objects);
+  CHECK_TRUE("record permission call and property forms use the real primitive",
+             body.find("EntityText.ReadPermission()") != std::string::npos &&
+                 body.find("EntityText.ReadPermission()",
+                           body.find("EntityText.ReadPermission()") + 1) != std::string::npos &&
+                 !body.contains("absent::"));
+  CHECK_TRUE("the original caller includes the stored definition",
+             body.contains("#include \"system/text/table/EntityText.h\""));
+  for (const auto *policy : {"DataPerCompany = false; ReplicateData = false;",
+                             "ReplicateData = true;",
+                             "ReplicateData = false; TableType = Temporary;",
+                             ""}) {
+    auto changed = table;
+    changed.properties =
+        agiru::al::ParseTable("table 1 T {" + std::string(policy) + "}").properties;
+    bool refused = false;
+    try {
+      static_cast<void>(agiru::gen::PlatformTables(std::array{changed}));
+    } catch (const std::runtime_error &error) {
+      refused = std::string_view(error.what()).contains("stored System table property");
+    }
+    CHECK_TRUE("Entity Text storage policy drift refuses", refused);
+  }
+}
+
 void SharedTableProperties() {
   auto table = SourceTable();
   table.properties = agiru::al::ParseTable(R"(table 1 T {
@@ -591,6 +652,7 @@ int main() {
     NativeIdentityRefusals();
     NativeOwnedDeclarations();
     StoredSystemBindings();
+    StoredEntityBindings();
     SharedTableProperties();
     RefusalsAndCodedOrdinals();
     NativePropertyRefusals();

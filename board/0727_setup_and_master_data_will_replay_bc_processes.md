@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: repair generic Record.ReadPermission binding under 0720 and rerun the three
-retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
+Next: regenerate/rebuild native ERP consumers of 0720's stored-platform binding and
+rerun the three retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
 setup/master-data workflows.
 
 ## Processes and implementation
@@ -95,6 +95,10 @@ setup/master-data workflows.
   `Entity Text.ReadPermission` is misclassified as an unimplemented .NET member.
   Fixture/client input hashes and original Company source remain unchanged.
   The earlier PageWindowProvider refusal at 6a1556c is superseded by this new blocker.
+  0720 now qualifies the actual missing platform-table binding from verified System
+  declarations: GenNativeBinding 199 checks, NativeStorage 84 SQL/runtime checks,
+  three source defects rejected. Both AL permission forms observe revocation without
+  bypasses; production regeneration/rebuild and fresh Item replay remain required.
   Item List declares OnFindRecord/OnNextRecord: stored Rec
   normally, temporary attribute/pick selection conditionally. Preserve both sources,
   custom navigation and bounded windows; removing the declaration check alone would

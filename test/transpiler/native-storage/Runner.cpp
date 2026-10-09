@@ -1,6 +1,7 @@
 #include "meta/ModuleDef.h"
 #include "meta/PermissionSetDef.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/User.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Database.h"
@@ -16,10 +17,12 @@
 #include "Check.h"
 #include "OwnedDatabase.h"
 #include "PlatformModule.h"
+#include "core/codeunit/StoredRecordAccess.h"
 #include "system/security/access_control/table/AccessControl.h"
 #include "system/security/access_control/table/TenantPermission.h"
 #include "system/security/access_control/table/TenantPermissionSet.h"
 #include "system/security/access_control/table/TenantPermissionSetRel.h"
+#include "system/text/table/EntityText.h"
 
 #include <array>
 #include <cstddef>
@@ -27,6 +30,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -35,9 +39,13 @@ using Sets = original::TenantPermissionSet_Table;
 using Permissions = original::TenantPermission_Table;
 using Relations = original::TenantPermissionSetRel_Table;
 using Assignments = original::AccessControl_Table;
+using EntityText = agiru::System::Text::EntityText_Table;
 constexpr std::string_view kUser = "00000000-0000-0000-0000-000000000001";
 constexpr std::int32_t kUserTable = 2000000120;
 constexpr std::int32_t kPage = 21;
+constexpr std::string_view kBinaryProbe{"\0\xff\x80"
+                                        "A",
+                                        4};
 
 std::string_view Cell(const agiru::Result &result, std::size_t column) {
   if (result.Rows() != 1 || column >= result.Columns()) {
@@ -257,6 +265,104 @@ WHERE "Object ID"=2000000120)");
              right(Operation::Read) == Level::None);
 }
 
+void EntitySeed(const std::string &dsn, const agiru::Connection &observer) {
+  const auto &table = agiru::TableTraits<EntityText>::kTable;
+  CHECK_TRUE("original Entity Text retains company-local normal storage",
+             table.dataPerCompany && table.tableType == agiru::TableType::Normal);
+  CHECK_TRUE("original Entity Text is not replicated", !table.replicateData);
+  CHECK_TEXT("Entity Text keeps its System module",
+             table.module->id,
+             "8874ed3a-0643-4247-9ced-7a7002f7135d");
+  CHECK_TEXT("Entity Text keeps its AL namespace", table.nameSpace, "System.Text");
+  const agiru::Session seed(dsn);
+  agiru::CreateTable(seed.Database(), table);
+  EntityText text;
+  text.Company = "Qualification";
+  text.SourceTableId = kUserTable;
+  text.SourceSystemId = agiru::Guid(kUser);
+  text.PreviewText = "Unicode Ω雪";
+  text.Text.Set(std::vector<std::uint8_t>{kBinaryProbe.begin(), kBinaryProbe.end()});
+  text.Insert();
+  Permissions permission;
+  permission.AppID = agiru::Guid(agiru::app::Platform::kModule.id);
+  permission.RoleID = "LEAF";
+  permission.ObjectID = table.id.Value();
+  permission.Insert();
+  agiru::Commit();
+  const auto width = observer.Execute(R"(SELECT character_maximum_length::text
+FROM information_schema.columns WHERE table_name='Entity Text' AND column_name='Preview Text')");
+  CHECK_TEXT("Entity Text SQL preserves original Text[1024] width", Cell(width, 0), "1024");
+  const auto stored = observer.Execute(R"(SELECT "Company","Source Table Id"::text,
+"Source System Id"::text,"Scenario"::text,"Preview Text",encode("Text",'hex') FROM "Entity Text")");
+  constexpr std::array<std::string_view, 6> expected{
+      "Qualification", "2000000120", kUser, "0", "Unicode Ω雪", "00ff8041"};
+  for (std::size_t index = 0; index < expected.size(); ++index) {
+    CHECK_TEXT("independent SQL retains the Entity Text composite key and exact content",
+               Cell(stored, index),
+               expected[index]);
+  }
+}
+
+void EntityAuthority(const std::string &dsn, const agiru::Connection &observer) {
+  agiru::Session session(dsn, agiru::Guid(kUser));
+  session.CompanyName("Qualification");
+  const agiru::InstalledPermissionSets installed;
+  session.TablePermissions(std::make_shared<agiru::NativePermissions>(installed));
+  EntityText text;
+  agiru::StoredRecordAccess_Codeunit caller;
+  CHECK_TRUE("stored Entity Text ReadPermission uses the original direct SQL grant",
+             text.ReadPermission() && text.WritePermission() && caller.Called() &&
+                 caller.Property());
+  CHECK_TRUE("Entity Text reads its original composite key through ordinary records",
+             text.Get("Qualification", kUserTable, agiru::Guid(kUser), text.Scenario));
+  CHECK_TEXT(
+      "Entity Text typed readback preserves Unicode", text.PreviewText.Value(), "Unicode Ω雪");
+  text.CalcFields(text.Text);
+  CHECK_TRUE("Entity Text typed BLOB readback preserves binary bytes",
+             text.Text.Bytes() ==
+                 std::vector<std::uint8_t>(kBinaryProbe.begin(), kBinaryProbe.end()));
+  const std::string before(
+      Cell(observer.Execute(R"(SELECT row_to_json(t)::text FROM "Entity Text" t)"), 0));
+  observer.Run(R"(UPDATE "Tenant Permission" SET "Read Permission"=0,"Modify Permission"=0
+WHERE "Object ID"=2000000132)");
+  CHECK_TRUE("revoked Entity Text permission getters never return constant success",
+             !text.ReadPermission() && !text.WritePermission() && !caller.Called() &&
+                 !caller.Property());
+  for (const bool writing : {false, true}) {
+    bool denied = false;
+    try {
+      if (writing) {
+        text.PreviewText = "DENIED";
+        text.Modify();
+      } else {
+        static_cast<void>(text.Get("Qualification", kUserTable, agiru::Guid(kUser), text.Scenario));
+      }
+    } catch (const agiru::Error &error) { denied = error.Code() == "Permission"; }
+    CHECK_TRUE("revoked Entity Text reads and modifications refuse", denied);
+  }
+  CHECK_TEXT("Entity Text denial preserves the full SQL row, audit and rowversion",
+             Cell(observer.Execute(R"(SELECT row_to_json(t)::text FROM "Entity Text" t)"), 0),
+             before);
+  observer.Run(R"(UPDATE "Tenant Permission" SET "Read Permission"=1,"Modify Permission"=1
+WHERE "Object ID"=2000000132)");
+  session.CompanyName("Other");
+  CHECK_TRUE("Entity Text never borrows another company's permission assignment",
+             !text.ReadPermission());
+  session.CompanyName("Qualification");
+  text.Get("Qualification", kUserTable, agiru::Guid(kUser), text.Scenario);
+  text.PreviewText = "Edited 雪";
+  text.Modify();
+  agiru::Commit();
+  CHECK_TEXT("authorized Entity Text modification has an independent SQL effect",
+             Cell(observer.Execute(R"(SELECT "Preview Text" FROM "Entity Text")"), 0),
+             "Edited 雪");
+  text.Delete();
+  agiru::Commit();
+  CHECK_TEXT("authorized Entity Text deletion has an independent SQL effect",
+             Cell(observer.Execute(R"(SELECT count(*)::text FROM "Entity Text")"), 0),
+             "0");
+}
+
 }
 
 int main() {
@@ -267,6 +373,8 @@ int main() {
     Seed(database.Dsn());
     const agiru::Connection observer(database.Dsn());
     Sql(observer);
+    EntitySeed(database.Dsn(), observer);
+    EntityAuthority(database.Dsn(), observer);
     Authority(database.Dsn(), observer);
   });
 }

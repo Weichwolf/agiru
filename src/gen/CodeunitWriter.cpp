@@ -2308,25 +2308,50 @@ std::optional<std::int32_t> NativeTableNumberOf(const Objects &objects, std::str
 namespace {
 
 bool StoredPlatformTable(const al::TableObject &table) {
-  constexpr std::array identities{
-      std::pair{2000000053, std::string_view{"Access Control"}},
-      std::pair{2000000165, std::string_view{"Tenant Permission Set"}},
-      std::pair{2000000166, std::string_view{"Tenant Permission"}},
-      std::pair{2000000253, std::string_view{"Tenant Permission Set Rel."}}};
-  const bool known = std::ranges::any_of(identities, [&](const auto &identity) {
-    return table.id == identity.first && SameName(table.name, identity.second);
+  struct Storage {
+    int id;
+    std::string_view name;
+    std::string_view nameSpace;
+    bool dataPerCompany;
+  };
+
+  constexpr std::array identities{Storage{.id = 2000000053,
+                                          .name = "Access Control",
+                                          .nameSpace = "System.Security.AccessControl",
+                                          .dataPerCompany = false},
+                                  Storage{.id = 2000000165,
+                                          .name = "Tenant Permission Set",
+                                          .nameSpace = "System.Security.AccessControl",
+                                          .dataPerCompany = false},
+                                  Storage{.id = 2000000166,
+                                          .name = "Tenant Permission",
+                                          .nameSpace = "System.Security.AccessControl",
+                                          .dataPerCompany = false},
+                                  Storage{.id = 2000000253,
+                                          .name = "Tenant Permission Set Rel.",
+                                          .nameSpace = "System.Security.AccessControl",
+                                          .dataPerCompany = false},
+                                  Storage{.id = 2000000132,
+                                          .name = "Entity Text",
+                                          .nameSpace = "System.Text",
+                                          .dataPerCompany = true}};
+  const auto *const known = std::ranges::find_if(identities, [&](const auto &identity) {
+    return table.id == identity.id && SameName(table.name, identity.name) &&
+           SameName(table.nameSpace, identity.nameSpace);
   });
-  if (!known || !SameName(table.nameSpace, "System.Security.AccessControl")) { return false; }
+  if (known == identities.end()) { return false; }
   for (const auto &property : table.properties) {
     const auto name = LowerKey(property.name);
     const auto value = LowerKey(property.text);
     if ((name == "tabletype" && value != "normal") ||
-        ((name == "datapercompany" || name == "replicatedata") && value != "false")) {
+        (name == "datapercompany" && value != (known->dataPerCompany ? "true" : "false")) ||
+        (name == "replicatedata" && value != "false")) {
       throw std::runtime_error("incompatible stored System table property: " + table.name + "." +
                                property.name);
     }
   }
   for (const auto *property : {"DataPerCompany", "ReplicateData"}) {
+    if (known->dataPerCompany && std::string_view(property) == "DataPerCompany") { continue; }
     if (al::Find(table.properties, property) == nullptr) {
       throw std::runtime_error("missing stored System table property: " + table.name + "." +
                                property);
