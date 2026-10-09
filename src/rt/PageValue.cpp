@@ -62,6 +62,8 @@ PageValue ReadScalar(const void *record, const FieldDef &field, std::string_view
       const auto ordinal = At<OrdinalValue>(record, field).AsInteger();
       result.value = std::to_string(ordinal);
       result.domain = domain;
+      result.members = field.values;
+      result.displayOrdinals = field.displayOrdinals;
       if (const EnumValueDef *member = ValueOf(field.values, ordinal)) {
         result.member = member->name;
       }

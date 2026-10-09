@@ -13,8 +13,9 @@ podman exec --user agiru "$container" sha256sum /workspace/build/podman/gate_Pag
   /workspace/build/podman/libagiru_rt.so > "$proof/producer.sha256"
 podman exec --user agiru "$container" /workspace/build/podman/gate_PageHtmlGate > "$proof/cpp-gate.log"
 podman exec --user agiru "$container" /workspace/build/podman/gate_PageHtmlGate --html > "$proof/page.html"
+podman exec --user agiru "$container" /workspace/build/podman/gate_PageHtmlGate --choices-html > "$proof/choices.html"
 cat "$proof/cpp-gate.log"
-AGIRU_CLIENT_HTML="$proof/page.html" AGIRU_WEB_PROOF="$proof" \
+AGIRU_CLIENT_HTML="$proof/page.html" AGIRU_CLIENT_CHOICES_HTML="$proof/choices.html" AGIRU_WEB_PROOF="$proof" \
   node --test test/ui/web-client.mjs > "$proof/browser.log" 2>&1 || {
   cat "$proof/browser.log"
   exit 1
@@ -36,7 +37,7 @@ for control in response-effects altered-envelope concurrent-post; do
   ' build/web/web.js > "$proof/$control.mjs"
   node --check "$proof/$control.mjs"
   status=0
-  AGIRU_CLIENT_HTML="$proof/page.html" AGIRU_WEB_PROOF="$proof" \
+  AGIRU_CLIENT_HTML="$proof/page.html" AGIRU_CLIENT_CHOICES_HTML="$proof/choices.html" AGIRU_WEB_PROOF="$proof" \
     AGIRU_WEB_SCRIPT="$proof/$control.mjs" node --test test/ui/web-client.mjs \
     > "$proof/$control.log" 2>&1 || status=$?
   [[ "$status" = 1 ]]

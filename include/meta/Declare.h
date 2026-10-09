@@ -186,6 +186,15 @@ template <typename E> struct FieldTypeOf<Enum<E>> {
 
   /// The declared values, taken from the enum object rather than repeated per field.
   static constexpr std::span<const EnumValueDef> kValues{EnumTraits<E>::kValues};
+
+  /// \brief Borrows declaration order when the enum producer supplies it.
+  static constexpr std::span<const std::int32_t> kDisplayOrdinals = [] {
+    if constexpr (requires { EnumTraits<E>::kDisplayOrdinals; }) {
+      return std::span<const std::int32_t>{EnumTraits<E>::kDisplayOrdinals};
+    } else {
+      return std::span<const std::int32_t>{};
+    }
+  }();
 };
 
 /// \brief `Enum<>` -- an enum field whose declaration this run never read.
@@ -282,6 +291,17 @@ struct Declared {
   bool sqlTimestamp = false;                ///< `SqlTimestamp`.
 };
 
+/// \brief Borrows enum presentation metadata; Options use their declared member sequence.
+/// \tparam T The declared AL storage type, not a display string.
+/// \return Immutable declaration-order ordinals, or empty when not supplied by the type.
+template <typename T> [[nodiscard]] constexpr std::span<const std::int32_t> DisplayOrdinalsOf() {
+  if constexpr (requires { FieldTypeOf<T>::kDisplayOrdinals; }) {
+    return FieldTypeOf<T>::kDisplayOrdinals;
+  } else {
+    return {};
+  }
+}
+
 template <auto Member>
 constexpr FieldDef Declare(FieldNo no,
                            std::string_view name,
@@ -294,6 +314,7 @@ constexpr FieldDef Declare(FieldNo no,
       .name = name,
       .caption = caption,
       .values = FieldTypeOf<Value>::kValues,
+      .displayOrdinals = DisplayOrdinalsOf<Value>(),
       .calcFormula = declared.calcFormula,
       .relationTable = declared.relationTable,
       .relationField = declared.relationField,

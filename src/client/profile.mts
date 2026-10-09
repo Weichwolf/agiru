@@ -8,9 +8,10 @@ export type Scalar = Readonly<{
 export type Operation = Readonly<{
   operation: "set" | "action"; control: string; command: string; enabled: boolean;
 }>;
+export type Choice = Readonly<{ value: string; member: string; caption: string }>;
 export type Control = Readonly<{
   identity: string; kind: "group" | "field" | "action" | "label" | "unsupported";
-  caption: string; depth: number; display?: string; scalar?: Scalar; operation?: Operation; reason?: string;
+  caption: string; depth: number; display?: string; scalar?: Scalar; choices?: readonly Choice[]; operation?: Operation; reason?: string;
 }>;
 export type Page = Readonly<{
   profile: "1" | "2" | "3" | "4"; view: "current-row" | "list" | "interaction"; page: string; handle: string; revision: string;
@@ -68,7 +69,7 @@ export function checkResponseProfile(contentType: string, hasHeader: (name: stri
     throw new ClientError("ResponseRefused", "Undeclared htmx response effects are not supported by this profile");
   }
 }
-const tags = new Set(["article", "h1", "h2", "h3", "section", "form", "input", "button", "output", "aside", "p"]);
+const tags = new Set(["article", "h1", "h2", "h3", "section", "form", "input", "select", "option", "button", "output", "aside", "p"]);
 const scalarAttributes = ["data-type", "data-value", "data-domain", "data-member", "data-undefined", "data-closing"];
 const attributes: Readonly<Record<string, readonly string[]>> = {
   article: ["data-agiru-profile", "data-view", "data-page", "data-handle", "data-revision", "data-limit", "data-more", "data-direction",
@@ -76,6 +77,7 @@ const attributes: Readonly<Record<string, readonly string[]>> = {
   h1: [], h2: [], h3: [], section: ["data-control", "data-kind", "data-row", "data-selected"],
   form: ["method", "action", "hx-post", "hx-target", "hx-swap"],
   input: ["type", "name", "value", "aria-label", ...scalarAttributes],
+  select: ["name", "aria-label", ...scalarAttributes], option: ["value", "data-member", "selected", "disabled"],
   button: ["type", "disabled"], output: ["data-unsupported-count", ...scalarAttributes],
   aside: ["role", "data-control", "data-unsupported"], p: ["data-control", "data-message", "data-prompt"],
 };
@@ -133,6 +135,34 @@ function scalar(node: Tree.Element): Scalar {
   return result;
 }
 
+function selection(node: Tree.Element): Readonly<{ choices: readonly Choice[]; display: string }> {
+  const current = scalar(node);
+  check(["Enum", "Option"].includes(current.type) && attr(node, "name") === "text", "Invalid choice field");
+  const seen = new Set<string>();
+  const choices: Choice[] = [];
+  let selected = 0, display = "", unknown = false;
+  const items = children(node);
+  check(items.length > 0 && items.length <= limits.controls, "Choice budget exceeded");
+  for (const option of items) {
+    check(option.tagName === "option", "Invalid choice item");
+    const value = attr(option, "value"), member = attr(option, "data-member"), caption = text(option);
+    check(/^(0|-?[1-9][0-9]*)$/.test(value) && BigInt(value) >= -2147483648n && BigInt(value) <= 2147483647n,
+      "Invalid choice ordinal");
+    check(!seen.has(value), "Duplicate choice ordinal");
+    seen.add(value);
+    if (has(option, "selected")) {
+      ++selected; display = caption;
+      check(value === current.value && member === current.member, "Selected choice disagrees with the exact scalar");
+    }
+    if (has(option, "disabled")) {
+      check(!unknown && has(option, "selected") && current.member === "", "Invalid undeclared current choice");
+      unknown = true;
+    } else choices.push(Object.freeze({ value, member, caption }));
+  }
+  check(selected === 1 && choices.length > 0, "Missing or ambiguous selected choice");
+  return Object.freeze({ choices: Object.freeze(choices), display });
+}
+
 function inspectTree(fragment: Tree.DocumentFragment): void {
   const pending: Array<{ node: Tree.ChildNode; depth: number }> = fragment.childNodes.map(node => ({ node, depth: 0 }));
   let count = 0;
@@ -173,7 +203,8 @@ function form(node: Tree.Element, page: Header, identity: string,
   text(button);
   check(items.length === (operation === "set" ? 8 : 7), "Unknown form content");
   if (operation === "set") {
-    const inputs = items.filter(child => child.tagName === "input" && attr(child, "type") === "text");
+    const inputs = items.filter(child => child.tagName === "select" ||
+      (child.tagName === "input" && attr(child, "type") === "text"));
     check(inputs.length === 1 && attr(inputs[0]!, "name") === "text", "Missing field text input");
   }
   commands.set(fields.command!, Object.freeze({ path, fields: Object.freeze(fields) }));
@@ -213,14 +244,17 @@ function controls(nodes: readonly Tree.Element[], page: Header, commands: Map<st
       let operation: Operation | undefined;
       if (contents.tagName === "form") {
         operation = form(contents, page, identity, "set", commands);
-        value = children(contents).find(child => child.tagName === "input" && attr(child, "type") === "text")!;
+        value = children(contents).find(child => child.tagName === "select" ||
+          (child.tagName === "input" && attr(child, "type") === "text"))!;
         check(attr(value, "aria-label") === caption, "Field labels disagree");
       } else {
         check(contents.tagName === "output", "Missing field value");
         value = contents;
       }
-      const display = value.tagName === "input" ? attr(value, "value") : text(value);
-      result.push(Object.freeze({ identity, depth, kind, caption, display, scalar: scalar(value), ...(operation ? { operation } : {}) }));
+      const selected = value.tagName === "select" ? selection(value) : undefined;
+      const display = selected?.display ?? (value.tagName === "input" ? attr(value, "value") : text(value));
+      result.push(Object.freeze({ identity, depth, kind, caption, display, scalar: scalar(value),
+        ...(selected ? { choices: selected.choices } : {}), ...(operation ? { operation } : {}) }));
     } else if (kind === "action") {
       check(children(node).length === 1, "Invalid action structure");
       const contents = one(node, "form");

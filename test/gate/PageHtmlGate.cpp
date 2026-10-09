@@ -1,3 +1,4 @@
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/PageDef.h"
 #include "runtime/ErrorValue.h"
@@ -11,8 +12,11 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -41,6 +45,33 @@ constexpr agiru::PageHtmlContext kContext{.pageHandle = "page_1",
                                           .commandPrefix = "cmd_1",
                                           .csrf = "test-csrf"};
 
+constexpr std::array kUntrustedCaption{'E',
+                                       'x',
+                                       't',
+                                       'r',
+                                       'a',
+                                       static_cast<char>(0xe2),
+                                       static_cast<char>(0x80),
+                                       static_cast<char>(0xae)};
+constexpr std::array kChoices{
+    agiru::EnumValueDef{.ordinal = 0, .name = " ", .caption = " "},
+    agiru::EnumValueDef{.ordinal = 5, .name = "Earlier", .caption = "Früher"},
+    agiru::EnumValueDef{.ordinal = 10, .name = "Chosen", .caption = "Gewählt <script> & 東京"},
+    agiru::EnumValueDef{.ordinal = 70,
+                        .name = "Extra",
+                        .caption =
+                            std::string_view(kUntrustedCaption.data(), kUntrustedCaption.size())}};
+constexpr std::array<std::int32_t, 4> kDisplayOrdinals{10, 0, 70, 5};
+
+agiru::PageValue ChoiceValue() {
+  return {.type = "Enum",
+          .value = "10",
+          .domain = "table/50400/field/1",
+          .member = "Chosen",
+          .members = kChoices,
+          .displayOrdinals = kDisplayOrdinals};
+}
+
 class Page final : public agiru::PageCore {
 public:
   void SetControlText(std::string_view /*control*/, std::string_view /*text*/) override {
@@ -54,6 +85,7 @@ public:
   std::string ControlOrdinal(std::string_view /*control*/) const override { return {}; }
 
   agiru::PageValue Control_Value(std::string_view control) const override {
+    if (control == "Amount" && choice) { return *choice; }
     if (control == "Computed") { return PageCore::Control_Value(control); }
     if (control == "Big") { return {.type = "BigInteger", .value = "9223372036854775807"}; }
     return {.type = "Decimal", .value = "1.2300"};
@@ -103,6 +135,7 @@ public:
   mutable int visibilityReads = 0;
   bool editable = true;
   std::string text = "Grüezi <script> & \"quoted\"\r\n";
+  std::optional<agiru::PageValue> choice;
 };
 
 class Authorization final : public agiru::PageAuthorization {
@@ -270,12 +303,67 @@ void Refusals() {
   CHECK_TRUE("refusal does not execute commands", page.writes == 0);
 }
 
+void Choices() {
+  Page page;
+  Authorization auth;
+  auth.verify = false;
+  page.choice = ChoiceValue();
+  auto result = agiru::RenderPageHtml(kPage, page, auth, kContext);
+  CHECK_TRUE("enum fields render a real select with exact typed metadata",
+             result.html.contains("<select name=\"text\"") &&
+                 result.html.contains("data-type=\"Enum\" data-value=\"10\""));
+  CHECK_TRUE(
+      "sparse enum choices preserve declaration order, not ordinal order",
+      result.html.find("<option value=\"10\"") < result.html.find("<option value=\"0\"") &&
+          result.html.find("<option value=\"0\"") < result.html.find("<option value=\"70\"") &&
+          result.html.find("<option value=\"70\"") < result.html.find("<option value=\"5\""));
+  CHECK_TRUE("choice identity is separate from escaped localized caption",
+             result.html.contains(
+                 "value=\"10\" data-member=\"Chosen\" selected>Gewählt &lt;script&gt; &amp; 東京"));
+  CHECK_TRUE("blank-space AL member remains an exact declared member",
+             result.html.contains("value=\"0\" data-member=\" \"> </option>"));
+  page.choice->value = "99";
+  page.choice->member.clear();
+  page.text = "99";
+  result = agiru::RenderPageHtml(kPage, page, auth, kContext);
+  CHECK_TRUE(
+      "unknown stored ordinal stays selected but is not a declared choice",
+      result.html.contains("<option disabled selected value=\"99\" data-member=\"\">99</option>") &&
+          !result.html.contains("data-member=\"Chosen\" selected"));
+  page.choice = ChoiceValue();
+  page.choice->type = "Option";
+  page.choice->displayOrdinals = {};
+  result = agiru::RenderPageHtml(kPage, page, auth, kContext);
+  CHECK_TRUE("Option members retain their declaration array order",
+             result.html.find("<option value=\"0\"") < result.html.find("<option value=\"5\"") &&
+                 result.html.find("<option value=\"5\"") <
+                     result.html.find("<option value=\"10\""));
+  page.choice = ChoiceValue();
+  page.editable = false;
+  result = agiru::RenderPageHtml(kPage, page, auth, kContext);
+  CHECK_TRUE("read-only enum rendering does not offer a write or duplicate choices",
+             !result.html.contains("<select") && !result.html.contains("<option"));
+  page.editable = true;
+  constexpr std::array<std::int32_t, 4> missing{10, 0, 70, 99};
+  for (const std::span<const std::int32_t> order :
+       {std::span<const std::int32_t>{}, std::span<const std::int32_t>{missing}}) {
+    page.choice->displayOrdinals = order;
+    result = agiru::RenderPageHtml(kPage, page, auth, kContext);
+    CHECK_TRUE("missing enum presentation metadata is counted before any partial form",
+               result.unsupported == 3 && !result.html.contains("<select") &&
+                   !result.html.contains("name=\"control\" value=\"Amount\""));
+  }
+  CHECK_TRUE("choice rendering and refusal never write or execute triggers", page.writes == 0);
+}
+
 }
 
 int main(int argc, char **argv) {
-  if (argc == 2 && std::string_view(argv[1]) == "--html") {
+  if (argc == 2 &&
+      (std::string_view(argv[1]) == "--html" || std::string_view(argv[1]) == "--choices-html")) {
     try {
       Page page;
+      if (std::string_view(argv[1]) == "--choices-html") { page.choice = ChoiceValue(); }
       Authorization auth;
       auth.verify = false;
       const auto result = agiru::RenderPageHtml(kPage, page, auth, kContext);
@@ -297,5 +385,6 @@ int main(int argc, char **argv) {
     LifecycleActions();
     AnonymousContainers();
     Refusals();
+    Choices();
   });
 }

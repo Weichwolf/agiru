@@ -11,7 +11,9 @@ function field(control: Control, command = ""): string {
   const domain = value.domain ? ` domain=${quote(value.domain)} member=${quote(value.member)}` : "";
   const flags = `${value.undefined ? " undefined" : ""}${value.closing ? " closing" : ""}`;
   const display = control.display !== value.value ? ` display=${quote(control.display!)}` : "";
-  return `${quote(control.identity)} ${value.type}=${quote(value.value)}${domain}${flags}${command}${display}`;
+  const choices = control.choices ? ` choices=[${control.choices.map(choice =>
+    `{"value":${quote(choice.value)},"member":${quote(choice.member)},"caption":${quote(choice.caption)}}`).join(",")}]` : "";
+  return `${quote(control.identity)} ${value.type}=${quote(value.value)}${domain}${flags}${command}${display}${choices}`;
 }
 
 export function renderAscii(page: Page, budget = 262144): string {

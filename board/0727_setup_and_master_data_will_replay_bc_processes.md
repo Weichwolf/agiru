@@ -36,7 +36,8 @@ template → customer → edit → independent reopen regression.
   `scripts/analysis/patch_target_overlap.py`, `test/openerp/runtime/test_layer_view.py`;
   BC `ERM RS Package Operations::ImportPackageWithDuplicatedXMLFields`.
 
-- Current prerequisite regression, 2026-10-09: `make erp-client-test JOBS=2` passes
+- Last original-client prerequisite regression (eef54ac), 2026-10-09:
+  `make erp-client-test JOBS=2` passes
   preparation 22/22 and client 20/20, with zero failures/skips/cancellations, exit 0.
   Original Customer List/Card/edit/create cases pass across external CMD/MCP and
   actual Chromium. All three stale-page cases now return native failure diagnostics
@@ -52,7 +53,9 @@ template → customer → edit → independent reopen regression.
   Last Date Modified; independent SQL clock bounds qualify these rather than hiding
   their effects. This is the current UTC profile: My Settings timezone/Today,
   privacy-block confirmation, block enforcement on sales/journal posting and enum
-  dropdown discovery remain unqualified. 0720 owns shared choice discovery.
+  original dropdown discovery remain unqualified. 0720 implements shared native
+  HTML/ASCII choice discovery; its new metadata ABI still needs regeneration, a complete
+  native consumer rebuild and this original SQL/browser regression repeated.
   These are native validation proofs, not a newly executed BC-sandbox comparison.
   The retained eleven original cases verify the 40-row window, exact Unicode values, permissions
   and durable receipts; modal 1380 exposes all

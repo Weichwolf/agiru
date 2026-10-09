@@ -18,6 +18,61 @@ const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/clien
 const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"));
 const html = await readFile(process.env.AGIRU_CLIENT_HTML, "utf8");
 const page = parsePage(html);
+const choiceHtml = await readFile(process.env.AGIRU_CLIENT_CHOICES_HTML, "utf8");
+const choicePageHtml = choiceHtml.replaceAll("page_1", "page_choices");
+const choicePage = parsePage(choicePageHtml);
+const expectedChoices = [
+  { value: "10", member: "Chosen", caption: "Gewählt <script> & 東京" },
+  { value: "0", member: " ", caption: " " },
+  { value: "70", member: "Extra", caption: "Extra\u202e" },
+  { value: "5", member: "Earlier", caption: "Früher" },
+];
+
+test("native enum select exposes exact ordered values, names and captions without executing markup", () => {
+  const model = parsePage(choiceHtml);
+  const field = model.controls.find(control => control.identity === "Amount");
+  assert.deepEqual(field.choices, expectedChoices);
+  assert.equal(field.scalar.value, "10");
+  assert.equal(field.scalar.member, "Chosen");
+  assert.equal(field.display, expectedChoices[0].caption);
+  assert.ok(Object.isFrozen(field.choices) && field.choices.every(Object.isFrozen));
+  const ascii = renderAscii(model);
+  assert.ok(ascii.includes('"value":"10","member":"Chosen","caption":"Gewählt <script> & 東京"'));
+  assert.ok(ascii.includes('"caption":"Extra\\u202e"'));
+  assert.ok(!ascii.includes("\u202e"));
+});
+
+test("native choice profile refuses forged, ambiguous and noncanonical selection metadata", () => {
+  const replacements = [
+    ['<option value="10" data-member="Chosen" selected>', '<option value="10" data-member="Chosen">'],
+    ['<option value="0" data-member=" ">', '<option value="0" data-member=" " selected>'],
+    ['<option value="70"', '<option value="10"'],
+    ['<option value="0"', '<option value="-0"'],
+    ['<option value="0"', '<option value="00"'],
+    ['<option value="70"', '<option value="2147483648"'],
+    ['data-member="Chosen" selected', 'data-member="Forged" selected'],
+    ['data-member="Chosen" selected', 'data-member="Chosen" disabled selected'],
+    ['<select name="text"', '<select name="foreign"'],
+  ];
+  for (const [before, afterValue] of replacements) {
+    assert.ok(choiceHtml.includes(before), `Required choice mutation anchor: ${before}`);
+    assert.throws(() => parsePage(choiceHtml.replace(before, afterValue)), error => error.code === "ProfileRefused");
+  }
+});
+
+test("undeclared saved enum ordinal remains exact but is excluded from writable choices", () => {
+  const before = 'data-type="Enum" data-value="10" data-domain="table/50400/field/1" data-member="Chosen"';
+  assert.ok(choiceHtml.includes(before));
+  const unknown = choiceHtml.replace(before,
+    'data-type="Enum" data-value="99" data-domain="table/50400/field/1" data-member=""')
+    .replace('data-member="Chosen" selected', 'data-member="Chosen"')
+    .replace('<option value="10"', '<option disabled selected value="99" data-member="">99</option><option value="10"');
+  const field = parsePage(unknown).controls.find(control => control.identity === "Amount");
+  assert.equal(field.scalar.value, "99");
+  assert.equal(field.scalar.member, "");
+  assert.equal(field.display, "99");
+  assert.deepEqual(field.choices, expectedChoices);
+});
 const received = [];
 let posts = 0;
 const failureHtml = (command = "cmd_1_7", outcome = "failed") =>
@@ -86,7 +141,10 @@ const server = createServer(async (request, response) => {
   if (request.url === "/invalid-utf8") { response.end(Buffer.from([0xc0, 0xaf])); return; }
   if (request.url === "/big") { response.end("x".repeat(limits.bytes + 1)); return; }
   if (request.url === "/large") { response.end(html.replace("HTML &lt;fixture&gt;", "x".repeat(270000))); return; }
-  if (request.url === "/?handle=page_uncertain" || request.url === "/disconnect") {
+  if (request.url === "/?handle=page_choices" ||
+      (request.method === "POST" && received.at(-1).body.page === "page_choices")) {
+    response.end(choicePageHtml);
+  } else if (request.url === "/?handle=page_uncertain" || request.url === "/disconnect") {
     response.end(html.replaceAll('page_1', 'page_uncertain').replaceAll('action="/commands"', 'action="/disconnect"').replaceAll('hx-post="/commands"', 'hx-post="/disconnect"'));
   } else response.end(html);
 });
@@ -311,6 +369,20 @@ test("CMD set performs exactly one explicit form POST with unchanged text and to
   assert.equal(sent.headers.origin, origin); assert.equal(sent.headers["hx-request"], "true");
 });
 
+test("external CMD discovers native choices and sends one exact ordinal form value", async () => {
+  const read = await cmd(["--json", "read", "/?handle=page_choices"]);
+  assert.equal(read.code, 0);
+  assert.deepEqual(JSON.parse(read.stdout).page.controls.find(field => field.identity === "Amount").choices,
+    expectedChoices);
+  const before = posts;
+  const input = { ...request("Amount", "set", "70"), path: "/?handle=page_choices", page: "page_choices" };
+  const written = await cmd(["--json", "execute", JSON.stringify(input)]);
+  assert.equal(written.code, 0, written.stderr);
+  assert.deepEqual(JSON.parse(written.stdout).page, choicePage);
+  assert.equal(posts, before + 1);
+  assert.equal(received.findLast(request => request.method === "POST").body.text, "70");
+});
+
 test("stale/disabled/unknown actions and invalid schemas never POST", async () => {
   const before = posts;
   await assert.rejects(operate(client, "execute", { ...request("Post", "action"), revision: "1" }), error => error.code === "StalePage");
@@ -406,6 +478,16 @@ test("MCP real stdio initialize/discover/read/set/action matches CMD and form ef
     assert.deepEqual(result.structuredContent, { status: 200, page });
     assert.equal(result.content[0].text, renderAscii(page));
     assert.equal(result.isError, undefined);
+    const choices = await mcp.callTool({ name: "agiru_read", arguments: { path: "/?handle=page_choices" } });
+    assert.deepEqual(choices.structuredContent.page.controls.find(field => field.identity === "Amount").choices,
+      expectedChoices);
+    assert.equal(choices.content[0].text, renderAscii(choicePage));
+    const choiceWrites = posts;
+    const selected = await mcp.callTool({ name: "agiru_execute", arguments: {
+      ...request("Amount", "set", "70"), path: "/?handle=page_choices", page: "page_choices" } });
+    assert.deepEqual(selected.structuredContent, { status: 200, page: choicePage });
+    assert.equal(posts, choiceWrites + 1);
+    assert.equal(received.findLast(request => request.method === "POST").body.text, "70");
     const large = await mcp.callTool({ name: "agiru_read", arguments: { path: "/large" } });
     assert.equal(large.structuredContent.presentation.code, "OutputLimit");
     assert.equal(large.structuredContent.page.caption.length, 270000);

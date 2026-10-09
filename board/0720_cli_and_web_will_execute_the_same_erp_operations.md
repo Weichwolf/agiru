@@ -4,11 +4,12 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: carry the new declaration-order enum metadata through table/variable bindings
-into server-declared HTML/ASCII choices and prove CMD/MCP/web discovery/write parity,
-then qualify Customer privacy-block confirmation/rollback, remaining invalid/duplicate/
+Next: regenerate production app declarations and rebuild every native ABI consumer,
+then qualify original Customer choice discovery/write/SQL parity, privacy-block
+confirmation/rollback, remaining invalid/duplicate/
 lookup/dimension cases and vendor/item/setup processes under 0727.
-The rebuilt native image passes all twenty Customer client cases. Preserve
+The last original-client baseline (eef54ac) passes all twenty Customer cases; the
+new FieldDef/PageValue ABI requires regeneration/rebuild and another original run. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The protected-observation native diagnostic-slice image compiles and links with `make dev-exec
@@ -25,9 +26,27 @@ preserve the complete Customer and four ledger populations and independently reo
 Three blocking cases save/reopen Ship, Invoice, All and the exact blank member through
 CMD/MCP/Chromium. Independent SQL qualifies ordinals, audit/rowversion and original
 OnModify timestamps while preserving all other fields/Customers/ledgers (0727).
-Enum edits currently use text forms in `src/rt/PageHtml.cpp`; valid member choices
-are not yet discoverable from `src/client/profile.mts`. This is not dropdown/UI parity
-or proof that sales/journal posting enforces the chosen block.
+Enum/Option choices now flow from immutable table/type declarations through borrowed
+PageValue spans into native semantic HTML selects and the shared TypeScript parser.
+Values, AL member names and captions stay separate; enum display order follows the
+declaration array, while Option uses its member sequence. Unknown saved ordinals remain
+disabled selected placeholders, not fabricated writable choices. Missing enum order
+or members is counted unsupported before emitting a partial field form. Read-only/list
+scalars do not duplicate choice lists. ASCII escapes untrusted caption framing characters.
+`make gate GATE=PageValueGate JOBS=2` passes 49 checks and PageHtmlGate passes 174.
+`make client-test` passes 48 cases and all ten compiled defects reject, including choice
+ordering and unsafe ASCII caption escaping. External CMD and real MCP stdio discover
+the native choices and each submits one exact ordinal over HTTP. `make web-test` passes
+15 Chromium cases plus the Caddy asset/routing case; all three compiled browser defects
+reject. The browser selects the exact blank AL member and sends the same ordinal form
+envelope as the agent library. This is native HTML/transport fixture qualification,
+not original ERP SQL proof. Four affected C++ units pass targeted clang-tidy, zero
+failures; not FULL lint. The PageValue standalone header comparison is 326.6 ms before
+and 349.6 ms after (three no-PCH rounds each); no performance improvement is claimed.
+Fresh BrowserHttp/BrowserSession/SessionIdentity gates pass 37/61/75 checks. This does
+not qualify active-stack revocation/cancellation or cryptographic stolen-cookie binding.
+Page-level OptionCaption/ML overrides and original Customer dropdown/SQL parity remain
+unqualified; no claim that sales/journal posting enforces the chosen block.
 The declaration-order prerequisite is implemented in `src/gen/EnumWriter.cpp`:
 `EnumTraits::kDisplayOrdinals` retains source/base-before-extension order separately
 from sorted `kValues`; it adds immutable ordinal metadata, not per-session copies.

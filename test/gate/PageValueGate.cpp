@@ -1,3 +1,4 @@
+#include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
@@ -27,8 +28,22 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <string>
+
+namespace page_value_fixture {
+enum class Choice : std::int32_t { Before = 0, After = 10 };
+}
+
+namespace agiru {
+template <> struct EnumTraits<page_value_fixture::Choice> {
+  static constexpr std::array kValues{
+      EnumValueDef{.ordinal = 0, .name = "Before", .caption = "Vorher"},
+      EnumValueDef{.ordinal = 10, .name = "After", .caption = "Nachher"}};
+  static constexpr std::array<std::int32_t, 2> kDisplayOrdinals{10, 0};
+};
+}
 
 namespace {
 
@@ -58,6 +73,7 @@ struct Row {
 constexpr std::array kChoices{
     agiru::EnumValueDef{.ordinal = 0, .name = "Before", .caption = "Vorher"},
     agiru::EnumValueDef{.ordinal = 10, .name = "After", .caption = "Nachher"}};
+constexpr std::array<std::int32_t, 2> kDisplayOrdinals{10, 0};
 constexpr std::array kFields{
     agiru::FieldDef{.offset = offsetof(Row, amount),
                     .no = agiru::FieldNo{1},
@@ -71,6 +87,7 @@ constexpr std::array kFields{
         .offset = offsetof(Row, text), .no = agiru::FieldNo{4}, .type = agiru::FieldType::Text},
     agiru::FieldDef{.offset = offsetof(Row, choice),
                     .values = kChoices,
+                    .displayOrdinals = kDisplayOrdinals,
                     .no = agiru::FieldNo{5},
                     .type = agiru::FieldType::Enum},
     agiru::FieldDef{
@@ -249,6 +266,37 @@ void VariableValues() {
   CHECK_TRUE("standalone scalar requires its declaration identity", refused);
 }
 
+void ChoiceMetadata() {
+  const Row row;
+  const auto value = Value(row, 4);
+  CHECK_TRUE("table enum borrows immutable members instead of copying per-session choices",
+             value.members.data() == kChoices.data() && value.members.size() == kChoices.size());
+  CHECK_TRUE("table enum presentation order is distinct from its ordinal lookup order",
+             value.displayOrdinals.data() == kDisplayOrdinals.data() &&
+                 value.displayOrdinals.front() == 10 && value.members.front().ordinal == 0);
+  const auto option = Value(row, 12);
+  CHECK_TRUE("Option borrows its original member sequence without guessed enum ordering",
+             option.members.data() == kChoices.data() && option.displayOrdinals.empty());
+  CHECK_TRUE("non-choice scalars contain no choice metadata", Value(row, 0).members.empty());
+  using Choice = agiru::Enum<page_value_fixture::Choice>;
+  using Traits = agiru::EnumTraits<page_value_fixture::Choice>;
+  const auto variable = agiru::ReadPageVariable(Choice{10}, "page/50352/control/Choice");
+  CHECK_TRUE("typed variable borrows static trait arrays after its local declaration dies",
+             variable.members.data() == Traits::kValues.data() &&
+                 variable.displayOrdinals.data() == Traits::kDisplayOrdinals.data() &&
+                 variable.displayOrdinals.front() == 10 && variable.member == "After");
+
+  struct TypedRow {
+    Choice choice;
+  };
+
+  constexpr auto field = agiru::Declare<&TypedRow::choice>(
+      agiru::FieldNo{1}, "Choice", "Choice", offsetof(TypedRow, choice));
+  CHECK_TRUE("generated table declarations retain the exact shared enum presentation array",
+             field.values.data() == Traits::kValues.data() &&
+                 field.displayOrdinals.data() == Traits::kDisplayOrdinals.data());
+}
+
 }
 
 int main() {
@@ -257,5 +305,6 @@ int main() {
     Refusals();
     RemainingScalars();
     VariableValues();
+    ChoiceMetadata();
   });
 }

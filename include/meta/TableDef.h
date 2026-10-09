@@ -81,6 +81,10 @@ struct FieldDef {
   /// ordinal.
   std::span<const EnumValueDef> values{};
 
+  /// \brief Enum declaration-order ordinals, separate from the sorted lookup values.
+  /// Empty for non-enums or unavailable presentation metadata; never infer enum order.
+  std::span<const std::int32_t> displayOrdinals{};
+
   /// \brief The `CalcFormula` property, as AL wrote it, for a FlowField.
   std::string_view calcFormula{};
 

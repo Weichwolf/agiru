@@ -5,12 +5,13 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { AgentClient } from "../../build/client/http.mjs";
 import { parsePage, commandEnvelope } from "../../build/client/profile.mjs";
-import { assertBrowserPage } from "./browser-client.mjs";
+import { assertBrowserPage, browserSet } from "./browser-client.mjs";
 import { questionHtml } from "./dialog-fixture.mjs";
 
 const require = createRequire(new URL("../../src/client/package.json", import.meta.url));
 const { chromium } = require("playwright-core");
 const original = await readFile(process.env.AGIRU_CLIENT_HTML, "utf8");
+const choiceHtml = await readFile(process.env.AGIRU_CLIENT_CHOICES_HTML, "utf8");
 const bearer = `Bearer ag1_${"a".repeat(64)}`;
 const requests = [];
 let responseHtml = original;
@@ -77,6 +78,31 @@ async function ready(page) {
   await page.waitForFunction(() => !document.querySelector(".htmx-request"));
 }
 const control = (page, name) => page.locator(`section[data-control="${name}"]`);
+
+test("actual browser discovers the native enum choices and submits the exact ordinal", async () => {
+  responseHtml = choiceHtml;
+  const page = await open();
+  await ready(page);
+  const model = parsePage(choiceHtml);
+  await assertBrowserPage(page, model);
+  assert.deepEqual(await control(page, "Amount").locator("select option").evaluateAll(options =>
+    options.map(option => option.value)), ["10", "0", "70", "5"]);
+  assert.equal(await page.locator("#workspace script").count(), 0);
+  responseHtml = choiceHtml
+    .replaceAll('9007199254740993', '9007199254740994')
+    .replace('data-value="10" data-domain="table/50400/field/1" data-member="Chosen"',
+      'data-value="0" data-domain="table/50400/field/1" data-member=" "')
+    .replace('data-member="Chosen" selected', 'data-member="Chosen"')
+    .replace('<option value="0" data-member=" ">', '<option value="0" data-member=" " selected>');
+  const before = requests.length;
+  const { page: updated } = await browserSet(page, origin, model, "Amount", " ");
+  assert.equal(updated.controls.find(field => field.identity === "Amount").scalar.value, "0");
+  const writes = requests.slice(before).filter(request => request.method === "POST");
+  assert.equal(writes.length, 1);
+  const envelope = commandEnvelope(model, model.controls.find(field => field.identity === "Amount").operation, "0");
+  assert.deepEqual(writes[0].fields, envelope.fields);
+  await assertBrowserPage(page, updated);
+});
 
 test("htmx follows a working call with GET only and preserves the native page contract", async () => {
   const page = await open();

@@ -1,5 +1,6 @@
 #include "runtime/PageHtml.h"
 
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/PageDef.h"
 #include "runtime/ErrorValue.h"
@@ -163,11 +164,61 @@ void ValueAttributes(Writer &out, const PageValue &value) {
   out.Attribute("data-closing", value.closing ? "true" : "false");
 }
 
+void CheckChoices(const PageValue &value) {
+  if (value.type != "Enum" && value.type != "Option") {
+    throw Error("Choice metadata has no declared choice type", "PageValueUnsupported");
+  }
+  if (value.type != "Enum") { return; }
+  if (value.displayOrdinals.size() != value.members.size()) {
+    throw Error("Enum choice declaration order is unavailable", "PageValueUnsupported");
+  }
+  for (const auto ordinal : value.displayOrdinals) {
+    if (ValueOf(value.members, ordinal) == nullptr) {
+      throw Error("Choice ordinal lacks a member", "PageValueUnsupported");
+    }
+  }
+}
+
+void ChoiceHtml(Writer &out, const PageControlResult &field) {
+  const auto &value = field.value;
+  out.Raw("<select name=\"text\"");
+  out.Attribute("aria-label", field.caption);
+  ValueAttributes(out, value);
+  out.Raw(">");
+  const bool declared = std::ranges::any_of(value.members, [&](const EnumValueDef &member) {
+    return std::to_string(member.ordinal) == value.value;
+  });
+  if (!declared) {
+    out.Raw("<option disabled selected");
+    out.Attribute("value", value.value);
+    out.Attribute("data-member", value.member);
+    out.Raw(">");
+    out.Text(field.text);
+    out.Raw("</option>");
+  }
+  for (std::size_t at = 0; at < value.members.size(); ++at) {
+    const auto *member = value.type == "Enum" ? ValueOf(value.members, value.displayOrdinals[at])
+                                              : &value.members[at];
+    out.Raw("<option");
+    const auto ordinal = std::to_string(member->ordinal);
+    out.Attribute("value", ordinal);
+    out.Attribute("data-member", member->name);
+    if (ordinal == value.value) { out.Raw(" selected"); }
+    out.Raw(">");
+    out.Text(member->caption.empty() ? member->name : member->caption);
+    out.Raw("</option>");
+  }
+  out.Raw("</select>");
+}
+
 void FieldHtml(Writer &out, PageDispatcher &dispatcher, const ControlDef &control, bool readOnly) {
   PageControlResult field;
   try {
     field =
         dispatcher.Execute({.operation = PageControlOperation::ReadValue, .control = control.name});
+    if (!readOnly && field.editable && field.enabled && !field.value.members.empty()) {
+      CheckChoices(field.value);
+    }
   } catch (const Error &error) {
     if (error.Code() != "PageValueUnsupported") { throw; }
     out.Unsupported(control.name, "PageValueUnsupported");
@@ -181,11 +232,16 @@ void FieldHtml(Writer &out, PageDispatcher &dispatcher, const ControlDef &contro
   out.Raw("</h3>");
   if (!readOnly && field.editable && field.enabled) {
     out.Form("set", control.name);
-    out.Raw(R"(<input name="text" type="text")");
-    out.Attribute("aria-label", field.caption);
-    out.Attribute("value", field.text);
-    ValueAttributes(out, field.value);
-    out.Raw("><button type=\"submit\">Set</button></form>");
+    if (!field.value.members.empty()) {
+      ChoiceHtml(out, field);
+    } else {
+      out.Raw(R"(<input name="text" type="text")");
+      out.Attribute("aria-label", field.caption);
+      out.Attribute("value", field.text);
+      ValueAttributes(out, field.value);
+      out.Raw(">");
+    }
+    out.Raw("<button type=\"submit\">Set</button></form>");
   } else {
     out.Raw("<output");
     ValueAttributes(out, field.value);

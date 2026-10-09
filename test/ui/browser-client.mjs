@@ -38,13 +38,15 @@ export async function assertBrowserPage(page, model) {
     const readControl = node => {
       const identity = node.dataset.control;
       const kind = node.dataset.kind ?? (node.tagName === "ASIDE" ? "unsupported" : "label");
-      const value = node.querySelector(":scope > form > input[name=text], :scope > output[data-type]");
+      const value = node.querySelector(":scope > form > input[name=text], :scope > form > select[name=text], :scope > output[data-type]");
       const heading = node.querySelector(":scope > h2, :scope > h3, :scope > form > button");
       const button = node.querySelector(":scope > form > button");
       const command = node.querySelector(':scope > form > input[name="command"]');
       return { identity, kind, caption: heading?.textContent ?? node.textContent,
         ...(value ? { scalar: { type: value.dataset.type, value: value.dataset.value, domain: value.dataset.domain,
           member: value.dataset.member, undefined: value.dataset.undefined === "true", closing: value.dataset.closing === "true" } } : {}),
+        ...(value?.tagName === "SELECT" ? { choices: [...value.options].filter(option => !option.disabled).map(option => ({
+          value: option.value, member: option.dataset.member, caption: option.textContent })) } : {}),
         ...(command ? { command: command.value, enabled: !button.disabled } : {}) };
     };
     const rows = [...article.querySelectorAll('[data-kind="row"]')].map(row => {
@@ -77,6 +79,7 @@ export async function assertBrowserPage(page, model) {
   });
   const expectedControl = control => ({ identity: control.identity, kind: control.kind, caption: control.caption,
     ...(control.scalar ? { scalar: control.scalar } : {}),
+    ...(control.choices ? { choices: control.choices } : {}),
     ...(control.operation ? { command: control.operation.command, enabled: control.operation.enabled } : {}) });
   const controls = model.controls.map(expectedControl);
   const rows = model.rows?.map(row => ({ handle: row.handle, selected: row.selected, caption: row.caption,
@@ -115,7 +118,12 @@ export async function browserSet(page, origin, model, identity, text) {
   const endpoint = model.interaction?.state === "modal" ? `/modal-commands/${model.interaction.dialog}` : "/commands";
   const received = page.waitForResponse(response => response.url() === `${origin}${endpoint}` &&
     response.request().method() === "POST");
-  await control.locator("input[name=text]").fill(text);
+  if (await control.locator("select[name=text]").count()) {
+    const choice = model.controls.find(control => control.identity === identity)?.choices?.find(choice =>
+      choice.value === text || choice.member === text);
+    assert.ok(choice, "the browser must explicitly choose a server-declared enum value");
+    await control.locator("select[name=text]").selectOption(choice.value);
+  } else await control.locator("input[name=text]").fill(text);
   await control.locator("button").click();
   const response = await finishedResponse(page, origin, await received);
   assert.equal(response.status(), 200, await response.text());

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -9,9 +11,10 @@
 namespace agiru {
 
 struct FieldDef;
+struct EnumValueDef;
 struct TableDef;
 
-/// \brief A version-one semantic-HTML scalar. Unknown values always refuse.
+/// \brief A version-one semantic-HTML scalar. Unsupported storage types always refuse.
 /// All numbers travel as strings. Date/Time/DateTime use invariant text with an
 /// explicit undefined flag; a Date also carries its closing flag. Duration is
 /// signed milliseconds. Option/Enum carry an ordinal and a declared storage domain,
@@ -22,7 +25,11 @@ struct PageValue {
   std::string value{}; ///< Exact invariant value, never a localized number.
   /// \brief Option/Enum domain: table/<id>/field/<number> or <object-kind>/<id>/control/<name>.
   std::string domain{};
-  std::string member{};   ///< Declared Option/Enum member name; empty if undeclared.
+  std::string member{}; ///< Declared Option/Enum member name; empty if undeclared.
+  /// \brief Borrowed immutable members; their owning declaration must outlive this value.
+  std::span<const EnumValueDef> members{};
+  /// \brief Borrowed Enum display order. Options use the member sequence, not enum sorting.
+  std::span<const std::int32_t> displayOrdinals{};
   bool undefined = false; ///< Undefined Date/Time/DateTime, distinct from a blank display.
   bool closing = false;   ///< Closing Date, distinct from its normal twin.
 };
@@ -31,7 +38,8 @@ struct PageValue {
 /// \param record Non-null storage matching the supplied immutable table declaration.
 /// \param table The owning declaration and stable Option/Enum field domain.
 /// \param field The field belonging to that table, including its storage offset.
-/// \return An owned lossless value; Decimal scale and Int64 digits remain unchanged.
+/// \return Owned lossless scalar text plus borrowed immutable choice metadata.
+/// \note The declaration's member/order arrays must outlive the result.
 /// \throws Error for null/mismatched declarations or unsupported Blob/Media/filter values.
 [[nodiscard]] PageValue
 ReadPageValue(const void *record, const TableDef &table, const FieldDef &field);
@@ -40,7 +48,8 @@ ReadPageValue(const void *record, const TableDef &table, const FieldDef &field);
 /// \param value Non-null storage matching the declaration's type, length and members.
 /// \param declaration Scalar declaration with offset zero and no FlowFilter class.
 /// \param domain Nonempty stable declaration identity, not a localized caption.
-/// \return An owned exact value; no display-text parsing or numeric narrowing occurs.
+/// \return Owned exact scalar text plus borrowed immutable choice metadata.
+/// \note The declaration's member/order arrays must outlive the result.
 /// \throws Error for null storage, invalid declarations or unsupported scalar types.
 [[nodiscard]] PageValue
 ReadPageScalar(const void *value, const FieldDef &declaration, std::string_view domain);

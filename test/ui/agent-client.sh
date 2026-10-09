@@ -7,17 +7,20 @@ sha256sum src/client/*.{mts,json} test/ui/agent-client.{sh,mjs} test/ui/dialog-f
 if [[ -n ${AGIRU_PAGE_HTML_GATE:-} ]]; then
   "$AGIRU_PAGE_HTML_GATE" > "$proof/cpp-gate.log"
   "$AGIRU_PAGE_HTML_GATE" --html > "$proof/page.html"
+  "$AGIRU_PAGE_HTML_GATE" --choices-html > "$proof/choices.html"
 else
   make dev-exec COMMAND='make gate GATE=PageHtmlGate JOBS=2 B=/workspace/build/podman' > "$proof/cpp-gate.log"
   make --no-print-directory dev-exec COMMAND='/workspace/build/podman/gate_PageHtmlGate --html' > "$proof/page.html"
+  make --no-print-directory dev-exec COMMAND='/workspace/build/podman/gate_PageHtmlGate --choices-html' > "$proof/choices.html"
 fi
 cat "$proof/cpp-gate.log"
-AGIRU_CLIENT_HTML="$proof/page.html" node --test test/ui/agent-client.mjs > "$proof/client.log" 2>&1 || {
+AGIRU_CLIENT_HTML="$proof/page.html" AGIRU_CLIENT_CHOICES_HTML="$proof/choices.html" \
+  node --test test/ui/agent-client.mjs > "$proof/client.log" 2>&1 || {
   cat "$proof/client.log"
   exit 1
 }
 cat "$proof/client.log"
-for control in rounded-scalars disabled-command stale-revision double-post blocking-auth unsafe-read-hints opening-replay error-identity; do
+for control in rounded-scalars disabled-command stale-revision double-post blocking-auth unsafe-read-hints opening-replay error-identity choice-order choice-escaping; do
   mutant="$proof/$control"
   mkdir "$mutant"
   cp build/client/*.mjs "$mutant/"
@@ -25,6 +28,7 @@ for control in rounded-scalars disabled-command stale-revision double-post block
   source=profile
   case "$control" in stale-revision|double-post|blocking-auth|opening-replay|error-identity) source=http;; esac
   if [[ "$control" = unsafe-read-hints ]]; then source=mcp; fi
+  if [[ "$control" = choice-escaping ]]; then source=ascii; fi
   awk -v control="$control" '
     control == "rounded-scalars" && /value: attr\(node, "data-value"\)/ {
       sub(/value: attr\(node, "data-value"\)/, "value: String(Number(attr(node, \"data-value\")))"); changed++
@@ -51,12 +55,18 @@ for control in rounded-scalars disabled-command stale-revision double-post block
     control == "error-identity" && /if \(command && failure.command !== expected/ {
       sub(/command && failure.command !== expected/, "false"); changed++
     }
+    control == "choice-order" && /choices: Object.freeze\(choices\)/ {
+      sub(/Object.freeze\(choices\)/, "Object.freeze(choices.reverse())"); changed++
+    }
+    control == "choice-escaping" && /quote\(choice.caption\)/ {
+      sub(/quote\(choice.caption\)/, "JSON.stringify(choice.caption)"); changed++
+    }
     { print }
     END { if (changed != 1) exit 2 }
   ' "build/client/$source.mjs" > "$mutant/$source.mjs"
   node --check "$mutant/$source.mjs"
   status=0
-  AGIRU_CLIENT_HTML="$proof/page.html" AGIRU_CLIENT_MODULES="$mutant" \
+  AGIRU_CLIENT_HTML="$proof/page.html" AGIRU_CLIENT_CHOICES_HTML="$proof/choices.html" AGIRU_CLIENT_MODULES="$mutant" \
     node --test test/ui/agent-client.mjs > "$proof/$control.log" 2>&1 || status=$?
   [[ "$status" = 1 ]]
   rg -q '^# fail [1-9]' "$proof/$control.log"
@@ -72,10 +82,14 @@ for control in rounded-scalars disabled-command stale-revision double-post block
   if [[ "$control" = error-identity ]]; then
     rg -q '^not ok .*typed server errors retain exact diagnostics' "$proof/$control.log"
   fi
+  case "$control" in
+    choice-order|choice-escaping)
+      rg -q '^not ok .*native enum select exposes exact ordered values' "$proof/$control.log";;
+  esac
   rm -- "$mutant/"*.mjs "$mutant/node_modules"
   rmdir "$mutant"
 done
 sha256sum --check --status "$proof/inputs.sha256"
-printf 'agent-client: eight executable value/disabled/revision/duplicate-write/blocking-auth/read-hint/opening-replay/error-identity mutants rejected\n'
+printf 'agent-client: ten executable value/disabled/revision/duplicate-write/blocking-auth/read-hint/opening-replay/error-identity/choice-order/choice-escaping mutants rejected\n'
 printf 'agent-client: semantic HTML/CMD/MCP transport fixture; no ERP SQL/browser parity claim\n'
 printf 'agent-client: %s\n' "$proof"
