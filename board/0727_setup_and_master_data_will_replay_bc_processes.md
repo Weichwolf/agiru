@@ -4,8 +4,8 @@ Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
 Next: expand invalid/duplicate/lookup/dimension cases and the remaining
-setup/master-data workflows; vendor/item creation follows the accepted original
-template → customer → edit → independent reopen regression.
+setup/master-data workflows; Item creation follows the accepted original
+template → Customer/Vendor → edit → independent reopen regressions.
 
 ## Processes and implementation
 
@@ -37,7 +37,7 @@ template → customer → edit → independent reopen regression.
 
 - Current original-client prerequisite regression, 2026-10-09:
   `make erp-client-test JOBS=2` passes
-  preparation 22/22 and client 23/23, with zero failures/skips/cancellations, exit 0.
+  preparation 22/22 and client 26/26, with zero failures/skips/cancellations, exit 0.
   Original Customer List/Card/edit/create cases pass across external CMD/MCP and
   actual Chromium. All three stale-page cases now return native failure diagnostics
   and durable failed receipts without changing any committed field/audit/rowversion
@@ -73,6 +73,21 @@ template → customer → edit → independent reopen regression.
   This accepts this Customer sequence on the stated native seed,
   not the whole process family, visual BC parity or a matching-tenant financial A/B.
   Choosing a template automatically is not an implementation.
+- Original Vendor creation now passes through CMD/MCP and actual Chromium:
+  List 27 → explicit non-default template in modal 1379 → Card 26 →
+  Name/Address/Country → independent List/Card reopen. All three seed templates remain
+  visible; no insertion precedes consent. Original AL allocates the key and transfers
+  five posting/payment/currency fields. SQL proves creator/modifier, exact full-row/
+  rowversion preservation on reopen, unchanged other Vendors and all Customers, and
+  unchanged counts/full-row fingerprints of Vendor/Detailed Vendor/Customer/G/L/Item/
+  Value entries. Durable cases: `test/ui/erp-client.mjs`; existing shared drivers serve
+  both master-data families. No new C++ business mask or native semantic fix was needed.
+  References at the pinned revisions below: developer `methods-auto/page/page-{runmodal-,
+  getrecord,settableview,update}-method.md`, `triggers-auto/page/devenv-onnewrecord-page-trigger.md`;
+  BCApps `Layers/W1/BaseApp/Purchases/Vendor/{VendorList.Page,VendorCard.Page,
+  SelectVendorTemplList.Page,VendorTemplMgt.Codeunit}.al`; user
+  `includes/create_new_vendor.md`; predecessor 1503/1761/1954. This accepts the native
+  Vendor sequence, not a fresh BC-sandbox comparison, purchase posting or the full family.
 - Docs revision `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`, under
   `~/Git/dynamics365smb-docs/business-central/`: `setup.md`,
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,

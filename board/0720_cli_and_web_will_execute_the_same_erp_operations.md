@@ -4,19 +4,19 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: execute the original Vendor template/card/create/edit/reopen workflows under
-0727, retaining the Customer baseline; then expand invalid/duplicate/lookup/dimension
-and item/setup processes.
+Next: execute original Item template/card/create/edit/reopen workflows under 0727,
+retaining Customer/Vendor regressions; then expand invalid/duplicate/lookup/dimension
+and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
 The complete native ABI-consumer rebuild exits 0 (2702 seconds). Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
-The current original-client regression passes all twenty-three Customer cases. Preserve
+The current original-client regression passes 23 Customer and three Vendor cases. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0. Preserve the
 1846 known unlinked-source refusals; complete generated-app compilation is not proven.
-`make erp-client-test JOBS=2` passes preparation 22/22 and client 23/23,
+Fresh 2026-10-09 `make erp-client-test JOBS=2` passes preparation 22/22 and client 26/26,
 with zero failures/skips/cancellations; outer exit 0. Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
 over external CMD/MCP and actual Chromium. All three stale-page cases now refuse
@@ -24,6 +24,13 @@ after a peer commits: independent full-row SQL and ledger fingerprints stay unch
 and the native diagnostic/command ID and durable failed receipt match each adapter.
 Three further cases normalize ` ch ` to `CH`, refuse an absent Country/Region,
 preserve the complete Customer and four ledger populations and independently reopen.
+Three Vendor cases execute the original 27 → 1379 → 26 page flow with an explicit
+non-default template, original numbering and five inherited posting/payment/currency
+fields. Name/Address/Country persist across CMD/MCP/Chromium and independent reopening.
+SQL preserves every other Vendor, the entire Customer population and six ledger
+populations, including Vendor and Detailed Vendor entries. Full stored row/audit/
+rowversion text stays unchanged on reopening. No new BC-sandbox or posting comparison
+is claimed; the native source/runtime required no Vendor-specific fix.
 Three blocking cases save/reopen Ship, Invoice, All and the exact blank member through
 CMD/MCP/Chromium. Independent SQL qualifies ordinals, audit/rowversion and original
 OnModify timestamps while preserving all other fields/Customers/ledgers (0727).

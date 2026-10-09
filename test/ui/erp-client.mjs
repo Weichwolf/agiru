@@ -43,8 +43,7 @@ async function customer(number) {
     'credit',"Credit Limit (LCY)"::text)
     FROM "Customer" WHERE "No."=${quoted(number)}`));
 }
-async function ledgerSnapshot() {
-  const tables = ["Cust. Ledger Entry", "G/L Entry", "Item Ledger Entry", "Value Entry"];
+async function ledgerSnapshot(tables = ["Cust. Ledger Entry", "G/L Entry", "Item Ledger Entry", "Value Entry"]) {
   return sql(`SELECT ${tables.map(name => `(SELECT count(*)::text || ':' ||
     COALESCE(md5(string_agg(md5(to_jsonb(entry)::text), '' ORDER BY "Entry No.")), 'empty')
     FROM "${name}" entry)`).join(",")}`);
@@ -136,10 +135,10 @@ async function workflowDriver(adapter, initial) {
   };
 }
 
-async function reopenCustomer(adapter, number) {
-  let list = JSON.parse((await cmd("read", target)).stdout);
+async function reopenMasterCard(adapter, number, table, listTarget, prefix) {
+  let list = JSON.parse((await cmd("read", listTarget)).stdout);
   const driver = await workflowDriver(adapter, list);
-  const blocks = Math.ceil(Number(await sql('SELECT count(*) FROM "Customer"')) / 40) + 1;
+  const blocks = Math.ceil(Number(await sql(`SELECT count(*) FROM "${table}"`)) / 40) + 1;
   try {
     for (let block = 0; block < blocks; ++block) {
       assert.equal(list.page.window.limit, "40");
@@ -147,14 +146,17 @@ async function reopenCustomer(adapter, number) {
       if (row) {
         list = await driver.action(list, row.select.control);
         const card = await driver.action(list, "$agiru.card");
-        await driver.screenshot(`customer-${adapter.toLowerCase()}-reopened`);
+        await driver.screenshot(`${prefix}-${adapter.toLowerCase()}-reopened`);
         return card;
       }
       if (!list.page.window.more) break;
       list = await driver.action(list, "$agiru.next");
     }
-    assert.fail(`independent Customer List did not expose newly created ${number}`);
+    assert.fail(`independent ${table} List did not expose newly created ${number}`);
   } finally { await driver.close(); }
+}
+async function reopenCustomer(adapter, number) {
+  return reopenMasterCard(adapter, number, "Customer", target, "customer");
 }
 
 let server, closed, pid, first, denied, client, list, card, saved, selected, original, browser;
@@ -649,5 +651,91 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
           WHERE handle=${quoted(stale.page.handle)} AND command_id=${quoted(attempt.request.command)}`), "failed");
         await driver.screenshot(`customer-${adapter.toLowerCase()}-stale-write-refused`);
       } finally { await driver.close(); }
+    });
+}
+
+for (const adapter of ["CMD", "MCP", "Web"]) {
+  test(`${adapter} creates an original Vendor from an explicitly selected template, edits and independently reopens it`,
+    { timeout: 120000 }, async () => {
+      const vendorTarget = `/?page=27&company=${encodeURIComponent(company)}`;
+      const ledgers = ["Vendor Ledger Entry", "Detailed Vendor Ledg. Entry", "Cust. Ledger Entry",
+        "G/L Entry", "Item Ledger Entry", "Value Entry"];
+      const snapshot = await ledgerSnapshot(ledgers);
+      const customers = await customerPopulation();
+      const population = Number(await sql('SELECT count(*) FROM "Vendor"'));
+      const unchangedVendors = await sql(`SELECT COALESCE(md5(string_agg(md5(to_jsonb(v)::text), ''
+        ORDER BY "No.")), 'empty') FROM "Vendor" v`);
+      assert.equal(await sql(`SELECT "Default Nos." FROM "No. Series" WHERE "Code" IN
+        (SELECT "Vendor Nos." FROM "Purchases & Payables Setup")`), "t");
+      const fresh = JSON.parse((await cmd("read", vendorTarget)).stdout);
+      assert.equal(fresh.page.page, "27");
+      assert.equal(fresh.page.window.limit, "40");
+      const driver = await workflowDriver(adapter, fresh);
+      const inputs = { Name: `AGIRU ${adapter} VENDOR Ω 雪`, Address: "AGIRU Testweg 7",
+        "Country/Region Code": "CH" };
+      const steps = [];
+      let created, number, stored;
+      try {
+        let modal = await driver.action(fresh, "$agiru.new");
+        assert.equal(modal.page.page, "1379", "original vendor template selection must execute");
+        assert.equal(modal.page.interaction.state, "modal");
+        assert.equal(modal.page.window.limit, "40");
+        assert.equal(await sql('SELECT count(*) FROM "Vendor"'), String(population));
+        const templates = JSON.parse(await sql(`SELECT json_agg(row_to_json(t)) FROM
+          (SELECT "Code" AS code,"Description" AS description FROM "Vendor Templ." ORDER BY "Code" LIMIT 40) t`));
+        assert.deepEqual(modal.page.rows.map(row => ({
+          code: row.controls.find(control => control.identity === "Code")?.scalar?.value,
+          description: row.controls.find(control => control.identity === "Description")?.scalar?.value,
+        })), templates);
+        assert.equal(templates.length, 3, "preserve the unchanged seed's three explicit choices");
+        const row = modal.page.rows[1];
+        assert.equal(row.selected, false, "select a non-default template explicitly");
+        const templateCode = row.controls.find(control => control.identity === "Code")?.scalar?.value;
+        modal = await driver.action(modal, row.select.control);
+        assert.equal(field(modal, "Code"), templateCode);
+        assert.equal(await sql('SELECT count(*) FROM "Vendor"'), String(population));
+        created = await driver.action(modal, "$agiru.modal_ok");
+        assert.equal(created.page.page, "26", "resume the original Vendor Card");
+        assert.equal(created.page.interaction, undefined);
+        number = field(created, "No.");
+        assert.ok(number, "original AL number-series allocation must assign the key");
+        assert.equal(await sql('SELECT count(*) FROM "Vendor"'), String(population + 1));
+        assert.equal(await sql(`SELECT "SystemCreatedBy"::text FROM "Vendor" WHERE "No."=${quoted(number)}`),
+          "00000000-0000-0000-0000-000000000001");
+        for (const name of ["Gen. Bus. Posting Group", "VAT Bus. Posting Group", "Vendor Posting Group",
+          "Payment Method Code", "Currency Code"]) {
+          assert.equal(await sql(`SELECT "${name}" FROM "Vendor" WHERE "No."=${quoted(number)}`),
+            await sql(`SELECT "${name}" FROM "Vendor Templ." WHERE "Code"=${quoted(templateCode)}`),
+            `original AL must inherit ${name} from the explicitly selected template`);
+        }
+        for (const [name, value] of Object.entries(inputs)) {
+          created = await driver.action(created, name, value);
+          assert.equal(field(created, name), value);
+          assert.equal(await sql(`SELECT "${name}" FROM "Vendor" WHERE "No."=${quoted(number)}`), value);
+          steps.push({ control: name, input: value, page: created.page });
+        }
+        stored = await sql(`SELECT to_jsonb(v)::text FROM "Vendor" v WHERE "No."=${quoted(number)}`);
+        const audit = JSON.parse(stored);
+        assert.equal(audit.SystemCreatedBy, "00000000-0000-0000-0000-000000000001");
+        assert.equal(audit.SystemModifiedBy, audit.SystemCreatedBy);
+        assert.equal(audit["Search Name"], inputs.Name.toUpperCase());
+        await driver.screenshot(`vendor-${adapter.toLowerCase()}-created`);
+        await writeFile(`${proof}/vendor-${adapter.toLowerCase()}-created.json`, JSON.stringify({
+          template: templateCode, number, inputs, steps, stored }));
+      } finally { await driver.close(); }
+      const reopened = await reopenMasterCard(adapter, number, "Vendor", vendorTarget, "vendor");
+      assert.notEqual(reopened.page.handle, created.page.handle);
+      assert.equal(reopened.page.page, "26");
+      assert.equal(field(reopened, "No."), number);
+      for (const [name, value] of Object.entries(inputs)) assert.equal(field(reopened, name), value);
+      assert.equal(field(reopened, "Balance (LCY)"), "0");
+      assert.equal(await sql(`SELECT to_jsonb(v)::text FROM "Vendor" v WHERE "No."=${quoted(number)}`),
+        stored, "independent read must preserve every stored field, audit value and rowversion");
+      assert.equal(await sql(`SELECT count(*) FROM "Vendor"`), String(population + 1));
+      assert.equal(await sql(`SELECT COALESCE(md5(string_agg(md5(to_jsonb(v)::text), '' ORDER BY "No.")), 'empty')
+        FROM "Vendor" v WHERE "No."<>${quoted(number)}`), unchangedVendors);
+      assert.equal(await customerPopulation(), customers);
+      assert.equal(await ledgerSnapshot(ledgers), snapshot,
+        "vendor master-data changes must not post or alter any of the six ledger populations");
     });
 }
