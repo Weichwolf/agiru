@@ -41,6 +41,9 @@ test("actual Caddy serves local assets and browser documents while preserving na
     const headers = await get("/", ["-I", "-H", "Accept: text/html"]);
     assert.match(headers, /content-security-policy:.*script-src .self./i);
     assert.match(headers, /referrer-policy: no-referrer/i);
+    assert.doesNotMatch(headers, /^strict-transport-security:/im);
+    const forgedTls = await get("/", ["-I", "-H", "Accept: text/html", "-H", "X-Forwarded-Proto: https"]);
+    assert.doesNotMatch(forgedTls, /^strict-transport-security:/im);
     assert.doesNotMatch(headers, /^server:/im);
     for (const name of ["web.js", "web.css", "htmx-LICENSE.txt", "parse5-LICENSE.txt", "entities-LICENSE.txt"]) {
       assert.equal(await get(`/assets/${name}`), await readFile(`build/web/${name}`, "utf8"));

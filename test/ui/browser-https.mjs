@@ -75,6 +75,7 @@ function request(path, method = "GET", supplied = {}, trusted = true) {
 
 function grant(response) {
   assert.equal(response.status, 200);
+  assert.equal(response.headers["strict-transport-security"], "max-age=31536000");
   assert.equal(response.headers["cache-control"], "no-store");
   assert.equal(response.headers["x-content-type-options"], "nosniff");
   assert.equal(response.headers["set-cookie"]?.length, 1);
@@ -100,6 +101,12 @@ test("TLS certificate validation fails without the private test CA", async () =>
 });
 
 test("Caddy overwrites forged forwarding authority and exchanges the source over trusted TLS", async () => {
+  const shell = await request("/", "GET", { Accept: "text/html" });
+  assert.equal(shell.status, 200);
+  assert.equal(shell.headers["strict-transport-security"], "max-age=31536000");
+  const asset = await request("/assets/web.css");
+  assert.equal(asset.status, 200);
+  assert.equal(asset.headers["strict-transport-security"], "max-age=31536000");
   current = grant(await request("/session", "POST", headers({ Authorization: auth.authorization,
     "X-Forwarded-Proto": "http", "X-Forwarded-Host": "forged.invalid", Forwarded: "proto=http;host=forged.invalid" })));
   original = current;
@@ -119,7 +126,9 @@ test("cross-site missing-CSRF navigation and prefetch denials have no independen
     { "Sec-Fetch-Site": "cross-site" }, { "Sec-Fetch-Site": "same-site" }, { "Sec-Fetch-Site": "" },
     { "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document" },
     { Purpose: "prefetch" }, { Origin: "https://elsewhere.invalid" }]) {
-    assert.equal((await request("/protected", "GET", browser(overrides))).status, 403);
+    const response = await request("/protected", "GET", browser(overrides));
+    assert.equal(response.status, 403);
+    assert.equal(response.headers["strict-transport-security"], "max-age=31536000");
   }
   assert.equal(await sql("SELECT count(*) FROM cookie_probe"), "1");
 });

@@ -238,6 +238,19 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   profile mounted only in the test process namespace. Personal trust remains unchanged;
   [Chromium Linux certificate management](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/cert_management.md)
   consulted 2026-10-08. No certificate bypass or disposable-receipt WI dependency.
+- HSTS: `deploy/dev/Caddyfile` sets `max-age=31536000` only for actual HTTPS,
+  deferred so upstream responses cannot weaken it; no subdomain/preload commitment.
+  The official Debian Caddy requires the compatible header block, not the newer `>`
+  shorthand; the real TLS test rejected its missing header before correction.
+  Fresh 2026-10-09 `make browser-https-test JOBS=2` passes nine protocol and eight
+  Chromium cases, including HSTS on shell/assets/grants/denials. `make web-test JOBS=2`
+  passes fourteen browser cases, the HTTP edge case and three compiled controls;
+  HTTP and forged `X-Forwarded-Proto: https` do not emit HSTS. Fresh container
+  `make browser-auth`, `make browser-sessions` and SessionIdentityGate retain
+  317, 61 plus one provider, and 75 passing checks; eighteen security defects reject.
+  HSTS follows [OWASP session transport guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+  and [Caddy headers](https://caddyserver.com/docs/caddyfile/directives/header),
+  consulted 2026-10-09. Active-stack revocation and full SaaS isolation remain unqualified.
 - Predecessor `~/Git/openerp/board/1775_a_session_per_tab.md`: do not equate a shared
   browser authentication cookie with AL page state. Retain explicit independent page
   contexts; reject global session managers, URL credentials and unbounded tab sessions.

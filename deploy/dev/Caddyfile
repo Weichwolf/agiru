@@ -16,6 +16,11 @@
 }
 
 {$AGIRU_HTTP_ADDRESS::8080} {
+	@https protocol https
+	header @https {
+		Strict-Transport-Security "max-age=31536000"
+		defer
+	}
 	header {
 		-Server
 		X-Content-Type-Options nosniff

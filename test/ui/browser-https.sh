@@ -57,6 +57,7 @@ podman cp "$name:$root_certificate" "$proof/ca.crt"
 podman port "$name" 8443/tcp > "$proof/port"
 podman exec "$name" dpkg-query -W -f='${Version}\n' caddy > "$proof/caddy-package"
 podman exec "$name" dpkg-query -S /usr/bin/caddy > "$proof/caddy-owner"
+podman cp build/web/. "$name:/usr/share/agiru/web/"
 AGIRU_BROWSER_TLS_CONTAINER="$name" AGIRU_BROWSER_TLS_PROOF="$proof" \
   node --test test/ui/browser-https.mjs > "$proof/execution.log" 2>&1 || {
     cat "$proof/execution.log"; exit 1;
@@ -65,7 +66,6 @@ cat "$proof/execution.log"
 podman exec "$name" install -d -m 700 -o agiru -g agiru /run/agiru/browser-pages
 podman cp "$proof/host" "$name:/run/agiru/browser-pages/host"
 podman cp "$proof/agiru" "$name:/run/agiru/browser-pages/agiru"
-podman cp build/web/. "$name:/usr/share/agiru/web/"
 mkdir -p "$proof/browser-home/.pki/nssdb"
 certutil -N --empty-password -d "sql:$proof/browser-home/.pki/nssdb"
 AGIRU_BROWSER_TLS_CONTAINER="$name" AGIRU_BROWSER_TLS_PROOF="$proof" NODE_EXTRA_CA_CERTS="$proof/ca.crt" \
