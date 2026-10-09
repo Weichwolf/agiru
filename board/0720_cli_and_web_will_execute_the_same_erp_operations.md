@@ -81,6 +81,20 @@ developer revision: `methods-auto/text/text-replace-method.md` and
 EntityTextAOAISettings.IsEnabled, with their original permission/capability checks.
 Durable qualifier: `make text-positions JOBS=2`, its AL fixture/Runner and Bash controls;
 the predecessor board has no more specific Replace/Char guarantee.
+Read-only dependency audit: original EntityTextAOAISettings checks GUI/write permission,
+then `Copilot Capability.IsCapabilityRegistered`. The original 7774 implementation
+reads table 7775 Copilot Settings at ReadCommitted, filtered by capability and caller
+module; no provider availability constant substitutes for that SQL result. Current
+`scope.json` omits its System.AI namespace, not an approved bounded product exclusion.
+The sealed native seed has no Copilot Settings relation; source `agiru-pg/cronus`
+has `system."Copilot Settings"`, one row and zero rows for Entity Text capability 2015.
+Qualify the needed original registry/storage dependency and faithful source import,
+not a fabricated empty table, narrower permission grant or Microsoft-cloud provider.
+This is static/SQL audit, not fresh Item acceptance. Sources at the pinned BCApps revision:
+`AI/src/Copilot/{CopilotCapability.Codeunit,CopilotCapabilityImpl.Codeunit,CopilotSettings.Table}.al`
+and `Entity Text/src/EntityTextCapability.EnumExt.al`; developer
+`methods-auto/record/record-readisolation-method.md`; predecessors 760/1997 retain
+the mixed-namespace/cloud-dependency distinction. Retain the full 29-case replay first.
 At 6a1556c, the earlier
 PageWindowProvider refusal occurred because PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate
