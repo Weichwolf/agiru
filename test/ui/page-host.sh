@@ -219,8 +219,8 @@ for control in dialog-default dialog-commit dialog-replay modal-poll-receipt; do
     control == "dialog-default" && /call->question = held;/ {
       $0 = $0 " held->answer = held->defaultChoice;"; changed++
     }
-    control == "dialog-commit" && /PublishQuestion\(options_, \*call, \*held\);/ {
-      $0 = "    agiru::Commit(); " $0; changed++
+    control == "dialog-commit" && /std::unique_lock lock\(call->mutex\);/ {
+      print "    agiru::Commit();"; changed++
     }
     control == "dialog-replay" && /replay.Value\(0, 0\) != std::to_string\(choice\)/ {
       sub(/replay.Value\(0, 0\) != std::to_string\(choice\)/, "false"); changed++

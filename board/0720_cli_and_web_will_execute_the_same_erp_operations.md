@@ -4,9 +4,9 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: complete shared-client regressions for active-call expiry/revocation
-cancellation, then expand invalid/duplicate/lookup/dimension and vendor/item/setup
-processes under 0727.
+Next: execute the original Vendor template/card/create/edit/reopen workflows under
+0727, retaining the Customer baseline; then expand invalid/duplicate/lookup/dimension
+and item/setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
 The complete native ABI-consumer rebuild exits 0 (2702 seconds). Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
@@ -283,9 +283,7 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `make page-host-test JOBS=2` run passed 170/170 regular cases (38 fixture, 44 native
   for each of limits 40/7/80), without skips or cancellations; all 22 compiled defects
   rejected and input hashes remained unchanged. That historical acceptance is retained
-  at e2d7a5f. The active-call increment's matrix retry is pending: its earlier attempt
-  completed 38 fixture/44 native cases, then ended with SIGTERM/143 and early auth-file
-  cleanup. This interrupted run is not acceptance; its owned service/database were removed.
+  at e2d7a5f. The active-call runtime at 3e69487 now passes the complete matrix below.
   Independent SQL proves same-user read/write/replay/poll/question/modal/receipt denial
   without additional effects. Eight affected C++ consumers pass targeted clang-tidy.
 - Local contracts at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
@@ -391,30 +389,36 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   317, 61 plus one provider, and 75 passing checks; eighteen security defects reject.
   HSTS follows [OWASP session transport guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [Caddy headers](https://caddyserver.com/docs/caddyfile/directives/header),
-  consulted 2026-10-09. Active-stack revocation and full SaaS isolation remain unqualified.
+  consulted 2026-10-09. Arbitrary CPU/blocked-SQL cancellation and full SaaS isolation
+  remain unqualified.
 - Predecessor `~/Git/openerp/board/1775_a_session_per_tab.md`: do not equate a shared
   browser authentication cookie with AL page state. Retain explicit independent page
   contexts; reject global session managers, URL credentials and unbounded tab sessions.
   Two actual tabs now prove passive shared authentication with independent page handles
   and AL variables; logout invalidates the other tab's next operation without SQL effects.
   Never claim stolen-cookie device binding.
-- Current `make page-host-test JOBS=2` passes all 170 regular cases: fixture 38/38
+- Fresh 2026-10-09 `make page-host-test JOBS=2` against the active-call runtime
+  at 3e69487 passes all 170 regular cases: fixture 38/38
   and production 44/44 for each of limits 40/7/80 and both TryFunction write policies.
   All 22 compiled defects reject; source/input hashes remain unchanged; outer exit 0.
   Source/navigation/dispatcher gates pass 15/270/122 checks, with 34 execution controls
   and one expected control-name compile refusal. The invalid-input case retains every
   Integer/Decimal/Int64/array/Enum family, all three adapters, exact diagnostics,
   independent SQL effects, rejected-command replay and explicit correction. It passes
-  in 37.125 seconds in the default native profile without changing its 60-second limit.
+  without changing its 60-second limit.
   `test/ui/browser-client.mjs::browserFailure` deliberately injects an undeclared option
   into the actual DOM select before submission: this is a browser-tamper negative test,
   not an advertised choice or a replacement HTTP client. The native server must refuse it.
   Preparing input before registering the response waiter also avoids an orphan rejection
   when input preparation fails. All owned page-host databases/auth/binaries are removed.
-  The historical cancellation remains recoverable at 2973049; its production latency
-  cause is not proved repaired. Five CLI help launches cost 144–166 ms; no HTTP/SQL or
-  production performance improvement is claimed. Active-stack revocation and complete
-  business-process/BC parity remain unqualified.
+  The implicit-dialog-commit control now injects before the call mutex: inserting under
+  that mutex deadlocked the new commit authority instead of proving the intended defect.
+  The corrected compiled control fails on an independently observed premature SQL write
+  (21 instead of 11), drains normally and leaves no service/database. No timeout or
+  refusal baseline changed. Interrupted predecessors remain recoverable at 3e69487;
+  they are not acceptance. Arbitrary CPU/blocked-SQL cancellation, full SaaS isolation
+  and complete business-process/BC parity remain unqualified. No performance improvement
+  is claimed. Durable control source: `test/ui/page-host.sh`.
 - References: [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
   consulted 2026-10-08. Sources/tests: `src/rt/{ClientCredentials,PageCommandHost}.cpp`,
