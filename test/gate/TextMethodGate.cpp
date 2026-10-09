@@ -5,12 +5,23 @@
 #include "Check.h"
 
 #include <string>
+#include <string_view>
 
 using agiru::Char;
 using agiru::List;
 using agiru::Text;
 
 namespace {
+
+template <typename Old, typename New>
+concept ReplaceArguments =
+    requires(const Text<0> &value, const Old &old, const New &next) { value.Replace(old, next); };
+
+static_assert(ReplaceArguments<Char, Char>);
+static_assert(ReplaceArguments<Char, std::string_view>);
+static_assert(ReplaceArguments<std::string_view, Char>);
+static_assert(!ReplaceArguments<int, Char>);
+static_assert(!ReplaceArguments<Char, int>);
 
 const Text<50> kAbc{"Hello world"};
 
@@ -75,6 +86,31 @@ void SplitKeepsWhatItFinds() {
   CHECK_TRUE("a List of [Char] separates too", Text<50>("a,b").Split(commas).Count() == 2);
 }
 
+void CharactersAreTextArguments() {
+  const Text<50> lines{"a\nb\nc"};
+  CHECK_TEXT("Replace converts a newline Char to text", lines.Replace(Char{10}, ""), "abc");
+  CHECK_TEXT("Replace leaves its source unchanged", lines, "a\nb\nc");
+  CHECK_TEXT(
+      "Replace converts the replacement Char", Text<50>{"a-b-c"}.Replace("-", Char{"€"}), "a€b€c");
+  CHECK_TEXT(
+      "Replace converts both Char arguments", Text<50>{"äbä"}.Replace(Char{"ä"}, Char{"€"}), "€b€");
+  CHECK_TEXT("Replace does not truncate a multibyte old Char",
+             Text<50>{"€a€"}.Replace(Char{"€"}, "éé"),
+             "ééaéé");
+  CHECK_TEXT(
+      "Replace does not rescan an inserted Char", Text<50>{"aa"}.Replace("a", Char{'a'}), "aa");
+  CHECK_TEXT("Replace accepts typed Text with a Char",
+             Text<50>{"ababa"}.Replace(Text<2>{"ab"}, Char{'z'}),
+             "zza");
+  CHECK_TEXT("Replace returns unbounded text", Text<1>{"ä"}.Replace(Char{"ä"}, "€€"), "€€");
+  CHECK_TEXT("Replace retains text empty-pattern behaviour",
+             Text<50>{"abc"}.Replace("", Char{'z'}),
+             "abc");
+  CHECK_TEXT("Replace encodes a null Char without losing its length",
+             (Text<50>{std::string_view{"a\0b", 3}}.Replace(Char{}, "!")),
+             "a!b");
+}
+
 void AnIndexCountsUtf16Units() {
   // The same rule StrLen follows: a Latin-1 letter is one unit and four UTF-8 bytes are two.
   const Text<50> umlaut{"\xc3\xa4x"};
@@ -92,6 +128,7 @@ int main() {
     ASubstringIsCutOneBased();
     TheEdgesAreTrimmedAndPadded();
     CaseAndReplacementAreWholesale();
+    CharactersAreTextArguments();
     SplitKeepsWhatItFinds();
     AnIndexCountsUtf16Units();
   });

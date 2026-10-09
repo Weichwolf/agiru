@@ -38,4 +38,19 @@ codeunit 50260 "Text Position Consumer"
         Bounded[StrLen(Bounded) + 1] := 8364;
         exit(Bounded);
     end;
+
+    procedure ReplaceCharacter(Value: Text; OldCharacter: Char; NewValue: Text): Text
+    begin
+        exit(Value.Replace(OldCharacter, NewValue));
+    end;
+
+    procedure ReplaceWithCharacter(Value: Text; OldValue: Text; NewCharacter: Char): Text
+    begin
+        exit(Value.Replace(OldValue, NewCharacter));
+    end;
+
+    procedure ReplaceCharacters(Value: Text; OldCharacter: Char; NewCharacter: Char): Text
+    begin
+        exit(Value.Replace(OldCharacter, NewCharacter));
+    end;
 }

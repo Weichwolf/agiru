@@ -40,5 +40,14 @@ int main() {
       (void)consumer.ReplacePosition("A💡Z", 2, agiru::Char{"X"});
     } catch (const agiru::StringError &) { refused = true; }
     CHECK_TRUE("generated AL explicitly refuses unsupported half-surrogate replacement", refused);
+    CHECK_TEXT("generated AL removes every newline Char through Text.Replace",
+               consumer.ReplaceCharacter("a\nb\nc", agiru::Char{10}, "").Value(),
+               "abc");
+    CHECK_TEXT("generated AL accepts a Unicode replacement Char",
+               consumer.ReplaceWithCharacter("a-b-c", "-", agiru::Char{"€"}).Value(),
+               "a€b€c");
+    CHECK_TEXT("generated AL converts both Unicode Char arguments",
+               consumer.ReplaceCharacters("äbä", agiru::Char{"ä"}, agiru::Char{"€"}).Value(),
+               "€b€");
   });
 }

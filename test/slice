@@ -14237,3 +14237,4 @@ base/finance/vat/registration/codeunit/VATLookupQuotaMgt.cpp
 base/finance/vat/registration/table/VATRegNoLookupQuota.cpp
 base/finance/vat/registration/table/VATRegNoLookupQuota.def.cpp
 base/core/table/SynthRelationMappingBuffer.def.cpp
+system/system/text/codeunit/EntityTextImpl.cpp

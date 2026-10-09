@@ -3,7 +3,7 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: link the original Entity Text Impl. prerequisite through 0720 and rerun the
+Next: finish 0720's native rebuild of the original Entity Text Impl. prerequisite and rerun the
 three retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
 setup/master-data workflows.
 
@@ -105,6 +105,10 @@ setup/master-data workflows.
   Customer/Vendor cases remain green on this fresh image. The measured client result
   remains 26/29. The image retains 1850 mechanically counted unlinked-source identities,
   four more than its predecessor; that delta remains a gap, not a higher accepted baseline.
+  The original missing codeunit is appended to the slice. Its Char-to-Text Replace
+  compile prerequisite is qualified by 47 TextMethod, 91 Text and 13 generated checks,
+  four rejected compiled defects and two clean targeted clang-tidy consumers (0720).
+  Its actual stable unity consumer now compiles; full linking and Item replay remain pending.
   Item List declares OnFindRecord/OnNextRecord: stored Rec
   normally, temporary attribute/pick selection conditionally. Preserve both sources,
   custom navigation and bounded windows; removing the declaration check alone would

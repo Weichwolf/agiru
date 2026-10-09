@@ -456,6 +456,20 @@ public:
   /// \see `text-replace-method.md`
   [[nodiscard]] Text<0> Replace(std::string_view OldValue, std::string_view NewValue) const;
 
+  /// \brief AL `Text.Replace(Text, Text)` with a Char converted to one-character text.
+  /// \tparam Old The old argument's declared type, Char or text-convertible.
+  /// \tparam New The replacement's declared type, Char or text-convertible.
+  /// \param OldValue The character or string to replace at every occurrence.
+  /// \param NewValue Its replacement, preserving the character's full UTF-8 encoding.
+  /// \return New unbounded text; this value remains unchanged.
+  /// \note Numeric and enum arguments do not become text through Char's numeric conversion.
+  /// \see `text-replace-method.md`, `char-data-type.md`
+  template <typename Old, typename New>
+    requires((std::same_as<Old, Char> || std::same_as<New, Char>) &&
+             (std::same_as<Old, Char> || std::convertible_to<const Old &, std::string_view>) &&
+             (std::same_as<New, Char> || std::convertible_to<const New &, std::string_view>))
+  [[nodiscard]] Text<0> Replace(const Old &OldValue, const New &NewValue) const;
+
   /// \brief AL `Text.Substring(Integer)` -- everything from a position onwards.
   /// \param StartIndex The one-based position the substring starts at.
   /// \return The substring.
@@ -931,6 +945,23 @@ inline Text<0> StringValue::Remove(Integer StartIndex, Integer Count) const {
 /// \return What the declaration above promises.
 inline Text<0> StringValue::Replace(std::string_view OldValue, std::string_view NewValue) const {
   return detail::ReplaceText(value_, {.from = OldValue, .to = NewValue});
+}
+
+/// \brief Converts each declared Char once, then uses the ordinary text replacement primitive.
+/// \return New unbounded text with every original occurrence replaced.
+template <typename Old, typename New>
+  requires((std::same_as<Old, Char> || std::same_as<New, Char>) &&
+           (std::same_as<Old, Char> || std::convertible_to<const Old &, std::string_view>) &&
+           (std::same_as<New, Char> || std::convertible_to<const New &, std::string_view>))
+inline Text<0> StringValue::Replace(const Old &OldValue, const New &NewValue) const {
+  const auto text = []<typename T>(const T &argument) {
+    if constexpr (std::same_as<T, Char>) {
+      return Encoded(argument);
+    } else {
+      return std::string_view(argument);
+    }
+  };
+  return Replace(text(OldValue), text(NewValue));
 }
 
 /// \brief The out-of-line half of `StringValue::Substring`.

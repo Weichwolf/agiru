@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: link the original Entity Text Impl. source required by Item's FactBox, rebuild,
+Next: finish the native rebuild with the original Entity Text Impl. source required by Item's FactBox,
 then rerun original Item template/card/create/edit/reopen under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
@@ -64,6 +64,23 @@ reaches FactBox initialization, which calls the declared but unlinked
 `EntityTextImpl_Codeunit::CanSuggest()`. Original `EntityTextAOAISettings.cpp` is
 already in the slice; inspect its real permission/capability checks, not constant
 feature substitutes. Retain all later Item edit/reopen/SQL assertions, still unaccepted.
+`test/slice` now appends that original codeunit without removing/reordering identities.
+Its first compilation exposed generic `Text.Replace` Char-to-Text argument binding,
+not an Item business-rule defect. `include/type/StringValue.h` now converts either/both
+declared Char arguments through existing UTF-8 encoding and the ordinary replacement
+primitive; numeric arguments do not acquire implicit text conversion. TextMethodGate
+passes 47/47, TextGate 91/91 and generated text consumers 13/13. All four compiled
+source/UTF-8/replacement defects reject; input hashes stay unchanged. Both changed
+C++ test consumers pass targeted clang-tidy, zero failures, not FULL lint.
+The stable unity consumer containing original EntityTextImpl now compiles, exit 0;
+source-check retains raw 14227/selected 14024/excluded 102/omitted 101, zero missing.
+Full native linking and the fresh 29-case replay remain pending; this does not enable
+Microsoft-cloud providers or qualify every text operation. Contracts at the pinned
+developer revision: `methods-auto/text/text-replace-method.md` and
+`methods-auto/char/char-data-type.md`; BCApps original EntityTextImpl.BuildFacts and
+EntityTextAOAISettings.IsEnabled, with their original permission/capability checks.
+Durable qualifier: `make text-positions JOBS=2`, its AL fixture/Runner and Bash controls;
+the predecessor board has no more specific Replace/Char guarantee.
 At 6a1556c, the earlier
 PageWindowProvider refusal occurred because PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate

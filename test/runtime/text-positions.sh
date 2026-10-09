@@ -14,7 +14,7 @@ flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Ite
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 sha256sum test/runtime/text-positions/Fixture.Codeunit.al test/runtime/text-positions/Runner.cpp \
-  test/runtime/text-positions.sh test/gate/TextGate.cpp include/type/Char.h \
+  test/runtime/text-positions.sh test/gate/{Text,TextMethod}Gate.cpp include/type/Char.h \
   include/type/AlArray.h include/type/StringValue.h src/net/StringValue.cpp "$B/agirutc" \
   "$B/libagiru_net.so" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 "$B/agirutc" "$proof" "$proof/apps.json" "$proof/generated" > "$proof/generation.log" 2>&1
@@ -67,7 +67,19 @@ for control in lead-payload continuation-payload; do
   fi
   rg -q 'Char decodes each UTF-8 width boundary' "$proof/$control-execution.log"
 done
+mkdir -p "$proof/char-replacement/type"
+awk '
+  /return Encoded\(argument\);/ {sub(/Encoded\(argument\)/, "Encoded(Char{32})"); changed++}
+  {print} END {if (changed != 1) exit 1}' \
+  include/type/StringValue.h > "$proof/char-replacement/type/StringValue.h"
+"$CXX" -O2 "-I$proof/char-replacement" "${flags[@]}" test/gate/TextMethodGate.cpp "${links[@]}" \
+  -o "$proof/char-replacement-gate"
+if "$proof/char-replacement-gate" > "$proof/char-replacement-execution.log" 2>&1; then
+  printf 'text-positions: wrong Char replacement escaped execution checks\n' >&2
+  exit 1
+fi
+rg -q 'Replace converts a newline Char to text' "$proof/char-replacement-execution.log"
 sha256sum --check --status "$proof/inputs.sha256"
 find "$proof" -maxdepth 1 -type f \
   \( -name runner.o -o -name runner -o -name mutant -o -name '*-gate' \) -delete
-printf 'text-positions: generated reads/writes/copies/bounds execute; source-index and two UTF-8 payload controls fail; %s\n' "$proof"
+printf 'text-positions: generated positions and Char replacements execute; source-index, two UTF-8 payload and Char replacement controls fail; %s\n' "$proof"
