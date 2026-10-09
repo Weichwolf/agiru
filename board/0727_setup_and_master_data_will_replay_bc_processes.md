@@ -3,9 +3,9 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: expand invalid/duplicate/lookup/dimension cases and the remaining
-setup/master-data workflows; Item creation follows the accepted original
-template → Customer/Vendor → edit → independent reopen regressions.
+Next: qualify bounded custom-source list windows under 0720 and rerun the three
+retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
+setup/master-data workflows.
 
 ## Processes and implementation
 
@@ -88,6 +88,21 @@ template → Customer/Vendor → edit → independent reopen regressions.
   SelectVendorTemplList.Page,VendorTemplMgt.Codeunit}.al`; user
   `includes/create_new_vendor.md`; predecessor 1503/1761/1954. This accepts the native
   Vendor sequence, not a fresh BC-sandbox comparison, purchase posting or the full family.
+- Item workflows are retained, not accepted: the expanded `make erp-client-test JOBS=2`
+  run has preparation 22/22, client 26/29, three failures, no skips/cancellations,
+  outer exit 2. CMD/MCP/Web each refuse original List 31 with PageWindowProvider
+  before initialization. Item List declares OnFindRecord/OnNextRecord: stored Rec
+  normally, temporary attribute/pick selection conditionally. Preserve both sources,
+  custom navigation and bounded windows; removing the declaration check alone would
+  silently bypass AL. `test/ui/erp-client.mjs` retains List 31 → modal 1378 → Card 30,
+  explicit template, inherited fields/base unit, exact Decimal price, independent
+  reopen/full-row/audit checks and unchanged seven ledger/warehouse populations.
+  Those later Item steps remain unexecuted. All 26 existing cases still pass.
+  References at the pinned revisions below: developer
+  `triggers-auto/page/devenv-{onfindrecord,onnextrecord}-page-trigger.md`; BCApps
+  `Layers/W1/BaseApp/Inventory/Item/{ItemList.Page,ItemCard.Page,Item.Table,
+  SelectItemTemplList.Page,ItemTemplMgt.Codeunit}.al`; user
+  `includes/create_new_item.md`; predecessors 1228/1767/1858/1868.
 - Docs revision `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`, under
   `~/Git/dynamics365smb-docs/business-central/`: `setup.md`,
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,

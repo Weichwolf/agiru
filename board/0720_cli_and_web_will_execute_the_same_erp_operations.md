@@ -4,20 +4,28 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: execute original Item template/card/create/edit/reopen workflows under 0727,
-retaining Customer/Vendor regressions; then expand invalid/duplicate/lookup/dimension
-and setup processes.
+Next: implement bounded custom-source list windows without bypassing OnFindRecord/
+OnNextRecord, then rerun original Item template/card/create/edit/reopen under 0727.
+Retain Customer/Vendor regressions and client/session permission boundaries; follow
+with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
 The complete native ABI-consumer rebuild exits 0 (2702 seconds). Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
-The current original-client regression passes 23 Customer and three Vendor cases. Preserve
+The expanded original-client regression passes 23 Customer and three Vendor cases;
+three Item cases currently fail explicitly at the custom-list provider. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0. Preserve the
 1846 known unlinked-source refusals; complete generated-app compilation is not proven.
-Fresh 2026-10-09 `make erp-client-test JOBS=2` passes preparation 22/22 and client 26/26,
-with zero failures/skips/cancellations; outer exit 0. Original Customer List,
+The accepted 26-case 2026-10-09 `make erp-client-test JOBS=2` run passes preparation
+22/22 and client 26/26, with zero failures/skips/cancellations; outer exit 0.
+Its expanded 29-case rerun retains preparation 22/22 and all 26 Customer/Vendor passes,
+but all three Item cases fail with PageWindowProvider on original List 31: outer
+exit 2, no skips/cancellations. PageWindowSession refuses declared OnFindRecord/
+OnNextRecord before page initialization; do not omit those triggers or fabricate
+an Item-only SQL provider. 0727 retains the exact workflow and reference paths.
+Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
 over external CMD/MCP and actual Chromium. All three stale-page cases now refuse
 after a peer commits: independent full-row SQL and ledger fingerprints stay unchanged,

@@ -53,9 +53,12 @@ async function customerSnapshot(number, omitted = []) {
   return sql(`SELECT (to_jsonb(customer)${projection})::text FROM "Customer" customer WHERE "No."=${quoted(number)}`);
 }
 async function customerPopulation(except) {
+  return masterPopulation("Customer", except);
+}
+async function masterPopulation(table, except) {
   return sql(`SELECT count(*)::text || ':' ||
-    COALESCE(md5(string_agg(md5(to_jsonb(customer)::text), '' ORDER BY "No.")), 'empty')
-    FROM "Customer" customer${except === undefined ? "" : ` WHERE "No."<>${quoted(except)}`}`);
+    COALESCE(md5(string_agg(md5(to_jsonb(master)::text), '' ORDER BY "No.")), 'empty')
+    FROM "${table}" master${except === undefined ? "" : ` WHERE "No."<>${quoted(except)}`}`);
 }
 async function cmd(name, value, denied = false) {
   return execute(process.execPath, ["build/client/cmd.mjs", "--json", name,
@@ -654,88 +657,109 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
     });
 }
 
-for (const adapter of ["CMD", "MCP", "Web"]) {
-  test(`${adapter} creates an original Vendor from an explicitly selected template, edits and independently reopens it`,
+const masters = [{ table: "Vendor", list: "27", modal: "1379", card: "26", templates: 3, selected: 1,
+  setup: 'SELECT "Vendor Nos." FROM "Purchases & Payables Setup"', search: "Search Name", name: "Name",
+  inherited: ["Gen. Bus. Posting Group", "VAT Bus. Posting Group", "Vendor Posting Group", "Payment Method Code", "Currency Code"],
+  zero: "Balance (LCY)", others: ["Customer", "Item"],
+  values: { Address: "AGIRU Testweg 7", "Country/Region Code": "CH" } },
+{ table: "Item", list: "31", modal: "1378", card: "30", templates: 2, selected: 0,
+  setup: 'SELECT "Item Nos." FROM "Inventory Setup"', search: "Search Description", name: "Description",
+  inherited: ["Type", "Gen. Prod. Posting Group", "VAT Prod. Posting Group", "Inventory Posting Group", "Base Unit of Measure", "Costing Method"],
+  zero: "Inventory", others: ["Customer", "Vendor"],
+  values: { "Unit Price": "1234.56789" } }];
+
+for (const master of masters) for (const adapter of ["CMD", "MCP", "Web"]) {
+  test(`${adapter} creates an original ${master.table} from an explicitly selected template, edits and independently reopens it`,
     { timeout: 120000 }, async () => {
-      const vendorTarget = `/?page=27&company=${encodeURIComponent(company)}`;
+      const { table } = master;
+      const prefix = table.toLowerCase();
+      const listTarget = `/?page=${master.list}&company=${encodeURIComponent(company)}`;
       const ledgers = ["Vendor Ledger Entry", "Detailed Vendor Ledg. Entry", "Cust. Ledger Entry",
-        "G/L Entry", "Item Ledger Entry", "Value Entry"];
+        "G/L Entry", "Item Ledger Entry", "Value Entry", "Warehouse Entry"];
       const snapshot = await ledgerSnapshot(ledgers);
-      const customers = await customerPopulation();
-      const population = Number(await sql('SELECT count(*) FROM "Vendor"'));
-      const unchangedVendors = await sql(`SELECT COALESCE(md5(string_agg(md5(to_jsonb(v)::text), ''
-        ORDER BY "No.")), 'empty') FROM "Vendor" v`);
-      assert.equal(await sql(`SELECT "Default Nos." FROM "No. Series" WHERE "Code" IN
-        (SELECT "Vendor Nos." FROM "Purchases & Payables Setup")`), "t");
-      const fresh = JSON.parse((await cmd("read", vendorTarget)).stdout);
-      assert.equal(fresh.page.page, "27");
+      const others = await Promise.all(master.others.map(name => masterPopulation(name)));
+      const population = Number(await sql(`SELECT count(*) FROM "${table}"`));
+      const unchangedMasters = await masterPopulation(table);
+      assert.equal(await sql(`SELECT "Default Nos." FROM "No. Series" WHERE "Code" IN (${master.setup})`), "t");
+      const fresh = JSON.parse((await cmd("read", listTarget)).stdout);
+      assert.equal(fresh.page.page, master.list);
       assert.equal(fresh.page.window.limit, "40");
       const driver = await workflowDriver(adapter, fresh);
-      const inputs = { Name: `AGIRU ${adapter} VENDOR Ω 雪`, Address: "AGIRU Testweg 7",
-        "Country/Region Code": "CH" };
+      const inputs = { [master.name]: `AGIRU ${adapter} ${table.toUpperCase()} Ω 雪`, ...master.values };
       const steps = [];
       let created, number, stored;
       try {
         let modal = await driver.action(fresh, "$agiru.new");
-        assert.equal(modal.page.page, "1379", "original vendor template selection must execute");
+        assert.equal(modal.page.page, master.modal, "original template selection must execute");
         assert.equal(modal.page.interaction.state, "modal");
         assert.equal(modal.page.window.limit, "40");
-        assert.equal(await sql('SELECT count(*) FROM "Vendor"'), String(population));
+        assert.equal(await sql(`SELECT count(*) FROM "${table}"`), String(population));
         const templates = JSON.parse(await sql(`SELECT json_agg(row_to_json(t)) FROM
-          (SELECT "Code" AS code,"Description" AS description FROM "Vendor Templ." ORDER BY "Code" LIMIT 40) t`));
+          (SELECT "Code" AS code,"Description" AS description FROM "${table} Templ." ORDER BY "Code" LIMIT 40) t`));
         assert.deepEqual(modal.page.rows.map(row => ({
           code: row.controls.find(control => control.identity === "Code")?.scalar?.value,
           description: row.controls.find(control => control.identity === "Description")?.scalar?.value,
         })), templates);
-        assert.equal(templates.length, 3, "preserve the unchanged seed's three explicit choices");
-        const row = modal.page.rows[1];
-        assert.equal(row.selected, false, "select a non-default template explicitly");
+        assert.equal(templates.length, master.templates, "preserve every original seed template");
+        const row = modal.page.rows[master.selected];
+        if (master.selected !== 0) assert.equal(row.selected, false, "select a non-default template explicitly");
         const templateCode = row.controls.find(control => control.identity === "Code")?.scalar?.value;
         modal = await driver.action(modal, row.select.control);
         assert.equal(field(modal, "Code"), templateCode);
-        assert.equal(await sql('SELECT count(*) FROM "Vendor"'), String(population));
+        assert.equal(await sql(`SELECT count(*) FROM "${table}"`), String(population));
         created = await driver.action(modal, "$agiru.modal_ok");
-        assert.equal(created.page.page, "26", "resume the original Vendor Card");
+        assert.equal(created.page.page, master.card, "resume the original master-data Card");
         assert.equal(created.page.interaction, undefined);
         number = field(created, "No.");
         assert.ok(number, "original AL number-series allocation must assign the key");
-        assert.equal(await sql('SELECT count(*) FROM "Vendor"'), String(population + 1));
-        assert.equal(await sql(`SELECT "SystemCreatedBy"::text FROM "Vendor" WHERE "No."=${quoted(number)}`),
+        assert.equal(await sql(`SELECT count(*) FROM "${table}"`), String(population + 1));
+        assert.equal(await sql(`SELECT "SystemCreatedBy"::text FROM "${table}" WHERE "No."=${quoted(number)}`),
           "00000000-0000-0000-0000-000000000001");
-        for (const name of ["Gen. Bus. Posting Group", "VAT Bus. Posting Group", "Vendor Posting Group",
-          "Payment Method Code", "Currency Code"]) {
-          assert.equal(await sql(`SELECT "${name}" FROM "Vendor" WHERE "No."=${quoted(number)}`),
-            await sql(`SELECT "${name}" FROM "Vendor Templ." WHERE "Code"=${quoted(templateCode)}`),
+        for (const name of master.inherited) {
+          assert.equal(await sql(`SELECT "${name}" FROM "${table}" WHERE "No."=${quoted(number)}`),
+            await sql(`SELECT "${name}" FROM "${table} Templ." WHERE "Code"=${quoted(templateCode)}`),
             `original AL must inherit ${name} from the explicitly selected template`);
         }
         for (const [name, value] of Object.entries(inputs)) {
           created = await driver.action(created, name, value);
           assert.equal(field(created, name), value);
-          assert.equal(await sql(`SELECT "${name}" FROM "Vendor" WHERE "No."=${quoted(number)}`), value);
+          if (name === "Unit Price") {
+            assert.equal(await sql(`SELECT "${name}"=${quoted(value)}::numeric FROM "${table}" WHERE "No."=${quoted(number)}`), "t");
+          } else {
+            assert.equal(await sql(`SELECT "${name}" FROM "${table}" WHERE "No."=${quoted(number)}`), value);
+          }
           steps.push({ control: name, input: value, page: created.page });
         }
-        stored = await sql(`SELECT to_jsonb(v)::text FROM "Vendor" v WHERE "No."=${quoted(number)}`);
+        stored = await sql(`SELECT to_jsonb(v)::text FROM "${table}" v WHERE "No."=${quoted(number)}`);
         const audit = JSON.parse(stored);
         assert.equal(audit.SystemCreatedBy, "00000000-0000-0000-0000-000000000001");
         assert.equal(audit.SystemModifiedBy, audit.SystemCreatedBy);
-        assert.equal(audit["Search Name"], inputs.Name.toUpperCase());
-        await driver.screenshot(`vendor-${adapter.toLowerCase()}-created`);
-        await writeFile(`${proof}/vendor-${adapter.toLowerCase()}-created.json`, JSON.stringify({
+        assert.equal(audit[master.search], inputs[master.name].toUpperCase());
+        if (table === "Item") {
+          assert.equal(field(created, "Type"), "0", "selected ITEM template creates an inventory item");
+          assert.equal(field(created, "Base Unit of Measure"), "PCS");
+          assert.equal(await sql(`SELECT count(*)::text||':'||bool_and("Code"='PCS' AND "Qty. per Unit of Measure"=1)::text
+            FROM "Item Unit of Measure" WHERE "Item No."=${quoted(number)}`), "1:true");
+        }
+        await driver.screenshot(`${prefix}-${adapter.toLowerCase()}-created`);
+        await writeFile(`${proof}/${prefix}-${adapter.toLowerCase()}-created.json`, JSON.stringify({
           template: templateCode, number, inputs, steps, stored }));
       } finally { await driver.close(); }
-      const reopened = await reopenMasterCard(adapter, number, "Vendor", vendorTarget, "vendor");
+      const reopened = await reopenMasterCard(adapter, number, table, listTarget, prefix);
       assert.notEqual(reopened.page.handle, created.page.handle);
-      assert.equal(reopened.page.page, "26");
+      assert.equal(reopened.page.page, master.card);
       assert.equal(field(reopened, "No."), number);
-      for (const [name, value] of Object.entries(inputs)) assert.equal(field(reopened, name), value);
-      assert.equal(field(reopened, "Balance (LCY)"), "0");
-      assert.equal(await sql(`SELECT to_jsonb(v)::text FROM "Vendor" v WHERE "No."=${quoted(number)}`),
+      for (const [name, value] of Object.entries(inputs)) {
+        assert.equal(field(reopened, name), name === "Unit Price" ?
+          await sql(`SELECT "Unit Price"::text FROM "Item" WHERE "No."=${quoted(number)}`) : value);
+      }
+      assert.equal(field(reopened, master.zero), "0");
+      assert.equal(await sql(`SELECT to_jsonb(v)::text FROM "${table}" v WHERE "No."=${quoted(number)}`),
         stored, "independent read must preserve every stored field, audit value and rowversion");
-      assert.equal(await sql(`SELECT count(*) FROM "Vendor"`), String(population + 1));
-      assert.equal(await sql(`SELECT COALESCE(md5(string_agg(md5(to_jsonb(v)::text), '' ORDER BY "No.")), 'empty')
-        FROM "Vendor" v WHERE "No."<>${quoted(number)}`), unchangedVendors);
-      assert.equal(await customerPopulation(), customers);
+      assert.equal(await sql(`SELECT count(*) FROM "${table}"`), String(population + 1));
+      assert.equal(await masterPopulation(table, number), unchangedMasters);
+      assert.deepEqual(await Promise.all(master.others.map(name => masterPopulation(name))), others);
       assert.equal(await ledgerSnapshot(ledgers), snapshot,
-        "vendor master-data changes must not post or alter any of the six ledger populations");
+        "master-data changes must not post or alter any of the seven ledger/warehouse populations");
     });
 }
