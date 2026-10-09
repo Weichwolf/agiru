@@ -4,16 +4,17 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: compile the regenerated mixed runtime dependencies, then repeat the Customer
-workflow and concurrent-edit rejection. Original configuration/read/event declarations
-are now selected below; their native execution is not yet proven. Preserve
+Next: repeat the Customer workflow and concurrent-edit rejection with the newly linked
+mixed runtime dependencies. Original configuration/read/event declarations
+are now selected below; their native workflow execution is not yet proven. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice integration now compiles and links with `make dev-exec
-COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1761 AL procedures
+COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1846 AL procedures
 still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
-The regenerated image passes `make all` with exit 0. `make erp-client-test JOBS=2`
-passes preparation 22/22 and client 1/14, with thirteen failures, zero skips/cancellations.
+The mixed-dependency image passes `make all` with exit 0. The preceding image's
+`make erp-client-test JOBS=2` passes preparation 22/22 and client 1/14,
+with thirteen failures, zero skips/cancellations; replay of the new image is pending.
 Original Customer List now passes OnInit's ObjectId/selected-part call and fails in
 OnOpenPage at the unselected AL codeunit's IsCRMIntegrationEnabled. Master-data and
 three concurrent-edit cases still do not reach their prerequisites. Historical 11/11
@@ -112,8 +113,15 @@ references in Customer List. Parser UT stays 77/2,298 and total methods 38,421; 
 discrepancy remains open. Translation exits 1: 21 unresolved anchors, 618 untranslated
 objects and 5,708 refused properties, including 2,303 ExternalName, 2,250 ExternalType
 and 1,014 ExternalAccess declarations. Do not discard these or claim backend support.
-Slice-check exits 0: 14,225 raw, 14,022 selected, 102 excluded, 101 omitted, zero missing.
-Native integration and original Customer replay after activation remain pending.
+Slice-check exits 0: 14,226 raw, 14,023 selected, 102 excluded, 101 omitted, zero missing.
+Native integration exits 0 with 1,846 explicit unlinked-source procedure refusals;
+original Customer replay after activation remains pending. The first link correctly
+refused missing data `kSynthRelationMappingBufferTable`; `test/slice` now includes its
+original `base/core/table/SynthRelationMappingBuffer.def.cpp`, not a data stub.
+Its namespace-less original `Integration/Dataverse/SynthRelationMappingBuffer.Table.al`
+declares temporary table 5378 with no procedures; source SHA-256
+`15ff05308758d1ba1a6bdbbd50553353f376d530f4c19421aebc869024aef99f`
+matches the generated provenance. Existing slice identities remain unchanged.
 Contracts at the pinned developer revision: `methods-auto/record/record-readpermission-method.md`,
 `properties/devenv-{singleinstance,eventsubscriberinstance}-property.md`; original BaseApp
 `Integration/{Dataverse,D365Sales,SynchEngine}/` and `CRM/Outlook/`. The sealed client

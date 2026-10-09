@@ -14236,3 +14236,4 @@ system/system/azure/identity/query/UsersInPlans.cpp
 base/finance/vat/registration/codeunit/VATLookupQuotaMgt.cpp
 base/finance/vat/registration/table/VATRegNoLookupQuota.cpp
 base/finance/vat/registration/table/VATRegNoLookupQuota.def.cpp
+base/core/table/SynthRelationMappingBuffer.def.cpp
