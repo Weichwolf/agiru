@@ -474,8 +474,10 @@ public:
   ///       (`Graph Mgt - Purch. Cr. Memo.VerifyCRUDIsPossibleForLine`, 3 asserterror cases,
   ///       2026-09-12). The cursor itself is not shared, so the step is a `Find('>')` from the
   ///       copied key. `record-copy-method.md` says a copy between a temporary and a database
-  ///       record invalidates the enumerator, and a temporary one's rows do not come across, so
-  ///       those start unpositioned.
+  ///       record invalidates the enumerator, not the copied row's seek anchor. The cursor and
+  ///       materialized view do not come across; Next can seek again from the copied fields
+  ///       (`optimize-sql-al-Database-methods-and-performance-on-server.md`). A temporary
+  ///       destination retains its own rows.
   /// \param o The other.
   /// \warning A failed allocation or image assignment retains the destination's image owner
   ///          and filter state. A throwing field assignment may partially change image fields.
@@ -492,11 +494,9 @@ public:
     Swap(copy);
     if (state_ != nullptr || keep != nullptr) {
       RecordState &mine = Ensure();
-      const bool positioned = mine.positioned && mine.temporary == nullptr && keep == nullptr;
       mine.temporary = std::move(keep);
       mine.view.clear();
       mine.viewDirty = true;
-      mine.positioned = positioned;
     }
   }
 

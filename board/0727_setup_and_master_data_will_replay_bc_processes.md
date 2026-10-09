@@ -98,6 +98,9 @@ setup/master-data workflows.
   explicit template, inherited fields/base unit, exact Decimal price, independent
   reopen/full-row/audit checks and unchanged seven ledger/warehouse populations.
   Those later Item steps remain unexecuted. All 26 existing cases still pass.
+  0720 now qualifies the shared custom navigation and cross-provider Copy/seek kernel
+  with generated SQL/temporary cases and compiled defect controls. The bounded custom
+  window adapter and fresh original Item replay remain prerequisites, not accepted work.
   References at the pinned revisions below: developer
   `triggers-auto/page/devenv-{onfindrecord,onnextrecord}-page-trigger.md`; BCApps
   `Layers/W1/BaseApp/Inventory/Item/{ItemList.Page,ItemCard.Page,Item.Table,

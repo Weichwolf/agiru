@@ -71,6 +71,16 @@ template <typename T> struct OnLookupOf {
 /// \brief The platform half of a record operation. Not part of the door's vocabulary.
 namespace detail {
 
+/// \brief Page-provider find kernel; defined with the page lifecycle in Page.h.
+/// \tparam P Generated source-backed page. \param page Live provider owner.
+/// \param which AL selector. \return Whether the custom/default provider found a row.
+template <typename P> bool FindPageRecord(P &page, std::string_view which);
+
+/// \brief Page-provider next kernel; defined with the page lifecycle in Page.h.
+/// \tparam P Generated source-backed page. \param page Live provider owner.
+/// \param steps Signed AL movement. \return Actual custom/default movement.
+template <typename P>::agiru::Integer NextPageRecord(P &page, ::agiru::Integer steps);
+
 /// \brief What a `Find` hands back: the answer, and the REFUSAL when nobody reads it.
 ///
 /// \note AL DECIDES AT CONSUMPTION. `record-findset--method.md`: "[Ok :=] ... If you omit this
@@ -2414,6 +2424,9 @@ public:
 private:
   friend Derived;
   template <typename P> friend class PageWindowSession;
+  template <typename P> friend bool detail::FindPageRecord(P &page, std::string_view which);
+  template <typename P>
+  friend ::agiru::Integer detail::NextPageRecord(P &page, ::agiru::Integer steps);
 
   /// Runs the `OnValidate` trigger of one field, when the table declares one.
   ///

@@ -178,13 +178,14 @@ public:
   /// \brief `PageSession.First()`.
   /// \return Whether there is a first record.
   Boolean First() {
-    return Landed_([](auto &rec) { return static_cast<bool>(Platform_(rec).FindFirst()); });
+    return Landed_([this](auto &) { return detail::FindPageRecord(Page_(), "-"); });
   }
 
   /// \brief `PageSession.Next()`.
   /// \return Whether there is a next record.
   Boolean Next() {
-    const Boolean moved = Landed_([](auto &rec) { return Platform_(rec).Next() != 0; });
+    const Boolean moved =
+        Landed_([this](auto &) { return detail::NextPageRecord(Page_(), 1) != 0; });
     if (!moved) { PresentNewRow_(); }
     return moved;
   }
@@ -192,7 +193,7 @@ public:
   /// \brief `PageSession.Previous()`.
   /// \return Whether there is a previous record.
   Boolean Previous() {
-    return Landed_([](auto &rec) { return Platform_(rec).Next(-1) != 0; });
+    return Landed_([this](auto &) { return detail::NextPageRecord(Page_(), -1) != 0; });
   }
 
   /// \brief `PageSession.Prev()`, the older spelling of `Previous`.
@@ -202,7 +203,7 @@ public:
   /// \brief `PageSession.Last()`.
   /// \return Whether there is a last record.
   Boolean Last() {
-    return Landed_([](auto &rec) { return static_cast<bool>(Platform_(rec).FindLast()); });
+    return Landed_([this](auto &) { return detail::FindPageRecord(Page_(), "+"); });
   }
 
   /// \brief `PageSession.New()` -- moves to a new record and runs `OnNewRecord`.
@@ -1116,12 +1117,17 @@ private:
       SaveEditedNewRecord_();
       Relink_();
       newRecord_ = false;
-      const bool found = step(Record_());
-      if (found) {
-        Page_().LandedOnRecord();
-        detail::AfterGetRecord(Page_());
+      try {
+        const bool found = step(Record_());
+        if (found) {
+          Page_().LandedOnRecord();
+          detail::AfterGetRecord(Page_());
+        }
+        return found;
+      } catch (...) {
+        Release_();
+        throw;
       }
-      return found;
     } else {
       static_cast<void>(step);
       Unopened_();

@@ -5,7 +5,8 @@ Depends on: existing generated page declarations, typed record/session primitive
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
 Next: implement bounded custom-source list windows without bypassing OnFindRecord/
-OnNextRecord, then rerun original Item template/card/create/edit/reopen under 0727.
+OnNextRecord, using the qualified navigation kernel below; then rerun original Item
+template/card/create/edit/reopen under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
@@ -25,6 +26,26 @@ but all three Item cases fail with PageWindowProvider on original List 31: outer
 exit 2, no skips/cancellations. PageWindowSession refuses declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate
 an Item-only SQL provider. 0727 retains the exact workflow and reference paths.
+Custom navigation prerequisite: `make page-navigation JOBS=2` passes PageSource 15/15,
+generated navigation 314/314 and dispatcher 122/122; all forty compiled execution
+defects and one control-name compile refusal reject, input hashes unchanged, exit 0.
+Declared OnFindRecord/OnNextRecord replace default navigation; false/zero never falls
+through. Stored/temporary returned buffers carry their own xRec and selected-row
+triggers. A custom Next error closes the page and rolls back its SQL modification.
+Cross-provider Copy retains independent destination rows and the copied seek anchor,
+not a cursor or materialized view. Existing Find/Temporary/RecordWindow/RecordPosition
+gates pass 43/95/23511/67 checks. Runner and PageRecord consumers pass targeted
+clang-tidy; this is not FULL lint, original Item window acceptance or a rebuilt ERP image.
+Sources: `include/runtime/{Page,PageSession,RecordState,Table}.h`,
+`test/runtime/page-navigation/{Custom.Page,FindOnly.Page}.al`, its `Runner.cpp` and
+`test/runtime/page-navigation.sh`. At developer revision pinned below, contracts are
+`triggers-auto/page/devenv-{onfindrecord,onnextrecord,onaftergetrecord}-page-trigger.md`,
+`methods-auto/record/record-{copy,next}-method.md` and
+`administration/optimize-sql-al-Database-methods-and-performance-on-server.md`:
+invalidating enumeration does not erase the copied fields used by a fresh seek.
+BCApps Item List's temporary Copy/Next branch and predecessors 1228/1767/1768/1868
+retain the source/provider and calculated-buffer requirements. Custom list windows
+still refuse explicitly until their bounded adapter is implemented.
 Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
 over external CMD/MCP and actual Chromium. All three stale-page cases now refuse

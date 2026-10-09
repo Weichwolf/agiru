@@ -9,6 +9,7 @@
 #include "runtime/PageInstance.h"
 #include "runtime/PageValue.h"
 #include "runtime/RecordRef.h"
+#include "runtime/RecordState.h"
 #include "runtime/UiHost.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/PageTraps.h"
@@ -443,6 +444,39 @@ struct OpenedPageRecord {
   bool blank = false; ///< An editable empty page initialized a new row.
 };
 
+/// \brief Uses a declared OnFindRecord instead of default record navigation.
+/// \tparam P Generated page with a source record.
+/// \param page Live page; custom sources may be temporary or synthesized.
+/// \param which AL Find direction or matching preference.
+/// \return Whether the provider found a row; false never falls through to SQL.
+template <typename P> bool FindPageRecord(P &page, std::string_view which) {
+  if constexpr (requires { page.OnFindRecord(::agiru::Text<0>{which}); }) {
+    using Source = std::remove_cvref_t<decltype(page.Rec)>;
+    const bool found = static_cast<bool>(page.OnFindRecord(::agiru::Text<0>{which}));
+    reinterpret_cast<detail::StateHandle *>(&page.Rec)->Ensure().positioned = found;
+    return static_cast<typename Source::Platform_Half &>(page.Rec).Read(found);
+  } else {
+    using Source = std::remove_cvref_t<decltype(page.Rec)>;
+    return static_cast<bool>(static_cast<typename Source::Platform_Half &>(page.Rec).Find(which));
+  }
+}
+
+/// \brief Uses a declared OnNextRecord instead of default record navigation.
+/// \tparam P Generated page with a source record.
+/// \param page Live page owning the custom provider's state.
+/// \param steps Signed AL movement, including zero.
+/// \return Actual movement; zero never falls through to a different provider.
+template <typename P>::agiru::Integer NextPageRecord(P &page, ::agiru::Integer steps) {
+  if constexpr (requires { page.OnNextRecord(steps); }) {
+    using Source = std::remove_cvref_t<decltype(page.Rec)>;
+    return static_cast<typename Source::Platform_Half &>(page.Rec).Stepped(
+        page.OnNextRecord(steps));
+  } else {
+    using Source = std::remove_cvref_t<decltype(page.Rec)>;
+    return static_cast<typename Source::Platform_Half &>(page.Rec).Next(steps);
+  }
+}
+
 /// \brief Positions on the supplied row, then the first row, or an allowed blank row.
 /// \tparam P The generated page class.
 /// \param page The page after its open trigger and event.
@@ -455,8 +489,7 @@ template <typename P> OpenedPageRecord PositionOpenedPage(P &page, bool editable
     if (!isNew) {
       using Source = std::remove_cvref_t<decltype(page.Rec)>;
       auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
-      selected.found =
-          static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst());
+      selected.found = FindPageRecord(page, "=") || FindPageRecord(page, "-");
       if (!selected.found && editable && StartsBlankWhenEmpty<P>()) {
         platform.Init();
         if constexpr (requires { PageTraits<P>::kPage; }) {

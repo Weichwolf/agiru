@@ -36,7 +36,9 @@
 #include "fixture/page/NavigationBlockedList.h"
 #include "fixture/page/NavigationCard.h"
 #include "fixture/page/NavigationCreated.h"
+#include "fixture/page/NavigationCustom.h"
 #include "fixture/page/NavigationDelayed.h"
+#include "fixture/page/NavigationFindOnly.h"
 #include "fixture/page/NavigationList.h"
 #include "fixture/page/NavigationModal.h"
 #include "fixture/page/NavigationOverride.h"
@@ -604,6 +606,132 @@ void GeneratedListWindows() {
              refused && !invalid->IsOpen());
 }
 
+void CustomSourceNavigation() {
+  using Custom = agiru::Fixture::NavigationCustom_Page;
+  for (const bool temporary : {false, true}) {
+    Custom original{};
+    original.Configure(temporary, false, false, false);
+    agiru::PageSession<Custom> page;
+    page.Prepare_Borrowed(original);
+    page.OpenView();
+    CHECK_TEXT("custom opening invokes find instead of the default SQL provider",
+               page.ControlText("ID"),
+               temporary ? "7" : "2");
+    CHECK_TEXT(
+        "custom opening retains the exact find fallback order", page.ControlText("FindCalls"), "2");
+    CHECK_TEXT("custom returned row captures its own xRec",
+               page.ControlText("Original"),
+               temporary ? "70" : "22");
+    CHECK_TEXT("custom opening executes loaded-row calculations",
+               page.ControlText("Loaded"),
+               temporary ? "140" : "44");
+    CHECK_TRUE("custom first is an explicit provider navigation", page.First());
+    CHECK_TEXT(
+        "custom first receives the AL first-record selector", page.ControlText("LastWhich"), "-");
+    CHECK_TEXT(
+        "custom first reruns the current-record trigger", page.ControlText("CurrentCount"), "2");
+    CHECK_TRUE("custom next uses its declared result without SQL fallback",
+               static_cast<bool>(page.Next()) == temporary);
+    CHECK_TEXT("custom next receives the signed AL step", page.ControlText("LastSteps"), "1");
+    if (temporary) {
+      CHECK_TEXT("custom next returns a row absent from SQL", page.ControlText("ID"), "9");
+      CHECK_TEXT(
+          "custom next captures the returned row's xRec", page.ControlText("Original"), "90");
+      CHECK_TRUE("custom previous uses the original provider", page.Previous());
+      CHECK_TEXT(
+          "custom previous receives a negative AL step", page.ControlText("LastSteps"), "-1");
+      CHECK_TEXT("custom previous restores its exact temporary row", page.ControlText("ID"), "7");
+    }
+    CHECK_TRUE("custom last invokes its declared find", page.Last());
+    CHECK_TEXT(
+        "custom last receives the AL last-record selector", page.ControlText("LastWhich"), "+");
+    CHECK_TEXT("custom last displays the provider's last row",
+               page.ControlText("ID"),
+               temporary ? "9" : "2");
+    page.Close();
+  }
+  Custom refused{};
+  refused.Configure(false, true, true, false);
+  agiru::PageSession<Custom> empty;
+  empty.Prepare_Borrowed(refused);
+  empty.OpenView();
+  CHECK_TRUE("custom find refusal never falls through to existing SQL rows", !empty.First());
+  CHECK_TEXT(
+      "custom find refusal runs no after-current trigger", empty.ControlText("CurrentCount"), "0");
+  empty.Close();
+  Custom stopped{};
+  stopped.Configure(true, false, true, false);
+  agiru::PageSession<Custom> stopping;
+  stopping.Prepare_Borrowed(stopped);
+  stopping.OpenView();
+  CHECK_TRUE("custom zero next result does not adopt another source", !stopping.Next());
+  CHECK_TEXT("custom zero next result retains the selected row", stopping.ControlText("ID"), "7");
+  CHECK_TEXT("custom zero next result raises no current-row trigger",
+             stopping.ControlText("CurrentCount"),
+             "1");
+  stopping.Close();
+  agiru::PageSession<agiru::Fixture::NavigationFindOnly_Page> findOnly;
+  findOnly.OpenView();
+  CHECK_TRUE("a find-only provider retains default Next navigation", findOnly.Next());
+  CHECK_TEXT("default Next reaches the next SQL row without a custom next trigger",
+             findOnly.ControlText("ID"),
+             "2");
+  findOnly.Close();
+}
+
+void CustomNavigationErrorsCloseAndRollback() {
+  using Custom = agiru::Fixture::NavigationCustom_Page;
+  Custom original{};
+  original.Configure(false, false, false, true);
+  agiru::PageSession<Custom> page;
+  page.Prepare_Borrowed(original);
+  page.OpenView();
+  bool refused = false;
+  {
+    const agiru::detail::Scope boundary;
+    try {
+      static_cast<void>(page.Next());
+    } catch (const agiru::Error &error) {
+      refused = std::string_view(error.what()) == "custom next failed";
+    }
+    CHECK_TRUE("a custom next error closes the page and retains its diagnostic",
+               refused && !page.IsOpen());
+  }
+  const auto stored = agiru::Session::Current().Database().Execute(
+      R"(SELECT "Value" FROM "Navigation Row" WHERE "ID"=2)");
+  CHECK_TEXT("a failed custom navigation rolls back its SQL modification",
+             stored.Value(0, 0).value_or(""),
+             "22");
+}
+
+void CopiedBuffersRetainSeekAnchorsWithoutSharingRows() {
+  constexpr agiru::Integer kTemporaryFirstValue = 101;
+  constexpr agiru::Integer kTemporaryLastValue = 303;
+  Row source;
+  CHECK_TRUE("the ordinary copy source has an observed SQL row", source.Get(1));
+  agiru::Temporary<Row> temporary;
+  temporary.ID = 1;
+  temporary.Value = kTemporaryFirstValue;
+  temporary.Insert();
+  temporary.ID = 3;
+  temporary.Value = kTemporaryLastValue;
+  temporary.Insert();
+  temporary.Copy(source);
+  CHECK_TRUE("ordinary-to-temporary Copy retains the destination's independent rows",
+             temporary.Count() == 2 && temporary.Value == source.Value);
+  CHECK_TRUE("Next after cross-provider Copy seeks from the copied buffer",
+             temporary.Next() == 1 && temporary.ID == 3 && temporary.Value == kTemporaryLastValue);
+  Row copied;
+  copied.Copy(temporary);
+  CHECK_TRUE("temporary-to-ordinary Copy does not turn SQL storage temporary",
+             !copied.IsTemporary());
+  CHECK_TRUE("a cross-provider SQL seek uses the copied key without sharing the temporary store",
+             copied.Next(-1) == -1 && copied.ID == 2 && copied.Value == 22);
+  CHECK_TRUE("copied cursor invalidation does not move or replace its source",
+             temporary.ID == 3 && temporary.Value == kTemporaryLastValue && source.ID == 1 &&
+                 source.Value == kFirstValue);
+}
+
 void ListWindowErrorsCloseAndRollback() {
   using Failing = agiru::Fixture::NavigationWindowError_Page;
   auto list = agiru::MakeInstalledPage(agiru::PageTraits<Failing>::kId);
@@ -1059,6 +1187,9 @@ int main(int argc, char **argv) {
     PageRunArgumentsBorrowTheLastUsableRecord();
     InstalledPageLifecycle();
     GeneratedListWindows();
+    CustomSourceNavigation();
+    CustomNavigationErrorsCloseAndRollback();
+    CopiedBuffersRetainSeekAnchorsWithoutSharingRows();
     ListWindowErrorsCloseAndRollback();
     ListWindowBoundaries();
     ListEditOpensSelectedCard();

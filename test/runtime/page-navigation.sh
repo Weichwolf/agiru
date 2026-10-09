@@ -23,7 +23,7 @@ sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/run
   src/rt/PageListHtml.h \
   src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
   include/runtime/PageWindow.h include/runtime/RecordWindow.h src/rt/RecordWindow.cpp \
-  include/runtime/Table.h \
+  include/runtime/Table.h include/runtime/RecordState.h \
   include/runtime/Page.h src/gen/{BodyWriter,PageWriter,RuntimeSurface}.cpp \
   include/runtime/PageSession.h include/runtime/test/TestPage.h \
   include/runtime/Session.h include/runtime/SessionCommand.h src/rt/Session.cpp \
@@ -367,6 +367,63 @@ for control in integer-range integer-overflow integer-prefix; do
   esac
   rg -q "FAIL .*${claim}" "$proof/$control-execution.log"
 done
+for control in custom-no-find custom-no-next custom-no-image custom-no-position custom-no-copy-anchor custom-no-close; do
+  for header in Page.h PageSession.h RecordState.h; do
+    cp "include/runtime/$header" "$proof/mutant/include/runtime/$header"
+  done
+  case "$control" in
+    custom-no-copy-anchor) header=RecordState.h ;;
+    custom-no-close) header=PageSession.h ;;
+    *) header=Page.h ;;
+  esac
+  awk -v control="$control" '
+    control == "custom-no-find" && /if constexpr \(requires \{ page.OnFindRecord/ {
+      $0 = "  if constexpr (false) {"; changed++
+    }
+    control == "custom-no-next" && /if constexpr \(requires \{ page.OnNextRecord/ {
+      $0 = "  if constexpr (false) {"; changed++
+    }
+    control == "custom-no-image" && /return static_cast<typename Source::Platform_Half &>\(page.Rec\).Read\(found\);/ {
+      $0 = "    static_cast<void>(sizeof(Source)); return found;"; changed++
+    }
+    control == "custom-no-position" && /Ensure\(\).positioned = found;/ {
+      sub(/positioned = found/, "positioned = false"); changed++
+    }
+    control == "custom-no-copy-anchor" && /mine.temporary = std::move\(keep\);/ {
+      print "      mine.positioned = false;"; changed++
+    }
+    /template <typename Step> Boolean Landed_/ { navigation = 1 }
+    navigation && /^  }/ { navigation = 0 }
+    control == "custom-no-close" && navigation && /Release_\(\);/ {
+      sub(/Release_\(\);/, "static_cast<void>(page_);"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' "include/runtime/$header" > "$proof/mutant/include/runtime/$header"
+  custom_objects=()
+  for source in "${sources[@]}"; do
+    object="$proof/objects/${source##*/}.o"
+    if [[ "$source" == */NavigationCustom.cpp || "$source" == */NavigationCustom.def.cpp ]]; then
+      object="$proof/objects/custom-mutant-${source##*/}.o"
+      "$CXX" "-I$proof/mutant/include" "${flags[@]}" -c "$source" -o "$object"
+    fi
+    custom_objects+=("$object")
+  done
+  "$CXX" "-I$proof/mutant/include" "${flags[@]}" test/runtime/page-navigation/Runner.cpp \
+    "${custom_objects[@]}" "${links[@]}" -o "$proof/$control"
+  status=0
+  "$proof/$control" "$dsn" > "$proof/$control-execution.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  case "$control" in
+    custom-no-find) claim='custom opening invokes find instead of the default SQL provider' ;;
+    custom-no-next|custom-no-position) claim='custom next uses its declared result without SQL fallback' ;;
+    custom-no-image) claim='custom returned row captures its own xRec' ;;
+    custom-no-copy-anchor) claim='Next after cross-provider Copy seeks from the copied buffer' ;;
+    custom-no-close) claim='a custom next error closes the page and retains its diagnostic' ;;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control-execution.log"
+  unlink "$proof/$control"
+done
 awk '
   /Integer TestField::AsInteger\(\)/ { method = 1 }
   method && /if \(core_ == nullptr\) \{ Unbound\(\); \}/ { changed++; next }
@@ -389,4 +446,4 @@ fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, production factories/lifecycle and authorized control dispatch execute; thirty-four execution controls and one control-name compile refusal reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, custom SQL/temporary providers, production factories/lifecycle and authorized control dispatch execute; forty execution controls and one control-name compile refusal reject; %s\n' "$proof"
