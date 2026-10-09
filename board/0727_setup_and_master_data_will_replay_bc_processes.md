@@ -36,11 +36,16 @@ template → customer → edit → independent reopen regression.
   BC `ERM RS Package Operations::ImportPackageWithDuplicatedXMLFields`.
 
 - Current prerequisite regression, 2026-10-09: `make erp-client-test JOBS=2` passes
-  preparation 22/22 and client 11/14, with three failures and none skipped/cancelled.
+  preparation 22/22 and client 17/17, with zero failures/skips/cancellations, exit 0.
   Original Customer List/Card/edit/create cases pass across external CMD/MCP and
-  actual Chromium; all three stale-page conflict cases incorrectly modify the row.
-  Independent SQL verifies the defect; 0720 owns the generic observed-version repair.
-  The eleven passing cases verify the 40-row window, exact Unicode values, permissions
+  actual Chromium. All three stale-page cases now return native failure diagnostics
+  and durable failed receipts without changing any committed field/audit/rowversion
+  or ledger fingerprint. The shared runtime repair belongs to 0720.
+  Three additional cases normalize ` ch ` to `CH` on own created Customers and
+  refuse the absent Country/Region `AGIRUX`. Independent SQL preserves the full row,
+  entire Customer population and four ledger populations; a fresh card retains `CH`.
+  These are native validation proofs, not a newly executed BC-sandbox comparison.
+  The retained eleven original cases verify the 40-row window, exact Unicode values, permissions
   and durable receipts; modal 1380 exposes all
   three templates. CMD/MCP/Chromium explicitly select the second template, create one
   customer through original AL, and independently verify creator plus five inherited
@@ -48,7 +53,8 @@ template → customer → edit → independent reopen regression.
   original List/Card independently reopens the exact typed values and zero balance.
   SQL verifies no new customer ledger entries and unchanged counts/full-row fingerprints
   across Customer/G/L/Item/Value ledgers. The generic state repair and production rebuild
-  are qualified in 0741. This accepts this Customer sequence on the stated native seed,
+  are qualified in 0741; 0720 qualifies optimistic-write protection and this replay.
+  This accepts this Customer sequence on the stated native seed,
   not the whole process family, visual BC parity or a matching-tenant financial A/B.
   Choosing a template automatically is not an implementation.
 - Docs revision `bf5ffffa9b026e146d29f13a242daa5334ddf0d8`, under
@@ -56,6 +62,17 @@ template → customer → edit → independent reopen regression.
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,
   `purchasing-how-register-new-vendors.md`, `inventory-how-register-new-items.md`,
   `finance-setup-finance.md`, `ui-create-number-series.md`, `finance-dimensions.md`.
+- Validation contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
+  `methods-auto/code/code-data-type.md`, `methods-auto/record/record-validate-method.md`,
+  `properties/devenv-validatetablerelation-property.md` and
+  `triggers-auto/field/devenv-onvalidate-field-trigger.md`. BCApps main
+  `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`,
+  `Layers/W1/BaseApp/Sales/Customer/{Customer.Table,CustomerCard.Page}.al`:
+  field 35 is Code[10] related to Country/Region with default validation enabled.
+  Predecessor WIs 962/1132 distinguish relation-validation diagnostics/order from
+  lookup metadata; disabling validation never removes the lookup contract.
+  `test/ui/erp-client.mjs` retains the original fourteen cases and adds the three above;
+  `test/ui/erp-fixture.sh` migrates private write ownership only on its owned clone.
 - BC reference, 2026-10-06, company CRONUS CH: Customers 22 → New → three-template
   selection → DEBITOR MANDANT → Customer Card 21 creates own C00060. Saved Name
   `AGIRU 261006 - Customer`, Address `AGIRU Testweg 6`, Country CH and Credit Limit

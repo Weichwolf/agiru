@@ -79,6 +79,8 @@ dsn="postgresql://agiru:agiru@127.0.0.1:5432/$database"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -Iinclude -Itest/gate -Iapps/platform -Iapps/shared)
 "${native_exec[@]}" sha256sum "$native_build"/libagiru_{app_platform,rt,net,db}.so > "$proof/libraries.sha256"
+"${native_exec[@]}" "$native_build/agiru" client-init --database "$dsn" \
+  > "$proof/client-storage-migration.log" 2>&1
 "${native_exec[@]}" clang++-19 "${flags[@]}" -c test/ui/erp/Prepare.cpp -o "$native/prepare.o"
 "${native_exec[@]}" clang++-19 -stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
   "$native/prepare.o" "-L$native_build" "-Wl,-rpath,$native_build" \

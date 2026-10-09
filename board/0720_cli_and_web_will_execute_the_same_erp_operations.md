@@ -4,22 +4,25 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: finish native rebuild and replay all fourteen original Customer client cases
-against protected observed versions and atomic PostgreSQL write predicates.
-The newly linked mixed declarations restore all eleven existing Customer cases. Preserve
+Next: qualify remaining original Customer invalid/duplicate/lookup/dimension cases,
+then vendor/item creation and setup/master-data processes under 0727.
+The rebuilt native image passes all seventeen Customer client cases. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
-The preceding mixed-dependency native diagnostic-slice image compiles and links with `make dev-exec
+The protected-observation native diagnostic-slice image compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1846 AL procedures
 still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
-The mixed-dependency image passes `make all` with exit 0. Its last
-`make erp-client-test JOBS=2` passes preparation 22/22 and client 11/14,
-with three failures, zero skips/cancellations; outer exit 2. Original Customer List,
+`make erp-client-test JOBS=2` passes preparation 22/22 and client 17/17,
+with zero failures/skips/cancellations; outer exit 0. Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
-over external CMD/MCP and actual Chromium. Each stale-page case reaches real AL and
-incorrectly changes the row/audit/rowversion after a peer committed; independent full-row
-SQL proves the defect for CMD, MCP and Web. Their native failure/receipt assertions
-remain unexecuted until the SQL refusal works. No concurrency acceptance is claimed.
+over external CMD/MCP and actual Chromium. All three stale-page cases now refuse
+after a peer commits: independent full-row SQL and ledger fingerprints stay unchanged,
+and the native diagnostic/command ID and durable failed receipt match each adapter.
+Three further cases normalize ` ch ` to `CH`, refuse an absent Country/Region,
+preserve the complete Customer and four ledger populations and independently reopen.
+The owned clone, binary/auth copies and native process are drained and removed;
+an independent SQL check finds no remaining ERP fixture database. This proves these
+workflows, not complete client/ERP parity, tenant matching, visual BC parity or scale.
 The generic runtime repair now retains SQL observations independently of mutable
 AL timestamp aliases, including assignment, Copy, Reset, Init and RecordRef.
 Modify/Rename/Delete compare the observation atomically in SQL. A private UUID
@@ -30,9 +33,9 @@ An actual blocked competing UPDATE rejects after the writer commits, preserving 
 independent full row. Speculative sequence gaps are allowed; stored versions remain exact.
 `make dev-exec COMMAND='env AGIRU_TEST_DSN=postgresql://agiru:agiru@127.0.0.1:5432/agiru_gate make rowversions B=/workspace/build/podman JOBS=2'`
 exits 0: 136 allocator and 185
-SQL checks, plus 25 compiled negative controls. These are runtime proofs, not yet
-the original fourteen-client-case acceptance. Rebuild all native consumers before
-replay: the protected observation changes the heap-owned RecordState layout.
+SQL checks, plus 25 compiled negative controls. All native consumers were rebuilt
+before the successful original-client replay: the protected observation changes
+the heap-owned RecordState layout.
 Trusted `client-init` installs private ownership metadata on registered existing SQL
 tables transactionally; it never creates missing ERP tables or changes existing
 business/audit/rowversion values. The ERP qualifier migrates only its owned clone.
@@ -69,7 +72,7 @@ Never substitute a default template, UT handler or client rule.
 passes 15 Source, 270 generated navigation and 122 Dispatcher checks, zero red;
 all 34 execution controls and the control-name compile refusal reject, including five
 new identity controls. This does not implement excluded Power BI. Native integration
-and original Customer replay now reach the concurrent-write defect above. The changed
+and original Customer replay pass the conflict checks above. The changed
 Dispatcher consumer passes targeted clang-tidy: 1/344 units, zero failures, not FULL.
 Contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
 `methods-auto/page/page-objectid-method.md`; BCApps main
@@ -78,9 +81,9 @@ Contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
 `Modules/System/PowerBI/Embedding/PowerBIEmbeddedReportPart.Page.al`;
 predecessor board 1356 distinguishes CurrPage metadata from static object resolution.
 Sources: `include/runtime/Page.h`, `test/gate/PageDispatcherGate.cpp`,
-`test/runtime/page-navigation.sh`. Original-client rowversion acceptance remains pending
-the rebuilt image; the previous primary-key-only write/input reread defect is repaired
-in the shared runtime and qualified by the SQL gates above.
+`test/runtime/page-navigation.sh`. Original-client rowversion acceptance passes on the
+rebuilt image; the previous primary-key-only write/input reread defect is repaired
+in the shared runtime and qualified by the SQL gates and client replay above.
 
 Product-page selection: `scope.json` explicitly excludes only
 `Layers/W1/BaseApp/Modules/System/PowerBI/` as Microsoft-cloud integration. The independent

@@ -52,6 +52,11 @@ async function ledgerSnapshot() {
 async function customerSnapshot(number) {
   return sql(`SELECT to_jsonb(customer)::text FROM "Customer" customer WHERE "No."=${quoted(number)}`);
 }
+async function customerPopulation() {
+  return sql(`SELECT count(*)::text || ':' ||
+    COALESCE(md5(string_agg(md5(to_jsonb(customer)::text), '' ORDER BY "No.")), 'empty')
+    FROM "Customer" customer`);
+}
 async function cmd(name, value, denied = false) {
   return execute(process.execPath, ["build/client/cmd.mjs", "--json", name,
     typeof value === "string" ? value : JSON.stringify(value)], {
@@ -148,6 +153,7 @@ async function reopenCustomer(adapter, number) {
 }
 
 let server, closed, pid, first, denied, client, list, card, saved, selected, original, browser;
+const createdCustomers = new Map();
 let output = "", diagnostic = "";
 before(async () => {
   const config = await configurations.write({ database: dsn, company, origin });
@@ -426,6 +432,47 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
       assert.equal(field(reopened, "Credit Limit (LCY)"), (await customer(field(created, "No."))).credit,
         "fresh exact Decimal transport must retain the declared SQL storage scale, not binary floating point");
       assert.equal(field(reopened, "Balance (LCY)"), "0");
+      createdCustomers.set(adapter, field(reopened, "No."));
+    });
+}
+
+for (const adapter of ["CMD", "MCP", "Web"]) {
+  test(`${adapter} normalizes an original Customer Code and rejects an unknown country without database effects`,
+    { timeout: 120000 }, async () => {
+      const number = createdCustomers.get(adapter);
+      assert.ok(number, "original Customer creation prerequisite failed; validation was not executed");
+      const current = await reopenCustomer(adapter, number);
+      assert.equal(field(current, "Country/Region Code"), "CH");
+      const driver = await workflowDriver(adapter, current);
+      try {
+        const normalized = await driver.action(current, "Country/Region Code", " ch ");
+        assert.equal(field(normalized, "Country/Region Code"), "CH",
+          "AL Code must normalize spaces/case on the server, not in a client-specific mask");
+        assert.equal((await customer(number)).country, "CH");
+        const missing = "AGIRUX";
+        assert.equal(await sql(`SELECT count(*) FROM "Country/Region" WHERE "Code"=${quoted(missing)}`), "0");
+        const row = await customerSnapshot(number);
+        const population = await customerPopulation();
+        const ledgers = await ledgerSnapshot();
+        const attempt = await driver.attemptedSet(normalized, "Country/Region Code", missing);
+        await writeFile(`${proof}/customer-${adapter.toLowerCase()}-invalid-country.json`, JSON.stringify({
+          number, input: missing, normalized: normalized.page, attempt, stored: await customer(number) }));
+        assert.equal(attempt.result, undefined, "unknown country must not return a successful page");
+        assert.ok(attempt.failure?.message, "original field validation must return a native diagnostic");
+        assert.match(attempt.failure.message, /Country\/Region Code.*Customer.*AGIRUX.*related table \(Country\/Region\)/);
+        assert.equal(attempt.failure.outcome, "failed");
+        assert.equal(attempt.failure.command, attempt.request.command);
+        assert.notEqual(attempt.failure.error, "ServerFailure");
+        assert.notEqual(attempt.failure.error, "WriteUncertain");
+        assert.equal(await customerSnapshot(number), row, "rejected input must preserve every field/audit/stamp");
+        assert.equal(await customerPopulation(), population, "rejected input must preserve the entire Customer population");
+        assert.equal(await ledgerSnapshot(), ledgers, "rejected input must preserve all four ledger populations");
+        assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands
+          WHERE handle=${quoted(normalized.page.handle)} AND command_id=${quoted(attempt.request.command)}`), "failed");
+        await driver.screenshot(`customer-${adapter.toLowerCase()}-invalid-country-refused`);
+      } finally { await driver.close(); }
+      const reopened = await reopenCustomer(adapter, number);
+      assert.equal(field(reopened, "Country/Region Code"), "CH", "independent reopen must retain the valid Code");
     });
 }
 
