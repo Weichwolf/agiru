@@ -14,8 +14,9 @@ flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Ite
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 sha256sum test/runtime/text-positions/Fixture.Codeunit.al test/runtime/text-positions/Runner.cpp \
-  test/runtime/text-positions.sh test/gate/{Text,TextMethod}Gate.cpp include/type/Char.h \
-  include/type/AlArray.h include/type/StringValue.h src/net/StringValue.cpp "$B/agirutc" \
+  test/runtime/text-positions.sh test/gate/{Text,TextMethod,Refused}Gate.cpp include/type/Char.h \
+  include/type/AlArray.h include/type/StringValue.h include/type/JsonObject.h \
+  include/dotnet/Refused.h src/net/StringValue.cpp "$B/agirutc" \
   "$B/libagiru_net.so" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 "$B/agirutc" "$proof" "$proof/apps.json" "$proof/generated" > "$proof/generation.log" 2>&1
 rg -q '^absent    0 .NET type\(s\) with 0 member\(s\), 0 AL object\(s\) with 0$' "$proof/generation.log"
@@ -79,7 +80,29 @@ if "$proof/char-replacement-gate" > "$proof/char-replacement-execution.log" 2>&1
   exit 1
 fi
 rg -q 'Replace converts a newline Char to text' "$proof/char-replacement-execution.log"
+for control in text-refusal json-refusal; do
+  header=StringValue
+  if [ "$control" = json-refusal ]; then header=JsonObject; fi
+  mkdir -p "$proof/$control"
+  cp -a include "$proof/$control/include"
+  awk '
+    /^    return static_cast<.*Boolean>\(refusal\);$/ {
+      $0 = "    static_cast<void>(refusal);\n    return false;"; changed++
+    }
+    { print } END { if (changed != 1) exit 1 }
+  ' "include/type/$header.h" > "$proof/$control/include/type/$header.h"
+  "$CXX" -O2 "-I$proof/$control/include" "${flags[@]}" test/gate/RefusedGate.cpp "${links[@]}" \
+    -o "$proof/$control-gate"
+  status=0
+  "$proof/$control-gate" > "$proof/$control-execution.log" 2>&1 || status=$?
+  [ "$status" = 1 ] || {
+    printf 'text-positions: %s expected refusal-check exit 1, got %s\n' "$control" "$status" >&2
+    exit 1
+  }
+  rg -q 'unavailable scalar operations retain the original member identity' "$proof/$control-execution.log"
+  find "$proof/$control/include" -depth -delete
+done
 sha256sum --check --status "$proof/inputs.sha256"
 find "$proof" -maxdepth 1 -type f \
   \( -name runner.o -o -name runner -o -name mutant -o -name '*-gate' \) -delete
-printf 'text-positions: generated positions and Char replacements execute; source-index, two UTF-8 payload and Char replacement controls fail; %s\n' "$proof"
+printf 'text-positions: generated positions and Char replacements execute; source-index, two UTF-8 payload, Char replacement and two unavailable-value controls fail; %s\n' "$proof"

@@ -43,6 +43,12 @@ void Execute() {
              page.PartInstance("Cloud") == nullptr && page.PartInstance("CloudNumber") == nullptr &&
                  page.PartInstance("ExtensionCloud") == nullptr &&
                  page.PartInstance("Required") != nullptr);
+  Refused("generated text consumers preserve unavailable AL member refusal",
+          "Unavailable Service.Token",
+          [&] { static_cast<void>(page.UnavailableTextOperand()); });
+  Refused("generated overloaded JSON consumers preserve unavailable AL member refusal",
+          "Unavailable Service.Enabled",
+          [&] { page.UnavailableJsonOperand(); });
 }
 
 }

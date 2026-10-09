@@ -112,9 +112,24 @@ public:
   /// \param Value The member, whose ordinal is stored.
   /// \return Whether the key was added.
   template <typename O>
-    requires requires(const O &value) { value.AsInteger(); } ::agiru::Boolean
+    requires requires(const O &value) { value.AsInteger(); } &&
+             (!requires { typename O::IsAlRefusal; })::agiru::Boolean
   Add(std::string_view Key, const O &Value) const {
     return Add(Key, ::agiru::Integer{Value.AsInteger()});
+  }
+
+  /// \brief Propagates an unavailable value without selecting a fabricated JSON type.
+  /// \tparam T An explicitly marked refusal with a throwing member read.
+  /// \param Key The proposed property name. \param refusal The unavailable value.
+  /// \return Never. \throws Error from the value; this object remains unchanged.
+  template <typename T>
+    requires requires(const T &value) {
+      typename T::IsAlRefusal;
+      static_cast<::agiru::Boolean>(value);
+    } ::agiru::Boolean
+  Add(std::string_view Key, const T &refusal) const {
+    static_cast<void>(Key);
+    return static_cast<::agiru::Boolean>(refusal);
   }
 
   /// \brief AL `JsonObject.Add(Text, JsonArray)`. Adds a new property to a JsonObject.

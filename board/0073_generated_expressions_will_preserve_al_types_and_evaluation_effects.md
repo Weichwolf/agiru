@@ -27,6 +27,14 @@ compile and execute the four accepted overload counterexamples.
 
 ## Useful implementation details and acceptance
 
+- Caller-module gap: `BodyWriter.cpp` passes the current object's module to both
+  NavApp getters; `src/net/NavApp.cpp` describes that argument. Developer revision
+  `f928288ee840334be73142e5fc0202c0e19b246d`,
+  `methods-auto/navapp/navapp-getcallermoduleinfo-method.md`, requires A when an
+  A method calls B, which asks for its caller. Preserve GetCurrentModuleInfo's own
+  module; implement session-owned method frames and qualify cross-app, same-app,
+  nested/reentrant and exception-unwind cases without process globals. 0720's
+  Copilot wrapper/readback stays in the System app and is not cross-app proof.
 - Refreshed predecessor 1916/1917/1971/1972/1988: allocate collision-free names
   per declaration owner and retain original AL identity everywhere: fields/keys/
   CalcFormula/TableRelation/RecordRef, page/request controls, arrays and table globals.

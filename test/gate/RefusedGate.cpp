@@ -4,7 +4,10 @@
 #include "runtime/ErrorValue.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
+#include "type/JsonObject.h"
 #include "type/Option.h"
+#include "type/StringValue.h"
+#include "type/Text.h"
 
 #include "BuiltinsWritten.h"
 #include "Check.h"
@@ -92,6 +95,33 @@ void CompoundAssignmentsAndClearRefuseByName() {
   CHECK_TRUE("ordinary scalar Clear remains implemented", scalar == 0);
 }
 
+template <typename T>
+concept TextOperand =
+    requires(const agiru::Text<0> &text, const T &value) { text.Contains(value); };
+
+static_assert(!TextOperand<agiru::Integer>, "numeric operands do not acquire text conversion");
+
+void TextAndJsonRetainUnavailableValues() {
+  const agiru::dotnet::Refused amount{{.type = "Fixture", .member = "Amount"}};
+  const agiru::Text<0> text{"ordinary Unicode \u00e4\u03a9"};
+  MemberOperationRefuses([&] { static_cast<void>(text.Contains(amount)); });
+  MemberOperationRefuses([&] { static_cast<void>(text.Contains(amount())); });
+  const auto option = agiru::RefusedOption("Fixture.Amount");
+  MemberOperationRefuses([&] { static_cast<void>(text.Contains(option)); });
+  CHECK_TEXT(
+      "refused text operands do not modify the receiver", text, "ordinary Unicode \u00e4\u03a9");
+  CHECK_TRUE("ordinary text operands keep their substring behavior", text.Contains("\u00e4\u03a9"));
+  agiru::JsonObject object;
+  CHECK_TRUE("ordinary JSON Boolean addition remains implemented", object.Add("existing", true));
+  MemberOperationRefuses([&] { static_cast<void>(object.Add("property", amount)); });
+  MemberOperationRefuses([&] { static_cast<void>(object.Add("call", amount())); });
+  MemberOperationRefuses([&] { static_cast<void>(object.Add("option", option)); });
+  agiru::Text<0> encoded;
+  CHECK_TRUE("JSON remains serializable after unavailable operands", object.WriteTo(encoded));
+  CHECK_TEXT(
+      "refused JSON operands cannot add or alter any property", encoded, R"({"existing":true})");
+}
+
 }
 
 int main() {
@@ -99,5 +129,6 @@ int main() {
     RefusedChainsNameTheMember();
     ImmutableDescriptorsStillRefuseByName();
     CompoundAssignmentsAndClearRefuseByName();
+    TextAndJsonRetainUnavailableValues();
   });
 }

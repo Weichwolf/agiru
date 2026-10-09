@@ -33,6 +33,12 @@ page 50300 "Feature Host"
     procedure DependencyValue(): Integer
     var Dependency: Codeunit Fixture.Cloud."Local Dependency";
     begin exit(Dependency.Value()); end;
+    procedure UnavailableTextOperand(): Boolean
+    var Service: Codeunit "Unavailable Service"; Content: Text;
+    begin Content := 'ordinary'; exit(Content.Contains(Service.Token())); end;
+    procedure UnavailableJsonOperand()
+    var Service: Codeunit "Unavailable Service"; Content: JsonObject;
+    begin Content.Add('enabled', Service.Enabled()); end;
     procedure RequiredTouches(): Integer begin exit(CurrPage.Required.Page.TouchCount()); end;
     procedure Bump(Number: Integer): Integer
     begin Value := Value * 10 + Number; exit(Value); end;

@@ -4,8 +4,8 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: activate narrowly named original capability registry/storage declarations and
-import faithful source data; rebuild and rerun all 29 original-client cases under 0727.
+Next: finish the native rebuild of the narrowly selected original capability registry,
+qualify faithful source import and rerun all 29 original-client cases under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
@@ -122,6 +122,28 @@ exit 2, not inventory acceptance. 0058 retains the full coverage gaps.
 Sources: `src/gen/Apps.{h,cpp}`, `src/tc/Main.cpp`,
 `scripts/{scope_inventory,build_sources}.py`, `test/gate/GenScopeGate.cpp`,
 `test/transpiler/product-pages{.sh,/Runner.cpp,/al/fixture/dependency/}`.
+Native activation's first build exposed two unavailable-value compile failures in the
+original Copilot Capability Impl.: Text.Contains could not consume a refused Text
+result, and JsonObject.Add was ambiguous for a refused Boolean result. The failed
+six-job lane is stopped, not a successful image. Generic `IsAlRefusal`-constrained
+operand adapters now propagate the original error without changing text/JSON or
+guessing a provider result; ordinary numeric operands do not acquire text conversion.
+No service body, source-specific branch or generated-app edit is introduced.
+RefusedGate passes 22/22; JsonGate 250/250, TextGate 91/91 and TextMethodGate 47/47.
+Generated text/product consumers pass 13/13 each; six text controls (including two
+compiled false-answer defects), eight selection controls and four invalid policies
+reject, with unchanged input hashes. Full native linking and the Item replay remain
+unaccepted. Sources: `include/type/{StringValue,JsonObject}.h`,
+`test/gate/RefusedGate.cpp`, `test/runtime/text-positions.sh` and the product-pages
+AL/Runner fixtures. Contracts at the pinned developer revision:
+`methods-auto/text/text-contains-method.md` and
+`methods-auto/jsonobject/jsonobject-add-string-boolean-method.md`; BCApps original
+`AzureADTenant.GetAadTenantId` returns Text and `AzureOpenAI.IsEnabled` returns Boolean.
+Predecessor 760/1997 retains the mixed dependency/service distinction.
+Both changed compiled C++ consumers (RefusedGate and product-pages Runner) pass
+targeted clang-tidy with zero failures; this is not FULL lint or UT acceptance.
+0073 retains cross-app `NavApp.GetCallerModuleInfo`: current lowering passes the
+callee's module, not its caller's. Same-System-app registry checks do not qualify it.
 At 6a1556c, the earlier
 PageWindowProvider refusal occurred because PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate

@@ -328,6 +328,19 @@ public:
     return value_.find(Value) != std::string::npos;
   }
 
+  /// \brief Propagates an unavailable operand instead of inventing a substring result.
+  /// \tparam T An explicitly marked refusal with a throwing member read.
+  /// \param refusal The unavailable operand, retaining its original identity.
+  /// \return Never. \throws Error from the operand; this text remains unchanged.
+  template <typename T>
+    requires requires(const T &value) {
+      typename T::IsAlRefusal;
+      static_cast<Boolean>(value);
+    }
+  [[nodiscard]] Boolean Contains(const T &refusal) const {
+    return static_cast<Boolean>(refusal);
+  }
+
   /// \brief AL `Text.EndsWith(Text)`.
   /// \param Value The string to match.
   /// \return True when this text ends with it.
