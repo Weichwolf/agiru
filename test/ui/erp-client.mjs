@@ -49,13 +49,14 @@ async function ledgerSnapshot() {
     COALESCE(md5(string_agg(md5(to_jsonb(entry)::text), '' ORDER BY "Entry No.")), 'empty')
     FROM "${name}" entry)`).join(",")}`);
 }
-async function customerSnapshot(number) {
-  return sql(`SELECT to_jsonb(customer)::text FROM "Customer" customer WHERE "No."=${quoted(number)}`);
+async function customerSnapshot(number, omitted = []) {
+  const projection = omitted.length ? ` - ARRAY[${omitted.map(quoted).join(",")}]::text[]` : "";
+  return sql(`SELECT (to_jsonb(customer)${projection})::text FROM "Customer" customer WHERE "No."=${quoted(number)}`);
 }
-async function customerPopulation() {
+async function customerPopulation(except) {
   return sql(`SELECT count(*)::text || ':' ||
     COALESCE(md5(string_agg(md5(to_jsonb(customer)::text), '' ORDER BY "No.")), 'empty')
-    FROM "Customer" customer`);
+    FROM "Customer" customer${except === undefined ? "" : ` WHERE "No."<>${quoted(except)}`}`);
 }
 async function cmd(name, value, denied = false) {
   return execute(process.execPath, ["build/client/cmd.mjs", "--json", name,
@@ -473,6 +474,66 @@ for (const adapter of ["CMD", "MCP", "Web"]) {
       } finally { await driver.close(); }
       const reopened = await reopenCustomer(adapter, number);
       assert.equal(field(reopened, "Country/Region Code"), "CH", "independent reopen must retain the valid Code");
+    });
+}
+
+for (const adapter of ["CMD", "MCP", "Web"]) {
+  test(`${adapter} blocks and unblocks an original Customer with exact enum values and no unrelated SQL effects`,
+    { timeout: 120000 }, async () => {
+      const number = createdCustomers.get(adapter);
+      assert.ok(number, "original Customer creation prerequisite failed; blocking was not executed");
+      assert.equal(await sql(`SELECT "Privacy Blocked" FROM "Customer" WHERE "No."=${quoted(number)}`), "f");
+      assert.equal(await sql(`SELECT "Blocked" FROM "Customer" WHERE "No."=${quoted(number)}`), "0");
+      const effects = ["Blocked", "SystemModifiedAt", "SystemModifiedBy", "timestamp", "agiru$write_owner_v1",
+        "Last Modified Date Time", "Last Date Modified"];
+      const unchanged = await customerSnapshot(number, effects);
+      const others = await customerPopulation(number);
+      const ledgers = await ledgerSnapshot();
+      const population = await sql('SELECT count(*) FROM "Customer"');
+      const steps = [];
+      const exact = (page, ordinal, member) => {
+        const control = page.page.controls.find(control => control.identity === "Blocked");
+        assert.ok(control, "original Customer Card must expose its Blocked field");
+        assert.deepEqual(control.scalar, { type: "Enum", value: ordinal, domain: "table/18/field/39",
+          member, undefined: false, closing: false });
+        assert.equal(control.display, member, "display caption must not replace the exact enum ordinal/member");
+      };
+      let previous = await customer(number);
+      let current = await reopenCustomer(adapter, number);
+      for (const [ordinal, member] of [["1", "Ship"], ["2", "Invoice"], ["3", "All"], ["0", " "]]) {
+        const driver = await workflowDriver(adapter, current);
+        let changed;
+        try {
+          const clockBefore = await sql("SELECT date_trunc('milliseconds',clock_timestamp() AT TIME ZONE 'UTC')");
+          const request = operation(current, "Blocked", member);
+          changed = await driver.action(current, "Blocked", member);
+          const clockAfter = await sql("SELECT date_trunc('milliseconds',clock_timestamp() AT TIME ZONE 'UTC')");
+          exact(changed, ordinal, member);
+          assert.equal(await sql(`SELECT "Blocked" FROM "Customer" WHERE "No."=${quoted(number)}`), ordinal);
+          assert.equal(await sql(`SELECT "Last Modified Date Time" BETWEEN ${quoted(clockBefore)}::timestamp
+            AND ${quoted(clockAfter)}::timestamp AND "Last Date Modified"::date="Last Modified Date Time"::date
+            FROM "Customer" WHERE "No."=${quoted(number)}`), "t",
+          "original OnModify must stamp CurrentDateTime/Today within the independent SQL clock bounds on this UTC profile");
+          const stored = await customer(number);
+          assert.ok(BigInt(stored.version) > BigInt(previous.version), "a saved state change must advance rowversion");
+          assert.equal(stored.modifier, "00000000-0000-0000-0000-000000000001");
+          assert.equal(await customerSnapshot(number, effects), unchanged,
+          "blocking must preserve every other business field, creator and system identity");
+          assert.equal(await customerPopulation(number), others, "unrelated Customers must remain byte-for-byte unchanged");
+          assert.equal(await sql('SELECT count(*) FROM "Customer"'), population);
+          assert.equal(await ledgerSnapshot(), ledgers, "blocking must not alter any of the four ledger populations");
+          assert.equal(await sql(`SELECT outcome FROM agiru_client.page_commands
+            WHERE handle=${quoted(current.page.handle)} AND command_id=${quoted(request.command)}`), "complete");
+          steps.push({ input: member, ordinal, before: previous, stored, clockBefore, clockAfter, page: changed.page });
+          previous = stored;
+          await driver.screenshot(`customer-${adapter.toLowerCase()}-blocked-${ordinal}`);
+        } finally { await driver.close(); }
+        current = await reopenCustomer(adapter, number);
+        assert.notEqual(current.page.handle, changed.page.handle);
+        exact(current, ordinal, member);
+        steps.at(-1).reopened = current.page;
+        await writeFile(`${proof}/customer-${adapter.toLowerCase()}-blocking.json`, JSON.stringify({ number, steps }));
+      }
     });
 }
 

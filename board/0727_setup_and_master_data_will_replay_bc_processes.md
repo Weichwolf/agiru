@@ -3,7 +3,8 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: expand customer invalid/duplicate/lookup/dimension cases and the remaining
+Next: qualify customer privacy-block confirmation/rollback and expand
+invalid/duplicate/lookup/dimension cases and the remaining
 setup/master-data workflows; vendor/item creation follows the accepted original
 template → customer → edit → independent reopen regression.
 
@@ -36,7 +37,7 @@ template → customer → edit → independent reopen regression.
   BC `ERM RS Package Operations::ImportPackageWithDuplicatedXMLFields`.
 
 - Current prerequisite regression, 2026-10-09: `make erp-client-test JOBS=2` passes
-  preparation 22/22 and client 17/17, with zero failures/skips/cancellations, exit 0.
+  preparation 22/22 and client 20/20, with zero failures/skips/cancellations, exit 0.
   Original Customer List/Card/edit/create cases pass across external CMD/MCP and
   actual Chromium. All three stale-page cases now return native failure diagnostics
   and durable failed receipts without changing any committed field/audit/rowversion
@@ -44,6 +45,14 @@ template → customer → edit → independent reopen regression.
   Three additional cases normalize ` ch ` to `CH` on own created Customers and
   refuse the absent Country/Region `AGIRUX`. Independent SQL preserves the full row,
   entire Customer population and four ledger populations; a fresh card retains `CH`.
+  Three blocking cases save Ship/Invoice/All/blank through CMD/MCP/Chromium and
+  independently reopen each value. SQL proves exact ordinals, modifier, advancing
+  rowversion, unchanged creation identity, remaining fields, other Customers and
+  four ledger populations. Original OnModify updates Last Modified Date Time and
+  Last Date Modified; independent SQL clock bounds qualify these rather than hiding
+  their effects. This is the current UTC profile: My Settings timezone/Today,
+  privacy-block confirmation, block enforcement on sales/journal posting and enum
+  dropdown discovery remain unqualified. 0720 owns shared choice discovery.
   These are native validation proofs, not a newly executed BC-sandbox comparison.
   The retained eleven original cases verify the 40-row window, exact Unicode values, permissions
   and durable receipts; modal 1380 exposes all
@@ -61,7 +70,8 @@ template → customer → edit → independent reopen regression.
   `~/Git/dynamics365smb-docs/business-central/`: `setup.md`,
   `sales-how-register-new-customers.md`, `includes/create_new_customer.md`,
   `purchasing-how-register-new-vendors.md`, `inventory-how-register-new-items.md`,
-  `finance-setup-finance.md`, `ui-create-number-series.md`, `finance-dimensions.md`.
+  `finance-setup-finance.md`, `ui-create-number-series.md`, `finance-dimensions.md`,
+  `receivables-how-block-customers.md` (distinct Ship/Invoice/All restrictions).
 - Validation contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
   `methods-auto/code/code-data-type.md`, `methods-auto/record/record-validate-method.md`,
   `properties/devenv-validatetablerelation-property.md` and
@@ -71,7 +81,14 @@ template → customer → edit → independent reopen regression.
   field 35 is Code[10] related to Country/Region with default validation enabled.
   Predecessor WIs 962/1132 distinguish relation-validation diagnostics/order from
   lookup metadata; disabling validation never removes the lookup contract.
-  `test/ui/erp-client.mjs` retains the original fourteen cases and adds the three above;
+  Enum/time contracts at those revisions: `methods-auto/enum/enum-frominteger-method.md`,
+  `devenv-extensible-enums.md`, `methods-auto/system/system-{currentdatetime,today}-method.md`;
+  `Layers/W1/BaseApp/Sales/Customer/CustomerBlocked.Enum.al` declares 0/space, 1/Ship,
+  2/Invoice, 3/All. Customer field 39 validates privacy blocking; OnModify calls
+  SetLastModifiedDateTime. Predecessor 1576 separates typed Option identity from
+  display captions; 548 retains blocked opening-balance failures due to missing setup,
+  not proof of correct transaction blocking.
+  `test/ui/erp-client.mjs` retains all seventeen earlier cases plus the three blocking cases;
   `test/ui/erp-fixture.sh` migrates private write ownership only on its owned clone.
 - BC reference, 2026-10-06, company CRONUS CH: Customers 22 → New → three-template
   selection → DEBITOR MANDANT → Customer Card 21 creates own C00060. Saved Name

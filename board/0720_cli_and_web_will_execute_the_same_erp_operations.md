@@ -4,15 +4,16 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: qualify remaining original Customer invalid/duplicate/lookup/dimension cases,
-then vendor/item creation and setup/master-data processes under 0727.
-The rebuilt native image passes all seventeen Customer client cases. Preserve
+Next: expose server-declared Option/Enum choices through the shared HTML/ASCII model,
+then qualify Customer privacy-block confirmation/rollback, remaining invalid/duplicate/
+lookup/dimension cases and vendor/item/setup processes under 0727.
+The rebuilt native image passes all twenty Customer client cases. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The protected-observation native diagnostic-slice image compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1846 AL procedures
 still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
-`make erp-client-test JOBS=2` passes preparation 22/22 and client 17/17,
+`make erp-client-test JOBS=2` passes preparation 22/22 and client 20/20,
 with zero failures/skips/cancellations; outer exit 0. Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
 over external CMD/MCP and actual Chromium. All three stale-page cases now refuse
@@ -20,6 +21,12 @@ after a peer commits: independent full-row SQL and ledger fingerprints stay unch
 and the native diagnostic/command ID and durable failed receipt match each adapter.
 Three further cases normalize ` ch ` to `CH`, refuse an absent Country/Region,
 preserve the complete Customer and four ledger populations and independently reopen.
+Three blocking cases save/reopen Ship, Invoice, All and the exact blank member through
+CMD/MCP/Chromium. Independent SQL qualifies ordinals, audit/rowversion and original
+OnModify timestamps while preserving all other fields/Customers/ledgers (0727).
+Enum edits currently use text forms in `src/rt/PageHtml.cpp`; valid member choices
+are not yet discoverable from `src/client/profile.mts`. This is not dropdown/UI parity
+or proof that sales/journal posting enforces the chosen block.
 The owned clone, binary/auth copies and native process are drained and removed;
 an independent SQL check finds no remaining ERP fixture database. This proves these
 workflows, not complete client/ERP parity, tenant matching, visual BC parity or scale.
