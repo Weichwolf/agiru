@@ -4,17 +4,21 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: link and repeat the original Customer workflow, including concurrent-edit
-rejection. Bounded product-page selection is now implemented and fixture-qualified below;
-it is not yet proven in the original Customer image. Never silence unselected controls
-with successful no-ops or patch generated apps.
+Next: activate the original mixed runtime dependencies currently omitted by namespace
+selection, beginning with CRM Integration Management's disabled-connection read/event
+branches, then repeat the Customer workflow and concurrent-edit rejection. Preserve
+explicit product exclusions; do not implement Microsoft-cloud services, substitute
+constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice integration now compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1761 AL procedures
 still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
-`make erp-client-test JOBS=2` against that image passes preparation 22/22 and client
-1/14. Customer List opening fails at `Page.ObjectId(Boolean)`; the subsequent master-data
-and three concurrent-edit cases do not reach their prerequisites. Historical 11/11 is
-not current acceptance. The next call is the unavailable Power BI part's SetPageContext.
+The regenerated image passes `make all` with exit 0. `make erp-client-test JOBS=2`
+passes preparation 22/22 and client 1/14, with thirteen failures, zero skips/cancellations.
+Original Customer List now passes OnInit's ObjectId/selected-part call and fails in
+OnOpenPage at the unselected AL codeunit's IsCRMIntegrationEnabled. Master-data and
+three concurrent-edit cases still do not reach their prerequisites. Historical 11/11
+is not current acceptance. The reused refusal incorrectly labels this AL member as .NET;
+retain the diagnostic gap separately from activation of the real declaration.
 The pure O365 credentials page remains bounded-product-excluded (0058).
 Expand cookie-mode question/modal and CMD/MCP write parity, then setup/master-data
 workflows under 0727, retaining the accepted original
@@ -26,8 +30,8 @@ Never substitute a default template, UT handler or client rule.
 `make page-navigation B=/workspace/build/podman JOBS=2` in the development container
 passes 15 Source, 270 generated navigation and 122 Dispatcher checks, zero red;
 all 34 execution controls and the control-name compile refusal reject, including five
-new identity controls. This does not implement excluded Power BI. Integration and
-original Customer replay after the header change remain pending. The changed
+new identity controls. This does not implement excluded Power BI. Native integration
+and original Customer replay now reach the next opening blocker above. The changed
 Dispatcher consumer passes targeted clang-tidy: 1/344 units, zero failures, not FULL.
 Contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
 `methods-auto/page/page-objectid-method.md`; BCApps main
@@ -82,7 +86,16 @@ The parser retains 77 UT codeunits / 2,298 methods and 38,421 total test methods
 the one-method discrepancy from the independent census remains open under 0058.
 `make slice-check B=/workspace/build/podman JOBS=2` exits 0: 14,225 raw slice identities,
 13,592 selected, 102 product-excluded, 531 omitted and zero missing.
-Integration and original client execution after these changes remain pending.
+Native integration exits 0 with the unchanged 1,761 unlinked-source refusals. Original
+client execution reaches the next opening blocker above, not workflow acceptance.
+CRM Integration Management 5330 is not explicitly product-excluded: its namespace is
+omitted, so it remains a required-dependency gap. The pinned original
+`Integration/Dataverse/CRMIntegrationManagement.Codeunit.al` checks actual read permission,
+stored connection enablement and session-owned state; IsCDSIntegrationEnabled invokes
+an event. `CRM/Outlook/OfficeManagement.Codeunit.al` delegates IsAvailable to Office Host
+Management's event, not a client-side constant. The root policy and independent census
+must agree on any dependency activation. Predecessor board search has no specific
+replacement contract; its broad namespace omission is not permission to invent one.
 
 Immediate security prerequisite: qualify browser session transport below before accepting
 externally accessible client workflows; retain the credential-specific ownership regression.
