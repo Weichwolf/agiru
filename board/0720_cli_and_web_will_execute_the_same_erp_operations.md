@@ -4,16 +4,15 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: implement bounded custom-source list windows without bypassing OnFindRecord/
-OnNextRecord, using the qualified navigation kernel below; then rerun original Item
-template/card/create/edit/reopen under 0727.
+Next: rebuild the native ERP page consumers of the qualified custom-window adapter,
+then rerun original Item template/card/create/edit/reopen under 0727.
 Retain Customer/Vendor regressions and client/session permission boundaries; follow
 with invalid/duplicate/lookup/dimension and setup processes.
 Production enum declarations are regenerated; source-origin and slice checks pass.
 The complete native ABI-consumer rebuild exits 0 (2702 seconds). Regeneration still
 refuses 5708 properties and exits nonzero; this is not full-app or G1 acceptance.
-The expanded original-client regression passes 23 Customer and three Vendor cases;
-three Item cases currently fail explicitly at the custom-list provider. Preserve
+The last expanded original-client regression passed 23 Customer and three Vendor cases;
+three Item cases failed explicitly at the custom-list provider before this repair. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice image compiles and links with `make dev-exec
@@ -23,29 +22,43 @@ The accepted 26-case 2026-10-09 `make erp-client-test JOBS=2` run passes prepara
 22/22 and client 26/26, with zero failures/skips/cancellations; outer exit 0.
 Its expanded 29-case rerun retains preparation 22/22 and all 26 Customer/Vendor passes,
 but all three Item cases fail with PageWindowProvider on original List 31: outer
-exit 2, no skips/cancellations. PageWindowSession refuses declared OnFindRecord/
+exit 2, no skips/cancellations. At 6a1556c, PageWindowSession refused declared OnFindRecord/
 OnNextRecord before page initialization; do not omit those triggers or fabricate
 an Item-only SQL provider. 0727 retains the exact workflow and reference paths.
-Custom navigation prerequisite: `make page-navigation JOBS=2` passes PageSource 15/15,
-generated navigation 314/314 and dispatcher 122/122; all forty compiled execution
+Custom navigation/window prerequisite: `make page-navigation JOBS=2` passes PageSource 15/15,
+generated navigation 473/473 and dispatcher 122/122; all forty-seven compiled execution
 defects and one control-name compile refusal reject, input hashes unchanged, exit 0.
 Declared OnFindRecord/OnNextRecord replace default navigation; false/zero never falls
 through. Stored/temporary returned buffers carry their own xRec and selected-row
 triggers. A custom Next error closes the page and rolls back its SQL modification.
 Cross-provider Copy retains independent destination rows and the copied seek anchor,
-not a cursor or materialized view. Existing Find/Temporary/RecordWindow/RecordPosition
-gates pass 43/95/23511/67 checks. Runner and PageRecord consumers pass targeted
-clang-tidy; this is not FULL lint, original Item window acceptance or a rebuilt ERP image.
-Sources: `include/runtime/{Page,PageSession,RecordState,Table}.h`,
-`test/runtime/page-navigation/{Custom.Page,FindOnly.Page}.al`, its `Runner.cpp` and
+not a cursor or materialized view. Bounded custom windows retain field-only raw row
+anchors before AL changes to keys/values, re-position through the provider for selection
+and continuation, and preserve selected buffers/images on exhausted movement or failed
+selection. Backwards visits reverse into provider forward order, not client PK sorting.
+SQL, find-only/default-Next and temporary sources pass populations 0/1/39/40/41/80 at
+limits 7/40/80; filters and descending order remain provider-owned. Stalled/repeated
+rows refuse even at the probe. Seven new compiled bound/boundary/order/continuation/
+stall/SQL-selection/exhaustion defects reject. Ordinary pages retain the SQL fast path.
+Custom rowsRead counts source visits including the probe, not all positioning/AL SQL;
+this adapter bounds retained/presented rows, not arbitrary AL scans or provider work.
+Earlier Find/Temporary/RecordPosition gates pass 43/95/67 checks; the affected
+RecordWindow gate retains 23511/23511. Runner and PageRecord consumers pass targeted
+clang-tidy with zero failures; this is not FULL lint, original Item window acceptance
+or a rebuilt ERP image. The no-current-trigger mutant now consumes opening without
+running the trigger: its named runtime assertion fails, rather than Werror compilation.
+Successful fixture compilation records its lint command before defect execution.
+Sources: `include/runtime/{Page,PageSession,PageWindow,RecordState,Table}.h`,
+`test/runtime/page-navigation/{Custom.Page,FindOnly.Page,ProviderWindow.Page}.al`, its `Runner.cpp` and
 `test/runtime/page-navigation.sh`. At developer revision pinned below, contracts are
 `triggers-auto/page/devenv-{onfindrecord,onnextrecord,onaftergetrecord}-page-trigger.md`,
 `methods-auto/record/record-{copy,next}-method.md` and
 `administration/optimize-sql-al-Database-methods-and-performance-on-server.md`:
 invalidating enumeration does not erase the copied fields used by a fresh seek.
 BCApps Item List's temporary Copy/Next branch and predecessors 1228/1767/1768/1868
-retain the source/provider and calculated-buffer requirements. Custom list windows
-still refuse explicitly until their bounded adapter is implemented.
+retain the source/provider and calculated-buffer requirements. Fresh native ERP rebuild
+and original Item HTTP/CMD/MCP/Chromium replay remain required; fixture acceptance
+does not replace those workflows or prove BC collation/performance parity.
 Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
 over external CMD/MCP and actual Chromium. All three stale-page cases now refuse

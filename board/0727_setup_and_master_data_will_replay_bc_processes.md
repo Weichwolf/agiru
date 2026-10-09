@@ -3,8 +3,8 @@
 Status: queued | Priority: P0
 Depends on: 0720 list/card/edit/lookup/save and authorization contracts plus 0726
 for agiru execution; BC reference exploration can proceed before those contracts.
-Next: qualify bounded custom-source list windows under 0720 and rerun the three
-retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
+Next: rebuild native ERP consumers of the qualified 0720 custom-window adapter and
+rerun the three retained Item workflows; then expand invalid/duplicate/lookup/dimension and remaining
 setup/master-data workflows.
 
 ## Processes and implementation
@@ -98,9 +98,12 @@ setup/master-data workflows.
   explicit template, inherited fields/base unit, exact Decimal price, independent
   reopen/full-row/audit checks and unchanged seven ledger/warehouse populations.
   Those later Item steps remain unexecuted. All 26 existing cases still pass.
-  0720 now qualifies the shared custom navigation and cross-provider Copy/seek kernel
-  with generated SQL/temporary cases and compiled defect controls. The bounded custom
-  window adapter and fresh original Item replay remain prerequisites, not accepted work.
+  0720 now qualifies custom navigation, cross-provider Copy/seek and bounded windows:
+  generated navigation 473/473, dispatcher 122/122, all forty-seven compiled execution
+  defects rejected, source hashes unchanged. SQL/default-Next/temporary providers retain
+  7/40/80 bounds, raw anchors, per-row images/calculations, descending/filter order and
+  provider selection without SQL substitution. Native ERP consumers must be rebuilt;
+  fresh original Item replay remains unaccepted. Custom visits are not an AL SQL scan bound.
   References at the pinned revisions below: developer
   `triggers-auto/page/devenv-{onfindrecord,onnextrecord}-page-trigger.md`; BCApps
   `Layers/W1/BaseApp/Inventory/Item/{ItemList.Page,ItemCard.Page,Item.Table,

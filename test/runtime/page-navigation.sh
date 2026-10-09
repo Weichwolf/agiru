@@ -23,7 +23,7 @@ sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/run
   src/rt/PageListHtml.h \
   src/rt/PageInstance.cpp include/runtime/PageInstance.h include/runtime/Catalogue.h \
   include/runtime/PageWindow.h include/runtime/RecordWindow.h src/rt/RecordWindow.cpp \
-  include/runtime/Table.h include/runtime/RecordState.h \
+  include/runtime/Table.h include/runtime/RecordState.h include/runtime/TablePermissions.h \
   include/runtime/Page.h src/gen/{BodyWriter,PageWriter,RuntimeSurface}.cpp \
   include/runtime/PageSession.h include/runtime/test/TestPage.h \
   include/runtime/Session.h include/runtime/SessionCommand.h src/rt/Session.cpp \
@@ -62,6 +62,11 @@ for source in "${sources[@]}"; do
   objects+=("$object")
 done
 "$CXX" "${flags[@]}" -c test/runtime/page-navigation/Runner.cpp -o "$proof/runner.o"
+mkdir -p "$B/fixture-commands"
+jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/page-navigation/Runner.cpp" \
+  --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
+  "$CXX" "${flags[@]}" -c test/runtime/page-navigation/Runner.cpp -o "$proof/runner.o" \
+  > "$B/fixture-commands/page-navigation.json"
 "$CXX" "${flags[@]}" "$proof/runner.o" "${objects[@]}" "${links[@]}" -o "$proof/runner"
 "$proof/runner" "$dsn" > "$proof/execution.log" 2>&1
 cat "$proof/execution.log"
@@ -157,7 +162,7 @@ for control in window-no-row-trigger window-row-is-current window-no-current-tri
       sub(/detail::AfterReadPageRecord\(page\);/, "detail::AfterGetRecord(page);"); changed++
     }
     control == "window-no-current-trigger" && /if \(opening \|\| selected != previous\)/ {
-      sub(/opening \|\| selected != previous/, "false"); changed++
+      sub(/opening \|\| selected != previous/, "(static_cast<void>(opening), false)"); changed++
     }
     control == "window-lose-current" && /if \(i == 0 \|\| identity == previous\)/ {
       sub(/i == 0 \|\| identity == previous/, "true"); changed++
@@ -207,11 +212,60 @@ status=0
 [[ "$status" = 1 ]]
 rg -q 'absent or invalid factories refuse instead of headless success' "$proof/wrong-factory.log"
 rm -- "$proof/wrong-factory" "$proof/wrong-factory.cpp"
-mkdir -p "$B/fixture-commands"
-jq -n --arg directory "$PWD" --arg file "$PWD/test/runtime/page-navigation/Runner.cpp" \
-  --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
-  "$CXX" "${flags[@]}" -c test/runtime/page-navigation/Runner.cpp -o "$proof/runner.o" \
-  > "$B/fixture-commands/page-navigation.json"
+for control in custom-window-bound custom-window-boundary custom-window-reverse custom-window-more custom-window-stall custom-window-selection custom-window-restore; do
+  cp include/runtime/Page.h "$proof/mutant/include/runtime/Page.h"
+  cp include/runtime/RecordState.h "$proof/mutant/include/runtime/RecordState.h"
+  awk -v control="$control" '
+    control == "custom-window-bound" && /if \(rows.size\(\) == limit\)/ {
+      sub(/rows.size\(\) == limit/, "false"); changed++
+    }
+    control == "custom-window-boundary" && /const auto &anchor = step > 0/ {
+      $0 = "    const auto &anchor = customRows_.front();"; changed++
+    }
+    control == "custom-window-reverse" && /if \(backwards\) \{ std::ranges::reverse\(rows\); \}/ {
+      sub(/std::ranges::reverse\(rows\)/, "static_cast<void>(rows)"); changed++
+    }
+    control == "custom-window-more" && /Present_\(rows.size\(\), visited, found,/ {
+      sub(/visited, found,/, "visited, false,"); changed++
+    }
+    control == "custom-window-stall" && /std::ranges::find\(rows, identity, &CustomRow::identity\) != rows.end\(\)/ {
+      sub(/std::ranges::find\(rows, identity, &CustomRow::identity\) != rows.end\(\)/, "false"); changed++
+    }
+    control == "custom-window-selection" && /if \(!Base::Landed_\(\[&\]\(auto &\) \{ return Position_Custom_\(\*found\); \}\)\)/ {
+      $0 = "      if (!Base::Select_Record(identity)) {"; changed++
+    }
+    control == "custom-window-restore" && /rec = previousValues;/ {
+      sub(/rec = previousValues/, "static_cast<void>(previousValues)"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' include/runtime/PageSession.h > "$proof/mutant/include/runtime/PageSession.h"
+  mutant_objects=()
+  for source in "${sources[@]}"; do
+    object="$proof/objects/${source##*/}.o"
+    if [[ "$source" == */NavigationProviderWindow.def.cpp || "$source" == */NavigationFindOnly.def.cpp ]]; then
+      object="$proof/objects/provider-mutant-${source##*/}.o"
+      "$CXX" "-I$proof/mutant/include" "${flags[@]}" -c "$source" -o "$object"
+    fi
+    mutant_objects+=("$object")
+  done
+  "$CXX" "-I$proof/mutant/include" "${flags[@]}" test/runtime/page-navigation/Runner.cpp \
+    "${mutant_objects[@]}" "${links[@]}" -o "$proof/$control"
+  status=0
+  "$proof/$control" "$dsn" > "$proof/$control.log" 2>&1 || status=$?
+  [[ "$status" = 1 ]]
+  case "$control" in
+    custom-window-bound|custom-window-more) claim='custom SQL windows retain the bound and one undisplayed source probe' ;;
+    custom-window-boundary) claim='temporary continuation uses the declared provider and excludes the boundary' ;;
+    custom-window-reverse) claim='custom last reverses visits into provider forward order, not client key sorting' ;;
+    custom-window-stall) claim='stalled custom navigation refuses even when the duplicate is only the probe' ;;
+    custom-window-selection) claim='temporary retained row absent from SQL can be selected through its provider' ;;
+    custom-window-restore) claim='custom exhaustion preserves the selected post-trigger buffer' ;;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control.log"
+  unlink "$proof/$control"
+done
+cp include/runtime/PageSession.h "$proof/mutant/include/runtime/PageSession.h"
 awk '
   /PageSession\(\) = default;/ {
     print "  void Open() {}"; changed++
@@ -446,4 +500,4 @@ fi
 rm -r -- "$proof/mutant"
 rm -r -- "$proof/objects"
 sha256sum --check "$proof/dispatcher-inputs.sha256" > "$proof/dispatcher-integrity.log"
-printf 'page-navigation: generated navigation, custom SQL/temporary providers, production factories/lifecycle and authorized control dispatch execute; forty execution controls and one control-name compile refusal reject; %s\n' "$proof"
+printf 'page-navigation: generated navigation, bounded custom SQL/temporary providers, production factories/lifecycle and authorized control dispatch execute; forty-seven execution controls and one control-name compile refusal reject; %s\n' "$proof"

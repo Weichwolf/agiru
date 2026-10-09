@@ -42,6 +42,7 @@
 #include "fixture/page/NavigationList.h"
 #include "fixture/page/NavigationModal.h"
 #include "fixture/page/NavigationOverride.h"
+#include "fixture/page/NavigationProviderWindow.h"
 #include "fixture/page/NavigationWindow.h"
 #include "fixture/page/NavigationWindowError.h"
 #include "fixture/report/NavigationReport.h"
@@ -732,6 +733,218 @@ void CopiedBuffersRetainSeekAnchorsWithoutSharingRows() {
                  source.Value == kFirstValue);
 }
 
+void CustomStoredWindows() {
+  using Provider = agiru::Fixture::NavigationProviderWindow_Page;
+  Provider original{};
+  original.Configure(false, 0, true);
+  agiru::PageWindowSession<Provider> page;
+  page.Prepare_Borrowed(original);
+  WindowReceiver first;
+  const auto opened = page.Open_Window(agiru::PageOpenMode::View, 1, first);
+  CHECK_TRUE("custom SQL windows retain the bound and one undisplayed source probe",
+             opened.rows == 1 && opened.rowsRead == 2 && opened.more && first.ids.size() == 1);
+  CHECK_TEXT(
+      "custom SQL windows capture xRec before row buffer mutation", first.originals.at(0), "11");
+  CHECK_TEXT("custom SQL windows present calculated fields", first.values.at(0), "22");
+  CHECK_TEXT("custom SQL windows keep row triggers distinct from current", first.trace, "OAC");
+  CHECK_TEXT(
+      "custom SQL probe invokes the declared step only once", page.ControlText("NextCalls"), "1");
+  CHECK_TEXT("custom SQL windows do not invoke after-get for the probe", first.readCount, "1");
+  CHECK_TRUE("custom window identity is independent of mutated display keys",
+             first.current == first.identities.at(0) &&
+                 first.current == page.Window_Current_Record());
+  WindowReceiver next;
+  next.previousCurrentCount = "1";
+  const auto continued = page.Read_Window(agiru::PageWindowPosition::Next, 1, next);
+  CHECK_TRUE("custom windows continue from immutable source keys instead of mutated buffers",
+             continued.rows == 1 && continued.rowsRead == 1 && !continued.more &&
+                 next.ids.size() == 1);
+  CHECK_TEXT(
+      "custom forward continuation presents the second provider row", next.ids.at(0), "1002");
+  CHECK_TEXT(
+      "custom continuation has the second row's own before-image", next.originals.at(0), "22");
+  WindowReceiver all;
+  all.previousCurrentCount = "2";
+  static_cast<void>(page.Read_Window(agiru::PageWindowPosition::First, kListRows, all));
+  CHECK_TRUE("custom block reloading retains selection and ordered per-row calculations",
+             all.current == next.current && (all.values == std::vector<std::string>{"22", "44"}));
+  CHECK_TEXT(
+      "custom selected image survives loading other source rows", all.selectedOriginal, "22");
+  CHECK_TEXT("custom unchanged selection does not rerun after-current", all.currentCount, "2");
+  CHECK_TRUE("custom retained selection uses its original identity",
+             page.Select_Window_Record(first.identities.at(0)));
+  CHECK_TEXT("custom selecting a mutated row recaptures its actual source image",
+             page.ControlText("SelectedOriginal"),
+             "11");
+  Row missing;
+  missing.ID = 3;
+  bool refused = false;
+  try {
+    static_cast<void>(page.Select_Window_Record(missing.RecordId()));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageWindowSelection"; }
+  CHECK_TRUE("custom selecting a row outside the retained block refuses without navigation",
+             refused && page.Window_Current_Record() == first.current);
+  page.Close();
+}
+
+void CustomTemporaryWindows() {
+  using Provider = agiru::Fixture::NavigationProviderWindow_Page;
+  constexpr agiru::Integer kPopulation = 5;
+  Provider original{};
+  original.Configure(true, kPopulation, true);
+  agiru::PageWindowSession<Provider> page;
+  page.Prepare_Borrowed(original);
+  WindowReceiver first;
+  const auto opened = page.Open_Window(agiru::PageOpenMode::View, 2, first);
+  CHECK_TRUE("temporary custom windows bound visits without a whole-result materialization",
+             opened.rows == 2 && opened.rowsRead == 3 && opened.more && first.ids.size() == 2);
+  CHECK_TRUE("temporary custom row projections keep exact independent before-images",
+             (first.originals == std::vector<std::string>{"10", "20"} &&
+              first.values == std::vector<std::string>{"20", "40"}));
+  CHECK_TEXT("temporary windows complete all row triggers before current", first.trace, "OAAC");
+  WindowReceiver next;
+  next.previousCurrentCount = "1";
+  const auto continued = page.Read_Window(agiru::PageWindowPosition::Next, 2, next);
+  CHECK_TRUE("temporary continuation uses the declared provider and excludes the boundary",
+             continued.rows == 2 && continued.rowsRead == 3 && continued.more &&
+                 (next.ids == std::vector<std::string>{"1003", "1004"}));
+  WindowReceiver last;
+  last.previousCurrentCount = "2";
+  const auto ending = page.Read_Window(agiru::PageWindowPosition::Last, 2, last);
+  CHECK_TRUE("custom last reverses visits into provider forward order, not client key sorting",
+             ending.rows == 2 && ending.rowsRead == 3 && ending.more &&
+                 (last.ids == std::vector<std::string>{"1004", "1005"}));
+  CHECK_TEXT("custom reverse loading captures original images in presentation order",
+             last.selectedOriginal,
+             "40");
+  CHECK_TRUE("temporary retained row absent from SQL can be selected through its provider",
+             page.Select_Window_Record(last.identities.at(1)));
+  CHECK_TEXT(
+      "temporary selection does not substitute or reread SQL", page.ControlText("Value"), "100");
+  WindowReceiver previous;
+  previous.previousCurrentCount = "4";
+  const auto preceding = page.Read_Window(agiru::PageWindowPosition::Previous, 2, previous);
+  CHECK_TRUE("custom previous starts before the raw first boundary with no duplicate or skip",
+             preceding.rows == 2 && preceding.more &&
+                 (previous.ids == std::vector<std::string>{"1002", "1003"}));
+  WindowReceiver beginning;
+  beginning.previousCurrentCount = "5";
+  const auto start = page.Read_Window(agiru::PageWindowPosition::Previous, 2, beginning);
+  CHECK_TRUE("custom reverse exhaustion presents the final partial block",
+             start.rows == 1 && start.rowsRead == 1 && !start.more &&
+                 beginning.ids.at(0) == "1001");
+  WindowReceiver exhausted;
+  const auto empty = page.Read_Window(agiru::PageWindowPosition::Previous, 2, exhausted);
+  CHECK_TRUE("exhausted custom continuation retains the block and selected source identity",
+             empty.rows == 0 && empty.rowsRead == 0 && exhausted.ids.empty() &&
+                 exhausted.current == beginning.current &&
+                 page.Window_Current_Record() == beginning.current);
+  CHECK_TEXT(
+      "custom exhaustion preserves the selected post-trigger buffer", exhausted.currentValue, "20");
+  CHECK_TEXT("custom exhaustion runs no extra after-get/current triggers",
+             exhausted.trace,
+             beginning.trace);
+  CHECK_TEXT(
+      "custom exhaustion preserves the selected before-image", exhausted.selectedOriginal, "10");
+  page.Close();
+}
+
+void CustomWindowRefusals() {
+  using Provider = agiru::Fixture::NavigationProviderWindow_Page;
+  Provider original{};
+  original.Configure(false, 0, false);
+  original.ConfigureFailure(true, false, false, false);
+  agiru::PageWindowSession<Provider> empty;
+  empty.Prepare_Borrowed(original);
+  WindowReceiver none;
+  const auto missing = empty.Open_Window(agiru::PageOpenMode::View, kListRows, none);
+  CHECK_TRUE("custom window false find never falls through to existing SQL rows",
+             missing.rows == 0 && missing.rowsRead == 0 && !missing.more && none.ids.empty());
+  CHECK_TEXT("custom window false find runs no current-row trigger", none.currentCount, "0");
+  empty.Close();
+  original.ConfigureFailure(false, true, false, false);
+  agiru::PageWindowSession<Provider> stopped;
+  stopped.Prepare_Borrowed(original);
+  WindowReceiver one;
+  const auto ended = stopped.Open_Window(agiru::PageOpenMode::View, kListRows, one);
+  CHECK_TRUE("custom window zero Next ends its source without default SQL fallback",
+             ended.rows == 1 && ended.rowsRead == 1 && !ended.more && one.ids.size() == 1);
+  stopped.Close();
+  original.ConfigureFailure(false, false, true, false);
+  agiru::PageWindowSession<Provider> stalled;
+  stalled.Prepare_Borrowed(original);
+  bool refused = false;
+  try {
+    static_cast<void>(stalled.Open_Window(agiru::PageOpenMode::View, 1, none));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageWindowProgress"; }
+  CHECK_TRUE("stalled custom navigation refuses even when the duplicate is only the probe",
+             refused && !stalled.IsOpen());
+  original.ConfigureFailure(false, false, false, true);
+  agiru::PageWindowSession<Provider> failing;
+  failing.Prepare_Borrowed(original);
+  refused = false;
+  {
+    const agiru::detail::Scope boundary;
+    try {
+      static_cast<void>(failing.Open_Window(agiru::PageOpenMode::View, kListRows, none));
+    } catch (const agiru::Error &error) {
+      refused = std::string_view(error.what()) == "provider window next failed";
+    }
+    CHECK_TRUE("custom window Next errors close the page with the original diagnostic",
+               refused && !failing.IsOpen());
+  }
+  const auto stored = agiru::Session::Current().Database().Execute(
+      R"(SELECT "Value" FROM "Navigation Row" WHERE "ID"=1)");
+  CHECK_TEXT("custom window Next errors roll back pending SQL writes",
+             stored.Value(0, 0).value_or(""),
+             "11");
+}
+
+void CustomWindowSelectionAndFilters() {
+  using Provider = agiru::Fixture::NavigationProviderWindow_Page;
+  constexpr agiru::Integer kPopulation = 5;
+  Provider original{};
+  original.Configure(true, kPopulation, true);
+  original.Rec.SetRange(original.Rec.ID, 2, 4);
+  original.Rec.Ascending(false);
+  agiru::PageWindowSession<Provider> page;
+  page.Prepare_Borrowed(original);
+  WindowReceiver first;
+  const auto initial = page.Open_Window(agiru::PageOpenMode::View, 2, first);
+  CHECK_TRUE("custom temporary windows inherit filters and descending provider order",
+             initial.rows == 2 && initial.more &&
+                 (first.ids == std::vector<std::string>{"1004", "1003"}));
+  WindowReceiver next;
+  next.previousCurrentCount = "1";
+  const auto following = page.Read_Window(agiru::PageWindowPosition::Next, 2, next);
+  CHECK_TRUE("custom descending continuation preserves the source filter",
+             following.rows == 1 && !following.more && next.ids.at(0) == "1002");
+  WindowReceiver last;
+  last.previousCurrentCount = "2";
+  static_cast<void>(page.Read_Window(agiru::PageWindowPosition::Last, 2, last));
+  CHECK_TRUE("custom last restores declared descending order instead of ascending PK order",
+             (last.ids == std::vector<std::string>{"1003", "1002"}));
+  CHECK_TRUE("custom selection can choose the other retained filtered row",
+             page.Select_Window_Record(last.identities.at(0)));
+  const auto selected = page.Window_Current_Record();
+  original.ConfigureFailure(true, false, false, false);
+  CHECK_TRUE("a missing custom selection restores the prior retained identity and buffer",
+             !page.Select_Window_Record(last.identities.at(1)) &&
+                 page.Window_Current_Record() == selected);
+  CHECK_TEXT(
+      "failed custom selection preserves post-trigger fields", page.ControlText("ID"), "1003");
+  CHECK_TEXT("failed custom selection preserves the current before-image",
+             page.ControlText("SelectedOriginal"),
+             "30");
+  bool refused = false;
+  try {
+    WindowReceiver invalid;
+    static_cast<void>(page.Read_Window(agiru::PageWindowPosition::Next, 2, invalid));
+  } catch (const agiru::Error &error) { refused = error.Code() == "PageWindowAnchor"; }
+  CHECK_TRUE("missing custom continuation anchors refuse and close instead of falling back to SQL",
+             refused && !page.IsOpen());
+}
+
 void ListWindowErrorsCloseAndRollback() {
   using Failing = agiru::Fixture::NavigationWindowError_Page;
   auto list = agiru::MakeInstalledPage(agiru::PageTraits<Failing>::kId);
@@ -757,7 +970,34 @@ void ListWindowErrorsCloseAndRollback() {
              "11");
 }
 
+void CheckListWindowBoundary(agiru::PageInstance &page, std::size_t population, std::size_t bound) {
+  WindowReceiver receiver;
+  receiver.calculated = false;
+  const auto state = page.OpenWindow(agiru::PageOpenMode::View, bound, receiver);
+  CHECK_TRUE("generated windows respect zero/one/39/40/41 and configurable row bounds",
+             state.rows == std::min(population, bound) &&
+                 state.rowsRead == std::min(population, bound + 1) &&
+                 state.more == (population > bound) && receiver.ids.size() == state.rows);
+  CHECK_TRUE("display enumeration retains the first selected row, not its last",
+             receiver.current.IsEmpty() == (population == 0) &&
+                 (population == 0 || receiver.current == receiver.identities.front()));
+  if (state.more) {
+    WindowReceiver continuation;
+    continuation.calculated = false;
+    const auto next = page.ReadWindow(agiru::PageWindowPosition::Next, bound, continuation);
+    CHECK_TRUE("generated continuation transfers at most bound plus one",
+               next.rows == std::min(population - bound, bound) &&
+                   next.rowsRead == std::min(population - bound, bound + 1));
+    CHECK_TEXT("generated continuation does not skip the row after its boundary",
+               continuation.ids.at(0),
+               std::to_string(bound + 1));
+  }
+  page.Close();
+}
+
 void ListWindowBoundaries() {
+  using Provider = agiru::Fixture::NavigationProviderWindow_Page;
+  using FindOnly = agiru::Fixture::NavigationFindOnly_Page;
   constexpr std::array<std::size_t, 6> populations{0, 1, 39, 40, 41, 80};
   constexpr std::array<std::size_t, 3> bounds{7, 40, 80};
   const auto &database = agiru::Session::Current().Database();
@@ -768,29 +1008,15 @@ void ListWindowBoundaries() {
                    "," + std::to_string(i) + ")");
     }
     for (const auto bound : bounds) {
-      auto page = agiru::MakeInstalledPage(agiru::PageTraits<List>::kId);
-      WindowReceiver receiver;
-      receiver.calculated = false;
-      const auto state = page->OpenWindow(agiru::PageOpenMode::View, bound, receiver);
-      CHECK_TRUE("generated windows respect zero/one/39/40/41 and configurable row bounds",
-                 state.rows == std::min(population, bound) &&
-                     state.rowsRead == std::min(population, bound + 1) &&
-                     state.more == (population > bound) && receiver.ids.size() == state.rows);
-      CHECK_TRUE("display enumeration retains the first selected row, not its last",
-                 receiver.current.IsEmpty() == (population == 0) &&
-                     (population == 0 || receiver.current == receiver.identities.front()));
-      if (state.more) {
-        WindowReceiver continuation;
-        continuation.calculated = false;
-        const auto next = page->ReadWindow(agiru::PageWindowPosition::Next, bound, continuation);
-        CHECK_TRUE("generated continuation transfers at most bound plus one",
-                   next.rows == std::min(population - bound, bound) &&
-                       next.rowsRead == std::min(population - bound, bound + 1));
-        CHECK_TEXT("generated continuation does not skip the row after its boundary",
-                   continuation.ids.front(),
-                   std::to_string(bound + 1));
-      }
-      page->Close();
+      auto ordinary = agiru::MakeInstalledPage(agiru::PageTraits<List>::kId);
+      CheckListWindowBoundary(*ordinary, population, bound);
+      auto findOnly = agiru::MakeInstalledPage(agiru::PageTraits<FindOnly>::kId);
+      CheckListWindowBoundary(*findOnly, population, bound);
+      Provider original{};
+      original.Configure(true, static_cast<agiru::Integer>(population), false);
+      auto temporary = agiru::MakeInstalledPage(agiru::PageTraits<Provider>::kId);
+      temporary->PrepareBorrowed(&original, agiru::PageTraits<Provider>::kId);
+      CheckListWindowBoundary(*temporary, population, bound);
     }
   }
   Prepare();
@@ -1190,6 +1416,10 @@ int main(int argc, char **argv) {
     CustomSourceNavigation();
     CustomNavigationErrorsCloseAndRollback();
     CopiedBuffersRetainSeekAnchorsWithoutSharingRows();
+    CustomStoredWindows();
+    CustomTemporaryWindows();
+    CustomWindowRefusals();
+    CustomWindowSelectionAndFilters();
     ListWindowErrorsCloseAndRollback();
     ListWindowBoundaries();
     ListEditOpensSelectedCard();

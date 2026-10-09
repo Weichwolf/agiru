@@ -13,6 +13,7 @@
 #include "runtime/Relation.h"
 #include "runtime/SubPageLink.h"
 #include "runtime/Table.h"
+#include "runtime/TablePermissions.h"
 #include "runtime/TemporaryRecord.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
@@ -1415,13 +1416,19 @@ private:
   std::string partName_;
 };
 
-/// \brief Production-only SQL list loading; adds no methods to the AL TestPage facade.
-/// \tparam P The generated page class; custom/temporary providers remain explicit gaps.
+/// \brief Bounded production list loading; adds no methods to the AL TestPage facade.
+/// \tparam P The generated page class; declared navigation overrides the SQL fast path.
 template <typename P> class PageWindowSession final : public PageSession<P> {
   using Base = PageSession<P>;
+  static constexpr bool kCustom = requires { &P::OnFindRecord; } || requires { &P::OnNextRecord; };
+
+  struct CustomRow {
+    RecordId identity;
+    detail::HeldImage values;
+  };
 
 public:
-  /// \brief Initializes a SQL list and loads its first block without single-row triggers.
+  /// \brief Initializes a list and loads its first block without single-row triggers.
   /// \param mode View/Edit; New is not qualified by this adapter.
   /// \param limit Positive trusted server bound.
   /// \param receiver Synchronous authorized presentation receiver.
@@ -1437,8 +1444,7 @@ public:
     if (Base::IsOpen()) {
       throw Error(PageSessionDiagnostics::kAlreadyOpen, PageSessionDiagnostics::kAlreadyOpenCode);
     }
-    window_.reset();
-    selected_ = {};
+    Forget_Window();
     Base::OpenWith_(false, [&](P &page) {
       static_cast<void>(detail::InitializePage(page, mode == PageOpenMode::Edit, false));
       result = Load_(RecordWindowPosition::First, limit, receiver, true);
@@ -1449,25 +1455,28 @@ public:
   /// \brief Discards display boundaries after explicit single-record navigation.
   void Forget_Window() {
     window_.reset();
+    customRows_.clear();
+    customLoaded_ = false;
     selected_ = {};
   }
 
-  /// \return Original selected SQL identity, not a key changed only in an AL buffer.
+  /// \return Original selected source identity, not a key changed only in an AL buffer.
   [[nodiscard]] RecordId Window_Current_Record() const {
     static_cast<void>(Base::Page_());
-    return window_.has_value() ? selected_ : Base::Current_Record();
+    return Loaded_() ? selected_ : Base::Current_Record();
   }
 
-  /// \brief Selects an exact retained SQL row while retaining the loaded block's boundaries.
-  /// \param identity Server-retained SQL identity.
+  /// \brief Selects an exact retained source row while retaining the block's boundaries.
+  /// \param identity Server-retained source identity, never an arbitrary client key.
   /// \return Whether the row still exists.
   [[nodiscard]] bool Select_Window_Record(const RecordId &identity) {
     Require_();
     static_cast<void>(Base::Page_());
-    if (!window_.has_value()) { throw Error("The page has no loaded block.", "PageWindowAnchor"); }
+    if (!Loaded_()) { throw Error("The page has no loaded block.", "PageWindowAnchor"); }
     if constexpr (Base::kHasRecord) {
+      if constexpr (kCustom) { return Select_Custom_Record_(identity); }
       using Source = std::remove_cvref_t<decltype(Base::Record_())>;
-      Source source;
+      Source source{};
       bool retained = false;
       for (std::size_t i = 0; i < window_->Size(); ++i) {
         window_->Load(i, &source);
@@ -1490,8 +1499,8 @@ public:
     return false;
   }
 
-  /// \brief Loads a block relative to retained SQL boundaries, not mutated AL key values.
-  /// \param position Requested SQL-order movement.
+  /// \brief Loads a block relative to retained source boundaries, not mutated AL key values.
+  /// \param position Requested source-order movement.
   /// \param limit Positive trusted server bound.
   /// \param receiver Synchronous authorized presentation receiver.
   /// \return Bounded rows and continuation in the requested direction.
@@ -1503,14 +1512,14 @@ public:
     const RecordWindowPosition sqlPosition = Position_(position);
     if ((sqlPosition == RecordWindowPosition::After ||
          sqlPosition == RecordWindowPosition::Before) &&
-        (!window_.has_value() || window_->Size() == 0)) {
-      throw Error("List continuation has no SQL boundary.", "PageWindowAnchor");
+        (!Loaded_() || Size_() == 0)) {
+      throw Error("List continuation has no source boundary.", "PageWindowAnchor");
     }
     try {
       Base::RowLeft();
       return Load_(sqlPosition, limit, receiver, false);
     } catch (...) {
-      window_.reset();
+      Forget_Window();
       Base::Release_();
       throw;
     }
@@ -1518,10 +1527,10 @@ public:
 
 private:
   static void Require_() {
-    if constexpr (
-        !Base::kHasRecord || PageTraits<P>::kPage.type != PageType::List ||
-        requires { &P::OnFindRecord; } || requires { &P::OnNextRecord; }) {
-      throw Error("This page has no qualified SQL list provider.", "PageWindowProvider");
+    if constexpr (!Base::kHasRecord) {
+      throw Error("This page has no qualified list provider.", "PageWindowProvider");
+    } else if (PageTraits<P>::kPage.type != PageType::List) {
+      throw Error("This page has no qualified list provider.", "PageWindowProvider");
     }
   }
 
@@ -1546,6 +1555,8 @@ private:
       static_cast<void>(receiver);
       static_cast<void>(opening);
       throw Error("The page has no source record.", "PageWindowProvider");
+    } else if constexpr (kCustom) {
+      return Load_Custom_Window_(position, limit, receiver, opening);
     } else {
       return Load_Record_Window_(position, limit, receiver, opening);
     }
@@ -1572,12 +1583,30 @@ private:
       receiver.Current(selected_, *this);
       return {0, loaded.RowsRead(), false};
     }
-    const RecordId previous = window_.has_value() ? selected_ : RecordId{};
+    const auto result = Present_(
+        loaded.Size(), loaded.RowsRead(), loaded.HasMore(), receiver, opening, [&](std::size_t i) {
+          loaded.Load(i, &rec);
+        });
+    window_ = std::move(loaded);
+    return result;
+  }
+
+  template <typename Load>
+  PageWindowState Present_(std::size_t rows,
+                           std::size_t rowsRead,
+                           bool more,
+                           PageWindowReceiver &receiver,
+                           bool opening,
+                           Load load) {
+    auto &page = Base::Page_();
+    auto &rec = page.Rec;
+    using Source = std::remove_cvref_t<decltype(rec)>;
+    const RecordId previous = Loaded_() ? selected_ : RecordId{};
     RecordId selected;
-    Source selectedValues;
+    Source selectedValues{};
     detail::HeldImage selectedImage;
-    for (std::size_t i = 0; i < loaded.Size(); ++i) {
-      loaded.Load(i, &rec);
+    for (std::size_t i = 0; i < rows; ++i) {
+      load(i);
       const RecordId identity = rec.RecordId();
       static_cast<void>(static_cast<typename Source::Platform_Half &>(rec).Read(true));
       page.LandedOnRecord();
@@ -1589,7 +1618,7 @@ private:
         selectedImage.SetFrom(reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image);
       }
     }
-    if (loaded.Size() != 0) {
+    if (rows != 0) {
       rec = selectedValues;
       reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image.SetFrom(selectedImage);
     } else {
@@ -1598,13 +1627,130 @@ private:
     }
     if (opening || selected != previous) { detail::AfterCurrentPageRecord(page); }
     receiver.Current(selected, *this);
-    const PageWindowState result{loaded.Size(), loaded.RowsRead(), loaded.HasMore()};
-    window_ = std::move(loaded);
     selected_ = selected;
+    return {rows, rowsRead, more};
+  }
+
+  [[nodiscard]] bool Loaded_() const { return window_.has_value() || customLoaded_; }
+
+  [[nodiscard]] std::size_t Size_() const {
+    if constexpr (kCustom) { return customRows_.size(); }
+    return window_->Size();
+  }
+
+  bool Position_Custom_(const CustomRow &row) {
+    auto &rec = Base::Record_();
+    using Source = std::remove_cvref_t<decltype(rec)>;
+    detail::RequireRecordPermission(&rec, TableTraits<Source>::kTable, TableOperation::Read);
+    rec = *static_cast<const Source *>(row.values.Get());
+    return detail::FindPageRecord(Base::Page_(), "=") && rec.RecordId() == row.identity;
+  }
+
+  bool Select_Custom_Record_(const RecordId &identity) {
+    const auto found = std::ranges::find(customRows_, identity, &CustomRow::identity);
+    if (found == customRows_.end()) {
+      throw Error("Selected row is outside the window.", "PageWindowSelection");
+    }
+    try {
+      auto &rec = Base::Record_();
+      using Source = std::remove_cvref_t<decltype(rec)>;
+      Source previous{};
+      previous = rec;
+      detail::HeldImage image;
+      image.SetFrom(reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image);
+      if (!Base::Landed_([&](auto &) { return Position_Custom_(*found); })) {
+        rec = previous;
+        auto &state = reinterpret_cast<detail::StateHandle *>(&rec)->Ensure();
+        state.image.SetFrom(image);
+        state.positioned = !selected_.IsEmpty();
+        return false;
+      }
+      selected_ = identity;
+      return true;
+    } catch (...) {
+      Forget_Window();
+      Base::Release_();
+      throw;
+    }
+  }
+
+  bool Start_Custom_(RecordWindowPosition position, Integer step) {
+    auto &page = Base::Page_();
+    if (position == RecordWindowPosition::First) { return detail::FindPageRecord(page, "-"); }
+    if (position == RecordWindowPosition::Last) { return detail::FindPageRecord(page, "+"); }
+    const auto &anchor = step > 0 ? customRows_.back() : customRows_.front();
+    if (!Position_Custom_(anchor)) {
+      throw Error("List continuation source anchor is no longer available.", "PageWindowAnchor");
+    }
+    return detail::NextPageRecord(page, step) != 0;
+  }
+
+  PageWindowState Load_Custom_Window_(RecordWindowPosition position,
+                                      std::size_t limit,
+                                      PageWindowReceiver &receiver,
+                                      bool opening) {
+    auto &page = Base::Page_();
+    auto &rec = page.Rec;
+    using Source = std::remove_cvref_t<decltype(rec)>;
+    detail::RequireRecordPermission(&rec, TableTraits<Source>::kTable, TableOperation::Read);
+    Source previousValues{};
+    previousValues = rec;
+    detail::HeldImage previousImage;
+    previousImage.SetFrom(reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().image);
+    const bool backwards =
+        position == RecordWindowPosition::Before || position == RecordWindowPosition::Last;
+    const Integer step = backwards ? -1 : 1;
+    bool found = Start_Custom_(position, step);
+    std::vector<CustomRow> rows;
+    rows.reserve(limit);
+    std::size_t visited = 0;
+    while (found) {
+      ++visited;
+      const auto identity = rec.RecordId();
+      if (std::ranges::find(rows, identity, &CustomRow::identity) != rows.end()) {
+        throw Error("Custom list navigation returned a repeated row.", "PageWindowProgress");
+      }
+      if (rows.size() == limit) { break; }
+      detail::HeldImage values;
+      values.Hold(new Source{});
+      *static_cast<Source *>(values.Get()) = rec;
+      rows.push_back({identity, std::move(values)});
+      found = detail::NextPageRecord(page, step) != 0;
+    }
+    if (rows.empty()) {
+      if (opening && page.OpenedEditable()) {
+        throw Error("Empty editable list windows are not qualified.", "PageWindowNewRow");
+      }
+      rec = previousValues;
+      auto &state = reinterpret_cast<detail::StateHandle *>(&rec)->Ensure();
+      state.image.SetFrom(previousImage);
+      state.positioned = !selected_.IsEmpty();
+      if (position == RecordWindowPosition::First || position == RecordWindowPosition::Last) {
+        rec = Source{};
+        state.image.SetFrom(detail::HeldImage{});
+        state.positioned = false;
+        selected_ = {};
+        customRows_.clear();
+        customLoaded_ = true;
+      }
+      receiver.Current(selected_, *this);
+      return {0, visited, false};
+    }
+    if (backwards) { std::ranges::reverse(rows); }
+    const auto result =
+        Present_(rows.size(), visited, found, receiver, opening, [&](std::size_t i) {
+          detail::RequireRecordPermission(&rec, TableTraits<Source>::kTable, TableOperation::Read);
+          rec = *static_cast<const Source *>(rows[i].values.Get());
+          reinterpret_cast<detail::StateHandle *>(&rec)->Ensure().positioned = true;
+        });
+    customRows_ = std::move(rows);
+    customLoaded_ = true;
     return result;
   }
 
   std::optional<RecordWindow> window_;
+  std::vector<CustomRow> customRows_;
+  bool customLoaded_ = false;
   RecordId selected_;
 };
 
