@@ -148,11 +148,23 @@ export async function finishedResponse(page, origin, response) {
 
 export async function browserFailure(page, origin, model, identity, text) {
   const escaped = await page.evaluate(value => CSS.escape(value), identity);
+  const control = page.locator(`[data-control="${escaped}"]`);
+  if (text !== undefined) {
+    const select = control.locator("select[name=text]");
+    if (await select.count()) {
+      await select.evaluate((element, text) => {
+        const option = document.createElement("option");
+        option.value = text;
+        option.textContent = text;
+        element.add(option);
+        element.value = text;
+      }, text);
+    } else await control.locator("input[name=text]").fill(text);
+  }
   const endpoint = `/modal-commands/${model.interaction.dialog}`;
   const received = page.waitForResponse(response => response.url() === origin + endpoint &&
     response.request().method() === "POST");
-  if (text !== undefined) await page.locator(`[data-control="${escaped}"] input[name=text]`).fill(text);
-  await page.locator(`[data-control="${escaped}"] button`).click();
+  await control.locator("button").click();
   const response = await finishedResponse(page, origin, await received);
   assert.equal(response.status(), 500);
   const failure = parseFailure(await response.text());

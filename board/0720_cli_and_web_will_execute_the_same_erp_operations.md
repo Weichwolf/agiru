@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: resolve the retained typed-modal timeout and qualify active-stack expiry/revocation
+Next: qualify active-stack expiry/revocation
 cancellation, then expand invalid/duplicate/lookup/dimension and vendor/item/setup
 processes under 0727.
 Production enum declarations are regenerated; source-origin and slice checks pass.
@@ -353,8 +353,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   unchanged input/binary hashes. The owned TLS container, native binaries/private
   auth and test trust profile are removed. The earlier HSTS `make web-test JOBS=2`
   passed fourteen browser cases, the HTTP edge case and three compiled controls;
-  HTTP and forged `X-Forwarded-Proto: https` do not emit HSTS. Fresh container
-  earlier `make browser-auth`, `make browser-sessions` and SessionIdentityGate retained
+  HTTP and forged `X-Forwarded-Proto: https` do not emit HSTS. Earlier container runs of
+  `make browser-auth`, `make browser-sessions` and SessionIdentityGate retained
   317, 61 plus one provider, and 75 passing checks; eighteen security defects reject.
   HSTS follows [OWASP session transport guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [Caddy headers](https://caddyserver.com/docs/caddyfile/directives/header),
@@ -365,22 +365,23 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   Two actual tabs now prove passive shared authentication with independent page handles
   and AL variables; logout invalidates the other tab's next operation without SQL effects.
   Never claim stolen-cookie device binding.
-- Current `make page-host-test JOBS=2` attempt: generated navigation 270, dispatcher
-  105 and source 15 checks pass with their 29 execution controls/one compile refusal.
-  The external fixture passes 38/38; production-shaped native configuration passes
-  43/44, with `CMD MCP and Chromium refuse invalid typed modal input and retain the
-  caller for explicit correction` cancelled at its unchanged 60-second timeout.
-  Consequently limits 7/80 and the 22 page-host mutation runs were not executed.
-  Preserve this failure; rerun/diagnose it, never count cancellation as green or increase
-  the timeout/defect baseline. Native TLS/SQL gates are not complete client acceptance.
-  `test/ui/page-host.mjs` now checks row value, write count and failed receipt in one
-  independent SQL statement per rejection, preserving all assertions and exact text values.
-  Adapter diagnostics locate the unchanged native deadline during the Web cases after
-  CMD/MCP progress. A serial repeat without the six-job integration build still passes
-  fixture 38/38 and cancels native case 38/44 at 60 seconds, after the Web array cases.
-  CMD reaches its last correction at 28.826 seconds, MCP at 14.867 seconds; the Web enum
-  cases remain unexecuted. Measure individual HTTP/SQL/client startup costs and repair
-  the latency; compilation contention alone does not explain this failure.
+- Current `make page-host-test JOBS=2` passes all 170 regular cases: fixture 38/38
+  and production 44/44 for each of limits 40/7/80 and both TryFunction write policies.
+  All 22 compiled defects reject; source/input hashes remain unchanged; outer exit 0.
+  Source/navigation/dispatcher gates pass 15/270/122 checks, with 34 execution controls
+  and one expected control-name compile refusal. The invalid-input case retains every
+  Integer/Decimal/Int64/array/Enum family, all three adapters, exact diagnostics,
+  independent SQL effects, rejected-command replay and explicit correction. It passes
+  in 37.125 seconds in the default native profile without changing its 60-second limit.
+  `test/ui/browser-client.mjs::browserFailure` deliberately injects an undeclared option
+  into the actual DOM select before submission: this is a browser-tamper negative test,
+  not an advertised choice or a replacement HTTP client. The native server must refuse it.
+  Preparing input before registering the response waiter also avoids an orphan rejection
+  when input preparation fails. All owned page-host databases/auth/binaries are removed.
+  The historical cancellation remains recoverable at 2973049; its production latency
+  cause is not proved repaired. Five CLI help launches cost 144–166 ms; no HTTP/SQL or
+  production performance improvement is claimed. Active-stack revocation and complete
+  business-process/BC parity remain unqualified.
 - References: [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
   consulted 2026-10-08. Sources/tests: `src/rt/{ClientCredentials,PageCommandHost}.cpp`,
