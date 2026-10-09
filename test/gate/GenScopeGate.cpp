@@ -29,8 +29,10 @@ void ANamespaceIsInOrOutByItsLongestMatch(const Scope &scope) {
   // A carve-out is more specific than the root, so it wins.
   CHECK_TRUE("an unmatched integration branch is out",
              !scope.Contains("Microsoft.Integration.Unclassified"));
-  CHECK_TRUE("the reference Dataverse namespace omission remains separate from product policy",
-             !scope.Contains("Microsoft.Integration.Dataverse"));
+  CHECK_TRUE("original mixed Dataverse dependencies are selected",
+             scope.Contains("Microsoft.Integration.Dataverse"));
+  CHECK_TRUE("dependency activation requires the exact namespace boundary",
+             !scope.Contains("Microsoft.Integration.DataverseOther"));
   // And a whitelisted sub of a carved-out branch wins again, because it is longer still.
   CHECK_TRUE("a re-included sub of a carve-out is in",
              scope.Contains("Microsoft.Integration.Entity"));
@@ -70,12 +72,14 @@ void ProductBoundariesPreserveCore(const Scope &scope) {
                                       "Microsoft.Integration.Graph.Child",
                                       "microsoft.integration.graph",
                                       "Microsoft.API",
+                                      "Microsoft.Integration.Dataverse",
+                                      "Microsoft.Integration.Dataverse.Child",
+                                      "microsoft.integration.d365sales",
+                                      "Microsoft.Integration.SyncEngine",
                                       "Microsoft.CRM.Outlook"}) {
-    const bool selected = name != "Microsoft.CRM.Outlook";
-    CHECK_TRUE("local APIs remain selected and the reference Outlook omission is retained",
-               scope.Contains(name) == selected);
-    CHECK_TRUE("the transpiler uses the same declared selection",
-               agiru::gen::Holds(rules, name) == selected);
+    CHECK_TRUE("local APIs and original mixed ERP dependencies remain selected",
+               scope.Contains(name));
+    CHECK_TRUE("the transpiler uses the same declared selection", agiru::gen::Holds(rules, name));
   }
   CHECK_TRUE(
       "namespace omissions alone cannot classify mixed integration sources",

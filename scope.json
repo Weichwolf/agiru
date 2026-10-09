@@ -4,6 +4,10 @@
     "Microsoft",
     "Microsoft.Integration.Entity",
     "Microsoft.Integration.Graph",
+    "Microsoft.Integration.Dataverse",
+    "Microsoft.Integration.D365Sales",
+    "Microsoft.Integration.SyncEngine",
+    "Microsoft.CRM.Outlook",
     "System.Utilities",
     "System.Text",
     "System.IO",
@@ -37,7 +41,6 @@
   ],
   "exclude": [
     "Microsoft.Integration",
-    "Microsoft.CRM.Outlook",
     "Microsoft.Booking",
     "System.AI",
     "System.Azure",
@@ -73,6 +76,7 @@
     "System.Test.Integration.PowerBI",
     "System.Test.Integration.Graph"
   ],
+  "_dependency_doc": "Dataverse, D365Sales, SyncEngine and Outlook declarations supply original mixed configuration/event dependencies of core ERP pages. Selecting these declarations does not add Microsoft-cloud services to product requirements or replace their behavior with constants. Explicit bounded product exclusions still win; unavailable providers remain explicit refusals.",
   "_area_doc": "Namespace-less sources use their top-level folder within the configured app. Match the reference test-area selection, including Graph; retain raw identities and report omitted coverage separately. Test libraries and generic local Graph/API functionality remain required.",
   "area_exclude": [
     "Azure AI",

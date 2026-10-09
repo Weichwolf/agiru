@@ -4,9 +4,9 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: activate the original mixed runtime dependencies currently omitted by namespace
-selection, beginning with CRM Integration Management's disabled-connection read/event
-branches, then repeat the Customer workflow and concurrent-edit rejection. Preserve
+Next: compile the regenerated mixed runtime dependencies, then repeat the Customer
+workflow and concurrent-edit rejection. Original configuration/read/event declarations
+are now selected below; their native execution is not yet proven. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
 The native diagnostic-slice integration now compiles and links with `make dev-exec
@@ -88,14 +88,38 @@ the one-method discrepancy from the independent census remains open under 0058.
 13,592 selected, 102 product-excluded, 531 omitted and zero missing.
 Native integration exits 0 with the unchanged 1,761 unlinked-source refusals. Original
 client execution reaches the next opening blocker above, not workflow acceptance.
-CRM Integration Management 5330 is not explicitly product-excluded: its namespace is
-omitted, so it remains a required-dependency gap. The pinned original
+CRM Integration Management 5330 was not explicitly product-excluded: the earlier
+namespace omission was a required-dependency gap. The pinned original
 `Integration/Dataverse/CRMIntegrationManagement.Codeunit.al` checks actual read permission,
 stored connection enablement and session-owned state; IsCDSIntegrationEnabled invokes
 an event. `CRM/Outlook/OfficeManagement.Codeunit.al` delegates IsAvailable to Office Host
 Management's event, not a client-side constant. The root policy and independent census
 must agree on any dependency activation. Predecessor board search has no specific
 replacement contract; its broad namespace omission is not permission to invent one.
+
+Dependency activation: root `scope.json` selects Dataverse/D365Sales/SyncEngine/Outlook
+declarations, not new cloud requirements or changed method bodies. Independent raw
+inventories contain 65/91/40/66 objects; all 262 identities were inspected before selection.
+Policy SHA-256 `1ee1354a74089b46c72aa7e0984c41a5534e2885658e36358900082a47f66513`
+selects 10,767 objects, with unchanged 252 explicit exclusions, 38,420 selected test
+methods, 109,367 required and 70,947 required omissions. Contact Sync Test's 21 methods
+remain area-omitted, not product-excluded; helper subscribers remain selected. The
+census retains its three-source/seven-variant refusal. GenScope passes 315 checks;
+SourceInventory/ProductSource qualifiers pass 20/7 tests with existing controls;
+GenScopeGate targeted clang-tidy passes 1/347 units, zero failures.
+Regeneration writes 18,917 objects (372 changed, zero swept), with real CRM/Office/table
+references in Customer List. Parser UT stays 77/2,298 and total methods 38,421; the census
+discrepancy remains open. Translation exits 1: 21 unresolved anchors, 618 untranslated
+objects and 5,708 refused properties, including 2,303 ExternalName, 2,250 ExternalType
+and 1,014 ExternalAccess declarations. Do not discard these or claim backend support.
+Slice-check exits 0: 14,225 raw, 14,022 selected, 102 excluded, 101 omitted, zero missing.
+Native integration and original Customer replay after activation remain pending.
+Contracts at the pinned developer revision: `methods-auto/record/record-readpermission-method.md`,
+`properties/devenv-{singleinstance,eventsubscriberinstance}-property.md`; original BaseApp
+`Integration/{Dataverse,D365Sales,SynchEngine}/` and `CRM/Outlook/`. The sealed client
+seed has no CRM/CDS connection rows; do not modify it to force disabled behavior.
+User workflow intent and predecessor namespace policy do not replace original events
+or permissions. No generator/runtime business-object-specific branch was introduced.
 
 Immediate security prerequisite: qualify browser session transport below before accepting
 externally accessible client workflows; retain the credential-specific ownership regression.

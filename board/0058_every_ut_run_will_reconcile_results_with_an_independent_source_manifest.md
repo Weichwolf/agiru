@@ -9,6 +9,13 @@ business workflows are active in 0720; full G1 acceptance does not block their i
 
 ## Current evidence
 
+- 0720 activates original mixed dependency declarations, not new cloud requirements.
+  Census remains 36,792 raw objects / 113,111 methods; selection becomes 10,767 objects
+  with unchanged 252 explicit exclusions, 38,420 selected / 109,367 required test methods
+  and the same three-source/seven-variant refusal. Parser UT remains 77/2,298; total
+  parsed methods 38,421 still disagree with census by one. Generation retains 5,708
+  refused properties; source qualifiers are not workflow execution or a new AL pass count.
+
 - Latest completed integration: `c79dd1bfb99d43b7aedaa8805d9f3bf598dadfc1` /
   content `0922a47ce9a41720bdec522b433bc0c481c4d19d40b32de5547a269ca20e5ba7`:
   slice-check/all pass; C++/specialist test is 159/159, zero red.
