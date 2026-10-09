@@ -23,6 +23,9 @@ bool HasRowVersion(const TableDef &table) {
   }
   if (present) {
     for (const FieldDef &field : table.fields) {
+      if (field.name == kWriteOwnerColumn) {
+        throw Error("Storage: field name collides with private write ownership", "RecordVersion");
+      }
       if (Stored(field) && !field.sqlTimestamp && field.name == kRowVersionColumn) {
         throw Error("SqlTimestamp collides with an ordinary timestamp column: " +
                     std::string(table.name));

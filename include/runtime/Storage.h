@@ -37,6 +37,15 @@ void CreateTable(const Connection &connection, const TableDef &table);
 /// \throws Error for incompatible declarations/storage; DatabaseError for failed SQL.
 void ProvisionTable(const Connection &connection, const TableDef &table);
 
+/// \brief Explicitly installs private own-write metadata on existing registered versioned tables.
+/// \param connection The operator-selected database; no request invokes this migration.
+/// \note Preserves business, audit and rowversion values; absent/provider-refused tables stay
+/// absent.
+///       One UUID column identifies own uncommitted writes without transaction-ID wrap assumptions.
+///       Migration is atomic in its own transaction or a savepoint of the caller's transaction.
+/// \throws Error for incompatible metadata, DatabaseError for schema failures.
+void ProvisionWriteOwnership(const Connection &connection);
+
 /// \brief Drops the table if it exists.
 /// \param connection The database.
 /// \param table      The declaration.

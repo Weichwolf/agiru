@@ -13,6 +13,7 @@
 #include "runtime/PageHostOptions.h"
 #include "runtime/PermissionSetRegistry.h"
 #include "runtime/Session.h"
+#include "runtime/Storage.h"
 #include "type/Guid.h"
 
 #include <array>
@@ -107,6 +108,7 @@ void RunNativeService(const NativeServiceOptions &options) {
 
 void InitializeNativeClient(const std::string &database) {
   const Session session(database);
+  ProvisionWriteOwnership(session.Database());
   InstallClientCredentials(session.Database());
   InstallBrowserSessions(session.Database());
   InstallPageCommandHost(session.Database());

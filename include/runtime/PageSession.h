@@ -451,7 +451,7 @@ public:
       throw Error("the control '" + std::string(control) + "' shows no field to set");
     }
     if constexpr (kHasRecord) {
-      RereadBeforeEdit_();
+      PrepareRecordEdit_();
       const detail::ValidatingField editing(def->field);
       auto before = Record_();
       if constexpr (requires { page_->MarkEdited(); }) { page_->MarkEdited(); }
@@ -537,15 +537,11 @@ public:
     }
   }
 
-  /// THE READ HALF BEFORE AN INPUT (openerp WI-1113, the finding itself): the server reads the
-  /// record, applies the input, validates, saves -- so a page never keeps a copy across a round
-  /// trip. `Sales Cr. Memo Subform` writes `Invoice Discount Calculation := Amount` on the header
-  /// through a record variable of its own, and the header page's next `SetValue` decided on its
-  /// stale copy that the discount was a percentage (the API aggregate codeunits, 7 cases,
-  /// 2026-09-12). The rows come back and the FlowFields the page shows are calculated; the page's
-  /// triggers do not run again, which is the predecessor's measured line. A new record has nothing
-  /// to re-read and a temporary one keeps what the page put in it.
-  void RereadBeforeEdit_() {
+  /// \brief Prepares a positioned SQL record for input without refreshing its observed version.
+  /// \note A committed peer change must conflict at the atomic write predicate, not silently
+  /// authorize the stale client input through a reread. Shown FlowFields are calculated without
+  /// repeating page triggers. New and temporary records retain their existing lifecycle.
+  void PrepareRecordEdit_() {
     if constexpr (kHasRecord) {
       ReconcileNewRecord_();
       if (newRecord_ || page_ == nullptr) { return; }
@@ -553,7 +549,6 @@ public:
           reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
       if (state == nullptr || !state->positioned) { return; }
       if (detail::RuntimeIsTemporary(&Record_())) { return; }
-      if (!static_cast<bool>(Platform_(Record_()).Find("="))) { return; }
       if constexpr (requires { PageTraits<P>::kPage.layout; }) {
         detail::CalcShownFlowFields(
             static_cast<void *>(&Record_()), RecordTraits_().kTable, PageTraits<P>::kPage.layout);

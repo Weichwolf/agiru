@@ -2592,7 +2592,9 @@ private:
 
   void CaptureImage() {
     auto *copy = new Derived(*static_cast<const Derived *>(this));
+    const auto version = State().ObservedVersion();
     copy->State_Block = detail::StateHandle{};
+    if (version != 0) { copy->State_Block.Ensure().ObserveVersion(version); }
     State().image.Hold(copy);
   }
 

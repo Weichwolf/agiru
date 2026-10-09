@@ -4,15 +4,15 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: reject stale original Customer writes with a generic protected observed-version
-contract and atomic PostgreSQL write predicate; preserve BC's own uncommitted writes.
+Next: finish native rebuild and replay all fourteen original Customer client cases
+against protected observed versions and atomic PostgreSQL write predicates.
 The newly linked mixed declarations restore all eleven existing Customer cases. Preserve
 explicit product exclusions; do not implement Microsoft-cloud services, substitute
 constant feature answers, silence unselected controls or patch generated apps.
-The native diagnostic-slice integration now compiles and links with `make dev-exec
+The preceding mixed-dependency native diagnostic-slice image compiles and links with `make dev-exec
 COMMAND='make all B=/workspace/build/podman JOBS=6 KEEP=1'`, exit 0; 1846 AL procedures
 still have explicit unlinked-source refusals. Complete generated-app compilation is not proven.
-The mixed-dependency image passes `make all` with exit 0. Current
+The mixed-dependency image passes `make all` with exit 0. Its last
 `make erp-client-test JOBS=2` passes preparation 22/22 and client 11/14,
 with three failures, zero skips/cancellations; outer exit 2. Original Customer List,
 Card, template selection, creation, exact edits and independent reopening succeed
@@ -20,6 +20,41 @@ over external CMD/MCP and actual Chromium. Each stale-page case reaches real AL 
 incorrectly changes the row/audit/rowversion after a peer committed; independent full-row
 SQL proves the defect for CMD, MCP and Web. Their native failure/receipt assertions
 remain unexecuted until the SQL refusal works. No concurrency acceptance is claimed.
+The generic runtime repair now retains SQL observations independently of mutable
+AL timestamp aliases, including assignment, Copy, Reset, Init and RecordRef.
+Modify/Rename/Delete compare the observation atomically in SQL. A private UUID
+column permits stale aliases only within their own uncommitted PostgreSQL transaction;
+Commit/rollback end that authority. Successful writes require no full-row reread.
+Pages no longer refresh away their stale observation immediately before input.
+An actual blocked competing UPDATE rejects after the writer commits, preserving the
+independent full row. Speculative sequence gaps are allowed; stored versions remain exact.
+`make dev-exec COMMAND='env AGIRU_TEST_DSN=postgresql://agiru:agiru@127.0.0.1:5432/agiru_gate make rowversions B=/workspace/build/podman JOBS=2'`
+exits 0: 136 allocator and 185
+SQL checks, plus 25 compiled negative controls. These are runtime proofs, not yet
+the original fourteen-client-case acceptance. Rebuild all native consumers before
+replay: the protected observation changes the heap-owned RecordState layout.
+Trusted `client-init` installs private ownership metadata on registered existing SQL
+tables transactionally; it never creates missing ERP tables or changes existing
+business/audit/rowversion values. The ERP qualifier migrates only its owned clone.
+Contract: developer revision below, `devenv-table-system-fields.md` and
+`methods-auto/record/record-{rename,modify,delete,copy,reset}-method.md`;
+Rename explicitly distinguishes own uncommitted aliases from committed stale buffers.
+Predecessor `~/Git/openerp/openerp/runtime/base/table/_table.py` carries cache versions,
+not an optimistic-write specification;
+its board has no more specific guarantee. PostgreSQL 17 `transaction-iso.html`
+documents Read Committed predicate rechecking after a competing writer.
+Sources: `include/runtime/{RecordState,Table,PageSession,Storage,NativeService}.h`,
+`src/rt/{Storage,Table,Navigate,Temporary,SqlColumn,NativeService}.cpp`,
+`src/rt/{Rows,SqlColumn}.h`, `test/gate/SqlRowVersionGate.cpp`,
+`test/runtime/rowversions.sh`, `test/ui/erp-fixture.sh`.
+Key-only/unobserved committed writes, broader API-page regressions and complete UT
+acceptance remain unqualified; do not infer complete BC semantics from these gates.
+All seven changed C++ units pass individual `make lint-one` checks, zero failures,
+among 347 configured handwritten units; this is targeted, not FULL clang-tidy.
+`make page-navigation` passes 15 Source, 270 generated and 122 Dispatcher checks;
+all 34 execution controls and one control-name compile refusal reject.
+Affected `make gate` runs are green: RecordImage 35, Temporary 95, RecordRef 161,
+SelectionChange 364, Transaction 12 and TransactionContract 110 checks.
 The generic missing-AL diagnostic still incorrectly labels AL members as .NET;
 retain that gap separately. Temporary clones and private binary/auth copies were removed.
 The pure O365 credentials page remains bounded-product-excluded (0058).
@@ -43,9 +78,9 @@ Contract: developer `f928288ee840334be73142e5fc0202c0e19b246d`,
 `Modules/System/PowerBI/Embedding/PowerBIEmbeddedReportPart.Page.al`;
 predecessor board 1356 distinguishes CurrPage metadata from static object resolution.
 Sources: `include/runtime/Page.h`, `test/gate/PageDispatcherGate.cpp`,
-`test/runtime/page-navigation.sh`. Client rowversion conflicts remain unqualified;
-`Storage.cpp` currently updates by primary key without an observed-version predicate,
-and `PageSession.h::RereadBeforeEdit_` refreshes the stored record before entry.
+`test/runtime/page-navigation.sh`. Original-client rowversion acceptance remains pending
+the rebuilt image; the previous primary-key-only write/input reread defect is repaired
+in the shared runtime and qualified by the SQL gates above.
 
 Product-page selection: `scope.json` explicitly excludes only
 `Layers/W1/BaseApp/Modules/System/PowerBI/` as Microsoft-cloud integration. The independent

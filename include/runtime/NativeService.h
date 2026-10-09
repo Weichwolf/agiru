@@ -41,6 +41,8 @@ void RunNativeService(const NativeServiceOptions &options);
 
 /// \brief Explicit trusted-operator client-storage migration, never anonymous HTTP provisioning.
 /// \param database Database already containing the original User table.
+/// \note Installs private own-write metadata on existing registered versioned ERP tables;
+///       preserves their business/audit/rowversion values and creates no absent ERP tables.
 /// \throws Error for migration/commit failure; creates no users, roles or permissions.
 void InitializeNativeClient(const std::string &database);
 

@@ -40,6 +40,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace agiru {
 
@@ -180,7 +181,17 @@ std::string ColumnDefault(const FieldDef &field) {
                             : detail::ColumnZero(field);
 }
 
+constexpr std::string_view kEmptyWriteOwner = "'00000000-0000-0000-0000-000000000000'::uuid";
+
+std::string WriteOwnerDeclaration() {
+  return Quoted(detail::kWriteOwnerColumn) + " uuid NOT NULL DEFAULT " +
+         std::string(kEmptyWriteOwner);
+}
+
 bool FirstPhysicalColumn(std::set<std::string_view> &physical, const FieldDef &field) {
+  if (field.name == detail::kWriteOwnerColumn) {
+    throw Error("Storage: field name collides with private write ownership", "RecordVersion");
+  }
   if (physical.insert(detail::ColumnName(field)).second) { return true; }
   if (!field.sqlTimestamp) { throw Error("Storage: duplicate physical column declaration"); }
   return false;
@@ -199,6 +210,7 @@ void CreateStorageTable(const Connection &connection, const TableDef &table) {
     sql += detail::SqlColumn(field) + " " + ColumnType(field) + " NOT NULL DEFAULT " +
            ColumnDefault(field);
   }
+  if (detail::HasRowVersion(table)) { sql += ", " + WriteOwnerDeclaration(); }
   if (!table.keys.empty()) {
     sql += ", PRIMARY KEY (";
     bool first = true;
@@ -309,6 +321,14 @@ std::optional<FieldValues> InsertRow(const Connection &connection,
     columns += detail::SqlColumn(field);
     placeholders += Placeholder(bound.size());
   }
+  if (detail::HasRowVersion(table)) {
+    if (!columns.empty()) {
+      columns += ", ";
+      placeholders += ", ";
+    }
+    columns += Quoted(detail::kWriteOwnerColumn);
+    placeholders += "agiru_platform.write_transaction_v1()";
+  }
   const std::string insertion = columns.empty()
                                     ? std::string(" DEFAULT VALUES")
                                     : " (" + columns + ") VALUES (" + placeholders + ")";
@@ -372,6 +392,8 @@ std::string WrittenAssignments(const TableDef &table,
   if (detail::HasRowVersion(table)) {
     if (!assignments.empty()) { assignments += ", "; }
     assignments += Quoted(detail::kRowVersionColumn) + " = agiru_platform.next_rowversion_v1()";
+    assignments +=
+        ", " + Quoted(detail::kWriteOwnerColumn) + " = agiru_platform.write_transaction_v1()";
   }
   return assignments;
 }
@@ -386,16 +408,48 @@ std::string OwnedColumns(const TableDef &table) {
   return columns.empty() ? std::string("1") : columns;
 }
 
+std::string WritePredicate(const TableDef &table,
+                           std::size_t keyAt,
+                           FieldValues &bound,
+                           std::int64_t observedVersion) {
+  std::string predicate = KeyPredicate(table, keyAt);
+  if (!detail::HasRowVersion(table)) { return predicate; }
+  bound.emplace_back(std::to_string(observedVersion));
+  return predicate + " AND (" + Quoted(detail::kRowVersionColumn) + " = " +
+         Placeholder(bound.size()) + "::bigint OR " + Quoted(detail::kWriteOwnerColumn) +
+         " = agiru_platform.write_transaction_v1())";
+}
+
+void RefuseStaleWrite(const Connection &connection,
+                      const TableDef &table,
+                      std::span<const std::optional<std::string>> key) {
+  if (!detail::HasRowVersion(table)) { return; }
+  if (connection
+          .Execute("SELECT 1 FROM " + Quoted(table.name) + " WHERE " + KeyPredicate(table, 1), key)
+          .Rows() != 0) {
+    throw Error("The changes to the " + std::string(table.name) +
+                    " record cannot be saved because the record is not up-to-date. "
+                    "Reload the record and enter your changes again.",
+                "RecordConflict");
+  }
+}
+
 std::optional<FieldValues> Updated(const Connection &connection,
                                    const TableDef &table,
                                    const std::string &assignments,
                                    std::size_t keyAt,
-                                   const FieldValues &bound) {
+                                   FieldValues bound,
+                                   std::int64_t observedVersion) {
+  const std::string predicate = WritePredicate(table, keyAt, bound, observedVersion);
   const Result result =
       connection.Execute("UPDATE " + Quoted(table.name) + " SET " + assignments + " WHERE " +
-                             KeyPredicate(table, keyAt) + " RETURNING " + OwnedColumns(table),
+                             predicate + " RETURNING " + OwnedColumns(table),
                          bound);
-  if (result.Rows() == 0) { return std::nullopt; }
+  if (result.Rows() == 0) {
+    RefuseStaleWrite(
+        connection, table, std::span(bound.data() + keyAt - 1, table.keys[0].fields.size()));
+    return std::nullopt;
+  }
   detail::RecordWritten(connection, table.id);
   return RowOf(result, 0);
 }
@@ -404,7 +458,8 @@ std::optional<FieldValues> Updated(const Connection &connection,
 
 std::optional<FieldValues> ModifyRow(const Connection &connection,
                                      const TableDef &table,
-                                     std::span<const std::optional<std::string>> values) {
+                                     std::span<const std::optional<std::string>> values,
+                                     std::int64_t observedVersion) {
   RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Modify: the value count does not match the declaration");
@@ -416,13 +471,14 @@ std::optional<FieldValues> ModifyRow(const Connection &connection,
   for (const FieldNo no : table.keys[0].fields) {
     bound.push_back(values[StoredIndexOf(table, no)]);
   }
-  return Updated(connection, table, assignments, keyAt, bound);
+  return Updated(connection, table, assignments, keyAt, std::move(bound), observedVersion);
 }
 
 std::optional<FieldValues> RenameRow(const Connection &connection,
                                      const TableDef &table,
                                      std::span<const std::optional<std::string>> values,
-                                     std::span<const std::optional<std::string>> oldKey) {
+                                     std::span<const std::optional<std::string>> oldKey,
+                                     std::int64_t observedVersion) {
   RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Rename: the value count does not match the declaration");
@@ -432,17 +488,20 @@ std::optional<FieldValues> RenameRow(const Connection &connection,
   const std::string assignments = WrittenAssignments(table, values, bound);
   const std::size_t keyAt = bound.size() + 1;
   bound.insert(bound.end(), oldKey.begin(), oldKey.end());
-  return Updated(connection, table, assignments, keyAt, bound);
+  return Updated(connection, table, assignments, keyAt, std::move(bound), observedVersion);
 }
 
 bool DeleteRow(const Connection &connection,
                const TableDef &table,
-               std::span<const std::optional<std::string>> key) {
+               std::span<const std::optional<std::string>> key,
+               std::int64_t observedVersion) {
   RequireTableProvider(table);
-  const Result result = connection.Execute("DELETE FROM " + Quoted(table.name) + " WHERE " +
-                                               KeyPredicate(table, 1) + " RETURNING 1",
-                                           key);
+  FieldValues bound(key.begin(), key.end());
+  const std::string predicate = WritePredicate(table, 1, bound, observedVersion);
+  const Result result = connection.Execute(
+      "DELETE FROM " + Quoted(table.name) + " WHERE " + predicate + " RETURNING 1", bound);
   const bool deleted = result.Rows() != 0;
+  if (!deleted) { RefuseStaleWrite(connection, table, key); }
   if (deleted) { detail::RecordWritten(connection, table.id); }
   return deleted;
 }
@@ -487,7 +546,8 @@ struct ExistingColumn {
   bool nullable = false;
 };
 
-SchemaChanges EnsureColumns(const Connection &into, const TableDef &table) {
+std::map<std::string, ExistingColumn, std::less<>> ReadColumns(const Connection &into,
+                                                               const TableDef &table) {
   const std::array<std::optional<std::string>, 1> named{Quoted(table.name)};
   const Result columns = into.Execute(
       "SELECT column_name, data_type, character_maximum_length, column_default, is_nullable "
@@ -508,7 +568,36 @@ SchemaChanges EnsureColumns(const Connection &into, const TableDef &table) {
                                  .initial = std::string(columns.Value(row, 3).value_or("")),
                                  .nullable = columns.Value(row, 4) == "YES"});
   }
+  return there;
+}
+
+bool EnsureWriteOwner(const Connection &into,
+                      const TableDef &table,
+                      const std::map<std::string, ExistingColumn, std::less<>> &there) {
+  if (!detail::HasRowVersion(table)) { return false; }
+  for (const auto &field : table.fields) {
+    if (field.name == detail::kWriteOwnerColumn) {
+      throw Error("Storage: field name collides with private write ownership", "RecordVersion");
+    }
+  }
+  const auto owner = there.find(detail::kWriteOwnerColumn);
+  if (owner == there.end()) {
+    into.Run("ALTER TABLE " + Quoted(table.name) + " ADD COLUMN " + WriteOwnerDeclaration());
+    return true;
+  }
+  if (owner->second.type != "uuid" || owner->second.nullable ||
+      owner->second.initial != kEmptyWriteOwner) {
+    throw Error("Storage: incompatible private write ownership; explicit migration required: " +
+                    std::string(table.name),
+                "RecordVersion");
+  }
+  return false;
+}
+
+SchemaChanges EnsureColumns(const Connection &into, const TableDef &table) {
+  const auto there = ReadColumns(into, table);
   SchemaChanges changes;
+  if (EnsureWriteOwner(into, table, there)) { ++changes.added; }
   std::set<std::string_view> physical;
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }
@@ -547,6 +636,25 @@ void ProvisionTable(const Connection &connection, const TableDef &table) {
   }
   static_cast<void>(EnsureColumns(connection, table));
   EnsureSequences(connection, table);
+}
+
+void ProvisionWriteOwnership(const Connection &connection) {
+  const bool caller = connection.InTransaction();
+  connection.Run(caller ? "SAVEPOINT agiru_write_ownership_v1" : "BEGIN");
+  try {
+    ProvisionRowVersions(connection);
+    for (const TableEntry *entry : InstalledTables()) {
+      const auto &table = *entry->table;
+      if (!table.providerRefusal.empty() || !detail::HasRowVersion(table)) { continue; }
+      const auto columns = ReadColumns(connection, table);
+      if (!columns.empty()) { static_cast<void>(EnsureWriteOwner(connection, table, columns)); }
+    }
+    connection.Run(caller ? "RELEASE SAVEPOINT agiru_write_ownership_v1" : "COMMIT");
+  } catch (...) {
+    connection.Run(caller ? "ROLLBACK TO SAVEPOINT agiru_write_ownership_v1" : "ROLLBACK");
+    if (caller) { connection.Run("RELEASE SAVEPOINT agiru_write_ownership_v1"); }
+    throw;
+  }
 }
 
 namespace {

@@ -28,10 +28,14 @@
 
 #include <array>
 #include <charconv>
+#include <chrono>
 #include <cstddef>
+#include <memory>
+#include <semaphore>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <thread>
 
 namespace {
 
@@ -172,8 +176,8 @@ void PhysicalStorageAndWrites() {
   const agiru::Session session(database.Dsn());
   const auto &connection = session.Database();
   agiru::CreateTable(connection, Declaration());
-  constexpr auto physicalColumns = 8;
-  CHECK_TRUE("aliases and FlowFields do not create extra physical columns",
+  constexpr auto physicalColumns = 9;
+  CHECK_TRUE("aliases and FlowFields add no columns beyond the single private write owner",
              Scalar(connection,
                     "SELECT count(*) FROM information_schema.columns "
                     "WHERE table_name = 'Rowversion Record Gate'") == physicalColumns);
@@ -513,6 +517,10 @@ void InvalidTimestampDeclarationsRefuse() {
   fields[1].name = "timestamp";
   CHECK_TRUE("an ordinary timestamp column cannot collide with the platform column",
              refused("SqlTimestamp collides with an ordinary timestamp column"));
+  fields = agiru::TableTraits<VersionedRow>::kFields;
+  fields[1].name = "agiru$write_owner_v1";
+  CHECK_TRUE("an AL field cannot impersonate private write ownership",
+             refused("field name collides with private write ownership"));
   CHECK_TRUE("invalid declarations install neither counter nor application table",
              Scalar(connection,
                     "SELECT count(*) FROM pg_catalog.pg_class AS relation "
@@ -582,10 +590,260 @@ void RollbackAndTwoSessions() {
   CheckVersion(Inserted(3), 3);
 }
 
+template <typename Call> bool Conflict(Call call) {
+  try {
+    call();
+  } catch (const agiru::Error &error) { return error.Code() == "RecordConflict"; }
+  return false;
 }
 
-int main() {
-  return gate::Run("SqlRowVersion", [] {
+std::string SnapshotText(const agiru::Result &row) {
+  if (row.Rows() != 1) { throw agiru::Error("missing conflict snapshot"); }
+  const auto value = row.Value(0, 0);
+  if (!value) { throw agiru::Error("null conflict snapshot"); }
+  return std::string(*value);
+}
+
+std::string StoredSnapshot(const agiru::Connection &connection) {
+  return SnapshotText(connection.Execute(
+      R"(SELECT to_jsonb(t)::text FROM "Rowversion Record Gate" t WHERE "ID"=1)"));
+}
+
+void CommittedPeerConflicts() {
+  const gate::OwnedDatabase database("sql_conflicts");
+  const agiru::Session session(database.Dsn());
+  const agiru::Connection observer(database.Dsn());
+  agiru::CreateTable(session.Database(), Declaration());
+  static_cast<void>(Inserted(1));
+  agiru::Commit();
+  VersionedRow stale;
+  CHECK_TRUE("conflict source reads the committed row", stale.Get(1));
+  VersionedRow constructed(stale);
+  VersionedRow assigned;
+  VersionedRow copied;
+  assigned = stale;
+  copied.Copy(stale);
+  {
+    const agiru::Session peer(database.Dsn());
+    VersionedRow newer;
+    CHECK_TRUE("independent peer reads the same row", newer.Get(1));
+    newer.Amount = agiru::Decimal{2};
+    newer.Modify();
+    agiru::Commit();
+  }
+  const auto before = StoredSnapshot(observer);
+  const auto version =
+      Scalar(observer, R"(SELECT "timestamp" FROM "Rowversion Record Gate" WHERE "ID"=1)");
+  stale.Version = version;
+  stale.SystemRowVersion = version;
+  stale.Amount = agiru::Decimal{3};
+  CHECK_TRUE("mutable timestamp aliases cannot forge an observed write stamp",
+             Conflict([&] { static_cast<void>(stale.Modify()); }));
+  CHECK_TRUE("record construction retains its protected stale observation",
+             Conflict([&] { static_cast<void>(constructed.Modify()); }));
+  CHECK_TRUE("record assignment retains its protected stale observation",
+             Conflict([&] { static_cast<void>(assigned.Modify()); }));
+  CHECK_TRUE("Record.Copy retains its protected stale observation",
+             Conflict([&] { static_cast<void>(copied.Modify()); }));
+  constructed.Reset();
+  CHECK_TRUE("Reset cannot discard optimistic write protection",
+             Conflict([&] { static_cast<void>(constructed.Modify()); }));
+  assigned.Init();
+  CHECK_TRUE("Init cannot discard optimistic write protection",
+             Conflict([&] { static_cast<void>(assigned.Modify()); }));
+  agiru::RecordRef reference;
+  reference.GetTable(copied);
+  CHECK_TRUE("RecordRef retains the source's protected observation",
+             Conflict([&] { static_cast<void>(reference.Modify()); }));
+  CHECK_TRUE("stale Rename refuses the committed peer version",
+             Conflict([&] { static_cast<void>(copied.Rename(2)); }));
+  CHECK_TRUE("stale Delete refuses the committed peer version",
+             Conflict([&] { static_cast<void>(stale.Delete()); }));
+  CHECK_TEXT(
+      "all denied writes preserve the independent full SQL row", StoredSnapshot(observer), before);
+  CHECK_TRUE("conflict predicates allocate no new rowversions",
+             Scalar(observer, "SELECT agiru_platform.last_rowversion_v1()") == version);
+  CHECK_TRUE("explicit refresh loads the peer's current version", stale.Get(1));
+  stale.Amount = agiru::Decimal{4};
+  CHECK_TRUE("a refreshed buffer can write after a committed conflict", stale.Modify());
+  agiru::Commit();
+  CHECK_TRUE("the refreshed write is independently committed",
+             Scalar(observer,
+                    R"(SELECT "Amount"::bigint FROM "Rowversion Record Gate" WHERE "ID"=1)") == 4);
+}
+
+void OwnWritesAndBoundaries() {
+  const gate::OwnedDatabase database("sql_own_writes");
+  const agiru::Session session(database.Dsn());
+  agiru::CreateTable(session.Database(), Declaration());
+  static_cast<void>(Inserted(1));
+  agiru::Commit();
+  VersionedRow first;
+  VersionedRow second;
+  CHECK_TRUE("own-write aliases read the same committed version", first.Get(1) && second.Get(1));
+  first.Amount = agiru::Decimal{2};
+  CHECK_TRUE("first alias starts its write transaction", first.Modify());
+  second.Amount = agiru::Decimal{3};
+  CHECK_TRUE("stale own alias can modify before Commit",
+             !Conflict([&] { static_cast<void>(second.Modify()); }));
+  {
+    agiru::detail::Scope scope;
+    first.Amount = agiru::Decimal{4};
+    CHECK_TRUE("savepoint keeps own uncommitted alias authority", first.Modify());
+    scope.Keep();
+  }
+  constexpr int kReleasedSavepointAmount = 5;
+  second.Amount = agiru::Decimal{kReleasedSavepointAmount};
+  CHECK_TRUE("released savepoint retains own alias write authority", second.Modify());
+  agiru::Commit();
+  CHECK_TRUE("Commit ends own-write permission for a stale alias",
+             Conflict([&] { static_cast<void>(first.Rename(2)); }));
+  CHECK_TRUE("the committed own alias can be explicitly refreshed", first.Get(1));
+  {
+    const agiru::detail::Scope scope;
+    constexpr int kRolledBackAmount = 6;
+    first.Amount = agiru::Decimal{kRolledBackAmount};
+    CHECK_TRUE("a rollback boundary permits its current write", first.Modify());
+  }
+  CHECK_TRUE("a rolled-back receipt cannot authorize another write",
+             Conflict([&] { static_cast<void>(first.Modify()); }));
+  CHECK_TRUE("refresh after rollback loads actual data", first.Get(1));
+  CHECK_TRUE("rolled-back data did not overwrite the committed value",
+             first.Amount == agiru::Decimal{5});
+  CHECK_TRUE("refresh after rollback restores normal writes", first.Modify());
+}
+
+void PrivateOwnershipMigration() {
+  const gate::OwnedDatabase database("sql_ownership_migration");
+  const agiru::Session session(database.Dsn());
+  const auto &connection = session.Database();
+  agiru::CreateTable(connection, Declaration());
+  static_cast<void>(Inserted(1));
+  agiru::Commit();
+  const auto version = Scalar(connection, "SELECT agiru_platform.last_rowversion_v1()");
+  const auto tables =
+      Scalar(connection, "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname='public'");
+  const auto before = connection.Execute(
+      R"(SELECT (to_jsonb(t)-'agiru$write_owner_v1')::text FROM "Rowversion Record Gate" t)");
+  const auto business = SnapshotText(before);
+  connection.Run(R"(ALTER TABLE "Rowversion Record Gate" DROP COLUMN "agiru$write_owner_v1")");
+  agiru::ProvisionWriteOwnership(connection);
+  CHECK_TRUE("operator migration preserves the committed rowversion",
+             Scalar(connection, "SELECT agiru_platform.last_rowversion_v1()") == version);
+  CHECK_TRUE(
+      "ownership migration never creates missing registered ERP tables",
+      Scalar(connection, "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname='public'") ==
+          tables);
+  CHECK_TRUE(
+      "legacy ownership is neutral, not an invented active writer",
+      Scalar(
+          connection,
+          R"(SELECT count(*) FROM "Rowversion Record Gate" WHERE "agiru$write_owner_v1"='00000000-0000-0000-0000-000000000000'::uuid)") ==
+          1);
+  const auto after = connection.Execute(
+      R"(SELECT (to_jsonb(t)-'agiru$write_owner_v1')::text FROM "Rowversion Record Gate" t)");
+  CHECK_TEXT("ownership migration preserves every business/audit/system value",
+             SnapshotText(after),
+             business);
+  agiru::ProvisionWriteOwnership(connection);
+  CHECK_TRUE("repeated ownership migration never restamps records",
+             Scalar(connection, "SELECT agiru_platform.last_rowversion_v1()") == version);
+  connection.Run(
+      R"(ALTER TABLE "Rowversion Record Gate" ALTER COLUMN "agiru$write_owner_v1" DROP NOT NULL)");
+  bool refused = false;
+  try {
+    agiru::ProvisionWriteOwnership(connection);
+  } catch (const agiru::Error &error) { refused = error.Code() == "RecordVersion"; }
+  CHECK_TRUE("incompatible private ownership refuses operator migration", refused);
+  CHECK_TRUE("refused migration leaves the connection usable",
+             connection.Execute("SELECT 1").Rows() == 1);
+}
+
+void ConcurrentCompareAndWrite() {
+  const gate::OwnedDatabase database("sql_atomic_conflict");
+  const agiru::Session session(database.Dsn());
+  const agiru::Connection observer(database.Dsn());
+  agiru::CreateTable(session.Database(), Declaration());
+  static_cast<void>(Inserted(1));
+  agiru::Commit();
+  VersionedRow writer;
+  CHECK_TRUE("atomic writer reads its original stamp", writer.Get(1));
+  std::binary_semaphore read{0};
+  std::binary_semaphore write{0};
+  agiru::BigInteger peerPid = 0;
+  std::string error;
+  bool readOk = false;
+  bool released = false;
+  std::thread peer([&] {
+    bool announced = false;
+    try {
+      const agiru::Session contender(database.Dsn());
+      contender.Database().Run("SET statement_timeout = '3s'");
+      peerPid = Scalar(contender.Database(), "SELECT pg_backend_pid()");
+      VersionedRow stale;
+      readOk = stale.Get(1);
+      announced = true;
+      read.release();
+      write.acquire();
+      stale.Amount = agiru::Decimal{3};
+      stale.Modify();
+      agiru::Commit();
+    } catch (const agiru::Error &failure) { error = failure.Code(); } catch (...) {
+      error = "unexpected exception";
+    }
+    if (!announced) { read.release(); }
+  });
+  const auto join = [&](std::thread *thread) {
+    if (!released) { write.release(); }
+    if (thread->joinable()) { thread->join(); }
+  };
+  const std::unique_ptr<std::thread, decltype(join)> guard(&peer, join);
+  read.acquire();
+  CHECK_TRUE("concurrent contender observes the pre-write version", readOk);
+  writer.Amount = agiru::Decimal{2};
+  writer.Modify();
+  write.release();
+  released = true;
+  bool blocked = false;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (std::chrono::steady_clock::now() < deadline) {
+    if (Scalar(observer,
+               "SELECT count(*) FROM pg_stat_activity WHERE pid=" + std::to_string(peerPid) +
+                   " AND wait_event_type='Lock'") == 1) {
+      blocked = true;
+      break;
+    }
+    constexpr auto kLockPollInterval = std::chrono::milliseconds(5);
+    std::this_thread::sleep_for(kLockPollInterval);
+  }
+  CHECK_TRUE("actual competing UPDATE waits for the writer transaction", blocked);
+  const auto expected = StoredSnapshot(session.Database());
+  agiru::Commit();
+  peer.join();
+  CHECK_TEXT(
+      "atomic predicate rejects the newly committed competing version", error, "RecordConflict");
+  CHECK_TRUE("blocked contender cannot replace the committed amount",
+             Scalar(observer,
+                    R"(SELECT "Amount"::bigint FROM "Rowversion Record Gate" WHERE "ID"=1)") == 2);
+  CHECK_TEXT(
+      "blocked conflict preserves the full committed row", StoredSnapshot(observer), expected);
+  CHECK_TRUE("blocked conflict preserves the visible writer stamp",
+             Scalar(observer, R"(SELECT "timestamp" FROM "Rowversion Record Gate" WHERE "ID"=1)") ==
+                 writer.SystemRowVersion);
+  CHECK_TRUE("a speculative allocation never moves the sequence behind the committed stamp",
+             Scalar(observer, "SELECT agiru_platform.last_rowversion_v1()") >=
+                 writer.SystemRowVersion);
+}
+
+}
+
+int main(int argc, char *argv[]) {
+  return gate::Run("SqlRowVersion", [&] {
+    if (argc == 2 && std::string_view(argv[1]) == "--migration") {
+      SchemaMigrationAndRefusal();
+      return;
+    }
+    if (argc != 1) { throw agiru::Error("unknown SqlRowVersion gate arguments"); }
     InitializationKeepsLoadedVersions();
     PhysicalStorageAndWrites();
     SystemIdLookupsShareOptionalResultsAndCursorPosition();
@@ -596,5 +854,9 @@ int main() {
     RelativeAliasNavigation();
     InvalidTimestampDeclarationsRefuse();
     RollbackAndTwoSessions();
+    CommittedPeerConflicts();
+    OwnWritesAndBoundaries();
+    PrivateOwnershipMigration();
+    ConcurrentCompareAndWrite();
   });
 }

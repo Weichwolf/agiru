@@ -3,6 +3,7 @@
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
 
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
@@ -35,16 +36,23 @@ InsertRow(const Connection &connection,
 [[nodiscard]] std::optional<FieldValues>
 ModifyRow(const Connection &connection,
           const TableDef &table,
-          std::span<const std::optional<std::string>> values);
+          std::span<const std::optional<std::string>> values,
+          std::int64_t observedVersion);
 
 [[nodiscard]] std::optional<FieldValues>
 RenameRow(const Connection &connection,
           const TableDef &table,
           std::span<const std::optional<std::string>> values,
-          std::span<const std::optional<std::string>> oldKey);
+          std::span<const std::optional<std::string>> oldKey,
+          std::int64_t observedVersion);
 
 bool DeleteRow(const Connection &connection,
                const TableDef &table,
-               std::span<const std::optional<std::string>> key);
+               std::span<const std::optional<std::string>> key,
+               std::int64_t observedVersion);
+
+namespace detail {
+void ObserveSqlVersion(void *record, const FieldDef &field, std::string_view value);
+}
 
 }

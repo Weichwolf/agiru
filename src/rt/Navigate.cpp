@@ -15,6 +15,7 @@
 #include "RecordChanges.h"
 #include "RecordOrder.h"
 #include "RecordSeek.h"
+#include "Rows.h"
 #include "Selection.h"
 #include "SqlColumn.h"
 #include "TableMetadata.h"
@@ -83,6 +84,7 @@ bool ReadInto(void *record, const TableDef &table, const Cursor &cursor) {
                   " came back null, and an AL field has no null");
     }
     SetFieldText(record, def, *value);
+    ObserveSqlVersion(record, def, *value);
   }
   return true;
 }
@@ -180,6 +182,7 @@ bool ReadOne(void *record, const TableDef &table, const Selection &made, const s
                   " came back null, and an AL field has no null");
     }
     SetFieldText(record, def, *value);
+    ObserveSqlVersion(record, def, *value);
   }
   return true;
 }

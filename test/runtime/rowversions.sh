@@ -10,9 +10,9 @@ flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -fPIC -shared 
   --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_db)
 trap 'find "$proof" -maxdepth 1 -type f \( -name "*.cpp" -o -name "*.so" -o -name "unchecked-disconnect" \) -delete' EXIT
-sha256sum src/rt/RowVersionStorage.cpp src/rt/{Storage,SqlColumn,Table,Query,Where,Selection,Navigate}.cpp \
+sha256sum src/rt/RowVersionStorage.cpp src/rt/{Storage,SqlColumn,Table,Query,Where,Selection,Navigate,Temporary,NativeService}.cpp \
   src/db/Connection.cpp \
-  src/rt/SqlColumn.h src/rt/Selection.h src/rt/Rows.h include/runtime/{Storage,Table,RecordRef}.h test/gate/{RowVersionGate,SqlRowVersionGate}.cpp \
+  src/rt/SqlColumn.h src/rt/Selection.h src/rt/Rows.h include/runtime/{Storage,Table,RecordRef,RecordState,PageSession,NativeService}.h test/gate/{RowVersionGate,SqlRowVersionGate}.cpp \
   test/gate/OwnedDatabase.h test/runtime/rowversions.sh "$gate" "$record_gate" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 "$CXX" --version > "$proof/compiler.txt"
 
@@ -201,6 +201,40 @@ gate="$record_gate"
 flags+=(-Isrc/rt)
 
 awk '
+  /return predicate .*Quoted\(detail::kRowVersionColumn\)/ {
+    sub(/" = "/, "\" >= \""); matches++
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Storage.cpp > "$proof/stale-version-accepted.cpp"
+build_overlay stale-version-accepted
+expect_red stale-version-accepted "mutable timestamp aliases cannot forge an observed write stamp"
+
+awk '
+  /" = agiru_platform.write_transaction_v1\(\)\)";/ {
+    sub(/agiru_platform.write_transaction_v1\(\)/,
+        "'\''00000000-0000-0000-0000-000000000000'\''::uuid"); matches++
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Storage.cpp > "$proof/disabled-own-writes.cpp"
+build_overlay disabled-own-writes
+expect_red disabled-own-writes "stale own alias can modify before Commit"
+
+awk '
+  /^bool RuntimeModify\(/ { modifying=1 }
+  /^void RuntimeRequireWritableProvider\(/ { modifying=0 }
+  modifying && /state == nullptr \? 0 : state->ObservedVersion\(\)/ {
+    print "                                     state == nullptr ? 0 : std::stoll(FieldText(record, *std::find_if(table.fields.begin(), table.fields.end(), [](const auto &field) { return field.sqlTimestamp; })))));"
+    matches++; next
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Table.cpp > "$proof/forged-observed-version.cpp"
+build_overlay forged-observed-version
+expect_red forged-observed-version "mutable timestamp aliases cannot forge an observed write stamp"
+
+awk '
   /if \(sparePrimaryKey && def.sqlTimestamp\)/ { matches++; next }
   { print }
   END { if (matches != 1) exit 2 }
@@ -276,7 +310,7 @@ awk '
   END { if (matches != 1) exit 2 }
 ' src/rt/Storage.cpp > "$proof/zero-backfill.cpp"
 build_overlay zero-backfill
-expect_red zero-backfill "migration allocates one nonzero version per existing row"
+expect_red zero-backfill "migration allocates one nonzero version per existing row" --migration
 
 "$record_gate" > "$proof/sql-record-restored.log" 2>&1
 
@@ -313,4 +347,4 @@ rg -q "FAIL .*discarding a reflected missing SystemId result" "$proof/unchecked-
 find "$proof/unchecked-system-id" -depth -delete
 
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'rowversions: write-transaction tokens, allocator fences, observed disconnect, SQL record/alias/Init/SystemId paths and twenty-two compiled negative controls proved; %s\n' "$proof"
+printf 'rowversions: write-transaction tokens, allocator fences, atomic optimistic writes, SQL record/alias/Init/SystemId paths and twenty-five compiled negative controls proved; %s\n' "$proof"

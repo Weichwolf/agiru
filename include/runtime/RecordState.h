@@ -331,7 +331,28 @@ private:
   TempTable *table_ = nullptr;
 };
 
+/// \brief A trusted SQL observation, separate from mutable AL timestamp fields.
+class SqlObservation {
+public:
+  /// \return The version observed through SQL, independent of mutable AL field aliases.
+  [[nodiscard]] std::int64_t ObservedVersion() const { return observedVersion_; }
+
+  /// \brief Retains a trusted SQL read/write receipt; AL field assignment never calls this.
+  /// \param version The database-owned stamp, or zero for an unobserved buffer.
+  void ObserveVersion(std::int64_t version) { observedVersion_ = version; }
+
+private:
+  std::int64_t observedVersion_ = 0;
+};
+
 struct RecordState {
+  /// \return The protected version carried by the record buffer.
+  [[nodiscard]] std::int64_t ObservedVersion() const { return observation.ObservedVersion(); }
+
+  /// \brief Retains a trusted SQL read/write receipt, never an AL field assignment.
+  /// \param version The database-owned stamp, or zero for an unobserved buffer.
+  void ObserveVersion(std::int64_t version) { observation.ObserveVersion(version); }
+
   /// \brief The temporary rows, when the record is `temporary`; null for a database record.
   ///        Temporariness is STATE and never type: a `Temporary<T>` installs it, and a `T &`
   ///        parameter bound to one keeps behaving as one (board:0583).
@@ -394,6 +415,8 @@ struct RecordState {
   IsolationLevel isolation = IsolationLevel::Default; ///< `ReadIsolation`, carried (board:0012).
   SecurityFilter securityFiltering =
       SecurityFilter::Validated; ///< `SecurityFiltering`, carried (board:0313).
+
+  SqlObservation observation; ///< Protected SQL observation copied with the record buffer.
 };
 
 /// \brief The record variable's state, owned, copied and freed with the record.
@@ -419,11 +442,8 @@ public:
   /// \param o The other.
   StateHandle(StateHandle &&o) noexcept : state_(o.state_) { o.state_ = nullptr; }
 
-  /// \brief Copies the state, letting go of this one's.
-  /// \param o The other.
-  /// \return This handle.
-  /// \brief AL `Rec := Other`: the FIELDS come across and nothing of the state does -- not the
-  ///        filters, not the key, not the position, not the rows.
+  /// \brief AL `Rec := Other`: fields and their SQL observation come across, but not the
+  /// filters, key, position or rows.
   ///
   /// \warning ASSIGNMENT COPIES THE RECORD BUFFER AND `Copy` COPIES THE FILTERS TOO.
   ///          `record-copy-method.md` lists "filters, views, marks, fields, and keys" as what
@@ -434,9 +454,12 @@ public:
   ///          `FindFirst` over the buffer saw one node of ten (Record Set UT, 27 cases,
   ///          2026-09-10). The state that a `Copy` transports is `CopyStateFrom`.
   /// \param o The other, which is left alone.
-  /// \return This handle, unchanged.
+  /// \note The protected SQL observation travels with the record buffer, not its filters.
+  /// \return This handle with the source buffer's observation and unchanged selection state.
   StateHandle &operator=(const StateHandle &o) {
     if (this == &o) { return *this; }
+    const auto version = o.state_ == nullptr ? 0 : o.state_->ObservedVersion();
+    if (state_ != nullptr || version != 0) { Ensure().ObserveVersion(version); }
     return *this;
   }
 

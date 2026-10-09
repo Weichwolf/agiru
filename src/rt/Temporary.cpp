@@ -181,7 +181,9 @@ void RuntimeReset(void *record) {
   const RecordState *state = PeekOf(record);
   if (state == nullptr) { return; }
   TempHandle keep = state->temporary;
+  const auto version = state->ObservedVersion();
   handle->Forget();
+  if (version != 0) { handle->Ensure().ObserveVersion(version); }
   if (keep != nullptr) { StateOf(record)->temporary = std::move(keep); }
 }
 

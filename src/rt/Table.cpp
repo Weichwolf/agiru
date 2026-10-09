@@ -50,6 +50,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -62,6 +63,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -687,6 +689,7 @@ bool TakePlatformOwned(void *record,
       throw Error("Storage: returned platform field count does not match the declaration");
     }
     SetFieldText(record, def, Required((*owned)[column], def));
+    ObserveSqlVersion(record, def, Required((*owned)[column], def));
     ++column;
   }
   return true;
@@ -702,7 +705,13 @@ bool RuntimeModify(void *record, const TableDef &table) {
   RequireWrite();
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
-  return TakePlatformOwned(record, table, ModifyRow(Session::Current().Database(), table, values));
+  const auto *state = reinterpret_cast<const StateHandle *>(record)->Peek();
+  return TakePlatformOwned(record,
+                           table,
+                           ModifyRow(Session::Current().Database(),
+                                     table,
+                                     values,
+                                     state == nullptr ? 0 : state->ObservedVersion()));
 }
 
 void RuntimeRequireWritableProvider(const void *record, const TableDef &table) {
@@ -723,8 +732,14 @@ bool RuntimeRename(void *record, const void *before, const TableDef &table) {
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
   const FieldValues oldKey = KeyOf(before, table);
-  if (!TakePlatformOwned(
-          record, table, RenameRow(Session::Current().Database(), table, values, oldKey))) {
+  const auto *state = reinterpret_cast<const StateHandle *>(before)->Peek();
+  if (!TakePlatformOwned(record,
+                         table,
+                         RenameRow(Session::Current().Database(),
+                                   table,
+                                   values,
+                                   oldKey,
+                                   state == nullptr ? 0 : state->ObservedVersion()))) {
     return false;
   }
   CascadeRename(record, before, table);
@@ -738,7 +753,9 @@ bool RuntimeDelete(const void *record, const TableDef &table) {
 
   RequireWrite();
   const FieldValues key = KeyOf(record, table);
-  return DeleteRow(Session::Current().Database(), table, key);
+  const auto *state = reinterpret_cast<const StateHandle *>(record)->Peek();
+  return DeleteRow(
+      Session::Current().Database(), table, key, state == nullptr ? 0 : state->ObservedVersion());
 }
 
 namespace {
@@ -748,10 +765,21 @@ void LoadRow(void *record, const TableDef &table, const FieldValues &row) {
   for (const FieldDef &def : table.fields) {
     if (!Stored(def)) { continue; }
     SetFieldText(record, def, Required(row[column], def));
+    ObserveSqlVersion(record, def, Required(row[column], def));
     ++column;
   }
 }
 
+}
+
+void ObserveSqlVersion(void *record, const FieldDef &field, std::string_view value) {
+  if (!field.sqlTimestamp) { return; }
+  std::int64_t version = 0;
+  const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), version);
+  if (error != std::errc{} || end != value.data() + value.size() || version <= 0) {
+    throw Error("Storage: invalid observed rowversion", "RecordVersion");
+  }
+  reinterpret_cast<StateHandle *>(record)->Ensure().ObserveVersion(version);
 }
 
 std::string RecordKeyText(const void *record, const TableDef &table) {
