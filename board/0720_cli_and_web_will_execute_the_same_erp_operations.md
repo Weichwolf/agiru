@@ -55,7 +55,8 @@ envelope as the agent library. This is native HTML/transport fixture qualificati
 not original ERP SQL proof. Four affected C++ units pass targeted clang-tidy, zero
 failures; not FULL lint. The PageValue standalone header comparison is 326.6 ms before
 and 349.6 ms after (three no-PCH rounds each); no performance improvement is claimed.
-Fresh BrowserHttp/BrowserSession/SessionIdentity gates pass 37/61/75 checks. This does
+Fresh BrowserHttp/BrowserSession/SessionIdentity gates pass 37/61/75 checks after
+the complete native consumer rebuild. This does
 not qualify active-stack revocation/cancellation or cryptographic stolen-cookie binding.
 Page-level OptionCaption/ML overrides remain unqualified; no claim that sales/journal
 posting enforces the chosen block.
@@ -346,11 +347,14 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   deferred so upstream responses cannot weaken it; no subdomain/preload commitment.
   The official Debian Caddy requires the compatible header block, not the newer `>`
   shorthand; the real TLS test rejected its missing header before correction.
-  Fresh 2026-10-09 `make browser-https-test JOBS=2` passes nine protocol and eight
-  Chromium cases, including HSTS on shell/assets/grants/denials. `make web-test JOBS=2`
-  passes fourteen browser cases, the HTTP edge case and three compiled controls;
+  Fresh 2026-10-09 `make browser-https-test JOBS=2`, at 445ca73 after the native ABI
+  consumer rebuild, passes nine protocol and eight
+  Chromium cases, including HSTS on shell/assets/grants/denials; outer exit 0 and
+  unchanged input/binary hashes. The owned TLS container, native binaries/private
+  auth and test trust profile are removed. The earlier HSTS `make web-test JOBS=2`
+  passed fourteen browser cases, the HTTP edge case and three compiled controls;
   HTTP and forged `X-Forwarded-Proto: https` do not emit HSTS. Fresh container
-  `make browser-auth`, `make browser-sessions` and SessionIdentityGate retain
+  earlier `make browser-auth`, `make browser-sessions` and SessionIdentityGate retained
   317, 61 plus one provider, and 75 passing checks; eighteen security defects reject.
   HSTS follows [OWASP session transport guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
   and [Caddy headers](https://caddyserver.com/docs/caddyfile/directives/header),
