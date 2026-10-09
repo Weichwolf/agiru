@@ -274,6 +274,46 @@ test("malformed HTTPS session grants never fall back to bearer ERP requests", as
   } finally { await isolated.close(); }
 });
 
+async function cancelled(interaction, pageHandle) {
+  const deadline = Date.now() + 5000;
+  while (await sql(`SELECT outcome FROM agiru_client.page_commands WHERE handle='${pageHandle}' AND command_id='${interaction.originCommand}'`) !== "failed") {
+    assert.ok(Date.now() < deadline, "active cancellation must finish before the thirty-second dialog timeout");
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  assert.equal(await sql(`SELECT invalidated FROM agiru_client.page_contexts WHERE handle='${pageHandle}'`), "t");
+  if (interaction.state === "modal") {
+    assert.equal(await sql(`SELECT active FROM agiru_client.page_modals WHERE handle='${interaction.dialog}'`), "f");
+  } else {
+    assert.equal(await sql(`SELECT closed::text||':'||(answer IS NULL)::text FROM agiru_client.page_dialogs WHERE handle='${interaction.dialog}'`), "true:true");
+  }
+}
+
+for (const [action, state, committed] of [["ConfirmWrite", "confirm", false],
+  ["CommittedConfirm", "confirm", true], ["ModalNested", "modal", false]]) {
+  test(`HTTPS browser logout cancels suspended ${action} and preserves only earlier commits`, async () => {
+    const isolated = await browser.newContext();
+    const tab = await isolated.newPage();
+    track(tab);
+    try {
+      const fresh = await open(tab, "/?page=50347&mode=Edit", auth.authorization.slice(7));
+      const before = BigInt(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'));
+      const writes = BigInt(await sql("SELECT count(*) FROM ui_writes"));
+      const question = await browserAction(tab, origin, fresh, action);
+      assert.equal(question.page.interaction.state, state);
+      const expected = String(before + (committed ? 10n : 0n));
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), expected);
+      await tab.locator("#logout").click();
+      await tab.waitForFunction(() => document.querySelector("#status").textContent.startsWith("Signed out"));
+      await cancelled(question.page.interaction, fresh.handle);
+      assert.deepEqual(await isolated.cookies(origin), []);
+      assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), expected);
+      assert.equal(await sql("SELECT count(*) FROM ui_writes"), String(writes + (committed ? 1n : 0n)));
+      const peer = await agent.read("/?page=50347&mode=Edit");
+      assert.equal(field(peer.page, "Value"), expected, "same-user agent authority is not revoked by browser logout");
+    } finally { await isolated.close(); }
+  });
+}
+
 test("expiry at an unanswered AL question retains the original command without consent or retry", async () => {
   current = await open(page, "/?page=50347&mode=Edit", auth.authorization.slice(7));
   const before = await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1');
@@ -283,9 +323,8 @@ test("expiry at an unanswered AL question retains the original command without c
   const original = question.page.interaction.originCommand;
   const choice = question.page.controls[1];
   assert.notEqual(choice.operation.command, original);
+  assert.equal(await sql(`SELECT closed FROM agiru_client.page_dialogs WHERE handle='${question.page.interaction.dialog}'`), "f");
   await sql("UPDATE agiru_client.browser_sessions SET idle_expires_at=clock_timestamp()-interval '1 second' WHERE revoked_at IS NULL");
-  assert.equal(await sql(`SELECT closed FROM agiru_client.page_dialogs WHERE handle='${question.page.interaction.dialog}'`), "f",
-    "the session expires while AL still waits, not after its timeout");
   const count = requests.length;
   const refused = page.waitForResponse(response => response.url() === `${origin}/answers`);
   const escaped = await page.evaluate(value => CSS.escape(value), choice.identity);
@@ -294,11 +333,7 @@ test("expiry at an unanswered AL question retains the original command without c
   await page.waitForFunction(command => document.querySelector("#status").textContent.includes(`reconcile command ${command}`), original);
   assert.equal(await page.locator("#workspace article").count(), 0);
   assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
-  const deadline = Date.now() + 35000;
-  while (await sql(`SELECT closed FROM agiru_client.page_dialogs WHERE handle='${question.page.interaction.dialog}'`) !== "t") {
-    assert.ok(Date.now() < deadline, "the unanswered native dialog times out without default consent");
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
+  await cancelled(question.page.interaction, current.handle);
   assert.equal(await sql("SELECT count(*) FROM ui_writes"), writes);
   assert.equal(await sql('SELECT "Value" FROM "Navigation Row" WHERE "ID"=1'), before);
   assert.equal(requests.slice(count).filter(request => request.method() === "POST").length, 1);

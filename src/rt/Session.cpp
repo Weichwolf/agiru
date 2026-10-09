@@ -1,11 +1,8 @@
 #include "runtime/Session.h"
 
-#include "meta/TableDef.h"
-#include "platform/User.h"
 #include "runtime/Database.h"
 #include "runtime/Events.h"
 #include "runtime/SessionOptions.h"
-#include "runtime/Table.h"
 #include "runtime/TablePermissions.h"
 #include "runtime/Transaction.h"
 #include "type/Date.h"
@@ -14,13 +11,10 @@
 #include "type/Integer.h"
 #include "type/Language.h"
 
-#include "Rows.h"
 #include "SessionState.h"
+#include "SessionUser.h"
 
-#include <array>
-#include <cstddef>
 #include <memory>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -56,20 +50,7 @@ Session::Session(const Guid &authenticatedUser, SessionOptions options)
 }
 
 void Session::ResolveUser(const Guid &authenticatedUser) {
-  if (authenticatedUser.IsNull()) { throw SessionError("session user is not active"); }
-  platform::User user;
-  const auto &table = platform::kUserTable;
-  const std::array<std::optional<std::string>, 1> key{authenticatedUser.ToStorageText()};
-  const auto row = GetRow(Database(), table, key);
-  if (!row) { throw SessionError("session user is not active"); }
-  std::size_t column = 0;
-  for (const auto &field : table.fields) {
-    if (Stored(field)) { detail::SetFieldText(&user, field, Required((*row)[column++], field)); }
-  }
-  if (user.UserName.Value().empty() || user.State != platform::UserState::Enabled ||
-      (!user.ExpiryDate.IsUndefined() && user.ExpiryDate <= CurrentDateTime())) {
-    throw SessionError("session user is not active");
-  }
+  const auto user = detail::RequireActiveUser(Database(), authenticatedUser);
   userSecurityId_ = user.UserSecurityID;
   userId_ = user.UserName.Value();
 }

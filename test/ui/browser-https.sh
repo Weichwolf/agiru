@@ -23,6 +23,8 @@ df -h /tmp > "$proof/space.txt"
 git rev-parse HEAD > "$proof/head"
 sha256sum Makefile deploy/dev/{Caddyfile,Containerfile,entrypoint.sh,agiru.json} \
   src/rt/BrowserHttp.{h,cpp} src/rt/BrowserSession.cpp src/net/{HttpServer,SecureToken}.cpp \
+  src/rt/{CommandAuthority,PageCallAuthority,SessionUser,PageInteraction,PageModal}.{h,cpp} \
+  src/rt/{PageCommandHost,Session,SessionCommand,Transaction}.cpp src/rt/SessionState.h \
   test/gate/BrowserHttpGate.cpp test/ui/browser-https.{sh,mjs} test/ui/browser-page-https.mjs \
   test/ui/trusted-chromium.sh test/ui/page-host/Runner.cpp test/ui/server-config.mjs \
   src/client/*.{mts,json} src/client/web/* build/web/* > "$proof/inputs.sha256"

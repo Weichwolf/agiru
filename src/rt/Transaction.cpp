@@ -9,6 +9,8 @@
 #include "type/CommitBehavior.h"
 #include "type/TransactionType.h"
 
+#include "CommandAuthority.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -101,6 +103,7 @@ void Boundaries::Write(const Connection &connection) {
 }
 
 void Boundaries::Commit(const Connection &connection) {
+  detail::LockCommandCommit(connection);
   if (isolationFloor_ > names_.size()) { throw Error(kLostIsolation); }
   if (connection.InFailedTransaction()) { throw Error(kFailedCommit); }
   if (!inconsistent_.empty()) {

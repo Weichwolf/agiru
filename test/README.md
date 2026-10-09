@@ -43,6 +43,14 @@ checks; RFC 4231 MAC vectors, provider failure and secret-free SQL statement/row
 are checked independently. Disposable databases and private secrets are removed.
 This is a storage gate, not live HTTPS cookies, browser login or SaaS acceptance (0720).
 
+`make page-call-authority JOBS=2` checks active bearer/browser authority independently
+of pending ERP writes. Expiry, revocation and account disablement refuse explicit and
+implicit commits; suspended questions abort without consent and preserve earlier commits.
+SQL locks order concurrent revocation against an authorized commit; pending self-account
+changes are not mistaken for committed revocation. Seven compiled defects
+must fail named checks. Cancellation covers UI waits and commit checkpoints, not arbitrary
+CPU/blocked-SQL preemption or stolen-cookie device binding.
+
 `make browser-auth JOBS=2` checks the native cookie/CSRF adapter and production page
 front door; nine compiled transport/retention/configuration defects must reject.
 `make browser-https-test` exercises real Caddy TLS, private libmicrohttpd and PostgreSQL
@@ -50,6 +58,8 @@ in one disposable container with an external protocol client and independent SQL
 Actual Chromium exercises the htmx cookie client; external CMD/MCP retain the same
 exact generated-list values. Independent SQL checks Validate/Save/replay, passive
 bootstrap, tab isolation, logout and expiry during an unanswered AL question.
+Logout also aborts suspended questions/modals; independent SQL checks rollback, preserved
+prior Commit, closed dialogs, failed original receipts and unaffected same-user agent access.
 Malformed grants must refuse without bearer fallback or AL execution. The private CA
 is explicitly trusted in an isolated profile after an actual browser rejection, never
 bypassed. Protocol probes retain metadata/origin denials, rotation and source expiry.

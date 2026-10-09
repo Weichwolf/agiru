@@ -47,6 +47,10 @@ void InstallPageCommandHost(const Connection &connection);
 /// Request-local connections are released after each command. Private AL pages remain bounded
 /// in this process; PostgreSQL owns user/company/credential identity, expiry, fencing and outcomes.
 /// Separate credentials for one user cannot share page/call/dialog/receipt handles.
+/// Suspended questions/modals recheck SQL authority every 250 ms; expired/revoked clients
+/// abort without consent. Commit checkpoints fence pending writes against revocation;
+/// earlier production Commits remain durable. Cancellation is cooperative, not arbitrary
+/// preemption of computation or blocked SQL.
 /// A host restart refuses old handles rather than fabricating recovered AL state. This initial
 /// single-company adapter exposes HTTPS development-credential exchange, not password login.
 /// It does not implement company schema routing,

@@ -291,8 +291,7 @@ private:
 
   std::shared_ptr<PageModalInput> Wait(std::chrono::steady_clock::time_point deadline) {
     std::unique_lock lock(call_->mutex);
-    if (!call_->ready.wait_until(
-            lock, deadline, [&] { return call_->cancelled || modal_->input; }) ||
+    if (!WaitForPageInteraction(*call_, lock, deadline, [&] { return modal_->input != nullptr; }) ||
         call_->cancelled) {
       Refuse("UiDialogCancelled");
     }

@@ -11,6 +11,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <exception>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -46,6 +47,7 @@ struct PageCall {
   std::string pageHandle;
   std::string host;
   std::string csrf;
+  std::string browserCsrf;
   std::string credential;
   Guid user;
   PageId page;
@@ -66,6 +68,10 @@ struct PageCall {
 };
 
 void InstallPageDialogs(const Connection &connection);
+bool WaitForPageInteraction(PageCall &call,
+                            std::unique_lock<std::mutex> &lock,
+                            std::chrono::steady_clock::time_point deadline,
+                            const std::function<bool()> &ready);
 std::unique_ptr<UiHost> MakePageUiHost(const std::shared_ptr<PageCall> &call,
                                        const PageHostOptions &options,
                                        const PageHostAuthorization &authorization);

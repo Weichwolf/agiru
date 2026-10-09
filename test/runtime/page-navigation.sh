@@ -34,6 +34,7 @@ sha256sum src/rt/PageDispatcher.cpp include/runtime/PageDispatcher.h include/run
   src/rt/BrowserHttp.{h,cpp} include/runtime/{BrowserSession,BrowserSessionOptions}.h src/rt/BrowserSession.cpp \
   src/rt/PageInteraction.{h,cpp} include/runtime/UiHost.h src/rt/UiHost.cpp \
   src/rt/PageModal.{h,cpp} \
+  src/rt/{CommandAuthority,PageCallAuthority,SessionUser}.{h,cpp} src/rt/SessionState.h \
   include/runtime/PermissionSetRegistry.h src/rt/PermissionSetRegistry.cpp \
   include/runtime/NativeService.h src/rt/{NativeService,NativeServiceConfig}.cpp deploy/dev/agiru.json \
   src/cli/{Main,Services}.cpp src/cli/Services.h \

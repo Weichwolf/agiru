@@ -22,11 +22,13 @@ class UiHost;
 namespace agiru::detail {
 
 class RecordChanges;
+class CommandAuthority;
 
 struct SessionState {
   SessionState();
   ~SessionState();
   std::atomic_flag commandActive = ATOMIC_FLAG_INIT;
+  CommandAuthority *commandAuthority = nullptr;
   std::unique_ptr<UiHost> uiHost;
   std::string applicationArea;
   std::unique_ptr<SessionRandom> random;

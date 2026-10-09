@@ -24,7 +24,9 @@
 #include "type/Utf8.h"
 
 #include "BrowserHttp.h"
+#include "CommandAuthority.h"
 #include "HtmlText.h"
+#include "PageCallAuthority.h"
 #include "PageInteraction.h"
 #include "PageListHtml.h"
 #include "PageModal.h"
@@ -692,6 +694,7 @@ struct PageCommandHost::Impl {
     const std::lock_guard lock(context->mutex);
     try {
       InstallUiHost(context->session, detail::MakePageUiHost(call, options, authorize));
+      const detail::PageCallAuthority authority(context->session, call, options);
       SessionCommand command(context->session, connection);
       context->page = MakeInstalledPage(PageId{static_cast<std::int32_t>(number)});
       const auto mode = Mode(context->page->Declaration(), Get(values, "mode"));
@@ -753,6 +756,7 @@ struct PageCommandHost::Impl {
     call->pageHandle = context->handle;
     call->host = host;
     call->csrf = context->csrf;
+    call->browserCsrf = browserCsrf;
     call->deadline = context->deadline;
     call->user = client.user;
     call->credential = client.verifier;
@@ -1090,6 +1094,7 @@ struct PageCommandHost::Impl {
         started);
     try {
       InstallUiHost(context->session, detail::MakePageUiHost(call, options, authorize));
+      const detail::PageCallAuthority authority(context->session, call, options);
       SessionCommand command(context->session, connection);
       Ownership(connection, *context, client);
       Execute(*context, values);
@@ -1118,6 +1123,7 @@ struct PageCommandHost::Impl {
                      "= $4::integer "
                      "WHERE handle = $1 AND command_id = $2",
                      completed);
+      detail::LockCommandCommit(connection);
       detail::RenewPageClient(connection, client, request.Header("X-Agiru-CSRF"));
       command.Keep();
       return result;
@@ -1173,6 +1179,7 @@ struct PageCommandHost::Impl {
       call->pageHandle = context->handle;
       call->host = host;
       call->csrf = context->csrf;
+      call->browserCsrf = request.Header("X-Agiru-CSRF");
       call->deadline = context->deadline;
       call->user = client.user;
       call->credential = client.verifier;

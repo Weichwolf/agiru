@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing generated page declarations, typed record/session primitives
 and database access, not full 0058 acceptance. Include client/workflow-blocking runtime
 repairs in coherent client increments; preserve existing tests and counted UT failures.
-Next: qualify active-stack expiry/revocation
+Next: complete shared-client regressions for active-call expiry/revocation
 cancellation, then expand invalid/duplicate/lookup/dimension and vendor/item/setup
 processes under 0727.
 Production enum declarations are regenerated; source-origin and slice checks pass.
@@ -56,8 +56,9 @@ not original ERP SQL proof. Four affected C++ units pass targeted clang-tidy, ze
 failures; not FULL lint. The PageValue standalone header comparison is 326.6 ms before
 and 349.6 ms after (three no-PCH rounds each); no performance improvement is claimed.
 Fresh BrowserHttp/BrowserSession/SessionIdentity gates pass 37/61/75 checks after
-the complete native consumer rebuild. This does
-not qualify active-stack revocation/cancellation or cryptographic stolen-cookie binding.
+the complete native consumer rebuild. Active-call UI/commit cancellation is qualified
+below; next-statement/blocked-SQL cancellation and cryptographic stolen-cookie binding
+remain unqualified.
 Page-level OptionCaption/ML overrides remain unqualified; no claim that sales/journal
 posting enforces the chosen block.
 The declaration-order prerequisite is implemented in `src/gen/EnumWriter.cpp`:
@@ -281,8 +282,10 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   invalidated without deleting command evidence. The earlier pre-cookie
   `make page-host-test JOBS=2` run passed 170/170 regular cases (38 fixture, 44 native
   for each of limits 40/7/80), without skips or cancellations; all 22 compiled defects
-  rejected and input hashes remained unchanged. The current cookie-enabled matrix is
-  red at the retained timeout below; this historical run is not current acceptance.
+  rejected and input hashes remained unchanged. That historical acceptance is retained
+  at e2d7a5f. The active-call increment's matrix retry is pending: its earlier attempt
+  completed 38 fixture/44 native cases, then ended with SIGTERM/143 and early auth-file
+  cleanup. This interrupted run is not acceptance; its owned service/database were removed.
   Independent SQL proves same-user read/write/replay/poll/question/modal/receipt denial
   without additional effects. Eight affected C++ consumers pass targeted clang-tidy.
 - Local contracts at developer revision `f928288ee840334be73142e5fc0202c0e19b246d`:
@@ -313,8 +316,8 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   `deploy/dev/agiru.json`; activation on HTTP refuses. Development defaults stay disabled.
   Same-origin bootstrap is passive; rotation/logout commit before issuing/deleting cookies.
   Fresh operations request idle renewal; actual cookie-mode SQL tests prove passive
-  bootstrap and command replay do not renew it. Active-stack revocation/cancellation
-  remains unqualified; expiry denies answers and unanswered AL follows its own timeout.
+  bootstrap and command replay do not renew it. Active UI waits and commit checkpoints
+  now recheck authority below; arbitrary CPU/blocked-SQL cancellation remains unqualified.
   `make browser-auth JOBS=2`: 37 protocol/front-door and 280 configuration checks,
   zero red; nine compiled CSRF/metadata/proxy/origin/cookie/retention/HTTPS-policy
   defects reject. Eleven affected compiled C++ units pass targeted clang-tidy.
@@ -325,12 +328,16 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   PostgreSQL together in a disposable container, with external Node and Chromium clients.
   All nine TLS/cookie/CSRF/rotation/logout/source-expiry cases pass without disabling
   certificate verification; an untrusted CA is rejected. Forged forwarding headers are
-  replaced and denials leave independent SQL probe effects unchanged. Eight actual
+  replaced and denials leave independent SQL probe effects unchanged. Eleven actual
   Chromium cases prove cookie adoption/no retained bearer, exact CMD/MCP list values,
   Validate/Save/GET-followed replay SQL effects, independent tab state, durable logout,
   malformed-grant refusal without bearer fallback, and expiry while AL still awaits
-  an explicit answer. The original command ID survives client reset; no automatic
-  answer/retry or additional SQL write occurs. This is generated-page transport proof,
+  an explicit answer. Logout now cancels suspended ConfirmWrite, CommittedConfirm and
+  ModalNested before the thirty-second dialog timeout. Independent SQL proves closed
+  unanswered dialogs/modals, failed original receipts, pending-write rollback, preserved
+  earlier Commit and unaffected same-user agent authority. The original command ID
+  survives expiry reset; no automatic answer/retry or additional SQL write occurs.
+  This is generated-page transport proof,
   not full business workflows or SaaS acceptance. Fixture Runner passes targeted
   clang-tidy with zero failures.
   Existing regressions: `make web-test` passes 14 Chromium cases and one Caddy case;
@@ -343,6 +350,32 @@ BC capture can proceed while client construction is underway. Keep one WI in pro
   profile mounted only in the test process namespace. Personal trust remains unchanged;
   [Chromium Linux certificate management](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/cert_management.md)
   consulted 2026-10-08. No certificate bypass or disposable-receipt WI dependency.
+- Active-call authority: `make page-call-authority JOBS=2` passes **75/75** checks;
+  seven compiled expiry/idle/sticky/commit/wait/serialization/own-account defects reject.
+  One private guard binds each AL activation to its user, credential/browser verifier,
+  CSRF, page, host and company. PostgreSQL rechecks run independently of pending ERP
+  changes; questions/modals poll every 250 ms without accepting defaults. A sticky
+  cancellation cannot be swallowed into a later explicit/implicit commit. Commit-time
+  User/credential/browser/context row locks order concurrent revocation; the gate proves
+  the actual SQL lock wait, not connection-start latency. Earlier commits remain durable.
+  Pending self-account changes are not mistaken for committed external disablement;
+  once committed, disablement refuses later commits. This is a primitive gate, not
+  original User Card workflow acceptance or arbitrary CPU/blocked-SQL preemption.
+  Native `make all` exits 0; the latest increment takes 11 seconds and retains all 1846
+  unlinked refusals. Nine changed C++ units pass targeted clang-tidy, no suppressions;
+  full lint, UT and complete AL execution are not qualified by these runs.
+  Existing identity/command/transaction/durability/browser gates pass
+  75/49/12/110/19/61 checks. Sources: `src/rt/{CommandAuthority,PageCallAuthority,
+  SessionUser,PageInteraction,PageModal}.{h,cpp}`, `src/rt/{PageCommandHost,Session,
+  Transaction}.cpp`, `test/gate/PageCallAuthorityGate.cpp`,
+  `test/runtime/page-call-authority.sh`, `test/ui/browser-page-https.mjs`.
+  Contracts at the pinned revisions above: developer
+  `developer/methods-auto/session/session-stopsession-method.md`,
+  `developer/methods-auto/database/database-commit-method.md` and
+  `administration/understanding-session-timeouts.md`; BCApps
+  `Modules/System/User/{UserCard.Page,User.Codeunit}.al` and
+  `System Application/App/User Permissions/src/UserPermissionsImpl.Codeunit.al`;
+  user `business-central/ui-how-users-permissions.md`; predecessor 1730/1775.
 - HSTS: `deploy/dev/Caddyfile` sets `max-age=31536000` only for actual HTTPS,
   deferred so upstream responses cannot weaken it; no subdomain/preload commitment.
   The official Debian Caddy requires the compatible header block, not the newer `>`

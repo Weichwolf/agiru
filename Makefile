@@ -28,6 +28,11 @@ export CCACHE_SLOPPINESS
 .PHONY: product-pages
 .PHONY: browser-sessions
 .PHONY: browser-auth browser-https-test
+.PHONY: page-call-authority
+
+page-call-authority: comments db ## qualify active client cancellation, rollback and serialized commit fences
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_PageCallAuthorityGate
+	@B="$(B)" bash "$(SELF)/test/runtime/page-call-authority.sh"
 
 browser-auth: comments db ## qualify native browser authentication protocol and compiled denial defects
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_BrowserHttpGate gate_NativeServiceConfigGate

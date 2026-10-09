@@ -11,6 +11,7 @@
 #include "type/Integer.h"
 #include "type/Variant.h"
 
+#include "CommandAuthority.h"
 #include "HtmlText.h"
 #include "PageModal.h"
 
@@ -19,6 +20,8 @@
 #include <charconv>
 #include <chrono>
 #include <cstddef>
+#include <exception>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -219,13 +222,18 @@ private:
     call->ready.notify_all();
     const auto deadline =
         std::min(call->deadline, std::chrono::steady_clock::now() + options_.dialogTimeout);
-    const bool answered = call->ready.wait_until(
-        lock, deadline, [&] { return call->cancelled || held->answer.has_value(); });
+    bool answered = false;
+    std::exception_ptr failure;
+    try {
+      answered =
+          WaitForPageInteraction(*call, lock, deadline, [&] { return held->answer.has_value(); });
+    } catch (...) { failure = std::current_exception(); }
     const auto answer = held->answer;
     const bool cancelled = call->cancelled;
     call->question.reset();
     lock.unlock();
     CloseQuestion(options_, *held);
+    if (failure) { std::rethrow_exception(failure); }
     if (!answered || cancelled || !answer) { Refuse("UiDialogCancelled"); }
     return *answer;
   }
@@ -246,6 +254,28 @@ std::string ModalPollAttributes(const PageCall &call) {
   return {};
 }
 
+}
+
+bool WaitForPageInteraction(PageCall &call,
+                            std::unique_lock<std::mutex> &lock,
+                            std::chrono::steady_clock::time_point deadline,
+                            const std::function<bool()> &ready) {
+  constexpr auto kAuthorityPoll = std::chrono::milliseconds(250);
+  for (;;) {
+    lock.unlock();
+    try {
+      CheckCommandAuthority();
+    } catch (...) {
+      lock.lock();
+      throw;
+    }
+    lock.lock();
+    if (call.cancelled) { return false; }
+    if (ready()) { return true; }
+    if (std::chrono::steady_clock::now() >= deadline) { return false; }
+    call.ready.wait_until(lock,
+                          std::min(deadline, std::chrono::steady_clock::now() + kAuthorityPoll));
+  }
 }
 
 void InstallPageDialogs(const Connection &connection) {
